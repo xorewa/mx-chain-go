@@ -7,6 +7,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	logger "github.com/multiversx/mx-chain-logger-go"
+	builtInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/config"
@@ -188,6 +189,13 @@ func (handler *enableEpochsHandler) createAllFlagsMap() {
 			},
 			activationEpoch:     handler.enableEpochsConfig.ESDTEnableEpoch,
 			activationEpochName: "ESDTEnableEpoch",
+		},
+		builtInFunctions.DRWAEnforcementFlag: {
+			isActiveInEpoch: func(epoch uint32) bool {
+				return epoch >= handler.enableEpochsConfig.DRWAEnforcementEnableEpoch
+			},
+			activationEpoch:     handler.enableEpochsConfig.DRWAEnforcementEnableEpoch,
+			activationEpochName: "DRWAEnforcementEnableEpoch",
 		},
 		common.ESDTFlagInSpecificEpochOnly: {
 			isActiveInEpoch: func(epoch uint32) bool {

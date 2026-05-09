@@ -3,6 +3,8 @@ package hooks
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"path"
@@ -42,6 +44,13 @@ var log = logger.GetOrCreate("process/smartcontract/blockchainhook")
 
 const defaultCompiledSCPath = "compiledSCStorage"
 const executeDurationAlarmThreshold = time.Duration(50) * time.Millisecond
+
+const (
+	drwaNativeGovernanceQueryConfig uint32 = iota
+	drwaNativeGovernanceQueryProposal
+	drwaNativeGovernanceQueryAuditRecord
+	drwaNativeGovernanceQueryRecoveryLastBlock
+)
 
 // ArgBlockChainHook represents the arguments structure for the blockchain hook
 type ArgBlockChainHook struct {
@@ -157,18 +166,31 @@ func NewBlockChainHookImpl(
 }
 
 func createMapActivationEpochs(enableEpochs *config.EnableEpochs) map[uint32]struct{} {
+	mapActivationEpoch, skippedFields := collectActivationEpochs(enableEpochs)
+	for _, fieldName := range skippedFields {
+		log.Warn("createMapActivationEpochs: skipping non-uint32 enable epoch field", "field", fieldName)
+	}
+
+	return mapActivationEpoch
+}
+
+func collectActivationEpochs(enableEpochs *config.EnableEpochs) (map[uint32]struct{}, []string) {
 	mapActivationEpoch := make(map[uint32]struct{})
+	skippedFields := make([]string, 0)
 
 	reflectVal := reflect.ValueOf(enableEpochs).Elem()
+	reflectType := reflectVal.Type()
 	for i := 0; i < reflectVal.NumField(); i++ {
 		f := reflectVal.Field(i)
 		epoch, ok := f.Interface().(uint32)
 		if !ok {
+			skippedFields = append(skippedFields, reflectType.Field(i).Name)
 			continue
 		}
 		mapActivationEpoch[epoch] = struct{}{}
 	}
-	return mapActivationEpoch
+
+	return mapActivationEpoch, skippedFields
 }
 
 func checkForNil(args ArgBlockChainHook) error {
@@ -303,12 +325,14 @@ func (bh *BlockChainHookImpl) GetStorageData(accountAddress []byte, index []byte
 		messages = append(messages, err)
 
 		bh.syncIfMissingDataTrieNode(err)
+		if errors.Is(err, state.ErrNilTrie) {
+			log.Trace("GetStorageData treating nil trie as empty storage", messages...)
+			return make([]byte, 0), 0, nil
+		}
 	}
 	log.Trace("GetStorageData ", messages...)
 
-	// returning nil here ensures backwards compatibility as the error wasn't taken into account by the previous versions
-	// of the vm. Now, the VM take into account this error so the processMaxReadsCounters call can stop the execution of the contract
-	return value, trieDepth, nil
+	return value, trieDepth, err
 }
 
 func (bh *BlockChainHookImpl) syncIfMissingDataTrieNode(err error) {
@@ -496,6 +520,157 @@ func (bh *BlockChainHookImpl) CurrentRound() uint64 {
 	defer bh.mutCurrentHdr.RUnlock()
 
 	return bh.currentHdr.GetRound()
+}
+
+// ApplyDRWASyncEnvelopeBytes applies a DRWA sync batch atomically from an encoded envelope payload.
+func (bh *BlockChainHookImpl) ApplyDRWASyncEnvelopeBytes(payload []byte, callerAddress []byte) error {
+	envelope, err := decodeDRWASyncEnvelope(payload)
+	if err != nil {
+		return err
+	}
+	if len(callerAddress) != drwaAuthorizedCallerAddressLen {
+		recordDRWAMetric(drwaMetricAuthorizedCallerMalformed)
+		return errors.New(drwaSyncRejectUnauthorizedCaller)
+	}
+	if bytes.Equal(callerAddress, make([]byte, drwaAuthorizedCallerAddressLen)) {
+		recordDRWAMetric(drwaMetricAuthorizedCallerMalformed)
+		return errors.New(drwaSyncRejectUnauthorizedCaller)
+	}
+
+	adapter, err := newDRWAHookStateAdapter(bh.accounts)
+	if err != nil {
+		return err
+	}
+	adapter.nonceProvider = bh
+
+	_, err = applyDRWASyncEnvelope(
+		adapter,
+		envelope,
+		drwaSyncMaxOperations,
+		callerAddress,
+	)
+
+	return err
+}
+
+// GetDRWAGovernanceConfig returns the native DRWA governance configuration stored for a token.
+func (bh *BlockChainHookImpl) GetDRWAGovernanceConfig(tokenID string) (*DRWAGovernanceConfig, error) {
+	store, err := newDRWAGovernanceTrieStore(bh.accounts)
+	if err != nil {
+		return nil, err
+	}
+
+	return store.GetGovernanceConfig(tokenID)
+}
+
+// GetDRWAGovernanceProposal returns a native DRWA recovery-governance proposal by its 32-byte ID.
+func (bh *BlockChainHookImpl) GetDRWAGovernanceProposal(proposalID []byte) (*DRWAGovernanceProposal, error) {
+	var proposalKey [32]byte
+	if len(proposalID) != len(proposalKey) {
+		return nil, errors.New("DRWA governance proposal ID must be 32 bytes")
+	}
+	copy(proposalKey[:], proposalID)
+
+	store, err := newDRWAGovernanceTrieStore(bh.accounts)
+	if err != nil {
+		return nil, err
+	}
+
+	return store.GetProposal(proposalKey)
+}
+
+// GetDRWAGovernanceAuditRecord returns the compact native DRWA governance audit record for an executed proposal.
+func (bh *BlockChainHookImpl) GetDRWAGovernanceAuditRecord(proposalID []byte) (*DRWAGovernanceAuditRecord, error) {
+	var proposalKey [32]byte
+	if len(proposalID) != len(proposalKey) {
+		return nil, errors.New("DRWA governance proposal ID must be 32 bytes")
+	}
+	copy(proposalKey[:], proposalID)
+
+	store, err := newDRWAGovernanceTrieStore(bh.accounts)
+	if err != nil {
+		return nil, err
+	}
+
+	return store.GetAuditRecord(proposalKey)
+}
+
+// GetDRWARecoveryLastBlock returns the last block nonce recorded for native recovery_admin writes on a token.
+func (bh *BlockChainHookImpl) GetDRWARecoveryLastBlock(tokenID string) (uint64, error) {
+	adapter, err := newDRWAHookStateAdapter(bh.accounts)
+	if err != nil {
+		return 0, err
+	}
+
+	return adapter.GetRecoveryLastBlock(tokenID)
+}
+
+// QueryDRWANativeGovernance exposes compact native DRWA governance reads to VM hooks.
+func (bh *BlockChainHookImpl) QueryDRWANativeGovernance(queryType uint32, key []byte) ([]byte, error) {
+	switch queryType {
+	case drwaNativeGovernanceQueryConfig:
+		config, err := bh.GetDRWAGovernanceConfig(string(key))
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(config)
+	case drwaNativeGovernanceQueryProposal:
+		proposal, err := bh.GetDRWAGovernanceProposal(key)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(proposal)
+	case drwaNativeGovernanceQueryAuditRecord:
+		auditRecord, err := bh.GetDRWAGovernanceAuditRecord(key)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(auditRecord)
+	case drwaNativeGovernanceQueryRecoveryLastBlock:
+		lastBlock, err := bh.GetDRWARecoveryLastBlock(string(key))
+		if err != nil {
+			return nil, err
+		}
+		encoded := make([]byte, 8)
+		binary.BigEndian.PutUint64(encoded, lastBlock)
+		return encoded, nil
+	default:
+		return nil, errors.New("unknown DRWA native governance query type")
+	}
+}
+
+// IsAuthorizedDRWASyncCaller returns true when the address matches a provisioned DRWA authorized caller.
+func (bh *BlockChainHookImpl) IsAuthorizedDRWASyncCaller(callerAddress []byte) bool {
+	if len(callerAddress) != drwaAuthorizedCallerAddressLen {
+		return false
+	}
+
+	adapter, err := newDRWAHookStateAdapter(bh.accounts)
+	if err != nil {
+		return false
+	}
+
+	for _, domain := range []string{
+		drwaSyncCallerAuthAdmin,
+		drwaSyncCallerPolicyRegistry,
+		drwaSyncCallerAssetManager,
+		drwaSyncCallerIdentityRegistry,
+		drwaSyncCallerAttestation,
+		drwaSyncCallerRecoveryAdmin,
+	} {
+		expectedAddress, readErr := adapter.GetAuthorizedCallerAddress(domain)
+		if readErr != nil {
+			return false
+		}
+		if len(expectedAddress) != drwaAuthorizedCallerAddressLen {
+			continue
+		}
+		if bytes.Equal(expectedAddress, callerAddress) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // CurrentTimeStamp return the timestamp from the current block
@@ -745,7 +920,7 @@ func (bh *BlockChainHookImpl) IsBuiltinFunctionName(functionName string) bool {
 // GetAllState returns the underlying state of a given account
 // TODO remove this func completely
 func (bh *BlockChainHookImpl) GetAllState(_ []byte) (map[string][]byte, error) {
-	return nil, nil
+	return nil, ErrNotImplemented
 }
 
 // GetESDTToken returns the unmarshalled esdt data for the given key

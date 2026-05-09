@@ -294,6 +294,74 @@ func TestPutEventsInTransactionSmartContractResults(t *testing.T) {
 	require.Equal(t, expectedSCRS, tx.SmartContractResults)
 }
 
+func TestPutEventsInTransactionSmartContractResultsForwardsEpochToParser(t *testing.T) {
+	t.Parallel()
+
+	testEpoch := uint32(9)
+	testRound := uint64(90)
+	testTxHash := []byte("txHash")
+	scrHash := []byte("scrHash1")
+	scr := &smartContractResult.SmartContractResult{
+		OriginalTxHash: testTxHash,
+		Value:          big.NewInt(0),
+	}
+
+	marshalizerMock := &mock.MarshalizerFake{}
+	dataStore := &storageStubs.ChainStorerStub{
+		GetStorerCalled: func(unitType dataRetriever.UnitType) (storage.Storer, error) {
+			switch unitType {
+			case dataRetriever.UnsignedTransactionUnit:
+				return &storageStubs.StorerStub{
+					GetFromEpochCalled: func(key []byte, epoch uint32) ([]byte, error) {
+						return marshalizerMock.Marshal(scr)
+					},
+				}, nil
+			default:
+				return genericMocks.NewStorerMock(), nil
+			}
+		},
+	}
+
+	historyRepo := &dbLookupExtMock.HistoryRepositoryStub{
+		GetEventsHashesByTxHashCalled: func(hash []byte, epoch uint32) (*dblookupext.ResultsHashesByTxHash, error) {
+			return &dblookupext.ResultsHashesByTxHash{
+				ScResultsHashesAndEpoch: []*dblookupext.ScResultsHashesAndEpoch{
+					{
+						Epoch:           testEpoch,
+						ScResultsHashes: [][]byte{scrHash},
+					},
+				},
+			}, nil
+		},
+	}
+
+	var capturedEpoch uint32
+	dataFieldParser := &testscommon.DataFieldParserStub{
+		ParseCalled: func(dataField []byte, sender, receiver []byte, _ uint32, epoch uint32) *datafield.ResponseParseData {
+			capturedEpoch = epoch
+			return &datafield.ResponseParseData{}
+		},
+	}
+
+	pubKeyConverter := &testscommon.PubkeyConverterMock{}
+	logsFacade := &testscommon.LogsFacadeStub{}
+	shardCoordinator := mock.NewOneShardCoordinatorMock()
+	txUnmarshalerAndPreparer := newTransactionUnmarshaller(
+		marshalizerMock,
+		pubKeyConverter,
+		dataFieldParser,
+		shardCoordinator,
+		&enableEpochsHandlerMock.EnableEpochsHandlerStub{},
+	)
+	enableRoundsHandler := &testscommon.EnableRoundsHandlerStub{}
+	n := newAPITransactionResultProcessor(pubKeyConverter, historyRepo, dataStore, marshalizerMock, txUnmarshalerAndPreparer, logsFacade, shardCoordinator, dataFieldParser, enableRoundsHandler)
+
+	tx := &transaction.ApiTransactionResult{}
+	err := n.putResultsInTransaction(testTxHash, tx, testEpoch, testRound)
+	require.NoError(t, err)
+	require.Equal(t, testEpoch, capturedEpoch)
+}
+
 func TestPutLogsInTransaction(t *testing.T) {
 	t.Parallel()
 

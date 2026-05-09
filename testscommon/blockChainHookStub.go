@@ -31,6 +31,9 @@ type BlockChainHookStub struct {
 	EpochStartBlockRoundCalled              func() uint64
 	EpochStartBlockTimeStampMsCalled        func() uint64
 	ProcessBuiltInFunctionCalled            func(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error)
+	ApplyDRWASyncEnvelopeBytesCalled        func(payload []byte, callerAddress []byte) error
+	QueryDRWANativeGovernanceCalled         func(queryType uint32, key []byte) ([]byte, error)
+	IsAuthorizedDRWASyncCallerCalled        func(callerAddress []byte) bool
 	GetBuiltinFunctionNamesCalled           func() vmcommon.FunctionNames
 	GetBuiltinFunctionsContainerCalled      func() vmcommon.BuiltInFunctionContainer
 	GetAllStateCalled                       func(address []byte) (map[string][]byte, error)
@@ -270,6 +273,33 @@ func (stub *BlockChainHookStub) ProcessBuiltInFunction(input *vmcommon.ContractC
 	}
 
 	return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok}, nil
+}
+
+// ApplyDRWASyncEnvelopeBytes -
+func (stub *BlockChainHookStub) ApplyDRWASyncEnvelopeBytes(payload []byte, callerAddress []byte) error {
+	if stub.ApplyDRWASyncEnvelopeBytesCalled != nil {
+		return stub.ApplyDRWASyncEnvelopeBytesCalled(payload, callerAddress)
+	}
+
+	return nil
+}
+
+// QueryDRWANativeGovernance -
+func (stub *BlockChainHookStub) QueryDRWANativeGovernance(queryType uint32, key []byte) ([]byte, error) {
+	if stub.QueryDRWANativeGovernanceCalled != nil {
+		return stub.QueryDRWANativeGovernanceCalled(queryType, key)
+	}
+
+	return nil, nil
+}
+
+// IsAuthorizedDRWASyncCaller -
+func (stub *BlockChainHookStub) IsAuthorizedDRWASyncCaller(callerAddress []byte) bool {
+	if stub.IsAuthorizedDRWASyncCallerCalled != nil {
+		return stub.IsAuthorizedDRWASyncCallerCalled(callerAddress)
+	}
+
+	return false
 }
 
 // SaveNFTMetaDataToSystemAccount -

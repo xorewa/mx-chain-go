@@ -68,6 +68,7 @@ type ArgsGenesisBlockCreator struct {
 	SystemSCConfig          config.SystemSmartContractsConfig
 	RoundConfig             config.RoundConfig
 	EpochConfig             config.EpochConfig
+	DRWAConfig              config.DRWAConfig
 	FeeSettings             config.FeeSettings
 	HeaderVersionConfigs    config.VersionsConfig
 	TxCacheSelectionConfig  config.TxCacheSelectionConfig

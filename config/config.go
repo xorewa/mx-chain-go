@@ -176,6 +176,23 @@ type HeartbeatV2Config struct {
 	PeerAuthenticationTimeBetweenChecksInSec         int64
 }
 
+// DRWAAuthorizedCallersConfig holds the configured native DRWA governance callers
+type DRWAAuthorizedCallersConfig struct {
+	AuthAdmin        string
+	PolicyRegistry   string
+	AssetManager     string
+	IdentityRegistry string
+	Attestation      string
+	RecoveryAdmin    string
+}
+
+// DRWAConfig holds native DRWA governance and enforcement configuration
+type DRWAConfig struct {
+	Enabled            bool
+	KeyManagementModel string
+	AuthorizedCallers  DRWAAuthorizedCallersConfig
+}
+
 // Config will hold the entire application configuration parameters
 type Config struct {
 	MiniBlocksStorage               StorageConfig
@@ -250,6 +267,7 @@ type Config struct {
 	HeartbeatV2          HeartbeatV2Config
 	ValidatorStatistics  ValidatorStatisticsConfig
 	GeneralSettings      GeneralSettingsConfig
+	DRWA                 DRWAConfig
 	Consensus            ConsensusConfig
 	StoragePruning       StoragePruningConfig
 	LogsAndEvents        LogsAndEventsConfig
