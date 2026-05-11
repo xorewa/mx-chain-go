@@ -60,6 +60,17 @@ const (
 	drwaMetricGovernanceUnauthorizedSigner = "governance_unauthorized_signer"
 	// M-14: fires on every successful `PruneProposal` call.
 	drwaMetricGovernanceProposalPruned = "governance_proposal_pruned"
+
+	// Dedicated counter for audit-record persistence failures during
+	// governance proposal execution. Distinct from
+	// drwaMetricSyncApplyFailure (which now strictly tracks failures of
+	// the state-mutating sync apply step). Operators monitoring for
+	// "did this proposal execute correctly?" check drwaMetricSyncApply
+	// Failure; operators monitoring for "is the audit trail intact?"
+	// check this counter. Conflating the two made it impossible to
+	// distinguish "state change failed" from "state change succeeded
+	// but audit record didn't persist".
+	drwaMetricGovernanceAuditFailure = "governance_audit_failure"
 )
 
 var (
@@ -461,10 +472,18 @@ func (e *DRWAGovernanceEngine) ExecuteRecoveryOperation(
 		Outcome:         "executed",
 	}
 	if auditErr := e.store.SaveAuditRecord(auditRecord); auditErr != nil {
-		// Emit as a metric on the sync layer (M-14 operational note)
-		// but do not fail the execute — the main state change is
-		// already in place.
-		recordDRWAMetric(drwaMetricSyncApplyFailure)
+		// Dedicated counter so audit-trail persistence failures are
+		// distinguishable from sync-apply (state-change) failures.
+		// The execute does not fail — the main state change is
+		// already in place — but the audit-trail break needs its own
+		// alertable signal because forensic chain-of-custody depends
+		// on it.
+		recordDRWAMetric(drwaMetricGovernanceAuditFailure)
+		log.Warn("DRWA governance audit record persist failed",
+			"proposal_id", proposal.ProposalID,
+			"envelope_hash", proposal.EnvelopeHash,
+			"executed_at_block", currentBlock,
+			"error", auditErr)
 	}
 
 	recordDRWAMetric(drwaMetricGovernanceProposalExecuted)

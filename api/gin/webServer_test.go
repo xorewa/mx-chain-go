@@ -203,3 +203,19 @@ func TestWebServer_CloseWithDisabledServerShouldNotPanic(t *testing.T) {
 	err = ws.Close()
 	assert.Nil(t, err)
 }
+
+func TestWebServer_CreateMiddlewareLimitersAlwaysAddsRequestSizeLimiter(t *testing.T) {
+	t.Parallel()
+
+	args := createMockArgsNewWebServer()
+	args.ApiConfig.Logging.LoggingEnabled = false
+	args.AntiFloodConfig.WebServerAntifloodEnabled = false
+
+	ws, _ := NewGinWebServerHandler(args)
+	require.NotNil(t, ws)
+
+	processors, err := ws.createMiddlewareLimiters()
+	require.NoError(t, err)
+	require.Len(t, processors, 1)
+	require.False(t, processors[0].IsInterfaceNil())
+}

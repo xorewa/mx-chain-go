@@ -539,9 +539,29 @@ func (bh *BlockChainHookImpl) ApplyDRWASyncEnvelopeBytes(payload []byte, callerA
 
 	adapter, err := newDRWAHookStateAdapter(bh.accounts)
 	if err != nil {
+		// Operator-error signal (e.g. accounts handler not wired)
+		// surfaces verbatim. Tests rely on ErrNilDRWAAccountsAdapter
+		// reaching the caller; the allowlist gate below runs only
+		// once the adapter is healthy.
 		return err
 	}
 	adapter.nonceProvider = bh
+
+	// Allowlist gate: the caller must match one of the provisioned
+	// DRWA authorized addresses for at least one of the role domains
+	// (auth admin, policy registry, asset manager, identity registry,
+	// attestation, recovery admin). Previously this function only
+	// checked length and non-zero, fully delegating identity to
+	// upstream callers — a single missed gate anywhere upstream would
+	// allow arbitrary callers to mutate DRWA compliance state. The
+	// IsAuthorizedDRWASyncCaller helper enforces the actual allowlist
+	// against chain state and runs AFTER adapter creation so the
+	// operator-error code path (ErrNilDRWAAccountsAdapter) is
+	// preserved.
+	if !bh.IsAuthorizedDRWASyncCaller(callerAddress) {
+		recordDRWAMetric(drwaMetricAuthorizedCallerMalformed)
+		return errors.New(drwaSyncRejectUnauthorizedCaller)
+	}
 
 	_, err = applyDRWASyncEnvelope(
 		adapter,

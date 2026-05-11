@@ -245,6 +245,8 @@ func (ws *webServer) registerRoutes(ginRouter *gin.Engine) {
 func (ws *webServer) createMiddlewareLimiters() ([]shared.MiddlewareProcessor, error) {
 	middlewares := make([]shared.MiddlewareProcessor, 0)
 
+	middlewares = append(middlewares, middleware.NewRequestSizeLimiter())
+
 	if ws.apiConfig.Logging.LoggingEnabled {
 		responseLoggerMiddleware := middleware.NewResponseLoggerMiddleware(time.Duration(ws.apiConfig.Logging.ThresholdInMicroSeconds) * time.Microsecond)
 		middlewares = append(middlewares, responseLoggerMiddleware)

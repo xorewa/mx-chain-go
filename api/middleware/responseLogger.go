@@ -16,6 +16,7 @@ const prefixDurationTooLong = "[too long]"
 const prefixBadRequest = "[bad request]"
 const prefixInternalError = "[internal error]"
 const responseMaxLength = 100
+const loggedPayloadMaxLength = 400
 
 type responseLoggerMiddleware struct {
 	thresholdDurationForLoggingRequest time.Duration
@@ -48,7 +49,7 @@ func (rlm *responseLoggerMiddleware) MiddlewareHandlerFunc() gin.HandlerFunc {
 
 		shouldLogRequest := latency > rlm.thresholdDurationForLoggingRequest || c.Writer.Status() != http.StatusOK
 		if shouldLogRequest {
-			responseBodyString := removeWhitespacesFromString(bw.body.String())
+			responseBodyString := prepareLogPayload(bw.body.String())
 			rlm.logRequestAndResponse(c, latency, status, responseBodyString)
 		}
 	}
@@ -64,14 +65,14 @@ func (rlm *responseLoggerMiddleware) logRequestAndResponse(c *gin.Context, durat
 
 	if c.Request.Body != nil {
 		reqBody := c.Request.Body
-		reqBodyBytes, err := io.ReadAll(reqBody)
+		reqBodyBytes, err := io.ReadAll(io.LimitReader(reqBody, loggedPayloadMaxLength+1))
 		if err != nil {
 			log.Debug(err.Error())
 			return
 		}
 
 		if len(reqBodyBytes) > 0 {
-			request = removeWhitespacesFromString(string(reqBodyBytes))
+			request = prepareLogPayload(string(reqBodyBytes))
 		}
 	}
 
@@ -118,12 +119,28 @@ func removeWhitespacesFromString(str string) string {
 	return b.String()
 }
 
+func prepareLogPayload(str string) string {
+	if len(str) > loggedPayloadMaxLength {
+		str = str[:loggedPayloadMaxLength]
+	}
+
+	return removeWhitespacesFromString(str)
+}
+
 type bodyWriter struct {
 	gin.ResponseWriter
 	body *bytes.Buffer
 }
 
 func (w bodyWriter) Write(b []byte) (int, error) {
-	w.body.Write(b)
+	remaining := loggedPayloadMaxLength + 1 - w.body.Len()
+	if remaining > 0 {
+		if len(b) > remaining {
+			_, _ = w.body.Write(b[:remaining])
+		} else {
+			_, _ = w.body.Write(b)
+		}
+	}
+
 	return w.ResponseWriter.Write(b)
 }

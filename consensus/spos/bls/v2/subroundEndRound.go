@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
+	"github.com/multiversx/mx-chain-core-go/core/random"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/display"
 
@@ -727,7 +727,16 @@ func (sr *subroundEndRound) getRandomManagedKeyProofSender() string {
 		return sr.SelfPubKey() // fallback return self pub key, should never happen
 	}
 
-	randIdx := rand.Intn(len(consensusKeysManagedByCurrentNode))
+	// Use the crypto-rand-backed ConcurrentSafeIntRandomizer instead of
+	// math/rand. The choice of which locally-managed BLS key signs the
+	// round-end broadcast is non-security-critical (all keys in the bag
+	// belong to this validator and are equally authoritative), but
+	// math/rand is package-global and seeded deterministically by
+	// default — using crypto/rand removes the predictability and
+	// matches the project's standing policy of not seeding math/rand
+	// in consensus paths.
+	randomizer := &random.ConcurrentSafeIntRandomizer{}
+	randIdx := randomizer.Intn(len(consensusKeysManagedByCurrentNode))
 	randManagedKey := consensusKeysManagedByCurrentNode[randIdx]
 
 	return randManagedKey
