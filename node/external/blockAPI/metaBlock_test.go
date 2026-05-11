@@ -216,6 +216,84 @@ func TestMetaAPIBlockProcessor_GetBlockByHashFromHistoryNode(t *testing.T) {
 	assert.Equal(t, expectedBlock, blk)
 }
 
+func TestMetaAPIBlockProcessor_GetBlockByHashMetaBlockV3ShouldNotUseNilLegacyFields(t *testing.T) {
+	t.Parallel()
+
+	epoch := uint32(7)
+	headerHash := []byte("meta block v3 hash")
+	headerStore := genericMocks.NewStorerMockWithEpoch(epoch)
+	executionResultsStore := genericMocks.NewStorerMockWithEpoch(epoch)
+	marshalizer := &mock.MarshalizerFake{}
+
+	metaAPIBlockProcessor := createMockMetaAPIProcessor(headerHash, headerStore, false, false)
+	metaAPIBlockProcessor.store = &storageMocks.ChainStorerStub{
+		GetCalled: func(unitType dataRetriever.UnitType, key []byte) ([]byte, error) {
+			switch unitType {
+			case dataRetriever.MetaBlockUnit:
+				return headerStore.Get(key)
+			case dataRetriever.MetaHdrNonceHashDataUnit:
+				return headerHash, nil
+			default:
+				require.Failf(t, "unexpected storer unit", "%v", unitType)
+				return nil, nil
+			}
+		},
+		GetStorerCalled: func(unitType dataRetriever.UnitType) (storage.Storer, error) {
+			switch unitType {
+			case dataRetriever.ExecutionResultsUnit:
+				return executionResultsStore, nil
+			case dataRetriever.MetaBlockUnit:
+				return headerStore, nil
+			default:
+				return genericMocks.NewStorerMockWithEpoch(epoch), nil
+			}
+		},
+	}
+
+	header := &block.MetaBlockV3{
+		Nonce: 11,
+		Round: 12,
+		Epoch: epoch,
+		LastExecutionResult: &block.MetaExecutionResultInfo{
+			ExecutionResult: &block.BaseMetaExecutionResult{
+				AccumulatedFeesInEpoch: big.NewInt(200),
+				DevFeesInEpoch:         big.NewInt(30),
+				BaseExecutionResult: &block.BaseExecutionResult{
+					RootHash: []byte("v3-root"),
+				},
+			},
+		},
+	}
+	headerBytes, err := marshalizer.Marshal(header)
+	require.NoError(t, err)
+	require.NoError(t, headerStore.Put(headerHash, headerBytes))
+
+	executionResult := &block.ExecutionResult{
+		BaseExecutionResult: &block.BaseExecutionResult{},
+		AccumulatedFees:     big.NewInt(100),
+		DeveloperFees:       big.NewInt(10),
+		ReceiptsHash:        []byte("receipts"),
+	}
+	executionResultBytes, err := marshalizer.Marshal(executionResult)
+	require.NoError(t, err)
+	require.NoError(t, executionResultsStore.Put(headerHash, executionResultBytes))
+
+	apiBlock, err := metaAPIBlockProcessor.GetBlockByHash(headerHash, api.BlockQueryOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, apiBlock)
+
+	require.NotEqual(t, "<nil>", apiBlock.AccumulatedFees)
+	require.NotEqual(t, "<nil>", apiBlock.DeveloperFees)
+	require.NotEqual(t, "<nil>", apiBlock.AccumulatedFeesInEpoch)
+	require.NotEqual(t, "<nil>", apiBlock.DeveloperFeesInEpoch)
+	require.Equal(t, "100", apiBlock.AccumulatedFees)
+	require.Equal(t, "10", apiBlock.DeveloperFees)
+	require.Equal(t, "200", apiBlock.AccumulatedFeesInEpoch)
+	require.Equal(t, "30", apiBlock.DeveloperFeesInEpoch)
+	require.Equal(t, hex.EncodeToString([]byte("v3-root")), apiBlock.StateRootHash)
+	require.Empty(t, apiBlock.ReceiptsHash)
+}
+
 func TestMetaAPIBlockProcessor_GetBlockByHashFromGenesis(t *testing.T) {
 	t.Parallel()
 

@@ -195,30 +195,30 @@ func (mbp *metaAPIBlockProcessor) convertMetaBlockBytesToAPIBlock(hash []byte, b
 	}
 
 	apiMetaBlock := &api.Block{
-		Nonce:                  blockHeader.GetNonce(),
-		Round:                  blockHeader.GetRound(),
-		Epoch:                  blockHeader.GetEpoch(),
-		Shard:                  core.MetachainShardId,
-		Hash:                   hex.EncodeToString(hash),
-		PrevBlockHash:          hex.EncodeToString(blockHeader.GetPrevHash()),
-		NotarizedBlocks:        notarizedBlocks,
-		AccumulatedFees:        blockHeader.GetAccumulatedFees().String(),
-		DeveloperFees:          blockHeader.GetDeveloperFees().String(),
-		AccumulatedFeesInEpoch: blockHeader.GetAccumulatedFeesInEpoch().String(),
-		DeveloperFeesInEpoch:   blockHeader.GetDevFeesInEpoch().String(),
-		Timestamp:              int64(timestampSec),
-		TimestampMs:            int64(timestampMs),
-		Status:                 BlockStatusOnChain,
-		LeaderSignature:        hex.EncodeToString(blockHeader.GetLeaderSignature()),
-		ChainID:                string(blockHeader.GetChainID()),
-		SoftwareVersion:        hex.EncodeToString(blockHeader.GetSoftwareVersion()),
-		ReceiptsHash:           hex.EncodeToString(blockHeader.GetReceiptsHash()),
-		Reserved:               blockHeader.GetReserved(),
-		RandSeed:               hex.EncodeToString(blockHeader.GetRandSeed()),
-		PrevRandSeed:           hex.EncodeToString(blockHeader.GetPrevRandSeed()),
+		Nonce:           blockHeader.GetNonce(),
+		Round:           blockHeader.GetRound(),
+		Epoch:           blockHeader.GetEpoch(),
+		Shard:           core.MetachainShardId,
+		Hash:            hex.EncodeToString(hash),
+		PrevBlockHash:   hex.EncodeToString(blockHeader.GetPrevHash()),
+		NotarizedBlocks: notarizedBlocks,
+		Timestamp:       int64(timestampSec),
+		TimestampMs:     int64(timestampMs),
+		Status:          BlockStatusOnChain,
+		LeaderSignature: hex.EncodeToString(blockHeader.GetLeaderSignature()),
+		ChainID:         string(blockHeader.GetChainID()),
+		SoftwareVersion: hex.EncodeToString(blockHeader.GetSoftwareVersion()),
+		Reserved:        blockHeader.GetReserved(),
+		RandSeed:        hex.EncodeToString(blockHeader.GetRandSeed()),
+		PrevRandSeed:    hex.EncodeToString(blockHeader.GetPrevRandSeed()),
 	}
 
 	if !blockHeader.IsHeaderV3() {
+		apiMetaBlock.AccumulatedFees = blockHeader.GetAccumulatedFees().String()
+		apiMetaBlock.DeveloperFees = blockHeader.GetDeveloperFees().String()
+		apiMetaBlock.AccumulatedFeesInEpoch = blockHeader.GetAccumulatedFeesInEpoch().String()
+		apiMetaBlock.DeveloperFeesInEpoch = blockHeader.GetDevFeesInEpoch().String()
+		apiMetaBlock.ReceiptsHash = hex.EncodeToString(blockHeader.GetReceiptsHash())
 		apiMetaBlock.PubKeyBitmap = hex.EncodeToString(blockHeader.GetPubKeysBitmap())
 		apiMetaBlock.Signature = hex.EncodeToString(blockHeader.GetSignature())
 
