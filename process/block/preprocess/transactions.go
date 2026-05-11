@@ -1847,10 +1847,19 @@ func sortTransactionsBySenderAndNonceLegacy(transactions []*txcache.WrappedTrans
 	sort.Slice(transactions, sorter)
 }
 
-// parameters need to be of the same len, otherwise it will panic (if second slice shorter)
+// xorBytes returns the byte-wise XOR of a and b, truncated to the shorter slice.
+// Operating on min(len(a), len(b)) avoids the out-of-bounds panic that would
+// otherwise occur whenever a caller passes a sender address longer than the
+// randomness digest (or vice versa). On the block-proposer hot path this
+// turns a potential crash-loop trigger into a benign degraded-ordering
+// outcome should an over-length sender ever reach the sorter.
 func xorBytes(a, b []byte) []byte {
-	res := make([]byte, len(a))
-	for i := range a {
+	length := len(a)
+	if len(b) < length {
+		length = len(b)
+	}
+	res := make([]byte, length)
+	for i := 0; i < length; i++ {
 		res[i] = a[i] ^ b[i]
 	}
 	return res
