@@ -208,3 +208,21 @@ require (
 )
 
 replace github.com/gogo/protobuf => github.com/multiversx/protobuf v1.3.2
+
+replace github.com/multiversx/mx-chain-core-go => github.com/mangonui/mx-chain-core-go v0.0.0-20260511065402-576e93c1a0dc
+
+replace github.com/multiversx/mx-chain-crypto-go => github.com/mangonui/mx-chain-crypto-go v0.0.0-20260130145351-270b99122e4f
+
+replace github.com/multiversx/mx-chain-logger-go => github.com/mangonui/mx-chain-logger-go v0.0.0-20250625144024-6bae11723d4e
+
+replace github.com/multiversx/mx-chain-storage-go => github.com/mangonui/mx-chain-storage-go v0.0.0-20250625144532-99d2dceff951
+
+replace github.com/multiversx/mx-chain-vm-common-go => github.com/mangonui/mx-chain-vm-common-go v0.0.0-20260509145109-8b808cd52eaf
+
+replace github.com/multiversx/mx-chain-scenario-go => github.com/mangonui/mx-chain-scenario-go v0.0.0-20260509042904-85566b986880
+
+replace github.com/multiversx/mx-chain-communication-go => github.com/mangonui/mx-chain-communication-go v0.0.0-20260509142827-18bcfae4cc36
+
+replace github.com/multiversx/mx-chain-vm-go => github.com/mangonui/mx-chain-vm-go v0.0.0-20260509052509-bca9b12e1615
+
+replace github.com/multiversx/mx-chain-es-indexer-go => github.com/mangonui/mx-chain-es-indexer-go v0.0.0-20260509171246-dc993ae08777
