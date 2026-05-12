@@ -343,12 +343,12 @@ github.com/lunixbochs/vtclean v1.0.0/go.mod h1:pHhQNgMf3btfWnGBVipUOjRYhoOsdGqdm
 github.com/mailru/easyjson v0.0.0-20190312143242-1de009706dbe/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
 github.com/mangonui/mx-chain-communication-go v0.0.0-20260512042141-e5c2130b312d h1:UFWlYun3xqp6fU8fH77jlsp9t2ppdENoG1r0ESqUkLQ=
 github.com/mangonui/mx-chain-communication-go v0.0.0-20260512042141-e5c2130b312d/go.mod h1:I5PyCIgo8aDMXgrUFmluaCGtEZUux4mKIlCjOvLPr0Y=
-github.com/mangonui/mx-chain-core-go v0.0.0-20260511065402-576e93c1a0dc h1:1GbW4p46vZmQckQQfjsaK1TlNP53YmOFqVSOkG6zaYQ=
-github.com/mangonui/mx-chain-core-go v0.0.0-20260511065402-576e93c1a0dc/go.mod h1:nx8HPC1fvHcXGXNAUQaMXNQWSMgSWcqST+Od76tuCeI=
+github.com/mangonui/mx-chain-core-go v0.0.0-20260512153159-d696dc43bf6d h1:Gqusv6Up2jkWP6+WvkMrdjWH8Xe8RCboem1ZyY63WYQ=
+github.com/mangonui/mx-chain-core-go v0.0.0-20260512153159-d696dc43bf6d/go.mod h1:nx8HPC1fvHcXGXNAUQaMXNQWSMgSWcqST+Od76tuCeI=
 github.com/mangonui/mx-chain-crypto-go v0.0.0-20260512042020-64e96976729c h1:iZ0isFJXct6GWqkuNvh163F54bAYMRP5R4VQEhI7vYQ=
 github.com/mangonui/mx-chain-crypto-go v0.0.0-20260512042020-64e96976729c/go.mod h1:mpGL2/M1vnYJQ3nmsxKZQtDb0C3D4YioEPsk1hns7V0=
-github.com/mangonui/mx-chain-es-indexer-go v0.0.0-20260512042141-92c0354a660d h1:AgYXhlf+r6IsOKI0ElBrMMh+0U+Dslhm6J5nv2JBGpU=
-github.com/mangonui/mx-chain-es-indexer-go v0.0.0-20260512042141-92c0354a660d/go.mod h1:15BDoVZmhJgw3Z4gK61zr69K0qY6vvFCmKUtU04j7z0=
+github.com/mangonui/mx-chain-es-indexer-go v0.0.0-20260512154259-fed32aa38c74 h1:dVsA8RykOKIlxYODKAVTclYT21ksMtv6bisVIKE1Hrc=
+github.com/mangonui/mx-chain-es-indexer-go v0.0.0-20260512154259-fed32aa38c74/go.mod h1:15BDoVZmhJgw3Z4gK61zr69K0qY6vvFCmKUtU04j7z0=
 github.com/mangonui/mx-chain-logger-go v0.0.0-20260512025801-4b00900c17b0 h1:Ied0nniRSsS1SVRQW7zieTFQn4lJBUgMH+P3Bsi81ok=
 github.com/mangonui/mx-chain-logger-go v0.0.0-20260512025801-4b00900c17b0/go.mod h1:ftcx53HVN/wZt/GbuE34dA0psb4jwvA3llIeM/5u9FM=
 github.com/mangonui/mx-chain-scenario-go v0.0.0-20260512042141-6b3f39ab04ca h1:r1JP1wz1BfpZ3Lu2Wup7nJtqKb81OImkV8iZd0oGI+A=
