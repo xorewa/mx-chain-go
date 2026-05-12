@@ -65,7 +65,11 @@ func NewBlockDataRequester(args BlockDataRequestArgs) (*BlockDataRequest, error)
 	}
 
 	bdr.requestedItemsHandler = cache.NewTimeCache(common.MaxWaitingTimeToReceiveRequestedItem)
-	bdr.miniBlockPool.RegisterHandler(bdr.receivedMiniBlock, core.UniqueIdentifier())
+	handlerID, err := core.UniqueIdentifierWithError()
+	if err != nil {
+		return nil, err
+	}
+	bdr.miniBlockPool.RegisterHandler(bdr.receivedMiniBlock, handlerID)
 
 	return bdr, nil
 }

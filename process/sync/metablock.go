@@ -120,7 +120,10 @@ func NewMetaBootstrap(arguments ArgMetaBootstrapper) (*MetaBootstrap, error) {
 		return nil, err
 	}
 
-	base.init()
+	err = base.init()
+	if err != nil {
+		return nil, err
+	}
 
 	return &boot, nil
 }

@@ -56,8 +56,12 @@ func NewMiniBlockTrack(
 		shardCoordinator:         shardCoordinator,
 		whitelistHandler:         whitelistHandler,
 	}
+	handlerID, err := core.UniqueIdentifierWithError()
+	if err != nil {
+		return nil, err
+	}
 
-	mbt.miniBlocksPool.RegisterHandler(mbt.receivedMiniBlock, core.UniqueIdentifier())
+	mbt.miniBlocksPool.RegisterHandler(mbt.receivedMiniBlock, handlerID)
 
 	return &mbt, nil
 }

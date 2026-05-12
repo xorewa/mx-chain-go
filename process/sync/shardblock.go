@@ -106,7 +106,10 @@ func NewShardBootstrap(arguments ArgShardBootstrapper) (*ShardBootstrap, error) 
 		return nil, err
 	}
 
-	base.init()
+	err = base.init()
+	if err != nil {
+		return nil, err
+	}
 
 	return &boot, nil
 }

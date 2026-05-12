@@ -68,8 +68,12 @@ func NewPendingMiniBlocksSyncer(args ArgsNewPendingMiniBlocksSyncer) (*pendingMi
 		marshalizer:             args.Marshalizer,
 		waitTimeBetweenRequests: args.RequestHandler.RequestInterval(),
 	}
+	handlerID, err := core.UniqueIdentifierWithError()
+	if err != nil {
+		return nil, err
+	}
 
-	p.pool.RegisterHandler(p.receivedMiniBlock, core.UniqueIdentifier())
+	p.pool.RegisterHandler(p.receivedMiniBlock, handlerID)
 
 	return p, nil
 }

@@ -73,6 +73,10 @@ func NewTrieSyncer(arg ArgTrieSyncer) (*trieSyncer, error) {
 	if err != nil {
 		return nil, err
 	}
+	handlerID, err := core.UniqueIdentifierWithError()
+	if err != nil {
+		return nil, err
+	}
 
 	ts := &trieSyncer{
 		requestHandler:            arg.RequestHandler,
@@ -84,7 +88,7 @@ func NewTrieSyncer(arg ArgTrieSyncer) (*trieSyncer, error) {
 		topic:                     arg.Topic,
 		shardId:                   arg.ShardId,
 		waitTimeBetweenRequests:   time.Second,
-		handlerID:                 core.UniqueIdentifier(),
+		handlerID:                 handlerID,
 		trieSyncStatistics:        arg.TrieSyncStatistics,
 		timeoutHandler:            arg.TimeoutHandler,
 		maxHardCapForMissingNodes: arg.MaxHardCapForMissingNodes,

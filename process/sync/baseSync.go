@@ -2197,7 +2197,7 @@ func (boot *baseBootstrap) waitForMiniBlocks() error {
 	}
 }
 
-func (boot *baseBootstrap) init() {
+func (boot *baseBootstrap) init() error {
 	boot.forkInfo = process.NewForkInfo()
 
 	boot.chRcvHdrNonce = make(chan bool)
@@ -2209,13 +2209,19 @@ func (boot *baseBootstrap) init() {
 	boot.setRequestedHeaderHash(nil)
 	boot.setRequestedMiniBlocks(nil)
 
-	boot.poolsHolder.MiniBlocks().RegisterHandler(boot.receivedMiniblock, core.UniqueIdentifier())
+	handlerID, err := core.UniqueIdentifierWithError()
+	if err != nil {
+		return err
+	}
+	boot.poolsHolder.MiniBlocks().RegisterHandler(boot.receivedMiniblock, handlerID)
 	boot.headers.RegisterHandler(boot.processReceivedHeader)
 	boot.proofs.RegisterHandler(boot.processReceivedProof)
 
 	boot.syncStateListeners = make([]func(bool), 0)
 	boot.requestedHashes = process.RequiredDataPool{}
 	boot.mapNonceSyncedWithErrors = make(map[uint64]uint32)
+
+	return nil
 }
 
 func (boot *baseBootstrap) requestHeaders(fromNonce uint64, toNonce uint64) {

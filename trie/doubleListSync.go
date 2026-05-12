@@ -59,6 +59,10 @@ func NewDoubleListTrieSyncer(arg ArgTrieSyncer) (*doubleListTrieSyncer, error) {
 	if err != nil {
 		return nil, err
 	}
+	handlerID, err := core.UniqueIdentifierWithError()
+	if err != nil {
+		return nil, err
+	}
 
 	d := &doubleListTrieSyncer{
 		requestHandler:            arg.RequestHandler,
@@ -69,7 +73,7 @@ func NewDoubleListTrieSyncer(arg ArgTrieSyncer) (*doubleListTrieSyncer, error) {
 		topic:                     arg.Topic,
 		shardId:                   arg.ShardId,
 		waitTimeBetweenChecks:     time.Millisecond * 100,
-		handlerID:                 core.UniqueIdentifier(),
+		handlerID:                 handlerID,
 		trieSyncStatistics:        arg.TrieSyncStatistics,
 		timeoutHandler:            arg.TimeoutHandler,
 		maxHardCapForMissingNodes: arg.MaxHardCapForMissingNodes,

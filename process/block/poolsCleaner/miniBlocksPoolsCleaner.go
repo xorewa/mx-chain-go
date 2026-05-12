@@ -52,8 +52,12 @@ func NewMiniBlocksPoolsCleaner(args ArgMiniBlocksPoolsCleaner) (*miniBlocksPools
 		miniblocksPool:      args.MiniblocksPool,
 		mapMiniBlocksRounds: make(map[string]*mbInfo),
 	}
+	handlerID, err := core.UniqueIdentifierWithError()
+	if err != nil {
+		return nil, err
+	}
 
-	mbpc.miniblocksPool.RegisterHandler(mbpc.receivedMiniBlock, core.UniqueIdentifier())
+	mbpc.miniblocksPool.RegisterHandler(mbpc.receivedMiniBlock, handlerID)
 
 	return &mbpc, nil
 }
