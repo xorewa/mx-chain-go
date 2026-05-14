@@ -152,9 +152,14 @@ type TopicHandler interface {
 	RegisterMessageProcessor(topic string, identifier string, handler p2p.MessageProcessor) error
 }
 
-// IntRandomizer interface provides functionality over generating integer numbers
+// IntRandomizer interface provides functionality over generating integer numbers.
+//
+// ISSUE-045 closure: see the equivalent interface in
+// mx-chain-core-go/core/closing/interface.go for the full rationale.
+// Short version: `Intn(n int) (int, error)` lets callers react to
+// entropy-source failures rather than crashing.
 type IntRandomizer interface {
-	Intn(n int) int
+	Intn(n int) (int, error)
 	IsInterfaceNil() bool
 }
 

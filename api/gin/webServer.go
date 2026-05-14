@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +28,18 @@ import (
 var log = logger.GetOrCreate("api/gin")
 
 const prometheusMetricsRoute = "/debug/metrics/prometheus"
-const readHeaderTimeout = 10 * time.Second
+
+// ISSUE-017: the chain-go REST API server previously set only
+// ReadHeaderTimeout. Slow-loris and keep-alive abuse remained possible
+// against ReadTimeout, WriteTimeout, and IdleTimeout. These values are
+// generous enough to accommodate large vm-values queries and slow client
+// links while still bounding malicious connections.
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 60 * time.Second
+	writeTimeout      = 60 * time.Second
+	idleTimeout       = 120 * time.Second
+)
 
 // ArgsNewWebServer holds the arguments needed to create a new instance of webServer
 type ArgsNewWebServer struct {
@@ -100,7 +113,17 @@ func (ws *webServer) StartHttpServer() error {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine = gin.Default()
-	engine.Use(cors.Default())
+	// ISSUE-015: previously this was `cors.Default()` which sets
+	// AllowAllOrigins=true — full wildcard, with no auth on read
+	// endpoints that browser-adjacent attackers could exploit (account
+	// state, transaction status, validator stats, etc.). Mirror the
+	// pattern already used by mx-chain-es-indexer-go: cors.DefaultConfig
+	// + a localhost-only AllowOriginFunc. Operators with cross-origin
+	// dApp needs must override this explicitly.
+	corsCfg := cors.DefaultConfig()
+	corsCfg.AllowOriginFunc = isAllowedCORSOrigin
+	corsCfg.AddAllowHeaders("Authorization")
+	engine.Use(cors.New(corsCfg))
 
 	processors, err := ws.createMiddlewareLimiters()
 	if err != nil {
@@ -132,6 +155,9 @@ func (ws *webServer) StartHttpServer() error {
 		Addr:              ws.facade.RestApiInterface(),
 		Handler:           engine,
 		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
 	}
 	log.Debug("creating gin web sever", "interface", ws.facade.RestApiInterface())
 	ws.httpServer, err = NewHttpServer(server)
@@ -313,4 +339,17 @@ func (ws *webServer) Close() error {
 // IsInterfaceNil returns true if there is no value under the interface
 func (ws *webServer) IsInterfaceNil() bool {
 	return ws == nil
+}
+
+// isAllowedCORSOrigin permits only same-host (loopback) Origins. Browser
+// requests from any other origin are rejected by the CORS layer. This
+// matches the pattern in mx-chain-es-indexer-go and replaces the prior
+// `cors.Default()` wildcard. See issues/ISSUE-015.
+func isAllowedCORSOrigin(origin string) bool {
+	parsedOrigin, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	hostname := strings.ToLower(parsedOrigin.Hostname())
+	return hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1"
 }

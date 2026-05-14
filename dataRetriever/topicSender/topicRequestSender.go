@@ -212,7 +212,18 @@ func (trs *topicRequestSender) sendOnTopic(
 	topRatedPeersList := trs.peersRatingHandler.GetTopRatedPeersFromList(peerList, maxToSend)
 
 	indexes := createIndexList(len(topRatedPeersList))
-	shuffledIndexes := random.FisherYatesShuffle(indexes, trs.randomizer)
+	// ISSUE-045: FisherYatesShuffle now returns ([]int, error). On
+	// entropy failure use the partially-shuffled slice it returns
+	// (still a valid permutation of `indexes`); peer-broadcast
+	// distribution is non-security-critical, a deterministic-after-
+	// failure ordering is acceptable. Log at TRACE matching the
+	// existing per-peer log level in this function.
+	shuffledIndexes, shuffleErr := random.FisherYatesShuffle(indexes, trs.randomizer)
+	if shuffleErr != nil {
+		log.Trace("FisherYatesShuffle: entropy failure during peer-broadcast index shuffle; "+
+			"using partial shuffle returned by the helper",
+			"error", shuffleErr)
+	}
 	logData := make([]interface{}, 0)
 	msgSentCounter := 0
 	shouldSendToPreferredPeer := preferredPeer != "" && maxToSend > 1
@@ -294,7 +305,18 @@ func (trs *topicRequestSender) getPreferredFullArchivePeer() core.PeerID {
 }
 
 func (trs *topicRequestSender) getRandomPeerID(peerIDs []core.PeerID) core.PeerID {
-	randomIdx := trs.randomizer.Intn(len(peerIDs))
+	// ISSUE-045: on entropy failure, fall back to peerIDs[0] (the first
+	// preferred peer). Peer selection for missing-data requests is
+	// non-security-critical — the request will be retried via the
+	// generic-peer broadcast path if the selected peer doesn't respond.
+	// A deterministic fallback skews load toward whichever peer is
+	// first in the slice; acceptable for a transient entropy issue.
+	randomIdx, err := trs.randomizer.Intn(len(peerIDs))
+	if err != nil {
+		log.Trace("topicRequestSender.getRandomPeerID: entropy failure, using first peer",
+			"error", err)
+		randomIdx = 0
+	}
 
 	return peerIDs[randomIdx]
 }

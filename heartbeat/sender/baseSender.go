@@ -102,7 +102,16 @@ func checkBaseSenderArgs(args argBaseSender) error {
 func (bs *baseSender) computeRandomDuration(baseDuration time.Duration) time.Duration {
 	timeBetweenSendsInNano := baseDuration.Nanoseconds()
 	maxThreshold := float64(timeBetweenSendsInNano) * bs.thresholdBetweenSends
-	randThreshold := randomizer.Intn(int(maxThreshold))
+	// ISSUE-045: on entropy failure, fall back to maxThreshold
+	// (deterministic but the longest-allowed jitter — preserves the
+	// "stagger sends" intent in expectation; loses only the
+	// randomization. Heartbeat send timing is non-security-critical.)
+	randThreshold, err := randomizer.Intn(int(maxThreshold))
+	if err != nil {
+		log.Warn("baseSender.computeRandomDuration: entropy failure, using deterministic maxThreshold",
+			"error", err)
+		randThreshold = int(maxThreshold)
+	}
 
 	ret := time.Duration(timeBetweenSendsInNano + int64(randThreshold))
 	return ret

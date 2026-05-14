@@ -2,6 +2,7 @@ package softwareVersion
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -41,9 +42,18 @@ func (stp *stableTagProvider) FetchTagVersion() (string, error) {
 		}
 	}()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	// ISSUE-027: cap upstream-version-tag response body. The expected
+	// payload is a small JSON describing the latest release tag.
+	// 1 MiB is far more than the GitHub releases API produces in
+	// practice; preventing a compromised or proxied upstream from
+	// streaming a multi-GiB body into memory.
+	const maxStableTagResponseBytes = 1 * 1024 * 1024
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxStableTagResponseBytes+1))
 	if err != nil {
 		return "", err
+	}
+	if int64(len(respBytes)) > maxStableTagResponseBytes {
+		return "", fmt.Errorf("stable-tag response exceeds %d bytes", maxStableTagResponseBytes)
 	}
 
 	var tag tagVersion

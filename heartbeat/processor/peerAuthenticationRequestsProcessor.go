@@ -223,7 +223,20 @@ func (processor *peerAuthenticationRequestsProcessor) getRandMaxMissingKeys(miss
 
 	randMissingKeys := make([][]byte, 0)
 	for len(randMissingKeys) != int(processor.maxMissingKeysInRequest) {
-		randomIndex := processor.randomizer.Intn(lenMissingKeys)
+		// ISSUE-045: on entropy failure, fall back to index 0 (the
+		// "first remaining missing key"). The selection is non-security-
+		// critical — order of querying missing peer-auth keys doesn't
+		// affect correctness, just the distribution of which keys get
+		// asked first when there are more missing keys than the
+		// per-request cap. Logging once at WARN keeps the deployment-
+		// side cause visible.
+		randomIndex, err := processor.randomizer.Intn(lenMissingKeys)
+		if err != nil {
+			log.Warn("peerAuthenticationRequestsProcessor: entropy failure on missing-key randomization, "+
+				"falling back to deterministic ordering",
+				"error", err)
+			randomIndex = 0
+		}
 		randMissingKeys = append(randMissingKeys, tmpKeys[randomIndex])
 
 		tmpKeys[randomIndex] = tmpKeys[lenMissingKeys-1]

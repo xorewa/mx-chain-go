@@ -14,6 +14,10 @@ import (
 
 var log = logger.GetOrCreate("termui/provider")
 
+var newHTTPClient = func() *http.Client {
+	return &http.Client{}
+}
+
 const (
 	AccountsSnapshotNumNodesMetric = "AccountsSnapshotNumNodesMetric"
 
@@ -21,6 +25,11 @@ const (
 	bootstrapStatusMetricsUrlSuffix = "/node/bootstrapstatus"
 
 	trieStatisticsMetricsUrlSuffix = "/network/trie-statistics/"
+
+	// ISSUE-027: cap polled-metrics response body so a misbehaving
+	// local node cannot OOM the termui process. Real responses are
+	// well under 1 MiB; 16 MiB is generous headroom.
+	maxMetricsResponseBytes = 16 * 1024 * 1024
 )
 
 type statusMetricsResponseData struct {
@@ -190,25 +199,30 @@ func (smp *StatusMetricsProvider) fetchAndApplyMetrics(metricsPath string) {
 }
 
 func (smp *StatusMetricsProvider) loadMetricsFromApi(metricsPath string) (map[string]interface{}, error) {
-	client := http.Client{}
+	client := newHTTPClient()
 
 	statusMetricsUrl := smp.nodeAddress + metricsPath
 	resp, err := client.Get(statusMetricsUrl)
 	if err != nil {
 		return nil, err
 	}
-
-	responseBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
 			log.Error("close response body", "error", err.Error())
 		}
 	}()
+
+	// ISSUE-027: cap metrics response body. Real metrics JSON is
+	// under a few MiB; 16 MiB is generous headroom while preventing
+	// a misbehaving local node from OOM-ing the termui process.
+	responseBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxMetricsResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(responseBytes)) > maxMetricsResponseBytes {
+		return nil, fmt.Errorf("metrics response exceeds %d bytes", maxMetricsResponseBytes)
+	}
 
 	var metricsResponse responseFromApi
 	err = json.Unmarshal(responseBytes, &metricsResponse)
@@ -220,24 +234,27 @@ func (smp *StatusMetricsProvider) loadMetricsFromApi(metricsPath string) (map[st
 }
 
 func (smp *StatusMetricsProvider) loadMetricsFromGatewayApi(statusMetricsUrl string) (uint64, error) {
-	client := http.Client{}
+	client := newHTTPClient()
 
 	resp, err := client.Get(statusMetricsUrl)
 	if err != nil {
 		return 0, err
 	}
-
-	responseBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, err
-	}
-
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
 			log.Error("close response body", "error", err.Error())
 		}
 	}()
+
+	// ISSUE-027: cap gateway-api response body (same rationale as above).
+	responseBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxMetricsResponseBytes+1))
+	if err != nil {
+		return 0, err
+	}
+	if int64(len(responseBytes)) > maxMetricsResponseBytes {
+		return 0, fmt.Errorf("gateway metrics response exceeds %d bytes", maxMetricsResponseBytes)
+	}
 
 	var metricsResponse responseFromGatewayApi
 	err = json.Unmarshal(responseBytes, &metricsResponse)

@@ -14,6 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDRWAHookStateAdapterImplementsOptionalRecoveryInterfaces(t *testing.T) {
+	var adapter any = (*drwaHookStateAdapter)(nil)
+
+	_, ok := adapter.(drwaSyncRecoveryTimelockProvider)
+	require.True(t, ok)
+	_, ok = adapter.(drwaSyncGovernanceProvider)
+	require.True(t, ok)
+	_, ok = adapter.(drwaMigrationStateReader)
+	require.True(t, ok)
+}
+
 func TestDRWAHookStateAdapterAuthorizedCallerDeleteAndArtifacts(t *testing.T) {
 	systemAccount := state.NewAccountWrapMock(core.SystemAccountAddress)
 	holderAddress := []byte("erd1holder")

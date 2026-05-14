@@ -2,6 +2,7 @@ package economics
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"sync"
@@ -264,7 +265,23 @@ func checkRewardConfig(rewardsCfg config.EpochRewardSettings) error {
 	return nil
 }
 
+// isPercentageInvalid returns true if the supplied percentage is outside
+// the inclusive [0.0, 1.0] range, OR is NaN, OR is +/-Inf.
+//
+// ISSUE-047: previously only checked the range, so a NaN value passed
+// every comparison (NaN < x and NaN > x are both false in IEEE-754)
+// and was accepted as a "valid" percentage. Downstream math
+// (GetIntTrimmedPercentageOfValue) then formats NaN to the string
+// "NaN", whose subsequent big.Int.SetString fails — but the
+// SetString error was also discarded (other half of ISSUE-047,
+// patched in core/computers.go), so the bad-input chain ended in a
+// nil-pointer panic on big.Int.Mul. Catching NaN/Inf at validation
+// time is the cleanest closure: the bad value never reaches the
+// downstream math.
 func isPercentageInvalid(percentage float64) bool {
+	if math.IsNaN(percentage) || math.IsInf(percentage, 0) {
+		return true
+	}
 	isLessThanZero := percentage < 0.0
 	isGreaterThanOne := percentage > 1.0
 	if isLessThanZero || isGreaterThanOne {

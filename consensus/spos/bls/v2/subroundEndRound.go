@@ -735,8 +735,23 @@ func (sr *subroundEndRound) getRandomManagedKeyProofSender() string {
 	// default — using crypto/rand removes the predictability and
 	// matches the project's standing policy of not seeding math/rand
 	// in consensus paths.
+	//
+	// ISSUE-045: the IntRandomizer interface now returns an error on
+	// entropy-source failure. Because the choice is non-security-critical
+	// (per the comment above), on error we fall back to index 0 (the
+	// first managed key) and log a warning so the deployment-side cause
+	// is visible. The validator continues participating in the round
+	// rather than crashing or skipping — the latter would cost the
+	// validator a missed signature for an entropy issue that's
+	// orthogonal to consensus correctness.
 	randomizer := &random.ConcurrentSafeIntRandomizer{}
-	randIdx := randomizer.Intn(len(consensusKeysManagedByCurrentNode))
+	randIdx, err := randomizer.Intn(len(consensusKeysManagedByCurrentNode))
+	if err != nil {
+		log.Warn("getRandomManagedKeyProofSender: entropy failure on managed-key randomization, "+
+			"falling back to first managed key",
+			"error", err)
+		randIdx = 0
+	}
 	randManagedKey := consensusKeysManagedByCurrentNode[randIdx]
 
 	return randManagedKey

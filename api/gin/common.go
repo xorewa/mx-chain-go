@@ -3,7 +3,10 @@ package gin
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
+	"sync/atomic"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -15,6 +18,19 @@ import (
 	"github.com/multiversx/mx-chain-go/config"
 	"gopkg.in/go-playground/validator.v8"
 )
+
+// ISSUE-016: bounds on the chain-go /log WebSocket surface. These exist
+// to keep a single misbehaving (or malicious) reader from monopolising
+// the goroutine pool or holding TCP slots open indefinitely.
+const (
+	logWSMaxConcurrentStreams int32         = 64
+	logWSHandshakeTimeout     time.Duration = 10 * time.Second
+)
+
+// activeLogWSStreams counts currently-open /log WebSocket connections.
+// Bounded by logWSMaxConcurrentStreams; 65th connection is rejected with
+// 429.
+var activeLogWSStreams int32
 
 type validatorInput struct {
 	Name      string
@@ -77,12 +93,27 @@ func registerValidators() error {
 }
 
 func registerLoggerWsRoute(ws *gin.Engine, marshalizer marshal.Marshalizer) {
-	upgrader := websocket.Upgrader{}
+	// ISSUE-016: previously the upgrader was constructed inside the
+	// handler with CheckOrigin set to a function that returned true
+	// unconditionally — every browser-adjacent caller could stream
+	// the node's logs cross-origin. Now: build the upgrader once with
+	// HandshakeTimeout + a strict same-host Origin check.
+	upgrader := websocket.Upgrader{
+		HandshakeTimeout: logWSHandshakeTimeout,
+		CheckOrigin:      isAllowedLogWSOrigin,
+	}
 
 	ws.GET("/log", func(c *gin.Context) {
-		upgrader.CheckOrigin = func(r *http.Request) bool {
-			return true
+		// Per-connection cap. The 65th concurrent reader is rejected with
+		// 429 so an attacker cannot pin goroutines + TCP slots
+		// indefinitely. counter is decremented in the StartSendingBlocking
+		// defer below.
+		if atomic.AddInt32(&activeLogWSStreams, 1) > logWSMaxConcurrentStreams {
+			atomic.AddInt32(&activeLogWSStreams, -1)
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many log streams"})
+			return
 		}
+		defer atomic.AddInt32(&activeLogWSStreams, -1)
 
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
@@ -98,4 +129,20 @@ func registerLoggerWsRoute(ws *gin.Engine, marshalizer marshal.Marshalizer) {
 
 		ls.StartSendingBlocking()
 	})
+}
+
+// isAllowedLogWSOrigin requires the WS Origin header to share the same
+// host as the request target. Empty Origin is rejected for the /log
+// surface — anyone reading logs at this level can do so from the same
+// host with no browser between them. See issues/ISSUE-016.
+func isAllowedLogWSOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	parsedOrigin, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return parsedOrigin.Host == r.Host
 }

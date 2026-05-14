@@ -100,9 +100,17 @@ func (h *httpClientWrapper) Post(
 		}
 	}()
 
-	resBody, err := io.ReadAll(resp.Body)
+	// ISSUE-027: cap outbound response body. Event POST responses are
+	// ACK/error strings, never large. 64 KiB is well above any
+	// legitimate value; preventing a malicious or buggy notifier
+	// endpoint from OOM-ing the caller.
+	const maxResponseBytes = 64 * 1024
+	resBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return err
+	}
+	if int64(len(resBody)) > maxResponseBytes {
+		return fmt.Errorf("response body exceeds %d bytes", maxResponseBytes)
 	}
 
 	if resp.StatusCode != http.StatusOK {

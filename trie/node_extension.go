@@ -1,37 +1,9 @@
 package trie
 
-import (
-	"encoding/binary"
-	"fmt"
-	"math"
-	"math/rand"
-	"time"
-
-	"github.com/multiversx/mx-chain-core-go/core"
-)
-
-const faultyChance = 1000000
-
-func shouldTestNode(n node, key []byte) bool {
-	hasher := n.getHasher()
-	randomness := string(key) + core.GetAnonymizedMachineID("") + fmt.Sprintf("%d", time.Now().UnixNano())
-	buff := hasher.Compute(randomness)
-	checkVal := binary.BigEndian.Uint32(buff)
-	if checkVal%faultyChance == 0 {
-		log.Debug("deliberately not saving hash", "hash", key)
-		return true
-	}
-
-	return false
-}
-
-func snapshotGetTestPoint(key []byte, faultyChance int) error {
-	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
-	checkVal := rnd.Intn(math.MaxInt)
-	if checkVal%faultyChance == 0 {
-		log.Debug("deliberately not returning hash", "hash", key)
-		return fmt.Errorf("snapshot get error")
-	}
-
-	return nil
-}
+// The trie fault-injection helpers (shouldTestNode, snapshotGetTestPoint
+// and the faultyChance constant) that previously lived in this file
+// were moved to node_extension_test.go after audit ISSUE-034. They are
+// test-only by design and had no production callers. This file is kept
+// as a placeholder so that historical references to its path remain
+// intact; it can be removed entirely once the operator confirms no
+// downstream tooling expects the path to exist.
