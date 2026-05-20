@@ -359,6 +359,8 @@ github.com/mangonui/mx-chain-vm-common-go v0.0.0-20260512042020-b605c960cbd0 h1:
 github.com/mangonui/mx-chain-vm-common-go v0.0.0-20260512042020-b605c960cbd0/go.mod h1:SWI+D+0RcLNwTy8a2ixJGz8dZP3/Dff+0ism9hJonX8=
 github.com/mangonui/mx-chain-vm-go v0.0.2-0.20260520094543-dc1a7442c47f h1:gFalkWGiYqJGTV5ptz4IzHa2C5NyjkpdpBYxBb7fi08=
 github.com/mangonui/mx-chain-vm-go v0.0.2-0.20260520094543-dc1a7442c47f/go.mod h1:9jkFWGja/Po3q8Q6YD1sWY32hVsV1VJg9oyNVD2Fdrw=
+github.com/mangonui/mx-chain-vm-go v0.0.2-0.20260520104551-e053edc7a42d h1:JBpRb76Njt0TS/cv1VNF6i62M4gC/iUYT/XE65D1TSo=
+github.com/mangonui/mx-chain-vm-go v0.0.2-0.20260520104551-e053edc7a42d/go.mod h1:9jkFWGja/Po3q8Q6YD1sWY32hVsV1VJg9oyNVD2Fdrw=
 github.com/mangonui/mx-chain-vm-v1_2-go v0.0.0-20260514040504-9320ef19765e h1:PruguxLFE41+gkCnKD5gCvAPgHyOj2fyYELHcOJGyt4=
 github.com/mangonui/mx-chain-vm-v1_2-go v0.0.0-20260514040504-9320ef19765e/go.mod h1:ohs4CbU66h//guHu60lVX037Vd3q/TtrSkDZfVpljJw=
 github.com/mangonui/mx-chain-vm-v1_3-go v0.0.0-20260514040521-bd7b757b5f9b h1:HwlL1H+UK5WIGZY+/L9HhD6YsjBpwKES52Y2VJ8xk8Y=
