@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"bytes"
+	"encoding/hex"
 	"testing"
 
 	builtInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
@@ -31,6 +33,58 @@ func TestInitPrefixValidation_DidNotPanic(t *testing.T) {
 	if drwaSyncAssetRecordPrefix != builtInFunctions.DRWAAssetRecordPrefix {
 		t.Fatalf("asset record prefix mismatch: local=%q vm-common=%q",
 			drwaSyncAssetRecordPrefix, builtInFunctions.DRWAAssetRecordPrefix)
+	}
+}
+
+func TestDRWANativeStateKeyBuildersStayCanonical(t *testing.T) {
+	tokenID := []byte("CARBON-ab12cd")
+	holder := bytes.Repeat([]byte{0xAB}, 32)
+	payloadHash := bytes.Repeat([]byte{0xCD}, 32)
+	proposalID := [32]byte{0xEF}
+
+	testCases := map[string][]byte{
+		"token policy":        buildDRWATokenPolicyKey(tokenID),
+		"asset record":        buildDRWAAssetRecordKey(tokenID),
+		"active flag":         buildDRWAActiveKey(tokenID),
+		"holder mirror":       buildDRWAHolderMirrorKey(tokenID, holder),
+		"holder profile":      buildDRWAHolderProfileKey(holder),
+		"holder auditor auth": buildDRWAHolderAuditorAuthorizationKey(tokenID, holder),
+	}
+	expected := map[string][]byte{
+		"token policy":        builtInFunctions.BuildDRWATokenPolicyKey(tokenID),
+		"asset record":        builtInFunctions.BuildDRWAAssetRecordKey(tokenID),
+		"active flag":         builtInFunctions.BuildDRWAActiveKey(tokenID),
+		"holder mirror":       builtInFunctions.BuildDRWAHolderMirrorKey(tokenID, holder),
+		"holder profile":      builtInFunctions.BuildDRWAHolderProfileKey(holder),
+		"holder auditor auth": builtInFunctions.BuildDRWAHolderAuditorAuthorizationKey(tokenID, holder),
+	}
+
+	for name, key := range testCases {
+		if !bytes.Equal(expected[name], key) {
+			t.Fatalf("%s key mismatch: local=%q vm-common=%q", name, key, expected[name])
+		}
+	}
+
+	if got := string(buildDRWAAuthorizedCallerKey(drwaSyncCallerPolicyRegistry)); got != "drwa:auth:"+drwaSyncCallerPolicyRegistry {
+		t.Fatalf("authorized caller key mismatch: %q", got)
+	}
+	if got := string(buildDRWARecoveryLastBlockKey(string(tokenID))); got != "drwa:recovery:lastBlock:"+string(tokenID) {
+		t.Fatalf("recovery last block key mismatch: %q", got)
+	}
+	if got := string(buildDRWARecoveryEvidenceKey(tokenID)); got != "drwa:evidence:"+hex.EncodeToString(tokenID)+":recovery:latest" {
+		t.Fatalf("recovery evidence key mismatch: %q", got)
+	}
+	if got := string(buildDRWARecoveryEvidenceHistoryKey(tokenID, payloadHash)); got != "drwa:evidence:"+hex.EncodeToString(tokenID)+":recovery:history:"+hex.EncodeToString(payloadHash) {
+		t.Fatalf("recovery evidence history key mismatch: %q", got)
+	}
+	if got := string(buildDRWAGovernanceConfigKey(string(tokenID))); got != "DRWA_GOV_"+hex.EncodeToString(tokenID) {
+		t.Fatalf("governance config key mismatch: %q", got)
+	}
+	if got := string(buildDRWAGovernanceProposalKey(proposalID)); got != "DRWA_PROPOSAL_"+hex.EncodeToString(proposalID[:]) {
+		t.Fatalf("governance proposal key mismatch: %q", got)
+	}
+	if got := string(buildDRWAGovernanceAuditKey(proposalID)); got != "DRWA_GOV_AUDIT_"+hex.EncodeToString(proposalID[:]) {
+		t.Fatalf("governance audit key mismatch: %q", got)
 	}
 }
 

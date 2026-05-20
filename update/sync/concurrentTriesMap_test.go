@@ -32,7 +32,7 @@ func TestConcurrentTriesMap_ConcurrentAccesses(t *testing.T) {
 			select {
 			case <-ctx.Done():
 			default:
-				randomID := rnd.Intn(100)
+				randomID, _ := rnd.Intn(100)
 				ctm.setTrie(fmt.Sprintf("%d", randomID), &trieMock.TrieStub{})
 			}
 		}
@@ -42,7 +42,7 @@ func TestConcurrentTriesMap_ConcurrentAccesses(t *testing.T) {
 			select {
 			case <-ctx.Done():
 			default:
-				randomID := rnd.Intn(100)
+				randomID, _ := rnd.Intn(100)
 				ctm.getTrie(fmt.Sprintf("%d", randomID))
 			}
 		}

@@ -52,7 +52,7 @@ func getDefaultBaseProcessor() *baseProcessor {
 			PostProcessTransactionsCalled: func() storage.Cacher {
 				return &cache.CacherStub{
 					GetCalled: func(key []byte) (value interface{}, ok bool) {
-						return []byte("marshalled map"), true
+						return map[block.Type]map[string]data.TransactionHandler{}, true
 					},
 				}
 			},
@@ -349,7 +349,7 @@ func TestBaseProcessor_saveExecutedData(t *testing.T) {
 				PostProcessTransactionsCalled: func() storage.Cacher {
 					return &cache.CacherStub{
 						GetCalled: func(key []byte) (value interface{}, ok bool) {
-							return []byte("marshalled map"), true
+							return map[block.Type]map[string]data.TransactionHandler{}, true
 						},
 					}
 				},
@@ -498,6 +498,37 @@ func TestBaseProcessor_saveExecutedData(t *testing.T) {
 
 			err := bp.saveExecutedData(header)
 			require.True(t, errors.Is(err, process.ErrMissingHeader))
+		})
+		t.Run("wrong cached transactions type should return error", func(t *testing.T) {
+			t.Parallel()
+
+			bp := getDefaultBaseProcessor()
+			bp.store = &commonStorage.ChainStorerStub{
+				GetStorerCalled: func(unitType dataRetriever.UnitType) (storage.Storer, error) {
+					require.Fail(t, "should not be called")
+					return nil, nil
+				},
+			}
+			bp.dataPool = &dataRetrieverMock.PoolsHolderStub{
+				PostProcessTransactionsCalled: func() storage.Cacher {
+					return &cache.CacherStub{
+						GetCalled: func(key []byte) (value interface{}, ok bool) {
+							return []byte("marshalled map"), true
+						},
+					}
+				},
+				ExecutedMiniBlocksCalled: func() storage.Cacher {
+					return &cache.CacherStub{
+						GetCalled: func(key []byte) (value interface{}, ok bool) {
+							return nil, false
+						},
+					}
+				},
+			}
+			header := getHeaderHandlerWithMiniBlocksHeaders([]block.MiniBlockHeader{})
+
+			err := bp.saveExecutedData(header)
+			require.ErrorIs(t, err, process.ErrWrongTypeAssertion)
 		})
 		t.Run("putTransactionsIntoStorage fails due to invalid block type", func(t *testing.T) {
 			t.Parallel()

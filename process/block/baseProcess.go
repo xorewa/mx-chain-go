@@ -3301,6 +3301,7 @@ func (bp *baseProcessor) saveIntermediateTxs(headerHash []byte) error {
 	cachedIntermediateTxsMap, ok := cachedIntermediateTxs.(map[block.Type]map[string]data.TransactionHandler)
 	if !ok {
 		log.Warn("saveIntermediateTxs: intermediateTxs cannot cast to concrete type", "hash", headerHash)
+		return fmt.Errorf("%w for header %s", process.ErrWrongTypeAssertion, hex.EncodeToString(headerHash))
 	}
 
 	for blockType, cachedTransactionsMap := range cachedIntermediateTxsMap {

@@ -1738,6 +1738,22 @@ func TestIndexHashedNodesCoordinator_GetValidatorsIndexesInvalidPubKey(t *testin
 	require.Nil(t, indexes)
 }
 
+func TestIndexHashedNodesCoordinator_GetValidatorsIndexesMissingEpochConfigShouldErr(t *testing.T) {
+	t.Parallel()
+
+	args := createArguments()
+	ihnc, err := NewIndexHashedNodesCoordinator(args)
+	require.Nil(t, err)
+
+	ihnc.mutNodesConfig.Lock()
+	delete(ihnc.nodesConfig, 0)
+	ihnc.mutNodesConfig.Unlock()
+
+	indexes, err := ihnc.GetValidatorsIndexes([]string{"pk1_shard0"}, 0)
+	require.True(t, errors.Is(err, ErrEpochNodesConfigDoesNotExist))
+	require.Nil(t, indexes)
+}
+
 func TestIndexHashedNodesCoordinator_GetSavedStateKey(t *testing.T) {
 	t.Parallel()
 

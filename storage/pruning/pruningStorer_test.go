@@ -1177,11 +1177,13 @@ func TestPruningStorer_ConcurrentOperations(t *testing.T) {
 				_, _ = ps.Get([]byte("key"))
 				log.Debug("called Get")
 			case 4:
-				epoch := uint32(rnd.Intn(100))
+				randomEpoch, _ := rnd.Intn(100)
+				epoch := uint32(randomEpoch)
 				_, _ = ps.GetFromEpoch([]byte("key"), epoch)
 				log.Debug("called GetFromEpoch", "epoch", epoch)
 			case 5:
-				epoch := uint32(rnd.Intn(100))
+				randomEpoch, _ := rnd.Intn(100)
+				epoch := uint32(randomEpoch)
 				_, _ = ps.GetBulkFromEpoch([][]byte{[]byte("key")}, epoch)
 				log.Debug("called GetBulkFromEpoch", "epoch", epoch)
 			case 6:

@@ -641,18 +641,21 @@ func (ihnc *indexHashedNodesCoordinator) GetValidatorsIndexes(
 ) ([]uint64, error) {
 	signersIndexes := make([]uint64, 0)
 
-	validatorsPubKeys, err := ihnc.GetAllEligibleValidatorsPublicKeys(epoch)
-	if err != nil {
-		return nil, err
-	}
-
 	ihnc.mutNodesConfig.RLock()
-	nodesConfig := ihnc.nodesConfig[epoch]
+	nodesConfig, ok := ihnc.nodesConfig[epoch]
 	ihnc.mutNodesConfig.RUnlock()
 
+	if !ok || nodesConfig == nil {
+		return nil, fmt.Errorf("%w epoch=%v", ErrEpochNodesConfigDoesNotExist, epoch)
+	}
+
+	nodesConfig.mutNodesMaps.RLock()
+	defer nodesConfig.mutNodesMaps.RUnlock()
+
+	validatorsPubKeys := nodesConfig.eligibleMap[nodesConfig.shardID]
 	for _, pubKey := range publicKeys {
-		for index, value := range validatorsPubKeys[nodesConfig.shardID] {
-			if bytes.Equal([]byte(pubKey), value) {
+		for index, value := range validatorsPubKeys {
+			if bytes.Equal([]byte(pubKey), value.PubKey()) {
 				signersIndexes = append(signersIndexes, uint64(index))
 			}
 		}
@@ -660,8 +663,8 @@ func (ihnc *indexHashedNodesCoordinator) GetValidatorsIndexes(
 
 	if len(publicKeys) != len(signersIndexes) {
 		strHaving := "having the following keys: \n"
-		for index, value := range validatorsPubKeys[nodesConfig.shardID] {
-			strHaving += fmt.Sprintf(" index %d  key %s\n", index, logger.DisplayByteSlice(value))
+		for index, value := range validatorsPubKeys {
+			strHaving += fmt.Sprintf(" index %d  key %s\n", index, logger.DisplayByteSlice(value.PubKey()))
 		}
 
 		strNeeded := "needed the following keys: \n"

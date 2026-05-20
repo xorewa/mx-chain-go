@@ -399,9 +399,11 @@ func TestFullHistoryPruningStorer_ConcurrentOperations(t *testing.T) {
 			case 3:
 				_, _ = fhps.Get([]byte("key"))
 			case 4:
-				_, _ = fhps.GetFromEpoch([]byte("key"), uint32(rnd.Intn(100)))
+				randomEpoch, _ := rnd.Intn(100)
+				_, _ = fhps.GetFromEpoch([]byte("key"), uint32(randomEpoch))
 			case 5:
-				_, _ = fhps.GetBulkFromEpoch([][]byte{[]byte("key")}, uint32(rnd.Intn(100)))
+				randomEpoch, _ := rnd.Intn(100)
+				_, _ = fhps.GetBulkFromEpoch([][]byte{[]byte("key")}, uint32(randomEpoch))
 			}
 			wg.Done()
 		}(idx)
