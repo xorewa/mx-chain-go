@@ -225,7 +225,7 @@ replace github.com/multiversx/mx-chain-communication-go => github.com/mangonui/m
 
 replace github.com/multiversx/mx-chain-vm-go => github.com/mangonui/mx-chain-vm-go v0.0.0-20260521130821-51bd50d9e869
 
-replace github.com/multiversx/mx-chain-es-indexer-go => github.com/mangonui/mx-chain-es-indexer-go v0.0.0-20260521130821-76e651935b73
+replace github.com/multiversx/mx-chain-es-indexer-go => github.com/mangonui/mx-chain-es-indexer-go v0.0.0-20260521134216-4761bf975b5c
 
 replace github.com/multiversx/mx-chain-vm-v1_2-go => github.com/mangonui/mx-chain-vm-v1_2-go v0.0.0-20260521130821-8ac77c27cb7e
 
