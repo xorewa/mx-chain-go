@@ -62,9 +62,8 @@ func TestTimeToUnixInEpoch(t *testing.T) {
 		unixTimeStamp := common.GetGenesisUnixTimestampFromStartTime(tt, enableEpochsHandler)
 		require.Equal(t, tt.UnixMilli(), unixTimeStamp)
 
-		// should not work properly to get start time from unix timestamp as milliseconds
 		timeFromUnixTimeStamp := common.GetGenesisStartTimeFromUnixTimestamp(unixTimeStamp, enableEpochsHandler)
-		require.NotEqual(t, tt, timeFromUnixTimeStamp)
+		require.Equal(t, tt, timeFromUnixTimeStamp)
 	})
 
 	t.Run("without supernova flag enabled", func(t *testing.T) {
@@ -84,6 +83,25 @@ func TestTimeToUnixInEpoch(t *testing.T) {
 		timeFromUnixTimeStamp := common.GetGenesisStartTimeFromUnixTimestamp(unixTimeStamp, enableEpochsHandler)
 		require.Equal(t, tt, timeFromUnixTimeStamp)
 	})
+}
+
+func TestGenesisTimestampRoundTripSupernovaKeepsMillisecondPrecision(t *testing.T) {
+	t.Parallel()
+
+	enableEpochsHandler := &enableEpochsHandlerMock.EnableEpochsHandlerStub{
+		IsFlagEnabledInEpochCalled: func(flag core.EnableEpochFlag, epoch uint32) bool {
+			return flag == common.SupernovaFlag && epoch == 0
+		},
+	}
+
+	tt := time.Date(2026, time.May, 21, 9, 13, 17, 456*int(time.Millisecond), time.UTC)
+
+	unixTimeStamp := common.GetGenesisUnixTimestampFromStartTime(tt, enableEpochsHandler)
+	require.Equal(t, tt.UnixMilli(), unixTimeStamp)
+
+	timeFromUnixTimeStamp := common.GetGenesisStartTimeFromUnixTimestamp(unixTimeStamp, enableEpochsHandler)
+	require.True(t, timeFromUnixTimeStamp.Equal(tt))
+	require.Equal(t, tt.UnixMilli(), timeFromUnixTimeStamp.UnixMilli())
 }
 
 func TestTimeDurationToUnix(t *testing.T) {

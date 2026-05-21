@@ -36,16 +36,17 @@ func GetGenesisUnixTimestampFromStartTime(
 }
 
 // GetGenesisStartTimeFromUnixTimestamp returns genesis time based on the provided
-// unix timestamp as seconds
+// unix timestamp. Before Supernova the value is expressed in seconds; once
+// Supernova is active at genesis, the value is expressed in milliseconds.
 func GetGenesisStartTimeFromUnixTimestamp(
-	unixTimestampAsSeconds int64,
+	unixTimestamp int64,
 	enableEpochsHandler EnableEpochsHandler,
 ) time.Time {
 	if enableEpochsHandler.IsFlagEnabledInEpoch(SupernovaFlag, genesisEpoch) {
-		return time.UnixMilli(unixTimestampAsSeconds * numMillisecondsInSec)
+		return time.UnixMilli(unixTimestamp)
 	}
 
-	return time.Unix(unixTimestampAsSeconds, 0)
+	return time.Unix(unixTimestamp, 0)
 }
 
 // CheckRoundDuration checks round duration based on current configuration
