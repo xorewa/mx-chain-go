@@ -5,7 +5,7 @@ startProxy() {
   setTerminalLayout "even-vertical"
 
   setWorkdirForNextCommands "$TESTNETDIR/proxy"
-  runCommandInTerminal "./proxy" $1
+  runCommandInTerminal "./proxy --start-swagger-ui -log-save -log-level $LOGLEVEL |& tee stdout.txt" $1
 }
 
 pauseProxy() {

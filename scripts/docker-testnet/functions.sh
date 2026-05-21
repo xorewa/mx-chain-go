@@ -227,5 +227,5 @@ startProxyDocker() {
       -v $TESTNETDIR/proxy/config:/mx-chain-proxy-go/cmd/proxy/config \
       --network ${DOCKER_NETWORK_NAME} \
       -p $PORT_PROXY:8080 \
-      proxy:dev
+      proxy:dev --start-swagger-ui -log-save -log-level "$LOGLEVEL"
 }

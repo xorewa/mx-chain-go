@@ -248,19 +248,60 @@ func TestConvertToEvenHexBigInt(t *testing.T) {
 func TestConvertShardIDToUint32(t *testing.T) {
 	t.Parallel()
 
-	shardID, err := core.ConvertShardIDToUint32("metachain")
-	assert.NoError(t, err)
-	assert.Equal(t, core.MetachainShardId, shardID)
+	testCases := []struct {
+		name     string
+		input    string
+		expected uint32
+		wantErr  bool
+	}{
+		{
+			name:     "metachain",
+			input:    "metachain",
+			expected: core.MetachainShardId,
+		},
+		{
+			name:     "zero",
+			input:    "0",
+			expected: 0,
+		},
+		{
+			name:    "non numeric",
+			input:   "wrongID",
+			wantErr: true,
+		},
+		{
+			name:    "negative one rejected",
+			input:   "-1",
+			wantErr: true,
+		},
+		{
+			name:    "negative shard rejected",
+			input:   "-42",
+			wantErr: true,
+		},
+		{
+			name:    "uint32 overflow rejected",
+			input:   "4294967296",
+			wantErr: true,
+		},
+	}
 
-	id := uint32(0)
-	shardIDStr := fmt.Sprintf("%d", id)
-	shardID, err = core.ConvertShardIDToUint32(shardIDStr)
-	assert.NoError(t, err)
-	assert.Equal(t, id, shardID)
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	shardID, err = core.ConvertShardIDToUint32("wrongID")
-	assert.Error(t, err)
-	assert.Equal(t, uint32(0), shardID)
+			shardID, err := core.ConvertShardIDToUint32(tc.input)
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, uint32(0), shardID)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, shardID)
+		})
+	}
 }
 
 func TestAssignShardForPubKeyWhenNotSpecified(t *testing.T) {
