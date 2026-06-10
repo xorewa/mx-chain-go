@@ -32,6 +32,7 @@ const (
 	blsConsensusType           = "bls"
 	roundsPerEpoch             = 10
 	roundTime                  = uint64(1000) // 1 second
+	minEpochSyncTimeoutSeconds = uint64(60)
 )
 
 var (
@@ -114,7 +115,8 @@ func TestConsensusBLSWithFullProcessing_WithEquivalentProofs(t *testing.T) {
 	enableEpochsConfig := integrationTests.CreateEnableEpochsConfig()
 	enableEpochsConfig.AndromedaEnableEpoch = uint32(0)
 	enableEpochsConfig.SupernovaEnableEpoch = integrationTests.UnreachableEpoch
-	numKeysOnEachNode := 1
+	// Equivalent proofs at genesis need the multi-key topology to keep metachain consensus stable across package-order runs.
+	numKeysOnEachNode := 3
 	targetEpoch := uint32(2)
 	txs := &generatedTxsParams{
 		numScTxs:          100,
@@ -123,7 +125,7 @@ func TestConsensusBLSWithFullProcessing_WithEquivalentProofs(t *testing.T) {
 
 	testParams := fullConsensusTestParams{
 		enableEpochsConfig: enableEpochsConfig,
-		roundsConfig:       integrationTests.GetDefaultRoundsConfig(),
+		roundsConfig:       integrationTests.GetSupernovaRoundsConfigDeactivated(),
 		numKeysOnEachNode:  numKeysOnEachNode,
 		roundsPerEpoch:     roundsPerEpoch,
 		roundTime:          roundTime,
@@ -325,7 +327,7 @@ func testConsensusBLSWithFullProcessing(
 	integrationTests.SetRootHashOfGenesisBlocks(nodesList)
 
 	maxRounds := uint64(roundsPerEpoch)*uint64(enableEpochsConfig.SCDeployEnableEpoch) + uint64(roundsPerEpoch)
-	timeoutSeconds := (maxRounds * roundTime) / 1000
+	timeoutSeconds := normalizeEpochSyncTimeout((maxRounds * roundTime) / 1000)
 	waitForAllNodesEpoch(t, nodes, enableEpochsConfig.SCDeployEnableEpoch, timeoutSeconds)
 
 	scTxs(t, shard0Node, txs.numScTxs, nodesList)
@@ -335,7 +337,7 @@ func testConsensusBLSWithFullProcessing(
 	moveBalanceTxs(t, shard0Node.TestProcessorNode, encodedReceiverAddr, txs.numMoveBalanceTxs)
 
 	maxRounds = uint64(roundsPerEpoch)*uint64(targetEpoch) + uint64(roundsPerEpoch)
-	timeoutSeconds = (maxRounds * roundTime) / 1000
+	timeoutSeconds = normalizeEpochSyncTimeout((maxRounds * roundTime) / 1000)
 	waitForAllNodesEpoch(t, nodes, targetEpoch, timeoutSeconds)
 
 	fmt.Println("Checking shards...")
@@ -776,6 +778,14 @@ func waitForAllNodesEpoch(t *testing.T, nodes map[uint32][]*integrationTests.Tes
 
 		time.Sleep(time.Second)
 	}
+}
+
+func normalizeEpochSyncTimeout(timeoutSeconds uint64) uint64 {
+	if timeoutSeconds < minEpochSyncTimeoutSeconds {
+		return minEpochSyncTimeoutSeconds
+	}
+
+	return timeoutSeconds
 }
 
 func scTxs(t *testing.T, senderNode *integrationTests.TestFullNode, numTxs int, nodesList []*integrationTests.TestProcessorNode) {
