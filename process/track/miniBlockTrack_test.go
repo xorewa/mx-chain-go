@@ -137,7 +137,7 @@ func TestReceivedMiniBlock_ShouldReturnIfKeyIsNil(t *testing.T) {
 
 	wasCalled := false
 	blockTransactionsPool := &testscommon.ShardedDataStub{
-		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string) {
+		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string, nonce uint64) {
 			wasCalled = true
 		},
 	}
@@ -155,7 +155,7 @@ func TestReceivedMiniBlock_ShouldReturnIfWrongTypeAssertion(t *testing.T) {
 
 	wasCalled := false
 	blockTransactionsPool := &testscommon.ShardedDataStub{
-		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string) {
+		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string, nonce uint64) {
 			wasCalled = true
 		},
 	}
@@ -173,7 +173,7 @@ func TestReceivedMiniBlock_ShouldReturnIfMiniBlockIsNotCrossShardDestMe(t *testi
 
 	wasCalled := false
 	blockTransactionsPool := &testscommon.ShardedDataStub{
-		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string) {
+		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string, nonce uint64) {
 			wasCalled = true
 		},
 	}
@@ -191,7 +191,7 @@ func TestReceivedMiniBlock_ShouldReturnIfMiniBlockTypeIsWrong(t *testing.T) {
 
 	wasCalled := false
 	blockTransactionsPool := &testscommon.ShardedDataStub{
-		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string) {
+		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string, nonce uint64) {
 			wasCalled = true
 		},
 	}
@@ -214,7 +214,7 @@ func TestReceivedMiniBlock_ShouldWork(t *testing.T) {
 
 	wasCalled := false
 	blockTransactionsPool := &testscommon.ShardedDataStub{
-		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string) {
+		ImmunizeSetOfDataAgainstEvictionCalled: func(keys [][]byte, destCacheId string, nonce uint64) {
 			wasCalled = true
 		},
 	}

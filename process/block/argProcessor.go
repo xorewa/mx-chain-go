@@ -97,6 +97,7 @@ type ArgBaseProcessor struct {
 	ScheduledTxsExecutionHandler       process.ScheduledTxsExecutionHandler
 	ScheduledMiniBlocksEnableEpoch     uint32
 	ProcessedMiniBlocksTracker         process.ProcessedMiniBlocksTracker
+	MiniBlockTracker                   process.MiniBlockTracker
 	ReceiptsRepository                 receiptsRepository
 	BlockProcessingCutoffHandler       cutoff.BlockProcessingCutoffHandler
 	ManagedPeersHolder                 common.ManagedPeersHolder

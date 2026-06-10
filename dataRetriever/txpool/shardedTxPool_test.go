@@ -470,7 +470,7 @@ func TestShardedTxPool_ImmunizeSetOfDataAgainstEviction(t *testing.T) {
 
 	poolAsInterface, _ := newTxPoolToTest()
 	pool := poolAsInterface.(*shardedTxPool)
-	pool.ImmunizeSetOfDataAgainstEviction([][]byte{[]byte("hash")}, "0")
+	pool.ImmunizeSetOfDataAgainstEviction([][]byte{[]byte("hash")}, "0", 0)
 }
 
 func Test_IsInterfaceNil(t *testing.T) {

@@ -1488,6 +1488,9 @@ var ErrNilTxCache = errors.New("nil tx cache")
 // ErrNilAOTSelector signals that a nil AOT selector has been provided
 var ErrNilAOTSelector = errors.New("nil AOT selector")
 
+// ErrNilMiniBlockTracker signals that a nil miniblock tracker was provided
+var ErrNilMiniBlockTracker = errors.New("nil miniblock tracker")
+
 // ErrNonceGapTooLarge signals that nonce gap between finalized and proposed shard headers is too large
 var ErrNonceGapTooLarge = errors.New("nonce gap between finalized and proposed shard headers is too large")
 

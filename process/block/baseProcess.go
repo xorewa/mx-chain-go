@@ -141,6 +141,7 @@ type baseProcessor struct {
 	lastRestartNonce              uint64
 	pruningDelay                  uint32
 	processedMiniBlocksTracker    process.ProcessedMiniBlocksTracker
+	miniBlockTracker              process.MiniBlockTracker
 	receiptsRepository            receiptsRepository
 
 	mutNonceOfFirstCommittedBlock sync.RWMutex
@@ -240,6 +241,7 @@ func NewBaseProcessor(arguments ArgBaseProcessor) (*baseProcessor, error) {
 		scheduledTxsExecutionHandler:       arguments.ScheduledTxsExecutionHandler,
 		pruningDelay:                       pruningDelay,
 		processedMiniBlocksTracker:         arguments.ProcessedMiniBlocksTracker,
+		miniBlockTracker:                   arguments.MiniBlockTracker,
 		receiptsRepository:                 arguments.ReceiptsRepository,
 		processDebugger:                    processDebugger,
 		outportDataProvider:                arguments.OutportDataProvider,

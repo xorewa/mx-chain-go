@@ -2121,6 +2121,11 @@ func (mp *metaProcessor) saveLastNotarizedHeader(metaHeader data.MetaHeaderHandl
 		hash := lastCrossNotarizedHeaderForShard[shardID].hash
 		mp.blockTracker.AddCrossNotarizedHeader(shardID, hdr, hash)
 		DisplayLastNotarized(mp.marshalizer, mp.hasher, hdr, shardID)
+
+		if !check.IfNil(hdr) && !check.IfNil(mp.miniBlockTracker) {
+			threshold := hdr.GetNonce() + 1
+			mp.miniBlockTracker.ReleaseImmunityForCommittedShardBlocks(shardID, threshold)
+		}
 	}
 
 	return nil

@@ -1056,6 +1056,13 @@ type BlockTracker interface {
 	IsInterfaceNil() bool
 }
 
+// MiniBlockTracker tracks confirmation status of cross-shard miniblocks and releases transaction-pool immunity on commit.
+type MiniBlockTracker interface {
+	ReleaseImmunityForCommittedMetaBlocks(threshold uint64)
+	ReleaseImmunityForCommittedShardBlocks(senderShard uint32, threshold uint64)
+	IsInterfaceNil() bool
+}
+
 // FloodPreventer defines the behavior of a component that is able to signal that too many events occurred
 // on a provided identifier between Reset calls
 type FloodPreventer interface {
