@@ -1324,20 +1324,23 @@ func TestEnableEpochConfig(t *testing.T) {
 	# BarnardOpcodesEnableEpoch represents the epoch when Barnard opcodes will be enabled
 	BarnardOpcodesEnableEpoch = 110
 
-    # AutomaticActivationOfNodesDisableEpoch represents the epoch when automatic activation of nodes for validators is disabled
-    AutomaticActivationOfNodesDisableEpoch = 111
+    # FailConditionallyEnableEpoch represents the epoch when unsafe-mode conditional VM errors will be enabled
+    FailConditionallyEnableEpoch = 111
 
     # FixGetBalanceEnableEpoch represents the epoch when get balance opcode fix is enabled
     FixGetBalanceEnableEpoch = 112
 
+    # AutomaticActivationOfNodesDisableEpoch represents the epoch when automatic activation of nodes for validators is disabled
+    AutomaticActivationOfNodesDisableEpoch = 113
+
     # RelayedTransactionsV1V2DisableEpoch represents the epoch when relayed transactions v1 and v2 are disabled
-    RelayedTransactionsV1V2DisableEpoch = 113
+    RelayedTransactionsV1V2DisableEpoch = 114
 
     # ConsumedGasInEconomicsFixEnableEpoch represents the epoch when consumed gas in accumulated economics is fixed
-    ConsumedGasInEconomicsFixEnableEpoch = 114
+    ConsumedGasInEconomicsFixEnableEpoch = 115
 
     # SupernovaEnableEpoch represents the epoch when sub-second finality will be enabled
-    SupernovaEnableEpoch = 115
+    SupernovaEnableEpoch = 116
 
     # MaxNodesChangeEnableEpoch holds configuration for changing the maximum number of nodes and the enabling epoch
     MaxNodesChangeEnableEpoch = [
@@ -1469,11 +1472,12 @@ func TestEnableEpochConfig(t *testing.T) {
 			FixBackTransferOPCODEEnableEpoch:                         108,
 			ValidationOnGobDecodeEnableEpoch:                         109,
 			BarnardOpcodesEnableEpoch:                                110,
-			AutomaticActivationOfNodesDisableEpoch:                   111,
+			FailConditionallyEnableEpoch:                             111,
 			FixGetBalanceEnableEpoch:                                 112,
-			RelayedTransactionsV1V2DisableEpoch:                      113,
-			ConsumedGasInEconomicsFixEnableEpoch:                     114,
-			SupernovaEnableEpoch:                                     115,
+			AutomaticActivationOfNodesDisableEpoch:                   113,
+			RelayedTransactionsV1V2DisableEpoch:                      114,
+			ConsumedGasInEconomicsFixEnableEpoch:                     115,
+			SupernovaEnableEpoch:                                     116,
 			MaxNodesChangeEnableEpoch: []MaxNodesChangeConfig{
 				{
 					EpochEnable:            44,

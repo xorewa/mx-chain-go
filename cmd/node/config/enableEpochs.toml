@@ -366,6 +366,9 @@
     # BarnardOpcodesEnableEpoch represents the epoch when Barnard opcodes will be enabled
     BarnardOpcodesEnableEpoch = 1
 
+    # FailConditionallyEnableEpoch represents the epoch when unsafe-mode conditional VM errors will be enabled
+    FailConditionallyEnableEpoch = 1
+
     # FixGetBalanceEnableEpoch represents the epoch when get balance opcode fix is enabled
     FixGetBalanceEnableEpoch = 1
 

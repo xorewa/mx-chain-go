@@ -479,6 +479,7 @@ func TestStatusMetrics_EnableEpochMetrics(t *testing.T) {
 	sm.SetUInt64Value(common.MetricFixBackTransferOPCODEEnableEpoch, uint64(4))
 	sm.SetUInt64Value(common.MetricValidationOnGobDecodeEnableEpoch, uint64(4))
 	sm.SetUInt64Value(common.MetricBarnardOpcodesEnableEpoch, uint64(4))
+	sm.SetUInt64Value(common.MetricFailConditionallyEnableEpoch, uint64(4))
 	sm.SetUInt64Value(common.MetricAutomaticActivationOfNodesDisableEpoch, uint64(4))
 	sm.SetUInt64Value(common.MetricFixGetBalanceEnableEpoch, uint64(4))
 	sm.SetUInt64Value(common.MetricTailInflationEnableEpoch, uint64(4))
@@ -620,6 +621,7 @@ func TestStatusMetrics_EnableEpochMetrics(t *testing.T) {
 		common.MetricFixBackTransferOPCODEEnableEpoch:                         uint64(4),
 		common.MetricValidationOnGobDecodeEnableEpoch:                         uint64(4),
 		common.MetricBarnardOpcodesEnableEpoch:                                uint64(4),
+		common.MetricFailConditionallyEnableEpoch:                             uint64(4),
 		common.MetricAutomaticActivationOfNodesDisableEpoch:                   uint64(4),
 		common.MetricFixGetBalanceEnableEpoch:                                 uint64(4),
 		common.MetricTailInflationEnableEpoch:                                 uint64(4),

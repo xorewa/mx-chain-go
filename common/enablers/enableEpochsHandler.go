@@ -996,6 +996,13 @@ func (handler *enableEpochsHandler) createAllFlagsMap() {
 			activationEpoch:     handler.enableEpochsConfig.BarnardOpcodesEnableEpoch,
 			activationEpochName: "BarnardOpcodesEnableEpoch",
 		},
+		common.FailConditionallyFlag: {
+			isActiveInEpoch: func(epoch uint32) bool {
+				return epoch >= handler.enableEpochsConfig.FailConditionallyEnableEpoch
+			},
+			activationEpoch:     handler.enableEpochsConfig.FailConditionallyEnableEpoch,
+			activationEpochName: "FailConditionallyEnableEpoch",
+		},
 		common.FixGetBalanceFlag: {
 			isActiveInEpoch: func(epoch uint32) bool {
 				return epoch >= handler.enableEpochsConfig.FixGetBalanceEnableEpoch

@@ -430,6 +430,7 @@ func (sm *statusMetrics) EnableEpochsMetrics() (map[string]interface{}, error) {
 	enableEpochsMetrics[common.MetricFixBackTransferOPCODEEnableEpoch] = sm.uint64Metrics[common.MetricFixBackTransferOPCODEEnableEpoch]
 	enableEpochsMetrics[common.MetricValidationOnGobDecodeEnableEpoch] = sm.uint64Metrics[common.MetricValidationOnGobDecodeEnableEpoch]
 	enableEpochsMetrics[common.MetricBarnardOpcodesEnableEpoch] = sm.uint64Metrics[common.MetricBarnardOpcodesEnableEpoch]
+	enableEpochsMetrics[common.MetricFailConditionallyEnableEpoch] = sm.uint64Metrics[common.MetricFailConditionallyEnableEpoch]
 	enableEpochsMetrics[common.MetricAutomaticActivationOfNodesDisableEpoch] = sm.uint64Metrics[common.MetricAutomaticActivationOfNodesDisableEpoch]
 	enableEpochsMetrics[common.MetricFixGetBalanceEnableEpoch] = sm.uint64Metrics[common.MetricFixGetBalanceEnableEpoch]
 	enableEpochsMetrics[common.MetricTailInflationEnableEpoch] = sm.uint64Metrics[common.MetricTailInflationEnableEpoch]

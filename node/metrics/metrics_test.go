@@ -219,10 +219,11 @@ func TestInitConfigMetrics(t *testing.T) {
 			FixBackTransferOPCODEEnableEpoch:                         111,
 			ValidationOnGobDecodeEnableEpoch:                         112,
 			BarnardOpcodesEnableEpoch:                                113,
-			AutomaticActivationOfNodesDisableEpoch:                   114,
-			FixGetBalanceEnableEpoch:                                 115,
-			RelayedTransactionsV1V2DisableEpoch:                      116,
-			SupernovaEnableEpoch:                                     118, // tail inflation 117 comes from EconomicsConfig
+			FailConditionallyEnableEpoch:                             114,
+			AutomaticActivationOfNodesDisableEpoch:                   115,
+			FixGetBalanceEnableEpoch:                                 116,
+			RelayedTransactionsV1V2DisableEpoch:                      117,
+			SupernovaEnableEpoch:                                     119, // tail inflation 118 comes from EconomicsConfig
 			MaxNodesChangeEnableEpoch: []config.MaxNodesChangeConfig{
 				{
 					EpochEnable:            0,
@@ -350,11 +351,12 @@ func TestInitConfigMetrics(t *testing.T) {
 		"erd_fix_back_transfer_opcode_enable_epoch":                            uint32(111),
 		"erd_validation_on_gobdecode_enable_epoch":                             uint32(112),
 		"erd_barnard_opcodes_enable_epoch":                                     uint32(113),
-		"erd_automatic_activation_of_nodes_disable_epoch":                      uint32(114),
-		"erd_fix_get_balance_enable_epoch":                                     uint32(115),
-		"erd_relayed_transactions_v1_v2_disable_epoch":                         uint32(116),
-		"erd_tail_inflation_enable_epoch":                                      uint32(117),
-		"erd_supernova_enable_epoch":                                           uint32(118),
+		"erd_fail_conditionally_enable_epoch":                                  uint32(114),
+		"erd_automatic_activation_of_nodes_disable_epoch":                      uint32(115),
+		"erd_fix_get_balance_enable_epoch":                                     uint32(116),
+		"erd_relayed_transactions_v1_v2_disable_epoch":                         uint32(117),
+		"erd_tail_inflation_enable_epoch":                                      uint32(118),
+		"erd_supernova_enable_epoch":                                           uint32(119),
 		"erd_max_nodes_change_enable_epoch":                                    nil,
 		"erd_total_supply":                                                     "12345",
 		"erd_hysteresis":                                                       "0.100000",
@@ -369,7 +371,7 @@ func TestInitConfigMetrics(t *testing.T) {
 		GlobalSettings: config.GlobalSettings{
 			GenesisTotalSupply: "12345",
 			TailInflation: config.TailInflationSettings{
-				EnableEpoch: 117,
+				EnableEpoch: 118,
 			},
 		},
 	}

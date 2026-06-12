@@ -794,6 +794,9 @@ const (
 	// MetricBarnardOpcodesEnableEpoch represents the epoch when Barnard opcodes will be enabled
 	MetricBarnardOpcodesEnableEpoch = "erd_barnard_opcodes_enable_epoch"
 
+	// MetricFailConditionallyEnableEpoch represents the epoch when unsafe-mode conditional VM errors will be enabled
+	MetricFailConditionallyEnableEpoch = "erd_fail_conditionally_enable_epoch"
+
 	// MetricFixGetBalanceEnableEpoch represents the epoch when get balance opcode fix is enabled
 	MetricFixGetBalanceEnableEpoch = "erd_fix_get_balance_enable_epoch"
 
@@ -1331,6 +1334,7 @@ const (
 	FixBackTransferOPCODEFlag                           core.EnableEpochFlag = "FixBackTransferOPCODEFlag"
 	ValidationOnGobDecodeFlag                           core.EnableEpochFlag = "ValidationOnGobDecodeFlag"
 	BarnardOpcodesFlag                                  core.EnableEpochFlag = "BarnardOpcodesFlag"
+	FailConditionallyFlag                               core.EnableEpochFlag = "FailConditionallyFlag"
 	AutomaticActivationOfNodesDisableFlag               core.EnableEpochFlag = "AutomaticActivationOfNodesDisableFlag"
 	FixGetBalanceFlag                                   core.EnableEpochFlag = "FixGetBalanceFlag"
 	RelayedTransactionsV1V2DisableFlag                  core.EnableEpochFlag = "RelayedTransactionsV1V2DisableFlag"
