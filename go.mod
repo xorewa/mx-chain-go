@@ -223,7 +223,7 @@ replace github.com/multiversx/mx-chain-scenario-go => github.com/xorewa/mx-chain
 
 replace github.com/multiversx/mx-chain-communication-go => github.com/xorewa/mx-chain-communication-go v0.0.0-20260608125608-94f396ffc1e2
 
-replace github.com/multiversx/mx-chain-vm-go => github.com/xorewa/mx-chain-vm-go v0.0.0-20260610180345-fb63c99c864e
+replace github.com/multiversx/mx-chain-vm-go => github.com/xorewa/mx-chain-vm-go v0.0.0-20260611070729-3b785f3cb4d7
 
 replace github.com/multiversx/mx-chain-es-indexer-go => github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260609091214-5cc7d83c9dbd
 
