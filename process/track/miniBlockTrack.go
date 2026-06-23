@@ -7,6 +7,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
+
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/sharding"
@@ -26,7 +27,6 @@ type miniBlockTrack struct {
 	miniBlocksPool           storage.Cacher
 	shardCoordinator         sharding.Coordinator
 	whitelistHandler         process.WhiteListHandler
-	requireConfirmation      bool
 	mutConfirmedMiniBlocks   sync.RWMutex
 	confirmedMiniBlocks      map[string]confirmedMiniBlockInfo
 }
@@ -34,10 +34,11 @@ type miniBlockTrack struct {
 // NewMiniBlockTrack creates an object for tracking the received mini blocks
 func NewMiniBlockTrack(
 	dataPool dataRetriever.PoolsHolder,
+	blockTracker process.BlockTracker,
 	shardCoordinator sharding.Coordinator,
 	whitelistHandler process.WhiteListHandler,
 ) (*miniBlockTrack, error) {
-	return newMiniBlockTrack(dataPool, nil, shardCoordinator, whitelistHandler)
+	return newMiniBlockTrack(dataPool, blockTracker, shardCoordinator, whitelistHandler)
 }
 
 // NewMiniBlockTrackWithBlockTracker creates an object for tracking received mini blocks and confirmation headers.
@@ -71,6 +72,9 @@ func newMiniBlockTrack(
 	if check.IfNil(dataPool.MiniBlocks()) {
 		return nil, process.ErrNilMiniBlockPool
 	}
+	if check.IfNil(blockTracker) {
+		return nil, process.ErrNilBlockTracker
+	}
 	if check.IfNil(shardCoordinator) {
 		return nil, process.ErrNilShardCoordinator
 	}
@@ -85,7 +89,6 @@ func newMiniBlockTrack(
 		miniBlocksPool:           dataPool.MiniBlocks(),
 		shardCoordinator:         shardCoordinator,
 		whitelistHandler:         whitelistHandler,
-		requireConfirmation:      !check.IfNil(blockTracker),
 		confirmedMiniBlocks:      make(map[string]confirmedMiniBlockInfo),
 	}
 	handlerID, err := core.UniqueIdentifierWithError()
@@ -138,10 +141,6 @@ func (mbt *miniBlockTrack) getTransactionPool(mbType block.Type) dataRetriever.S
 }
 
 func (mbt *miniBlockTrack) registerBlockTrackerHandlers(blockTracker process.BlockTracker) {
-	if check.IfNil(blockTracker) {
-		return
-	}
-
 	if mbt.shardCoordinator.SelfId() == core.MetachainShardId {
 		blockTracker.RegisterCrossNotarizedHeadersHandler(func(_ uint32, headers []data.HeaderHandler, _ [][]byte) {
 			mbt.registerConfirmedMiniBlocks(headers)
@@ -184,6 +183,7 @@ func (mbt *miniBlockTrack) registerFromMiniBlockHeaders(
 	selfShardID := mbt.shardCoordinator.SelfId()
 	for _, miniBlockHeader := range miniBlockHeaders {
 		receiverShard := miniBlockHeader.GetReceiverShardID()
+		// AllShardId from a metaheader (e.g. rewards) is treated as receiver = self.
 		receiverIsAllShardsMiniBlockFromMetaHeader := receiverShard == core.AllShardId && processingShard == core.MetachainShardId
 		receiverIsRelevantForCurrentShard := receiverShard == selfShardID || receiverIsAllShardsMiniBlockFromMetaHeader
 		senderShard := miniBlockHeader.GetSenderShardID()
@@ -204,6 +204,8 @@ func (mbt *miniBlockTrack) registerFromMiniBlockHeaders(
 			continue
 		}
 
+		// Threshold advance is deferred to commit (see ReleaseImmunityForCommittedMetaBlocks).
+		// Advancing here would release items from older metablocks before this shard executes them.
 		mbt.storeConfirmedMiniBlockInfo(miniBlockHeader.GetHash(), mbInfo)
 		mbt.tryProcessStoredMiniBlock(miniBlockHeader.GetHash())
 	}
@@ -224,6 +226,7 @@ func (mbt *miniBlockTrack) tryProcessStoredMiniBlock(miniBlockHash []byte) {
 }
 
 func (mbt *miniBlockTrack) immunizeMiniBlock(miniBlockHash []byte, miniBlock *block.MiniBlock) {
+	// TODO - stop reusing miniBlock.TxHashes for peer changes, add new fields
 	transactionPool := mbt.getTransactionPool(miniBlock.Type)
 	if check.IfNil(transactionPool) {
 		return
@@ -231,15 +234,7 @@ func (mbt *miniBlockTrack) immunizeMiniBlock(miniBlockHash []byte, miniBlock *bl
 
 	confirmationInfo, ok := mbt.getConfirmedMiniBlockInfo(miniBlockHash)
 	if !ok {
-		if mbt.requireConfirmation {
-			return
-		}
-
-		confirmationInfo = confirmedMiniBlockInfo{
-			cacheID: process.ShardCacherIdentifier(miniBlock.SenderShardID, miniBlock.ReceiverShardID),
-			mbType:  miniBlock.Type,
-			nonce:   0,
-		}
+		return
 	}
 
 	mbt.whitelistHandler.Add(miniBlock.TxHashes)
@@ -284,7 +279,10 @@ func (mbt *miniBlockTrack) removeConfirmedMiniBlockInfo(miniBlockHash []byte, no
 	delete(mbt.confirmedMiniBlocks, key)
 }
 
-// CleanupConfirmedMiniBlocksBelow drops every tracked confirmation whose nonce is strictly below threshold.
+// CleanupConfirmedMiniBlocksBelow drops every tracked confirmation whose nonce
+// is strictly below `threshold`. Called from the shard's commit path alongside
+// SetOldestImmuneNonceForAllCaches so that the local registry doesn't accumulate
+// stale entries for miniblocks that never arrived in the pool.
 func (mbt *miniBlockTrack) CleanupConfirmedMiniBlocksBelow(threshold uint64) {
 	mbt.mutConfirmedMiniBlocks.Lock()
 	defer mbt.mutConfirmedMiniBlocks.Unlock()
@@ -298,7 +296,9 @@ func (mbt *miniBlockTrack) CleanupConfirmedMiniBlocksBelow(threshold uint64) {
 	}
 }
 
-// CleanupConfirmedMiniBlocksBelowForCacheID drops every tracked confirmation whose cacheID matches and nonce is strictly below threshold.
+// CleanupConfirmedMiniBlocksBelowForCacheID drops every tracked confirmation whose
+// cacheID matches and nonce is strictly below `threshold`. Used by the meta commit
+// path where the threshold is per-sender-shard rather than uniform.
 func (mbt *miniBlockTrack) CleanupConfirmedMiniBlocksBelowForCacheID(cacheID string, threshold uint64) {
 	mbt.mutConfirmedMiniBlocks.Lock()
 	defer mbt.mutConfirmedMiniBlocks.Unlock()
@@ -312,7 +312,10 @@ func (mbt *miniBlockTrack) CleanupConfirmedMiniBlocksBelowForCacheID(cacheID str
 	}
 }
 
-// ReleaseImmunityForCommittedMetaBlocks advances the immunity threshold across all pools.
+// ReleaseImmunityForCommittedMetaBlocks advances the immunity threshold uniformly
+// across every tx-pool cache and prunes the local registry for entries below
+// `threshold`. Called from the shard's commit path once the cross-notarized
+// metablock has advanced past (threshold-1).
 func (mbt *miniBlockTrack) ReleaseImmunityForCommittedMetaBlocks(threshold uint64) {
 	if !check.IfNil(mbt.blockTransactionsPool) {
 		mbt.blockTransactionsPool.SetOldestImmuneNonceForAllCaches(threshold)
@@ -326,7 +329,10 @@ func (mbt *miniBlockTrack) ReleaseImmunityForCommittedMetaBlocks(threshold uint6
 	mbt.CleanupConfirmedMiniBlocksBelow(threshold)
 }
 
-// ReleaseImmunityForCommittedShardBlocks advances the immunity threshold for metachain-bound caches from senderShard.
+// ReleaseImmunityForCommittedShardBlocks advances the immunity threshold only on
+// caches with senderShardID = `senderShard` and receiver = metachain, and prunes
+// the local registry for matching entries below `threshold`. Called from the
+// meta processor after its cross-notarized shard header has advanced for `senderShard`.
 func (mbt *miniBlockTrack) ReleaseImmunityForCommittedShardBlocks(senderShard uint32, threshold uint64) {
 	cacheID := process.ShardCacherIdentifier(senderShard, core.MetachainShardId)
 	if !check.IfNil(mbt.blockTransactionsPool) {

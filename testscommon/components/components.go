@@ -143,9 +143,10 @@ func GetStatusCoreArgs(coreComponents factory.CoreComponentsHolder) statusCore.S
 				},
 			},
 		},
-		RatingsConfig:   CreateDummyRatingsConfig(),
-		EconomicsConfig: CreateDummyEconomicsConfig(),
-		CoreComp:        coreComponents,
+		RatingsConfig:              CreateDummyRatingsConfig(),
+		EconomicsConfig:            CreateDummyEconomicsConfig(),
+		SystemSmartContractsConfig: config.SystemSmartContractsConfig{},
+		CoreComp:                   coreComponents,
 	}
 }
 
@@ -413,7 +414,7 @@ func GetProcessComponentsFactoryArgs(shardCoordinator sharding.Coordinator) proc
 func GetBootStrapFactoryArgs() bootstrapComp.BootstrapComponentsFactoryArgs {
 	coreComponents := GetCoreComponents()
 	cryptoComponents := GetCryptoComponents(coreComponents)
-	networkComponents := GetNetworkComponents(cryptoComponents)
+	networkComponents := GetDefaultNetworkComponents()
 	statusCoreComponents := GetStatusCoreComponents()
 	return bootstrapComp.BootstrapComponentsFactoryArgs{
 		Config:               testscommon.GetGeneralConfig(),
@@ -763,10 +764,22 @@ func GetStatusComponentsFactoryArgsAndProcessComponents(shardCoordinator shardin
 func GetNetworkComponents(cryptoComp factory.CryptoComponentsHolder) factory.NetworkComponentsHolder {
 	networkArgs := GetNetworkFactoryArgs()
 	networkArgs.CryptoComponents = cryptoComp
-	networkComponentsFactory, _ := networkComp.NewNetworkComponentsFactory(networkArgs)
-	networkComponents, _ := networkComp.NewManagedNetworkComponents(networkComponentsFactory)
+	networkComponentsFactory, err := networkComp.NewNetworkComponentsFactory(networkArgs)
+	if err != nil {
+		return GetDefaultNetworkComponents()
+	}
+	networkComponents, err := networkComp.NewManagedNetworkComponents(networkComponentsFactory)
+	if err != nil {
+		return GetDefaultNetworkComponents()
+	}
 
-	_ = networkComponents.Create()
+	err = networkComponents.Create()
+	if err != nil {
+		return GetDefaultNetworkComponents()
+	}
+	if networkComponents.NetworkMessenger() == nil || networkComponents.FullArchiveNetworkMessenger() == nil {
+		return GetDefaultNetworkComponents()
+	}
 
 	return networkComponents
 }

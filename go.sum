@@ -616,8 +616,8 @@ github.com/xorewa/bls-go-binary v0.0.0-20250924002409-446538da6433 h1:xk3EPwP73+
 github.com/xorewa/bls-go-binary v0.0.0-20250924002409-446538da6433/go.mod h1:O4Vp1AfR4raRGwFeQpr9X/PQtncEicMoOe6BQt1oX0Y=
 github.com/xorewa/mx-chain-communication-go v0.0.0-20260608125608-94f396ffc1e2 h1:Nre78aTKaHuKb7AjodVTCdURyNRc4kfKWfyb3jU6Nzo=
 github.com/xorewa/mx-chain-communication-go v0.0.0-20260608125608-94f396ffc1e2/go.mod h1:iFfY9ZbLtnx4oNa8iGl7xtOqOnFcp40abmwjJ+EAsaY=
-github.com/xorewa/mx-chain-core-go v0.0.0-20260604191320-30151e35534a h1:MrWtH0BFCeaOVwUP3icAoMPe0Auwgv9Vts17gGqcJJc=
-github.com/xorewa/mx-chain-core-go v0.0.0-20260604191320-30151e35534a/go.mod h1:nx8HPC1fvHcXGXNAUQaMXNQWSMgSWcqST+Od76tuCeI=
+github.com/xorewa/mx-chain-core-go v0.0.0-20260622185646-a558edf5ceda h1:0A0rGEgeKlaQQHONiAUxN/DQMzSFraONLm0IviiXmo8=
+github.com/xorewa/mx-chain-core-go v0.0.0-20260622185646-a558edf5ceda/go.mod h1:nx8HPC1fvHcXGXNAUQaMXNQWSMgSWcqST+Od76tuCeI=
 github.com/xorewa/mx-chain-crypto-go v0.0.0-20260605063708-ba9091969cd6 h1:ysqpkyD6oHlc3lNqRTnpUXXU1i+aRDLRStTS4i0GeTk=
 github.com/xorewa/mx-chain-crypto-go v0.0.0-20260605063708-ba9091969cd6/go.mod h1:ApnxT0gVKleJFA82qDDg5dWuRQSJndmozjp2ywCI1Rk=
 github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260609091214-5cc7d83c9dbd h1:/OD0lqrQqGcwFjkrtj9R3czv0KBm90lEdIc5cyTmuEM=

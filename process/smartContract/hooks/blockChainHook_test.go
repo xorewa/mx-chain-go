@@ -1011,6 +1011,7 @@ func TestBlockChainHookImpl_GettersFromBlockchainCurrentHeader(t *testing.T) {
 		nonce := uint64(37)
 		round := uint64(5)
 		timestamp := uint64(1234)
+		timestampMs := timestamp * 1000
 		randSeed := []byte("a")
 		rootHash := []byte("b")
 		epoch := uint32(7)
@@ -1037,6 +1038,7 @@ func TestBlockChainHookImpl_GettersFromBlockchainCurrentHeader(t *testing.T) {
 		assert.Equal(t, nonce, bh.LastNonce())
 		assert.Equal(t, round, bh.LastRound())
 		assert.Equal(t, timestamp, bh.LastTimeStamp())
+		assert.Equal(t, timestampMs, bh.LastTimeStampMs())
 		assert.Equal(t, epoch, bh.LastEpoch())
 		assert.Equal(t, randSeed, bh.LastRandomSeed())
 		assert.Equal(t, rootHash, bh.GetStateRootHash())
@@ -1048,9 +1050,11 @@ func TestBlockChainHookImpl_GettersFromBlockchainCurrentHeader(t *testing.T) {
 		nonce := uint64(37)
 		round := uint64(5)
 		timestamp := uint64(1234)
+		timestampMs := timestamp * 1000
 		randSeed := []byte("a")
 		rootHash := []byte("b")
 		epoch := uint32(7)
+
 		lastExecutedHdr := &block.Header{
 			Nonce:     nonce,
 			Round:     round,
@@ -1075,8 +1079,50 @@ func TestBlockChainHookImpl_GettersFromBlockchainCurrentHeader(t *testing.T) {
 		assert.Equal(t, nonce, bh.LastNonce())
 		assert.Equal(t, round, bh.LastRound())
 		assert.Equal(t, timestamp, bh.LastTimeStamp())
+		assert.Equal(t, timestampMs, bh.LastTimeStampMs())
 		assert.Equal(t, randSeed, bh.LastRandomSeed())
 		assert.Equal(t, epoch, bh.LastEpoch())
+		assert.Equal(t, rootHash, bh.GetStateRootHash())
+	})
+
+	t.Run("header v2, expect correct values are returned", func(t *testing.T) {
+		t.Parallel()
+
+		nonce := uint64(37)
+		round := uint64(5)
+		timestamp := uint64(1234)
+		timestampMs := timestamp * 1000
+		randSeed := []byte("a")
+		rootHash := []byte("b")
+		epoch := uint32(7)
+		lastExecutedHdr := &block.HeaderV2{
+			Header: &block.Header{
+				Nonce:     nonce,
+				Round:     round,
+				TimeStamp: timestamp,
+				RandSeed:  randSeed,
+				RootHash:  rootHash,
+				Epoch:     epoch,
+			},
+		}
+
+		args := createMockBlockChainHookArgs()
+		args.BlockChain = &testscommon.ChainHandlerStub{
+			GetLastExecutedBlockHeaderCalled: func() data.HeaderHandler {
+				return lastExecutedHdr
+			},
+			GetLastExecutedBlockInfoCalled: func() (uint64, []byte, []byte) {
+				return nonce, []byte("hash"), rootHash
+			},
+		}
+		bh, _ := hooks.NewBlockChainHookImpl(args)
+
+		assert.Equal(t, nonce, bh.LastNonce())
+		assert.Equal(t, round, bh.LastRound())
+		assert.Equal(t, timestamp, bh.LastTimeStamp())
+		assert.Equal(t, timestampMs, bh.LastTimeStampMs())
+		assert.Equal(t, epoch, bh.LastEpoch())
+		assert.Equal(t, randSeed, bh.LastRandomSeed())
 		assert.Equal(t, rootHash, bh.GetStateRootHash())
 	})
 
@@ -1085,7 +1131,8 @@ func TestBlockChainHookImpl_GettersFromBlockchainCurrentHeader(t *testing.T) {
 
 		nonce := uint64(37)
 		round := uint64(5)
-		timestamp := uint64(1234)
+		timestampS := uint64(1234)
+		timestampMs := uint64(1234000)
 		randSeed := []byte("a")
 		rootHash1 := []byte("c")
 		epoch := uint32(7)
@@ -1093,12 +1140,19 @@ func TestBlockChainHookImpl_GettersFromBlockchainCurrentHeader(t *testing.T) {
 		lastExecutedHdr := &block.HeaderV3{
 			Nonce:       nonce,
 			Round:       round,
-			TimestampMs: timestamp,
+			TimestampMs: timestampMs,
 			RandSeed:    randSeed,
 			Epoch:       epoch,
 		}
 
 		args := createMockBlockChainHookArgs()
+
+		enableEpochsHandlerMock := enableEpochsHandlerMock.NewEnableEpochsHandlerStub(common.SupernovaFlag)
+		enableEpochsHandlerMock.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool {
+			return flag == common.SupernovaFlag
+		}
+		args.EnableEpochsHandler = enableEpochsHandlerMock
+
 		args.BlockChain = &testscommon.ChainHandlerStub{
 			GetLastExecutedBlockHeaderCalled: func() data.HeaderHandler {
 				return lastExecutedHdr
@@ -1111,7 +1165,8 @@ func TestBlockChainHookImpl_GettersFromBlockchainCurrentHeader(t *testing.T) {
 
 		assert.Equal(t, nonce, bh.LastNonce())
 		assert.Equal(t, round, bh.LastRound())
-		assert.Equal(t, timestamp, bh.LastTimeStamp())
+		assert.Equal(t, timestampS, bh.LastTimeStamp())
+		assert.Equal(t, timestampMs, bh.LastTimeStampMs())
 		assert.Equal(t, epoch, bh.LastEpoch())
 		assert.Equal(t, randSeed, bh.LastRandomSeed())
 		assert.Equal(t, rootHash1, bh.GetStateRootHash())
@@ -2766,6 +2821,7 @@ func TestBlockChainHookImpl_CurrentTimeStampMs(t *testing.T) {
 		t.Parallel()
 
 		timestamp := uint64(1234)
+		timestampMs := common.ConvertTimeStampSecToMs(timestamp)
 
 		hdr := &block.Header{
 			TimeStamp: timestamp,
@@ -2783,18 +2839,17 @@ func TestBlockChainHookImpl_CurrentTimeStampMs(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.Equal(t, timestamp, bh.CurrentTimeStamp())
-
-		expTimestampMs := common.ConvertTimeStampSecToMs(timestamp)
-		assert.Equal(t, expTimestampMs, bh.CurrentTimeStampMs())
+		assert.Equal(t, timestampMs, bh.CurrentTimeStampMs())
 	})
 
 	t.Run("after supernova", func(t *testing.T) {
 		t.Parallel()
 
+		timestampS := uint64(1234)
 		timestampMs := uint64(1234567)
 
-		hdr := &block.Header{
-			TimeStamp: timestampMs,
+		hdr := &block.HeaderV3{
+			TimestampMs: timestampMs,
 		}
 
 		args := createMockBlockChainHookArgs()
@@ -2808,6 +2863,7 @@ func TestBlockChainHookImpl_CurrentTimeStampMs(t *testing.T) {
 		err := bh.SetCurrentHeader(hdr)
 		require.Nil(t, err)
 
+		assert.Equal(t, timestampS, bh.CurrentTimeStamp())
 		assert.Equal(t, timestampMs, bh.CurrentTimeStampMs())
 	})
 }

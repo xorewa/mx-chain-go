@@ -88,10 +88,15 @@ func GetDefaultCryptoComponents() *mock.CryptoComponentsMock {
 // GetDefaultNetworkComponents -
 func GetDefaultNetworkComponents() *mock.NetworkComponentsMock {
 	return &mock.NetworkComponentsMock{
-		Messenger:       &p2pmocks.MessengerStub{},
-		InputAntiFlood:  &mock.P2PAntifloodHandlerStub{},
-		OutputAntiFlood: &mock.P2PAntifloodHandlerStub{},
-		PeerBlackList:   &mock.PeerBlackListHandlerStub{},
+		Messenger:                        &p2pmocks.MessengerStub{},
+		FullArchiveNetworkMessengerField: &p2pmocks.MessengerStub{},
+		InputAntiFlood:                   &mock.P2PAntifloodHandlerStub{},
+		OutputAntiFlood:                  &mock.P2PAntifloodHandlerStub{},
+		PeerBlackList:                    &mock.PeerBlackListHandlerStub{},
+		PreferredPeersHolder:             &p2pmocks.PeersHolderStub{},
+		PeersRatingHandlerField:          &p2pmocks.PeersRatingHandlerStub{},
+		PeersRatingMonitorField:          &p2pmocks.PeersRatingMonitorStub{},
+		FullArchivePreferredPeersHolder:  &p2pmocks.PeersHolderStub{},
 	}
 }
 

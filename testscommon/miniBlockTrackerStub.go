@@ -1,6 +1,6 @@
 package testscommon
 
-// MiniBlockTrackerStub is a stub for process.MiniBlockTracker.
+// MiniBlockTrackerStub is a stub for process.MiniBlockTracker
 type MiniBlockTrackerStub struct {
 	ReleaseImmunityForCommittedMetaBlocksCalled  func(threshold uint64)
 	ReleaseImmunityForCommittedShardBlocksCalled func(senderShard uint32, threshold uint64)
@@ -20,7 +20,7 @@ func (s *MiniBlockTrackerStub) ReleaseImmunityForCommittedShardBlocks(senderShar
 	}
 }
 
-// IsInterfaceNil -
+// IsInterfaceNil returns true if the receiver is nil
 func (s *MiniBlockTrackerStub) IsInterfaceNil() bool {
 	return s == nil
 }

@@ -48,7 +48,7 @@ func NewCrossTxCache(config ConfigDestinationMe) (*CrossTxCache, error) {
 	return &cache, nil
 }
 
-// ImmunizeTxsAgainstEviction marks items as non-evictable for the provided confirmation nonce.
+// ImmunizeTxsAgainstEviction marks items as non-evictable for the provided confirmation nonce
 func (cache *CrossTxCache) ImmunizeTxsAgainstEviction(keys [][]byte, nonce uint64) {
 	numNow, numFuture := cache.ImmunityCache.ImmunizeKeys(keys, nonce)
 	log.Trace("CrossTxCache.ImmunizeTxsAgainstEviction",
@@ -61,7 +61,7 @@ func (cache *CrossTxCache) ImmunizeTxsAgainstEviction(keys [][]byte, nonce uint6
 	cache.Diagnose(false)
 }
 
-// SetOldestImmuneNonce deactivates immunity below the provided nonce.
+// SetOldestImmuneNonce deactivates immunity below the provided nonce
 func (cache *CrossTxCache) SetOldestImmuneNonce(nonce uint64) {
 	cache.ImmunityCache.SetOldestImmuneNonce(nonce)
 }
