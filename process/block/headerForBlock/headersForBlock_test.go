@@ -914,6 +914,70 @@ func TestHeadersForBlock_ComputeHeadersForCurrentBlock(t *testing.T) {
 	})
 }
 
+func TestHeadersForBlock_RequestMissingFinalityAttestingShardHeaders_AttestationHeaderPresentProofMissingShouldRequestProof(t *testing.T) {
+	t.Parallel()
+
+	td := createTestData(3, false)
+	referenced := td[1]
+	attestation := td[2]
+	proofRequests := make(chan requestedProofForFinality, 1)
+
+	args := createMockArgs()
+	args.ShardCoordinator = &testscommon.ShardsCoordinatorMock{NoShards: 2}
+	args.RequestHandler = &testscommon.RequestHandlerStub{
+		RequestEquivalentProofByHashCalled: func(shardID uint32, hash []byte) {
+			proofRequests <- requestedProofForFinality{
+				shardID: shardID,
+				hash:    append([]byte(nil), hash...),
+			}
+		},
+	}
+	args.EnableEpochsHandler = &enableEpochsHandlerMock.EnableEpochsHandlerStub{
+		IsFlagEnabledInEpochCalled: func(flag core.EnableEpochFlag, epoch uint32) bool {
+			return flag == common.AndromedaFlag
+		},
+	}
+
+	poolsHolder, ok := args.DataPool.(*dataRetriever.PoolsHolderMock)
+	require.True(t, ok)
+
+	headersPoolStub := createPoolsHolderForHeaderRequests()
+	poolsHolder.SetHeadersPool(headersPoolStub)
+	headersPool := poolsHolder.Headers()
+	headersPool.AddHeader(attestation.headerHash, attestation.header)
+
+	proofsPoolStub := createProofsPoolForHeaderRequests()
+	poolsHolder.SetProofsPool(proofsPoolStub)
+
+	hfb, err := headerForBlock.NewHeadersForBlock(args)
+	require.NoError(t, err)
+
+	shardID := referenced.header.GetShardID()
+	hfb.SetBlockFinality(1)
+	hfb.SetHighestHdrNonce(shardID, referenced.header.GetNonce())
+	hfb.SetLastNotarizedShardHeader(
+		shardID,
+		headerForBlock.NewLastNotarizedHeaderInfo(referenced.header, referenced.headerHash, false, false),
+	)
+
+	missingFinalityHeaders := hfb.RequestMissingFinalityAttestingShardHeaders()
+
+	require.Equal(t, uint32(0), missingFinalityHeaders)
+
+	select {
+	case requested := <-proofRequests:
+		require.Equal(t, attestation.header.GetShardID(), requested.shardID)
+		require.Equal(t, attestation.headerHash, requested.hash)
+	case <-time.After(100 * time.Millisecond):
+		require.Fail(t, "missing equivalent proof request for attestation header")
+	}
+}
+
+type requestedProofForFinality struct {
+	shardID uint32
+	hash    []byte
+}
+
 type headerData struct {
 	header     data.HeaderHandler
 	headerHash []byte

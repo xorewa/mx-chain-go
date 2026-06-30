@@ -94,6 +94,7 @@ func GetDefaultNetworkComponents() *mock.NetworkComponentsMock {
 		OutputAntiFlood:                  &mock.P2PAntifloodHandlerStub{},
 		PeerBlackList:                    &mock.PeerBlackListHandlerStub{},
 		PreferredPeersHolder:             &p2pmocks.PeersHolderStub{},
+		PeerHonestyHandlerField:          &testscommon.PeerHonestyHandlerStub{},
 		PeersRatingHandlerField:          &p2pmocks.PeersRatingHandlerStub{},
 		PeersRatingMonitorField:          &p2pmocks.PeersRatingMonitorStub{},
 		FullArchivePreferredPeersHolder:  &p2pmocks.PeersHolderStub{},

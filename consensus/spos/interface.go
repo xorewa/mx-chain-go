@@ -53,6 +53,7 @@ type ConsensusCoreHandler interface {
 	EpochNotifier() process.EpochNotifier
 	InvalidSignersCache() InvalidSignersCache
 	AOTSelector() process.AOTTransactionSelector
+	MessagesHandler() ConsensusService
 	IsInterfaceNil() bool
 }
 

@@ -19,3 +19,6 @@ var ErrTooManyInvalidSigners = errors.New("too many invalid signers")
 
 // ErrValidSignatureFromInvalidSigner signals that a valid signature was received on invalid signers message
 var ErrValidSignatureFromInvalidSigner = errors.New("valid signature from invalid sender")
+
+// ErrHeaderHashMismatch signals that header hash does not match
+var ErrHeaderHashMismatch = errors.New("header hash does not match")

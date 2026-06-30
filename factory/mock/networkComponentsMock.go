@@ -13,6 +13,7 @@ type NetworkComponentsMock struct {
 	OutputAntiFlood                  factory.P2PAntifloodHandler
 	PeerBlackList                    process.PeerBlackListCacher
 	PreferredPeersHolder             factory.PreferredPeersHolderHandler
+	PeerHonestyHandlerField          factory.PeerHonestyHandler
 	PeersRatingHandlerField          p2p.PeersRatingHandler
 	PeersRatingMonitorField          p2p.PeersRatingMonitor
 	FullArchiveNetworkMessengerField p2p.Messenger
@@ -26,7 +27,7 @@ func (ncm *NetworkComponentsMock) PubKeyCacher() process.TimeCacher {
 
 // PeerHonestyHandler -
 func (ncm *NetworkComponentsMock) PeerHonestyHandler() factory.PeerHonestyHandler {
-	return nil
+	return ncm.PeerHonestyHandlerField
 }
 
 // Create -

@@ -574,12 +574,17 @@ func (hfb *headersForBlock) requestMissingFinalityAttestingHeaders(
 		}
 
 		for index := range headers {
+			hdrHash := headersHashes[index]
+			hdr := headers[index]
+
 			hfb.hdrHashAndInfo[string(headersHashes[index])] = newHeaderInfo(
-				headers[index],
+				hdr,
 				false,
 				false,
 				false,
 			)
+
+			hfb.requestProofIfNeeded(hdrHash, hdr)
 		}
 	}
 

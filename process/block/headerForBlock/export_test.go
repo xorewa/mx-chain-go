@@ -48,3 +48,23 @@ func (hfb *headersForBlock) ComputeExistingAndRequestMissingShardHeaders(metaBlo
 func (hfb *headersForBlock) UpdateLastNotarizedBlockForShard(hdr data.ShardHeaderHandler, headerHash []byte) {
 	hfb.updateLastNotarizedBlockForShard(hdr, headerHash)
 }
+
+// SetHighestHdrNonce -
+func (hfb *headersForBlock) SetHighestHdrNonce(shardID uint32, nonce uint64) {
+	hfb.highestHdrNonce[shardID] = nonce
+}
+
+// SetLastNotarizedShardHeader -
+func (hfb *headersForBlock) SetLastNotarizedShardHeader(shardID uint32, headerInfo LastNotarizedHeaderInfoHandler) {
+	hfb.lastNotarizedShardHeaders[shardID] = headerInfo
+}
+
+// SetBlockFinality -
+func (hfb *headersForBlock) SetBlockFinality(finality uint32) {
+	hfb.blockFinality = finality
+}
+
+// RequestMissingFinalityAttestingShardHeaders -
+func (hfb *headersForBlock) RequestMissingFinalityAttestingShardHeaders() uint32 {
+	return hfb.requestMissingFinalityAttestingShardHeaders()
+}
