@@ -277,7 +277,6 @@ func (ccf *consensusComponentsFactory) Create() (*consensusComponents, error) {
 		InvalidSignersCache:           invalidSignersCache,
 		MessagesHandler:               consensusService,
 		AOTSelector:                   ccf.processComponents.AOTSelector(),
-		MessagesHandler:               consensusService,
 	}
 
 	consensusDataContainer, err := spos.NewConsensusCore(
