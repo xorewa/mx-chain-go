@@ -46,8 +46,8 @@ type ConsensusCore struct {
 	equivalentProofsPool          consensus.EquivalentProofsPool
 	epochNotifier                 process.EpochNotifier
 	invalidSignersCache           InvalidSignersCache
-	aotSelector                   process.AOTTransactionSelector
 	messagesHandler               ConsensusService
+	aotSelector                   process.AOTTransactionSelector
 }
 
 // ConsensusCoreArgs store all arguments that are needed to create a ConsensusCore object
@@ -80,8 +80,8 @@ type ConsensusCoreArgs struct {
 	EquivalentProofsPool          consensus.EquivalentProofsPool
 	EpochNotifier                 process.EpochNotifier
 	InvalidSignersCache           InvalidSignersCache
-	AOTSelector                   process.AOTTransactionSelector
 	MessagesHandler               ConsensusService
+	AOTSelector                   process.AOTTransactionSelector
 }
 
 // NewConsensusCore creates a new ConsensusCore instance
@@ -117,8 +117,8 @@ func NewConsensusCore(
 		equivalentProofsPool:          args.EquivalentProofsPool,
 		epochNotifier:                 args.EpochNotifier,
 		invalidSignersCache:           args.InvalidSignersCache,
-		aotSelector:                   args.AOTSelector,
 		messagesHandler:               args.MessagesHandler,
+		aotSelector:                   args.AOTSelector,
 	}
 
 	err := ValidateConsensusCore(consensusCore)
@@ -414,6 +414,11 @@ func (cc *ConsensusCore) SetInvalidSignersCache(cache InvalidSignersCache) {
 	cc.invalidSignersCache = cache
 }
 
+// SetMessagesHandler sets consensus messages handler
+func (cc *ConsensusCore) SetMessagesHandler(messagesHandler ConsensusService) {
+	cc.messagesHandler = messagesHandler
+}
+
 // AOTSelector returns the AOT transaction selector
 func (cc *ConsensusCore) AOTSelector() process.AOTTransactionSelector {
 	return cc.aotSelector
@@ -422,11 +427,6 @@ func (cc *ConsensusCore) AOTSelector() process.AOTTransactionSelector {
 // SetAOTSelector sets the AOT transaction selector
 func (cc *ConsensusCore) SetAOTSelector(selector process.AOTTransactionSelector) {
 	cc.aotSelector = selector
-}
-
-// SetMessagesHandler sets consensus messages handler
-func (cc *ConsensusCore) SetMessagesHandler(messagesHandler ConsensusService) {
-	cc.messagesHandler = messagesHandler
 }
 
 // IsInterfaceNil returns true if there is no value under the interface

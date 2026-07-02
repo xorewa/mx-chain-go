@@ -275,6 +275,7 @@ func (ccf *consensusComponentsFactory) Create() (*consensusComponents, error) {
 		EquivalentProofsPool:          ccf.dataComponents.Datapool().Proofs(),
 		EpochNotifier:                 ccf.coreComponents.EpochNotifier(),
 		InvalidSignersCache:           invalidSignersCache,
+		MessagesHandler:               consensusService,
 		AOTSelector:                   ccf.processComponents.AOTSelector(),
 		MessagesHandler:               consensusService,
 	}
@@ -300,6 +301,7 @@ func (ccf *consensusComponentsFactory) Create() (*consensusComponents, error) {
 		OutportHandler:       ccf.statusComponents.OutportHandler(),
 		SentSignatureTracker: ccf.processComponents.SentSignaturesTracker(),
 		EnableEpochsHandler:  ccf.coreComponents.EnableEpochsHandler(),
+		CommonConfigsHandler: ccf.coreComponents.CommonConfigsHandler(),
 		ChainID:              []byte(ccf.coreComponents.ChainID()),
 		CurrentPid:           ccf.networkComponents.NetworkMessenger().ID(),
 	}

@@ -580,6 +580,43 @@ func TestSubroundBlock_DoBlockJob(t *testing.T) {
 		r := sr.DoBlockJob()
 		assert.False(t, r)
 	})
+
+	t.Run("no remaining time left should return false", func(t *testing.T) {
+		t.Parallel()
+
+		container := consensusMocks.InitConsensusCore()
+		sr := initSubroundBlock(nil, container, &statusHandler.AppStatusHandlerStub{})
+
+		container.SetRoundHandler(&testscommon.RoundHandlerMock{
+			IndexCalled: func() int64 {
+				return 1
+			},
+			RemainingTimeCalled: func(startTime time.Time, maxTime time.Duration) time.Duration {
+				return 0
+			},
+		})
+
+		container.SetEquivalentProofsPool(&dataRetriever.ProofsPoolMock{
+			GetProofCalled: func(shardID uint32, headerHash []byte) (data.HeaderProofHandler, error) {
+				return &block.HeaderProof{
+					HeaderHash: headerHash,
+				}, nil
+			},
+			GetProofByNonceCalled: func(headerNonce uint64, shardID uint32) (data.HeaderProofHandler, error) {
+				return nil, fmt.Errorf("no proof for nonce")
+			},
+		})
+
+		leader, err := sr.GetLeader()
+		assert.Nil(t, err)
+		sr.SetSelfPubKey(leader)
+		bpm := consensusMocks.InitBlockProcessorMock(container.Marshalizer())
+		container.SetBlockProcessor(bpm)
+
+		r := sr.DoBlockJob()
+		assert.False(t, r)
+	})
+
 	t.Run("should work", func(t *testing.T) {
 		t.Parallel()
 
@@ -1898,6 +1935,7 @@ func TestSubroundBlock_TriggerCreateSignaturesForManagedKeys(t *testing.T) {
 			&consensusMocks.NtpSyncControllerMock{},
 			&dataRetrieverMock.ThrottlerStub{},
 		)
+		srBlock.SetSignatureSubroundEndTimePercentage(0.85)
 
 		sr.SetHeader(&block.Header{Epoch: currEpoch})
 		sr.SetSelfPubKey("OTHER")
@@ -1977,6 +2015,7 @@ func TestSubroundBlock_TriggerCreateSignaturesForManagedKeys(t *testing.T) {
 				},
 			},
 		)
+		srBlock.SetSignatureSubroundEndTimePercentage(0.85)
 
 		sr.SetSelfPubKey("OTHER")
 
@@ -2042,6 +2081,7 @@ func TestSubroundBlock_TriggerCreateSignaturesForManagedKeys(t *testing.T) {
 				},
 			},
 		)
+		srBlock.SetSignatureSubroundEndTimePercentage(0.85)
 
 		sr.SetHeader(nil)
 		sr.SetSelfPubKey("OTHER")
@@ -2119,6 +2159,7 @@ func TestSubroundBlock_TriggerCreateSignaturesForManagedKeys(t *testing.T) {
 				},
 			},
 		)
+		srBlock.SetSignatureSubroundEndTimePercentage(0.85)
 
 		sr.SetSelfPubKey("OTHER")
 

@@ -361,7 +361,6 @@ func (cns *ConsensusState) GetData() []byte {
 	cns.mutData.RLock()
 	data := cns.data
 	cns.mutData.RUnlock()
-
 	return data
 }
 
