@@ -145,6 +145,10 @@ func parseDRWABinaryPayload(data []byte) (*drwaSyncEnvelope, error) {
 		return parseDRWABinaryPayloadV2(r, schemaVersion, callerDomain)
 	}
 
+	// v1 has no operation count or terminator; every remaining byte belongs to
+	// the operation stream. Malformed trailing data fails while reading an
+	// operation, and valid extra operations are covered by the payload hash.
+	// v2 is the strict format that can reject bytes after the declared op count.
 	var operations []drwaSyncOperation
 	for r.Len() > 0 {
 		// Cap operations before full allocation (matches JSON path).
