@@ -6,13 +6,11 @@ import (
 	"time"
 
 	"github.com/multiversx/mx-chain-core-go/core"
+
 	"github.com/multiversx/mx-chain-go/consensus/spos"
 )
 
-func checkGoRoutinesThrottler(
-	ctx context.Context,
-	signatureThrottler core.Throttler,
-) error {
+func checkGoRoutinesThrottler(ctx context.Context, signatureThrottler core.Throttler) error {
 	for {
 		if signatureThrottler.CanProcess() {
 			break

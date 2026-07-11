@@ -360,6 +360,10 @@ func (sr *subroundSignature) sendSignatureForManagedKey(ctx context.Context, idx
 	return sr.completeSignatureSubRound(pk)
 }
 
+func (sr *subroundSignature) checkGoRoutinesThrottler(ctx context.Context) error {
+	return checkGoRoutinesThrottler(ctx, sr.signatureThrottler)
+}
+
 func (sr *subroundSignature) doSignatureJobForSingleKey(ctx context.Context) bool {
 	pkBytes := []byte(sr.SelfPubKey())
 	nonce := sr.GetHeader().GetNonce()
