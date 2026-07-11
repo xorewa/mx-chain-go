@@ -2530,7 +2530,7 @@ func TestBaseBlockTrack_QuarantineIfLateProof(t *testing.T) {
 		require.False(t, quarantinedHeaders.Has(hash))
 	})
 
-	t.Run("one round late proof should be quarantined", func(t *testing.T) {
+	t.Run("one round late proof should pass validation without mutating quarantine cache", func(t *testing.T) {
 		t.Parallel()
 
 		bbt, quarantinedHeaders := newTracker(t)
@@ -2688,7 +2688,7 @@ func TestBaseBlockTrack_CheckProofAgainstRoundHandler(t *testing.T) {
 		})
 
 		require.Nil(t, err)
-		require.True(t, quarantinedHeaders.Has(hash))
+		require.False(t, quarantinedHeaders.Has(hash))
 	})
 
 	t.Run("one round late intra shard proof should not be quarantined", func(t *testing.T) {

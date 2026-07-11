@@ -164,6 +164,8 @@ func (bbt *baseBlockTrack) receivedProof(proof data.HeaderProofHandler) {
 		return
 	}
 
+	bbt.quarantineIfLateProof(proof)
+
 	headerHash := proof.GetHeaderHash()
 	header, err := bbt.getHeaderForProof(proof)
 	if err != nil {
@@ -554,8 +556,6 @@ func (bbt *baseBlockTrack) CheckProofAgainstRoundHandler(proof data.HeaderProofH
 	if check.IfNil(proof) {
 		return process.ErrNilHeaderProof
 	}
-
-	bbt.quarantineIfLateProof(proof)
 
 	return bbt.checkAgainstRoundHandler(proof.GetHeaderRound())
 }
