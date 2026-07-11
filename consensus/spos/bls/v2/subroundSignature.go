@@ -225,27 +225,18 @@ func (sr *subroundSignature) doSignatureConsensusCheck() bool {
 func (sr *subroundSignature) waitForSignatures(
 	timeLeft time.Duration,
 ) bool {
-	wg := sr.SignaturesWaitGroup()
-	if wg == nil {
-		return false
-	}
-
 	if timeLeft <= 0 {
 		sr.SignaturesCtxCancel()
 		return false
 	}
 
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
 	timer := time.NewTimer(timeLeft)
 	defer timer.Stop()
 
+	// Wait only on the done channel published by the trigger. It is closed when the optimistic-signatures
+	// creation finishes (or is already closed when no optimistic signatures were triggered this round).
 	select {
-	case <-done:
+	case <-sr.SignaturesDone():
 		sr.SignaturesCtxCancel()
 		return true
 	case <-timer.C:
