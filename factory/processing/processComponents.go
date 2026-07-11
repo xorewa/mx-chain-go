@@ -2193,6 +2193,9 @@ func (pc *processComponents) Close() error {
 	if !check.IfNil(pc.aotSelector) {
 		log.LogIfError(pc.aotSelector.Close())
 	}
+	if !check.IfNil(pc.blockTracker) {
+		log.LogIfError(pc.blockTracker.Close())
+	}
 
 	return nil
 }
