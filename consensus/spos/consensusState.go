@@ -88,7 +88,12 @@ func (cns *ConsensusState) ResetConsensusRoundState() {
 	// Start each round with an already-closed done channel, so a signature subround that runs without any
 	// optimistic-signatures trigger (e.g. no managed keys) waits on it and returns immediately.
 	cns.signaturesDone = newClosedChannel()
-	cns.signaturesTimeoutCtxCancel = nil
+
+	if cns.signaturesTimeoutCtxCancel != nil {
+		cns.signaturesTimeoutCtxCancel()
+		cns.signaturesTimeoutCtxCancel = nil
+	}
+
 	cns.mutState.Unlock()
 	cns.ResetRoundStatus()
 	cns.ResetRoundState()
@@ -580,8 +585,7 @@ func (cns *ConsensusState) SignaturesDone() <-chan struct{} {
 	return cns.signaturesDone
 }
 
-// SetSignaturesDone publishes the done channel for the current round's optimistic-signatures creation. The
-// channel is owned by the trigger (subroundBlock) and is closed when the per-trigger local WaitGroup drains.
+// SetSignaturesDone sets the done channel for the optimistic-signatures creation
 func (cns *ConsensusState) SetSignaturesDone(done <-chan struct{}) {
 	cns.mutState.Lock()
 	defer cns.mutState.Unlock()
