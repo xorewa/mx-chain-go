@@ -49,7 +49,7 @@ const (
 	drwaNativeGovernanceQueryConfig uint32 = iota
 	drwaNativeGovernanceQueryProposal
 	drwaNativeGovernanceQueryAuditRecord
-	drwaNativeGovernanceQueryRecoveryLastBlock
+	drwaNativeGovernanceQueryRecoveryLastTimestamp
 )
 
 // ArgBlockChainHook represents the arguments structure for the blockchain hook
@@ -617,14 +617,15 @@ func (bh *BlockChainHookImpl) GetDRWAGovernanceAuditRecord(proposalID []byte) (*
 	return store.GetAuditRecord(proposalKey)
 }
 
-// GetDRWARecoveryLastBlock returns the last block nonce recorded for native recovery_admin writes on a token.
-func (bh *BlockChainHookImpl) GetDRWARecoveryLastBlock(tokenID string) (uint64, error) {
+// GetDRWARecoveryLastTimestamp returns the last timestamp recorded for native
+// recovery_admin writes on a token.
+func (bh *BlockChainHookImpl) GetDRWARecoveryLastTimestamp(tokenID string) (uint64, error) {
 	adapter, err := newDRWAHookStateAdapter(bh.accounts)
 	if err != nil {
 		return 0, err
 	}
 
-	return adapter.GetRecoveryLastBlock(tokenID)
+	return adapter.GetRecoveryLastTimestamp(tokenID)
 }
 
 // QueryDRWANativeGovernance exposes compact native DRWA governance reads to VM hooks.
@@ -648,13 +649,13 @@ func (bh *BlockChainHookImpl) QueryDRWANativeGovernance(queryType uint32, key []
 			return nil, err
 		}
 		return json.Marshal(auditRecord)
-	case drwaNativeGovernanceQueryRecoveryLastBlock:
-		lastBlock, err := bh.GetDRWARecoveryLastBlock(string(key))
+	case drwaNativeGovernanceQueryRecoveryLastTimestamp:
+		lastTimestamp, err := bh.GetDRWARecoveryLastTimestamp(string(key))
 		if err != nil {
 			return nil, err
 		}
 		encoded := make([]byte, 8)
-		binary.BigEndian.PutUint64(encoded, lastBlock)
+		binary.BigEndian.PutUint64(encoded, lastTimestamp)
 		return encoded, nil
 	default:
 		return nil, errors.New("unknown DRWA native governance query type")

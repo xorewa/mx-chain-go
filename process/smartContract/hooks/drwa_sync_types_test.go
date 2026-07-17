@@ -68,8 +68,8 @@ func TestDRWANativeStateKeyBuildersStayCanonical(t *testing.T) {
 	if got := string(buildDRWAAuthorizedCallerKey(drwaSyncCallerPolicyRegistry)); got != "drwa:auth:"+drwaSyncCallerPolicyRegistry {
 		t.Fatalf("authorized caller key mismatch: %q", got)
 	}
-	if got := string(buildDRWARecoveryLastBlockKey(string(tokenID))); got != "drwa:recovery:lastBlock:"+string(tokenID) {
-		t.Fatalf("recovery last block key mismatch: %q", got)
+	if got := string(buildDRWARecoveryLastTimestampKey(string(tokenID))); got != "drwa:recovery:lastTimestamp:"+string(tokenID) {
+		t.Fatalf("recovery last timestamp key mismatch: %q", got)
 	}
 	if got := string(buildDRWARecoveryEvidenceKey(tokenID)); got != "drwa:evidence:"+hex.EncodeToString(tokenID)+":recovery:latest" {
 		t.Fatalf("recovery evidence key mismatch: %q", got)

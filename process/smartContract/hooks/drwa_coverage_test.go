@@ -248,6 +248,10 @@ func (m *mockBlockNonceProvider) CurrentNonce() uint64 {
 	return m.nonce
 }
 
+func (m *mockBlockNonceProvider) CurrentTimeStamp() uint64 {
+	return m.nonce
+}
+
 // ---------------------------------------------------------------------------
 // G-07: Test recovery timelock commit failure now causes hard error
 // ---------------------------------------------------------------------------
@@ -255,42 +259,42 @@ func (m *mockBlockNonceProvider) CurrentNonce() uint64 {
 // mockTimelockAdapter embeds mockDRWASyncStateAdapter and adds timelock support.
 type mockTimelockAdapter struct {
 	*mockDRWASyncStateAdapter
-	currentBlock     uint64
-	lastBlocks       map[string]uint64
-	failGetNonce     bool
-	failPutLastBlock bool
+	currentTimestamp     uint64
+	lastTimestamps       map[string]uint64
+	failGetTimestamp     bool
+	failPutLastTimestamp bool
 }
 
 func newMockTimelockAdapter() *mockTimelockAdapter {
 	return &mockTimelockAdapter{
 		mockDRWASyncStateAdapter: newMockDRWASyncStateAdapter(),
-		lastBlocks:               make(map[string]uint64),
-		currentBlock:             10000,
+		lastTimestamps:           make(map[string]uint64),
+		currentTimestamp:         10000,
 	}
 }
 
-func (m *mockTimelockAdapter) GetRecoveryLastBlock(tokenID string) (uint64, error) {
-	return m.lastBlocks[tokenID], nil
+func (m *mockTimelockAdapter) GetRecoveryLastTimestamp(tokenID string) (uint64, error) {
+	return m.lastTimestamps[tokenID], nil
 }
 
-func (m *mockTimelockAdapter) PutRecoveryLastBlock(tokenID string, blockNonce uint64) error {
-	if m.failPutLastBlock {
+func (m *mockTimelockAdapter) PutRecoveryLastTimestamp(tokenID string, timestamp uint64) error {
+	if m.failPutLastTimestamp {
 		return errors.New("timelock persist failed")
 	}
-	m.lastBlocks[tokenID] = blockNonce
+	m.lastTimestamps[tokenID] = timestamp
 	return nil
 }
 
-func (m *mockTimelockAdapter) GetCurrentBlockNonce() (uint64, error) {
-	if m.failGetNonce {
-		return 0, errors.New("nonce unavailable")
+func (m *mockTimelockAdapter) GetCurrentBlockTimestamp() (uint64, error) {
+	if m.failGetTimestamp {
+		return 0, errors.New("timestamp unavailable")
 	}
-	return m.currentBlock, nil
+	return m.currentTimestamp, nil
 }
 
 func TestCommitDRWARecoveryTimelockBlockFailureCausesError(t *testing.T) {
 	adapter := newMockTimelockAdapter()
-	adapter.failPutLastBlock = true
+	adapter.failPutLastTimestamp = true
 
 	ops := []drwaSyncOperation{
 		{TokenID: "CARBON-1", OperationType: drwaSyncOpTokenPolicy},
@@ -303,7 +307,7 @@ func TestCommitDRWARecoveryTimelockBlockFailureCausesError(t *testing.T) {
 
 func TestCommitDRWARecoveryTimelockBlockGetNonceFailure(t *testing.T) {
 	adapter := newMockTimelockAdapter()
-	adapter.failGetNonce = true
+	adapter.failGetTimestamp = true
 
 	ops := []drwaSyncOperation{
 		{TokenID: "CARBON-1", OperationType: drwaSyncOpTokenPolicy},
@@ -311,7 +315,7 @@ func TestCommitDRWARecoveryTimelockBlockGetNonceFailure(t *testing.T) {
 
 	err := commitDRWARecoveryTimelockBlock(adapter, ops)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot read current block")
+	require.Contains(t, err.Error(), "cannot read current block timestamp")
 }
 
 func TestCommitDRWARecoveryTimelockBlockSuccess(t *testing.T) {
@@ -325,8 +329,8 @@ func TestCommitDRWARecoveryTimelockBlockSuccess(t *testing.T) {
 
 	err := commitDRWARecoveryTimelockBlock(adapter, ops)
 	require.NoError(t, err)
-	require.Equal(t, uint64(10000), adapter.lastBlocks["CARBON-1"])
-	require.Equal(t, uint64(10000), adapter.lastBlocks["CARBON-2"])
+	require.Equal(t, uint64(10000), adapter.lastTimestamps["CARBON-1"])
+	require.Equal(t, uint64(10000), adapter.lastTimestamps["CARBON-2"])
 }
 
 func TestCommitDRWARecoveryTimelockBlockSkipsNonTimelockAdapter(t *testing.T) {
@@ -344,20 +348,26 @@ func TestCommitDRWARecoveryTimelockBlockSkipsNonTimelockAdapter(t *testing.T) {
 // Test that applyDRWASyncEnvelope fails and rolls back if timelock commit fails.
 func TestApplyDRWASyncEnvelopeTimelockCommitFailureRollsBack(t *testing.T) {
 	adapter := newMockTimelockAdapter()
-	adapter.failPutLastBlock = true
+	adapter.failPutLastTimestamp = true
+	stateHash, err := computeDRWARecoveryStateHash(
+		adapter.mockDRWASyncStateAdapter,
+		&drwaRecoveryManifest{TokenID: "CARBON-1"},
+	)
+	require.NoError(t, err)
 
 	ops := []drwaSyncOperation{
 		{OperationType: drwaSyncOpTokenPolicy, TokenID: "CARBON-1", Version: 1, Body: []byte(`{}`)},
 	}
-	hash, err := computeDRWASyncHash(drwaSyncCallerRecoveryAdmin, ops)
-	require.NoError(t, err)
-
 	envelope := &drwaSyncEnvelope{
-		CallerDomain:  drwaSyncCallerRecoveryAdmin,
-		PayloadHash:   hash,
-		Operations:    ops,
-		RecoveryScope: []string{"CARBON-1"},
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		Operations:           ops,
+		PreRecoveryStateHash: stateHash,
+		RecoveryScope:        []string{"CARBON-1"},
 	}
+	hash, err := computeDRWASyncEnvelopeHash(envelope)
+	require.NoError(t, err)
+	envelope.PayloadHash = hash
 
 	_, err = applyDRWASyncEnvelope(adapter, envelope, 16, testDRWACallerAddress(drwaSyncCallerRecoveryAdmin))
 	require.Error(t, err)
@@ -371,8 +381,8 @@ func TestApplyDRWASyncEnvelopeTimelockCommitFailureRollsBack(t *testing.T) {
 func TestEnforceDRWARecoveryTimelockPaths(t *testing.T) {
 	t.Run("timelock_active", func(t *testing.T) {
 		adapter := newMockTimelockAdapter()
-		adapter.currentBlock = 100
-		adapter.lastBlocks["CARBON-1"] = 50 // gap = 50, less than 600
+		adapter.currentTimestamp = 100
+		adapter.lastTimestamps["CARBON-1"] = 50 // gap = 50, less than 3600 seconds
 
 		ops := []drwaSyncOperation{
 			{TokenID: "CARBON-1", OperationType: drwaSyncOpTokenPolicy},
@@ -384,8 +394,8 @@ func TestEnforceDRWARecoveryTimelockPaths(t *testing.T) {
 
 	t.Run("timelock_elapsed", func(t *testing.T) {
 		adapter := newMockTimelockAdapter()
-		adapter.currentBlock = 1000
-		adapter.lastBlocks["CARBON-1"] = 100 // gap = 900, more than 600
+		adapter.currentTimestamp = 4000
+		adapter.lastTimestamps["CARBON-1"] = 100 // gap = 3900, more than 3600 seconds
 
 		ops := []drwaSyncOperation{
 			{TokenID: "CARBON-1", OperationType: drwaSyncOpTokenPolicy},
@@ -396,7 +406,7 @@ func TestEnforceDRWARecoveryTimelockPaths(t *testing.T) {
 
 	t.Run("no_prior_recovery", func(t *testing.T) {
 		adapter := newMockTimelockAdapter()
-		adapter.currentBlock = 100
+		adapter.currentTimestamp = 100
 
 		ops := []drwaSyncOperation{
 			{TokenID: "NEW-TOKEN", OperationType: drwaSyncOpTokenPolicy},
@@ -407,8 +417,8 @@ func TestEnforceDRWARecoveryTimelockPaths(t *testing.T) {
 
 	t.Run("chain_reorg_conservative_denial", func(t *testing.T) {
 		adapter := newMockTimelockAdapter()
-		adapter.currentBlock = 50
-		adapter.lastBlocks["CARBON-1"] = 100 // currentBlock < lastBlock
+		adapter.currentTimestamp = 50
+		adapter.lastTimestamps["CARBON-1"] = 100 // currentTimestamp < lastTimestamp
 
 		ops := []drwaSyncOperation{
 			{TokenID: "CARBON-1", OperationType: drwaSyncOpTokenPolicy},
@@ -420,19 +430,19 @@ func TestEnforceDRWARecoveryTimelockPaths(t *testing.T) {
 
 	t.Run("get_nonce_error", func(t *testing.T) {
 		adapter := newMockTimelockAdapter()
-		adapter.failGetNonce = true
+		adapter.failGetTimestamp = true
 
 		ops := []drwaSyncOperation{
 			{TokenID: "CARBON-1", OperationType: drwaSyncOpTokenPolicy},
 		}
 		err := enforceDRWARecoveryTimelock(adapter, ops)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "cannot read current block")
+		require.Contains(t, err.Error(), "cannot read current block timestamp")
 	})
 
 	t.Run("deduplicates_tokens", func(t *testing.T) {
 		adapter := newMockTimelockAdapter()
-		adapter.currentBlock = 10000
+		adapter.currentTimestamp = 10000
 
 		ops := []drwaSyncOperation{
 			{TokenID: "CARBON-1", OperationType: drwaSyncOpTokenPolicy},
@@ -444,14 +454,14 @@ func TestEnforceDRWARecoveryTimelockPaths(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// G-02: Coverage for buildDRWARecoveryLastBlockKey
+// G-02: Coverage for buildDRWARecoveryLastTimestampKey
 // ---------------------------------------------------------------------------
 
-func TestBuildDRWARecoveryLastBlockKey(t *testing.T) {
+func TestBuildDRWARecoveryLastTimestampKey(t *testing.T) {
 	t.Parallel()
 
-	key := buildDRWARecoveryLastBlockKey("CARBON-1")
-	require.Equal(t, []byte("drwa:recovery:lastBlock:CARBON-1"), key)
+	key := buildDRWARecoveryLastTimestampKey("CARBON-1")
+	require.Equal(t, []byte("drwa:recovery:lastTimestamp:CARBON-1"), key)
 }
 
 // ---------------------------------------------------------------------------
@@ -532,16 +542,16 @@ func TestPutAssetRecordBody(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// G-02: Coverage for GetRecoveryLastBlock and PutRecoveryLastBlock
+// G-02: Coverage for GetRecoveryLastTimestamp and PutRecoveryLastTimestamp
 // ---------------------------------------------------------------------------
 
-func TestGetPutRecoveryLastBlock(t *testing.T) {
+func TestGetPutRecoveryLastTimestamp(t *testing.T) {
 	// Use vmmock for full in-memory storage without trie dependency.
 	systemAccount := vmmock.NewAccountWrapMock(core.SystemAccountAddress)
 
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, 500)
-	require.NoError(t, systemAccount.SaveKeyValue(buildDRWARecoveryLastBlockKey("CARBON-1"), buf))
+	require.NoError(t, systemAccount.SaveKeyValue(buildDRWARecoveryLastTimestampKey("CARBON-1"), buf))
 
 	accountsStub := &state.AccountsStub{
 		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
@@ -553,21 +563,21 @@ func TestGetPutRecoveryLastBlock(t *testing.T) {
 	adapter, err := newDRWAHookStateAdapter(accountsStub)
 	require.NoError(t, err)
 
-	block, err := adapter.GetRecoveryLastBlock("CARBON-1")
+	block, err := adapter.GetRecoveryLastTimestamp("CARBON-1")
 	require.NoError(t, err)
 	require.Equal(t, uint64(500), block)
 
 	// Missing key → 0
-	block, err = adapter.GetRecoveryLastBlock("MISSING")
+	block, err = adapter.GetRecoveryLastTimestamp("MISSING")
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), block)
 }
 
-func TestGetRecoveryLastBlockCorruptValue(t *testing.T) {
+func TestGetRecoveryLastTimestampCorruptValue(t *testing.T) {
 	systemAccount := vmmock.NewAccountWrapMock(core.SystemAccountAddress)
 	// Write a 5-byte value (neither 0 nor 8 bytes)
 	require.NoError(t, systemAccount.SaveKeyValue(
-		buildDRWARecoveryLastBlockKey("CARBON-1"),
+		buildDRWARecoveryLastTimestampKey("CARBON-1"),
 		[]byte{1, 2, 3, 4, 5},
 	))
 
@@ -581,9 +591,33 @@ func TestGetRecoveryLastBlockCorruptValue(t *testing.T) {
 	adapter, err := newDRWAHookStateAdapter(accountsStub)
 	require.NoError(t, err)
 
-	_, err = adapter.GetRecoveryLastBlock("CARBON-1")
+	_, err = adapter.GetRecoveryLastTimestamp("CARBON-1")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "corrupt recovery last block value")
+	require.Contains(t, err.Error(), "corrupt recovery last timestamp value")
+}
+
+func TestGetRecoveryLastTimestampLegacyBlockStateFailsClosed(t *testing.T) {
+	systemAccount := vmmock.NewAccountWrapMock(core.SystemAccountAddress)
+	legacyBlock := make([]byte, 8)
+	binary.BigEndian.PutUint64(legacyBlock, 500)
+	require.NoError(t, systemAccount.SaveKeyValue(
+		buildDRWARecoveryLegacyLastBlockKey("CARBON-1"),
+		legacyBlock,
+	))
+
+	accountsStub := &state.AccountsStub{
+		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			return systemAccount, nil
+		},
+		SaveAccountCalled: func(account vmcommon.AccountHandler) error { return nil },
+	}
+
+	adapter, err := newDRWAHookStateAdapter(accountsStub)
+	require.NoError(t, err)
+
+	_, err = adapter.GetRecoveryLastTimestamp("CARBON-1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "legacy recovery last-block state requires timestamp migration")
 }
 
 // ---------------------------------------------------------------------------

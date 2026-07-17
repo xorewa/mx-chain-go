@@ -125,13 +125,19 @@ func makeTestRecoveryEnvelope(tokenID string) drwaSyncEnvelope {
 			Body:          []byte(`{"transferable":true}`),
 		},
 	}
-	hash, _ := computeDRWASyncHash(drwaSyncCallerRecoveryAdmin, ops)
-	return drwaSyncEnvelope{
-		CallerDomain:  drwaSyncCallerRecoveryAdmin,
-		PayloadHash:   hash,
-		Operations:    ops,
-		RecoveryScope: []string{tokenID},
+	stateHash, _ := computeDRWARecoveryStateHash(
+		newMockDRWASyncStateAdapter(),
+		&drwaRecoveryManifest{TokenID: tokenID},
+	)
+	envelope := drwaSyncEnvelope{
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		Operations:           ops,
+		PreRecoveryStateHash: stateHash,
+		RecoveryScope:        []string{tokenID},
 	}
+	envelope.PayloadHash, _ = computeDRWASyncEnvelopeHash(&envelope)
+	return envelope
 }
 
 func TestGovernanceTrieStoreConfigRoundTrip(t *testing.T) {
@@ -440,7 +446,7 @@ func TestGovernanceProposalIDCollisionRejected(t *testing.T) {
 	firstProposalID, err := engine.ProposeRecoveryOperation(signers[0], envelope, 1000)
 	require.NoError(t, err)
 
-	expectedHash, err := computeDRWASyncHash(envelope.CallerDomain, envelope.Operations)
+	expectedHash, err := computeDRWASyncEnvelopeHash(&envelope)
 	require.NoError(t, err)
 	var expectedEnvHash [32]byte
 	copy(expectedEnvHash[:], expectedHash)
@@ -694,15 +700,16 @@ func TestRecoveryAdminNoGovernanceConfigFailsClosed(t *testing.T) {
 			Body:          []byte(`{"transferable":true}`),
 		},
 	}
-	hash, err := computeDRWASyncHash(drwaSyncCallerRecoveryAdmin, ops)
-	require.NoError(t, err)
-
 	envelope := &drwaSyncEnvelope{
-		CallerDomain:  drwaSyncCallerRecoveryAdmin,
-		PayloadHash:   hash,
-		Operations:    ops,
-		RecoveryScope: []string{tokenID},
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		Operations:           ops,
+		PreRecoveryStateHash: bytes.Repeat([]byte{1}, 32),
+		RecoveryScope:        []string{tokenID},
 	}
+	hash, err := computeDRWASyncEnvelopeHash(envelope)
+	require.NoError(t, err)
+	envelope.PayloadHash = hash
 
 	result, err := applyDRWASyncEnvelope(adapter, envelope, drwaSyncMaxOperations, testDRWACallerAddress(drwaSyncCallerRecoveryAdmin))
 	require.ErrorIs(t, err, errDRWARecoveryGovernanceRequired)

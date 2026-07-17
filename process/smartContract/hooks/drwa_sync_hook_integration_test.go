@@ -71,6 +71,19 @@ func TestIntegrationBinaryPipelineTokenPolicyAndHolderMirror(t *testing.T) {
 	envelope.RecoveryScope = []string{drwaIntTestTokenEstate}
 
 	adapter := newMockDRWASyncStateAdapter()
+	stateHash, err := computeDRWARecoveryStateHash(adapter, &drwaRecoveryManifest{
+		TokenID: drwaIntTestTokenEstate,
+		Holders: []drwaRecoveryHolder{{Address: holderMirrorOp.Holder}},
+	})
+	if err != nil {
+		t.Fatalf("compute recovery state hash: %v", err)
+	}
+	envelope.SchemaVersion = drwaSyncEnvelopeSchemaVersionWithRecovery
+	envelope.PreRecoveryStateHash = stateHash
+	envelope.PayloadHash, err = computeDRWASyncEnvelopeHash(envelope)
+	if err != nil {
+		t.Fatalf("compute recovery envelope hash: %v", err)
+	}
 	callerAddr := testDRWACallerAddress(drwaSyncCallerRecoveryAdmin)
 
 	result, err := applyDRWASyncEnvelope(adapter, envelope, drwaSyncMaxOperations, callerAddr)

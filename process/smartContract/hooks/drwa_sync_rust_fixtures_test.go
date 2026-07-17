@@ -47,6 +47,9 @@ func TestDecodeDRWASyncEnvelope_RustGeneratedFixtures(t *testing.T) {
 			assertEnvelope: func(t *testing.T, envelope *drwaSyncEnvelope) {
 				require.Equal(t, repeatByte(0x06, 32), envelope.PreRecoveryStateHash)
 				require.Equal(t, []string{"CARBON-ab12cd"}, envelope.RecoveryScope)
+				expectedHash, err := computeDRWASyncEnvelopeHash(envelope)
+				require.NoError(t, err)
+				require.Equal(t, expectedHash, envelope.PayloadHash)
 			},
 		},
 		{

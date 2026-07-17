@@ -229,7 +229,10 @@ func (e *DRWAGovernanceEngine) ProposeRecoveryOperation(
 	}
 
 	// Compute envelope hash for binding.
-	envelopeHash, err := computeDRWASyncHash(envelope.CallerDomain, envelope.Operations)
+	if envelope.SchemaVersion != drwaSyncEnvelopeSchemaVersionWithRecovery || len(envelope.PreRecoveryStateHash) != 32 {
+		return [32]byte{}, errDRWAGovernanceNilEnvelope
+	}
+	envelopeHash, err := computeDRWASyncEnvelopeHash(&envelope)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("governance proposal: envelope hash computation failed: %w", err)
 	}
@@ -393,7 +396,7 @@ func (e *DRWAGovernanceEngine) ExecuteRecoveryOperation(
 	// (trie rewrite, migration bug, serde-layer change, storage
 	// tampering). Fail closed and surface the anomaly on a dedicated
 	// metric so post-mortem analysis has a signal.
-	reverifiedHash, err := computeDRWASyncHash(envelope.CallerDomain, envelope.Operations)
+	reverifiedHash, err := computeDRWASyncEnvelopeHash(envelope)
 	if err != nil {
 		return nil, fmt.Errorf("governance execute: envelope hash re-verification failed: %w", err)
 	}

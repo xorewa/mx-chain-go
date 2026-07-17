@@ -15,7 +15,6 @@ import (
 	"math"
 	"sort"
 	"strings"
-
 	// F-023: keccak import removed — now using drwaKeccakPool from drwa_sync.go
 )
 
@@ -193,7 +192,27 @@ func inspectDRWARecoveryState(reader drwaMigrationStateReader, manifest *drwaRec
 	// : Compute a hash of the current on-chain state so that
 	// buildDRWARecoveryEnvelope can bind the envelope to this exact state.
 	// If state changes between inspection and apply, the hash won't match.
-	stateHash, hashErr := computeDRWARecoveryStateHash(reader, manifest)
+	// Bind every holder key the repair may mutate, including unexpected
+	// mirrors that will become cleanup-delete operations. Hashing only the
+	// desired manifest holders would make the execute-time reconstruction
+	// (which correctly includes cleanup targets) disagree with inspection.
+	stateHashManifest := *manifest
+	stateHashManifest.Holders = append([]drwaRecoveryHolder(nil), manifest.Holders...)
+	hashedHolders := make(map[string]struct{}, len(stateHashManifest.Holders))
+	for _, holder := range stateHashManifest.Holders {
+		hashedHolders[holder.Address] = struct{}{}
+	}
+	for _, finding := range report.Findings {
+		if finding.Status != drwaRecoveryStatusUnexpectedHolderMirror || finding.Holder == "" {
+			continue
+		}
+		if _, exists := hashedHolders[finding.Holder]; exists {
+			continue
+		}
+		stateHashManifest.Holders = append(stateHashManifest.Holders, drwaRecoveryHolder{Address: finding.Holder})
+		hashedHolders[finding.Holder] = struct{}{}
+	}
+	stateHash, hashErr := computeDRWARecoveryStateHash(reader, &stateHashManifest)
 	if hashErr != nil {
 		return nil, hashErr
 	}
@@ -391,17 +410,23 @@ func buildDRWARecoveryEnvelope(manifest *drwaRecoveryManifest, report *drwaRecov
 		return drwaRecoveryOperationOrder(operations[i]) < drwaRecoveryOperationOrder(operations[j])
 	})
 
-	hash, err := computeDRWASyncHash(drwaSyncCallerRecoveryAdmin, operations)
+	if len(report.StateHash) != 32 {
+		return nil, errors.New("recovery report requires a 32-byte pre-recovery state hash")
+	}
+	envelope := &drwaSyncEnvelope{
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		Operations:           operations,
+		PreRecoveryStateHash: append([]byte(nil), report.StateHash...),
+		RecoveryScope:        []string{manifest.TokenID},
+	}
+	hash, err := computeDRWASyncEnvelopeHash(envelope)
 	if err != nil {
 		return nil, err
 	}
+	envelope.PayloadHash = hash
 
-	return &drwaSyncEnvelope{
-		CallerDomain:         drwaSyncCallerRecoveryAdmin,
-		PayloadHash:          hash,
-		Operations:           operations,
-		PreRecoveryStateHash: report.StateHash,
-	}, nil
+	return envelope, nil
 }
 
 // buildDRWARecoveryCleanupOperations produces holder_mirror_delete operations

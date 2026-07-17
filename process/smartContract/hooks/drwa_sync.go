@@ -450,6 +450,14 @@ func applyDRWASyncEnvelopeInternal(
 		recordDRWAMetric(drwaMetricSyncUnauthorizedCaller)
 		return nil, errors.New(drwaSyncRejectUnauthorizedCaller)
 	}
+	if envelope.CallerDomain == drwaSyncCallerRecoveryAdmin {
+		if envelope.SchemaVersion != drwaSyncEnvelopeSchemaVersionWithRecovery {
+			return nil, errors.New("DRWA_SYNC_RECOVERY_SCHEMA_V2_REQUIRED")
+		}
+		if len(envelope.PreRecoveryStateHash) != 32 {
+			return nil, errors.New("DRWA_SYNC_RECOVERY_STATE_HASH_REQUIRED")
+		}
+	}
 
 	// Phase 6 (G-11): Governance routing. Skipped when applying a
 	// governance-approved envelope to prevent re-entry into the proposal flow.
@@ -517,7 +525,7 @@ func applyDRWASyncEnvelopeInternal(
 		}
 	}
 
-	payloadHash, err := computeDRWASyncHash(envelope.CallerDomain, envelope.Operations)
+	payloadHash, err := computeDRWASyncEnvelopeHash(envelope)
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +536,7 @@ func applyDRWASyncEnvelopeInternal(
 	}
 
 	// : Enforce time-lock for recovery_admin writes. A compromised recovery
-	// key can only overwrite state once per drwaSyncRecoveryTimelockBlocks window
+	// key can only overwrite state once per drwaSyncRecoveryTimelockSeconds window
 	// per token. The time-lock check uses an optional interface so that adapters
 	// without block context (e.g. test mocks) skip the check gracefully.
 	if envelope.CallerDomain == drwaSyncCallerRecoveryAdmin {
@@ -542,7 +550,7 @@ func applyDRWASyncEnvelopeInternal(
 	// If the envelope carries a PreRecoveryStateHash (set by buildDRWARecoveryEnvelope),
 	// recompute the current on-chain state hash and reject if it differs.
 	// This prevents applying a stale recovery envelope after concurrent state changes.
-	if envelope.CallerDomain == drwaSyncCallerRecoveryAdmin && len(envelope.PreRecoveryStateHash) > 0 {
+	if envelope.CallerDomain == drwaSyncCallerRecoveryAdmin {
 		if err = verifyDRWAPreRecoveryStateHash(adapter, envelope); err != nil {
 			recordDRWAMetric(drwaMetricSyncApplyFailure)
 			return nil, err
@@ -587,7 +595,7 @@ func applyDRWASyncEnvelopeInternal(
 		result.LastTokenID = operation.TokenID
 	}
 
-	// : After successful recovery_admin apply, record the current block nonce
+	// : After successful recovery_admin apply, record the current block timestamp
 	// so subsequent recovery attempts within the timelock window are rejected.
 	// G-07: Timelock commit failure is a hard error — without the commit,
 	// rate-limiting is silently disabled for all future recovery operations.
@@ -837,18 +845,18 @@ func isDRWASyncCallerAuthorized(
 		// SECURITY — recovery_admin has the broadest write scope
 		// (token_policy, holder_mirror, holder_mirror_delete). A compromised
 		// recovery admin key can override ALL compliance state.
-		// DEPLOYMENT: key MUST be in HSM with multi-party access control.
+		// DEPLOYMENT: the recovery_admin address is rotated by the drwa-auth-admin
+		// multisig (min 5 signers, quorum ≥3, 48-hour timelock — see §4.4).
 		// All recovery_admin operations MUST emit high-priority alerts.
 		//
 		// RH-9: KEY MANAGEMENT REQUIREMENTS
-		// The recovery_admin private key MUST be stored in a FIPS 140-2 Level 3
-		// (or higher) Hardware Security Module (HSM). Acceptable HSM providers:
-		// AWS CloudHSM, Azure Dedicated HSM, Thales Luna, or equivalent.
-		// Key ceremonies MUST follow a Shamir Secret Sharing (SSS) or multi-party
-		// computation (MPC) split with a minimum 3-of-5 threshold.
-		// HSM audit logs MUST be forwarded to the SIEM and retained for 7 years.
-		// Key rotation: annual rotation required; the old key must remain valid
-		// for one drwaSyncRecoveryTimelockBlocks window after rotation to allow
+		// The recovery_admin EOA key should be stored in an HSM (FIPS 140-2
+		// Level 3 or higher) with SIEM-forwarded audit logs retained for 7 years.
+		// NOTE: the on-chain control is the auth-admin multisig rotation gate,
+		// not SSS/MPC on the EOA key itself — the issues register R-08 documents
+		// that earlier docs conflated SSS/HSM with the actual auth-admin model.
+		// Key rotation: annual rotation recommended; the old key remains valid
+		// for one drwaSyncRecoveryTimelockSeconds window after rotation to allow
 		// in-flight transactions to complete.
 		// See also: RH-7 (multi-sig governance) for M-of-N authorization at the
 		// contract level before recovery_admin operations reach the sync layer.
@@ -919,7 +927,7 @@ func verifyDRWANoopEnvelopeHash(envelope *drwaSyncEnvelope) error {
 	if len(envelope.PayloadHash) == 0 {
 		return fmt.Errorf("DRWA_NOOP_ENVELOPE_HASH_REQUIRED: noop envelopes must include a non-empty PayloadHash")
 	}
-	expectedHash, err := computeDRWASyncHash(envelope.CallerDomain, nil)
+	expectedHash, err := computeDRWASyncEnvelopeHash(envelope)
 	if err != nil {
 		return fmt.Errorf("noop envelope hash computation failed: %w", err)
 	}
@@ -940,6 +948,74 @@ func computeDRWASyncHash(callerDomain string, operations []drwaSyncOperation) ([
 	result := hasher.Compute(string(payload))
 	drwaKeccakPool.Put(hasher)
 	return result, nil
+}
+
+func computeDRWASyncEnvelopeHash(envelope *drwaSyncEnvelope) ([]byte, error) {
+	if envelope == nil {
+		return nil, errors.New("nil DRWA sync envelope")
+	}
+
+	var payload []byte
+	var err error
+	if envelope.SchemaVersion == drwaSyncEnvelopeSchemaVersionWithRecovery {
+		payload, err = serializeDRWARecoverySyncEnvelopePayload(envelope)
+	} else {
+		payload, err = serializeDRWASyncEnvelopePayload(envelope.CallerDomain, envelope.Operations)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	hasher := drwaKeccakPool.Get().(interface{ Compute(string) []byte })
+	result := hasher.Compute(string(payload))
+	drwaKeccakPool.Put(hasher)
+	return result, nil
+}
+
+func serializeDRWARecoverySyncEnvelopePayload(envelope *drwaSyncEnvelope) ([]byte, error) {
+	if envelope.SchemaVersion != drwaSyncEnvelopeSchemaVersionWithRecovery {
+		return nil, fmt.Errorf("unsupported DRWA recovery schema version: %d", envelope.SchemaVersion)
+	}
+	if len(envelope.RecoveryScope) > math.MaxUint16 {
+		return nil, errors.New("DRWA recovery scope count exceeds uint16")
+	}
+	if len(envelope.Operations) > math.MaxUint16 {
+		return nil, errors.New("DRWA recovery operation count exceeds uint16")
+	}
+
+	callerTag, err := drwaCallerDomainTag(envelope.CallerDomain)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload bytes.Buffer
+	var short [2]byte
+	binary.BigEndian.PutUint16(short[:], envelope.SchemaVersion)
+	payload.Write(short[:])
+	payload.WriteByte(callerTag)
+	writeDRWALengthPrefixed(&payload, envelope.PreRecoveryStateHash)
+	binary.BigEndian.PutUint16(short[:], uint16(len(envelope.RecoveryScope)))
+	payload.Write(short[:])
+	for _, tokenID := range envelope.RecoveryScope {
+		writeDRWALengthPrefixed(&payload, []byte(tokenID))
+	}
+	binary.BigEndian.PutUint16(short[:], uint16(len(envelope.Operations)))
+	payload.Write(short[:])
+	for _, operation := range envelope.Operations {
+		opTag, tagErr := drwaOperationTypeTag(operation.OperationType)
+		if tagErr != nil {
+			return nil, tagErr
+		}
+		payload.WriteByte(opTag)
+		writeDRWALengthPrefixed(&payload, []byte(operation.TokenID))
+		writeDRWALengthPrefixed(&payload, drwaSerializedHolder(operation))
+		var version [8]byte
+		binary.BigEndian.PutUint64(version[:], operation.Version)
+		payload.Write(version[:])
+		writeDRWALengthPrefixed(&payload, operation.Body)
+	}
+
+	return payload.Bytes(), nil
 }
 
 func serializeDRWASyncEnvelopePayload(callerDomain string, operations []drwaSyncOperation) ([]byte, error) {
@@ -1050,9 +1126,9 @@ type drwaSyncGovernanceProvider interface {
 // implement to support the C-1 recovery time-lock. Adapters that do not
 // implement this interface (e.g. test mocks) skip the time-lock check.
 type drwaSyncRecoveryTimelockProvider interface {
-	GetRecoveryLastBlock(tokenID string) (uint64, error)
-	PutRecoveryLastBlock(tokenID string, blockNonce uint64) error
-	GetCurrentBlockNonce() (uint64, error)
+	GetRecoveryLastTimestamp(tokenID string) (uint64, error)
+	PutRecoveryLastTimestamp(tokenID string, timestamp uint64) error
+	GetCurrentBlockTimestamp() (uint64, error)
 }
 
 // F-002: Compile-time assertion that drwaHookStateAdapter satisfies
@@ -1062,9 +1138,17 @@ var _ drwaSyncRecoveryTimelockProvider = (*drwaHookStateAdapter)(nil)
 var _ drwaSyncGovernanceProvider = (*drwaHookStateAdapter)(nil)
 var _ drwaMigrationStateReader = (*drwaHookStateAdapter)(nil)
 
-// buildDRWARecoveryLastBlockKey returns the system account key that stores the
-// block nonce of the last recovery_admin write for a given token.
-func buildDRWARecoveryLastBlockKey(tokenID string) []byte {
+// buildDRWARecoveryLastTimestampKey returns the system account key that stores
+// the timestamp of the last recovery_admin write for a given token.
+func buildDRWARecoveryLastTimestampKey(tokenID string) []byte {
+	return []byte("drwa:recovery:lastTimestamp:" + tokenID)
+}
+
+// buildDRWARecoveryLegacyLastBlockKey identifies pre-timestamp timelock state.
+// A block nonce cannot be converted safely to wall-clock time at read time, so
+// its presence must fail closed until an activation migration writes the new
+// timestamp key and removes the legacy key.
+func buildDRWARecoveryLegacyLastBlockKey(tokenID string) []byte {
 	return []byte("drwa:recovery:lastBlock:" + tokenID)
 }
 
@@ -1081,9 +1165,9 @@ func enforceDRWARecoveryTimelock(adapter drwaSyncStateAdapter, operations []drwa
 		return nil
 	}
 
-	currentBlock, err := timelockAdapter.GetCurrentBlockNonce()
+	currentTimestamp, err := timelockAdapter.GetCurrentBlockTimestamp()
 	if err != nil {
-		return fmt.Errorf("recovery timelock: cannot read current block: %w", err)
+		return fmt.Errorf("recovery timelock: cannot read current block timestamp: %w", err)
 	}
 
 	// Deduplicate tokenIDs to avoid redundant reads.
@@ -1094,30 +1178,30 @@ func enforceDRWARecoveryTimelock(adapter drwaSyncStateAdapter, operations []drwa
 		}
 		checked[op.TokenID] = struct{}{}
 
-		lastBlock, readErr := timelockAdapter.GetRecoveryLastBlock(op.TokenID)
+		lastTimestamp, readErr := timelockAdapter.GetRecoveryLastTimestamp(op.TokenID)
 		if readErr != nil {
-			return fmt.Errorf("recovery timelock: cannot read last block for %s: %w", op.TokenID, readErr)
+			return fmt.Errorf("recovery timelock: cannot read last timestamp for %s: %w", op.TokenID, readErr)
 		}
-		// Guard against uint64 underflow when currentBlock < lastBlock (chain
-		// reorganization or testnet rollback). Without this guard the subtraction
-		// wraps to near-MaxUint64, silently bypassing the timelock.
-		if lastBlock > 0 && currentBlock < lastBlock {
+		// Guard against uint64 underflow when currentTimestamp < lastTimestamp
+		// (clock rollback/testnet reset). Without this guard the subtraction wraps
+		// to near-MaxUint64, silently bypassing the timelock.
+		if lastTimestamp > 0 && currentTimestamp < lastTimestamp {
 			recordDRWAMetric(drwaMetricSyncRecoveryTimelockReject)
-			return fmt.Errorf("%w: token %s, current block %d < last recovery block %d (possible chain reorg — timelock enforced conservatively)",
-				errDRWARecoveryTimelockActive, op.TokenID, currentBlock, lastBlock)
+			return fmt.Errorf("%w: token %s, current timestamp %d < last recovery timestamp %d (clock rollback — timelock enforced conservatively)",
+				errDRWARecoveryTimelockActive, op.TokenID, currentTimestamp, lastTimestamp)
 		}
-		if lastBlock > 0 && currentBlock-lastBlock < drwaSyncRecoveryTimelockBlocks {
+		if lastTimestamp > 0 && currentTimestamp-lastTimestamp < drwaSyncRecoveryTimelockSeconds {
 			recordDRWAMetric(drwaMetricSyncRecoveryTimelockReject)
-			return fmt.Errorf("%w: token %s, last recovery at block %d, current block %d, required gap %d",
-				errDRWARecoveryTimelockActive, op.TokenID, lastBlock, currentBlock, drwaSyncRecoveryTimelockBlocks)
+			return fmt.Errorf("%w: token %s, last recovery at timestamp %d, current timestamp %d, required gap %d seconds",
+				errDRWARecoveryTimelockActive, op.TokenID, lastTimestamp, currentTimestamp, drwaSyncRecoveryTimelockSeconds)
 		}
 	}
 
 	return nil
 }
 
-// commitDRWARecoveryTimelockBlock writes the current block nonce as the last
-// recovery block for each token after a successful recovery_admin apply.
+// commitDRWARecoveryTimelockBlock writes the current block timestamp as the
+// last recovery timestamp for each token after a successful recovery_admin apply.
 // G-07: Returns an error if the timelock commit fails. A silent skip would
 // disable rate-limiting for all future recovery operations on the affected
 // token, so the caller MUST treat this as a hard failure and revert.
@@ -1130,9 +1214,9 @@ func commitDRWARecoveryTimelockBlock(adapter drwaSyncStateAdapter, operations []
 		return nil
 	}
 
-	currentBlock, err := timelockAdapter.GetCurrentBlockNonce()
+	currentTimestamp, err := timelockAdapter.GetCurrentBlockTimestamp()
 	if err != nil {
-		return fmt.Errorf("recovery timelock commit: cannot read current block: %w", err)
+		return fmt.Errorf("recovery timelock commit: cannot read current block timestamp: %w", err)
 	}
 
 	committed := make(map[string]struct{})
@@ -1141,9 +1225,9 @@ func commitDRWARecoveryTimelockBlock(adapter drwaSyncStateAdapter, operations []
 			continue
 		}
 		committed[op.TokenID] = struct{}{}
-		if putErr := timelockAdapter.PutRecoveryLastBlock(op.TokenID, currentBlock); putErr != nil {
-			return fmt.Errorf("recovery timelock commit: failed to persist for token %s at block %d: %w",
-				op.TokenID, currentBlock, putErr)
+		if putErr := timelockAdapter.PutRecoveryLastTimestamp(op.TokenID, currentTimestamp); putErr != nil {
+			return fmt.Errorf("recovery timelock commit: failed to persist for token %s at timestamp %d: %w",
+				op.TokenID, currentTimestamp, putErr)
 		}
 	}
 	return nil

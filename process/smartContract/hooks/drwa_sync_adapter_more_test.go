@@ -239,9 +239,9 @@ func TestDRWAHookStateAdapterVersionReadersTreatFreshNilTrieAsMissing(t *testing
 	require.Nil(t, address)
 	require.Equal(t, uint64(0), version)
 
-	recoveryLastBlock, err := adapter.GetRecoveryLastBlock("CARBON-1")
+	recoveryLastTimestamp, err := adapter.GetRecoveryLastTimestamp("CARBON-1")
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), recoveryLastBlock)
+	require.Equal(t, uint64(0), recoveryLastTimestamp)
 }
 
 func TestEncodeDecodeDRWASyncStoredValueBinaryRoundTrip(t *testing.T) {

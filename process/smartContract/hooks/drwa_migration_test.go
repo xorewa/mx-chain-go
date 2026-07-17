@@ -169,7 +169,17 @@ func TestApplyDRWAMigrationEnvelopeRollsBackAfterPartialProgress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build migration envelope: %v", err)
 	}
+	stateHash, err := computeDRWARecoveryStateHash(adapter, (*drwaRecoveryManifest)(manifest))
+	if err != nil {
+		t.Fatalf("compute migration state hash: %v", err)
+	}
+	envelope.SchemaVersion = drwaSyncEnvelopeSchemaVersionWithRecovery
 	envelope.RecoveryScope = []string{manifest.TokenID}
+	envelope.PreRecoveryStateHash = stateHash
+	envelope.PayloadHash, err = computeDRWASyncEnvelopeHash(envelope)
+	if err != nil {
+		t.Fatalf("compute migration envelope hash: %v", err)
+	}
 
 	callCount := 0
 	adapter.putHolderHook = func(tokenID, holder string, version uint64, body []byte) error {
@@ -209,7 +219,7 @@ func TestPersistDRWAMigrationAuthorizedCallers(t *testing.T) {
 	adapter := newMockDRWASyncStateAdapter()
 	// SM-1: All addresses must be 64-char hex (decodes to 32 bytes).
 	// Raw 32-byte binary is no longer accepted.
-	policyHex := strings.Repeat("a1", 32)   // 64 hex chars → 32 bytes
+	policyHex := strings.Repeat("a1", 32) // 64 hex chars → 32 bytes
 	assetHex := strings.Repeat("b2", 32)
 	identityHex := strings.Repeat("c3", 32)
 	attestationHex := strings.Repeat("d4", 32)
@@ -263,11 +273,11 @@ func TestValidateDRWAMigrationManifestRejectsInvalidAuthorizedCallerFormat(t *te
 		PolicyVersion: 1,
 		PolicyBody:    []byte(`{"drwa_enabled":true}`),
 		AuthorizedCallers: map[string]string{
-			drwaSyncCallerPolicyRegistry: "erd1policy",
-			drwaSyncCallerAssetManager:   strings.Repeat("a", 32),
+			drwaSyncCallerPolicyRegistry:   "erd1policy",
+			drwaSyncCallerAssetManager:     strings.Repeat("a", 32),
 			drwaSyncCallerIdentityRegistry: strings.Repeat("i", 32),
-			drwaSyncCallerAttestation:  strings.Repeat("t", 32),
-			drwaSyncCallerRecoveryAdmin:  strings.Repeat("r", 32),
+			drwaSyncCallerAttestation:      strings.Repeat("t", 32),
+			drwaSyncCallerRecoveryAdmin:    strings.Repeat("r", 32),
 		},
 	})
 

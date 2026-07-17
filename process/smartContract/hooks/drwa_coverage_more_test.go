@@ -4,6 +4,7 @@ package hooks
 // rollout, and adapter functions to push total package coverage >=90%.
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -414,9 +415,9 @@ func TestDrwaOperationTypeTagAssetRecordTag(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockRolloutStageStore struct {
-	stages   map[string]string
-	failGet  bool
-	failPut  bool
+	stages  map[string]string
+	failGet bool
+	failPut bool
 }
 
 func (m *mockRolloutStageStore) GetLastCompletedRolloutStage(tokenID string) (string, error) {
@@ -695,6 +696,7 @@ func TestBuildDRWARecoveryEnvelopeWithUnexpectedHolder(t *testing.T) {
 	t.Parallel()
 	report := &drwaRecoveryReport{
 		TokenID:    "T1",
+		StateHash:  bytes.Repeat([]byte{1}, 32),
 		Repairable: true,
 		Findings: []drwaRecoveryFinding{
 			{Status: drwaRecoveryStatusTokenPolicyMissing, TokenID: "T1", ExpectedVersion: 1},
@@ -921,7 +923,7 @@ func TestVerifyDRWAPreRecoveryStateHashMatches(t *testing.T) {
 // Full recovery_admin apply with pre-recovery state hash and timelock
 func TestApplyDRWASyncEnvelopeRecoveryAdminFullPath(t *testing.T) {
 	adapter := newMockTimelockAdapter()
-	adapter.currentBlock = 10000
+	adapter.currentTimestamp = 10000
 	adapter.tokenVersions["T1"] = 1
 	adapter.tokenBodies["T1"] = []byte(`{}`)
 
@@ -937,21 +939,20 @@ func TestApplyDRWASyncEnvelopeRecoveryAdminFullPath(t *testing.T) {
 	ops := []drwaSyncOperation{
 		{OperationType: drwaSyncOpTokenPolicy, TokenID: "T1", Version: 2, Body: []byte(`{"new":"policy"}`)},
 	}
-	hash, err := computeDRWASyncHash(drwaSyncCallerRecoveryAdmin, ops)
-	require.NoError(t, err)
-
 	envelope := &drwaSyncEnvelope{
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
 		CallerDomain:         drwaSyncCallerRecoveryAdmin,
-		PayloadHash:          hash,
 		Operations:           ops,
 		PreRecoveryStateHash: stateHash,
 		RecoveryScope:        []string{"T1"},
 	}
+	envelope.PayloadHash, err = computeDRWASyncEnvelopeHash(envelope)
+	require.NoError(t, err)
 
 	result, err := applyDRWASyncEnvelope(adapter, envelope, 16, testDRWACallerAddress(drwaSyncCallerRecoveryAdmin))
 	require.NoError(t, err)
 	require.Equal(t, 1, result.AppliedOperations)
-	require.Equal(t, uint64(10000), adapter.lastBlocks["T1"])
+	require.Equal(t, uint64(10000), adapter.lastTimestamps["T1"])
 }
 
 // ---------------------------------------------------------------------------
@@ -983,10 +984,10 @@ func TestParseDRWABinaryPayloadMaxOpsExceeded(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// PutRecoveryLastBlock through real adapter (0% → covered)
+// PutRecoveryLastTimestamp through real adapter (0% → covered)
 // ---------------------------------------------------------------------------
 
-func TestPutRecoveryLastBlockThroughAdapter(t *testing.T) {
+func TestPutRecoveryLastTimestampThroughAdapter(t *testing.T) {
 	systemAccount := vmmock.NewAccountWrapMock(core.SystemAccountAddress)
 	accountsStub := &state.AccountsStub{
 		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
@@ -998,9 +999,9 @@ func TestPutRecoveryLastBlockThroughAdapter(t *testing.T) {
 	adapter, err := newDRWAHookStateAdapter(accountsStub)
 	require.NoError(t, err)
 
-	require.NoError(t, adapter.PutRecoveryLastBlock("T1", 999))
+	require.NoError(t, adapter.PutRecoveryLastTimestamp("T1", 999))
 
-	block, err := adapter.GetRecoveryLastBlock("T1")
+	block, err := adapter.GetRecoveryLastTimestamp("T1")
 	require.NoError(t, err)
 	require.Equal(t, uint64(999), block)
 }
@@ -1093,9 +1094,9 @@ func TestInspectDRWARolloutPreflightWithThresholds(t *testing.T) {
 
 	manifest := &drwaRolloutManifest{
 		TokenID: "T1", Issuer: "issuer", Stage: drwaRolloutStageCanary,
-		ExpectedPolicyVersion: 1,
-		MaxSyncFailureRateBps: 50,
-		MaxAPIErrorRateBps:    30,
+		ExpectedPolicyVersion:    1,
+		MaxSyncFailureRateBps:    50,
+		MaxAPIErrorRateBps:       30,
 		MaxDenialMismatchRateBps: 5,
 	}
 	report, err := inspectDRWARolloutPreflight(adapter, manifest, nil)
@@ -1117,9 +1118,11 @@ func TestApplyDRWASyncEnvelopeRecoveryScopeRequired(t *testing.T) {
 	hash, _ := computeDRWASyncHash(drwaSyncCallerRecoveryAdmin, ops)
 
 	envelope := &drwaSyncEnvelope{
-		CallerDomain: drwaSyncCallerRecoveryAdmin,
-		PayloadHash:  hash,
-		Operations:   ops,
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		PayloadHash:          hash,
+		Operations:           ops,
+		PreRecoveryStateHash: bytes.Repeat([]byte{1}, 32),
 		// No RecoveryScope — should fail
 	}
 
@@ -1137,10 +1140,12 @@ func TestApplyDRWASyncEnvelopeRecoveryScopeViolation(t *testing.T) {
 	hash, _ := computeDRWASyncHash(drwaSyncCallerRecoveryAdmin, ops)
 
 	envelope := &drwaSyncEnvelope{
-		CallerDomain:  drwaSyncCallerRecoveryAdmin,
-		PayloadHash:   hash,
-		Operations:    ops,
-		RecoveryScope: []string{"OTHER-TOKEN"}, // T1 not in scope
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		PayloadHash:          hash,
+		Operations:           ops,
+		PreRecoveryStateHash: bytes.Repeat([]byte{1}, 32),
+		RecoveryScope:        []string{"OTHER-TOKEN"}, // T1 not in scope
 	}
 
 	_, err := applyDRWASyncEnvelope(adapter, envelope, 16, testDRWACallerAddress(drwaSyncCallerRecoveryAdmin))

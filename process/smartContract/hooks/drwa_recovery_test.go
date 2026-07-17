@@ -231,7 +231,8 @@ func TestBuildDRWARecoveryEnvelopeBuildsRepairBatch(t *testing.T) {
 	}
 
 	envelope, err := buildDRWARecoveryEnvelope(manifest, &drwaRecoveryReport{
-		TokenID: "CARBON-1",
+		TokenID:   "CARBON-1",
+		StateHash: bytes.Repeat([]byte{1}, 32),
 		Findings: []drwaRecoveryFinding{{
 			Status:          drwaRecoveryStatusHolderMirrorMissing,
 			TokenID:         "CARBON-1",
@@ -264,7 +265,8 @@ func TestBuildDRWARecoveryEnvelopeAddsCleanupDeleteOperations(t *testing.T) {
 	}
 
 	envelope, err := buildDRWARecoveryEnvelope(manifest, &drwaRecoveryReport{
-		TokenID: "CARBON-1",
+		TokenID:   "CARBON-1",
+		StateHash: bytes.Repeat([]byte{1}, 32),
 		Findings: []drwaRecoveryFinding{
 			{
 				Status:          drwaRecoveryStatusUnexpectedHolderMirror,
@@ -322,9 +324,6 @@ func TestApplyDRWARecoveryEnvelopeRollsBackAfterPartialProgress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build recovery envelope: %v", err)
 	}
-	envelope.RecoveryScope = []string{manifest.TokenID}
-	envelope.PreRecoveryStateHash = nil
-
 	callCount := 0
 	adapter.putHolderHook = func(tokenID, holder string, version uint64, body []byte) error {
 		callCount++
@@ -343,7 +342,7 @@ func TestApplyDRWARecoveryEnvelopeRollsBackAfterPartialProgress(t *testing.T) {
 		t.Fatalf("expected recovery apply failure")
 	}
 	if !adapter.rolledBack {
-		t.Fatalf("expected rollback after partial recovery progress")
+		t.Fatalf("expected rollback after partial recovery progress, apply error: %v", err)
 	}
 
 	if adapter.tokenVersions["CARBON-1"] != 3 || !bytes.Equal(adapter.tokenBodies["CARBON-1"], []byte(`{"regulated":false}`)) {

@@ -605,6 +605,46 @@ func TestComputeDRWASyncHashBindsCallerDomain(t *testing.T) {
 	}
 }
 
+func TestComputeDRWASyncEnvelopeHashBindsAllRecoveryMetadata(t *testing.T) {
+	base := &drwaSyncEnvelope{
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		PreRecoveryStateHash: bytes.Repeat([]byte{0x06}, 32),
+		RecoveryScope:        []string{"CARBON-ab12cd"},
+		Operations: []drwaSyncOperation{{
+			OperationType: drwaSyncOpHolderMirror,
+			TokenID:       "CARBON-ab12cd",
+			Holder:        "holder",
+			Version:       2,
+			Body:          []byte(`{"kyc_status":"approved"}`),
+		}},
+	}
+	baseHash, err := computeDRWASyncEnvelopeHash(base)
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name   string
+		mutate func(*drwaSyncEnvelope)
+	}{
+		{name: "pre-state hash", mutate: func(value *drwaSyncEnvelope) { value.PreRecoveryStateHash[0] ^= 0xff }},
+		{name: "scope", mutate: func(value *drwaSyncEnvelope) { value.RecoveryScope[0] = "CARBON-bc23de" }},
+		{name: "schema", mutate: func(value *drwaSyncEnvelope) { value.SchemaVersion = drwaSyncEnvelopeSchemaVersion }},
+		{name: "operation", mutate: func(value *drwaSyncEnvelope) { value.Operations[0].Version++ }},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			candidate := *base
+			candidate.PreRecoveryStateHash = append([]byte(nil), base.PreRecoveryStateHash...)
+			candidate.RecoveryScope = append([]string(nil), base.RecoveryScope...)
+			candidate.Operations = append([]drwaSyncOperation(nil), base.Operations...)
+			testCase.mutate(&candidate)
+			candidateHash, hashErr := computeDRWASyncEnvelopeHash(&candidate)
+			require.NoError(t, hashErr)
+			require.NotEqual(t, baseHash, candidateHash)
+		})
+	}
+}
+
 func TestApplyDRWASyncEnvelopeRejectsStaleReplay(t *testing.T) {
 	adapter := newMockDRWASyncStateAdapter()
 	adapter.tokenVersions["CARBON-1"] = 7
@@ -941,6 +981,7 @@ func TestApplyDRWASyncEnvelopeDeletesUnexpectedHolderMirror(t *testing.T) {
 	adapter.holderBodies["CARBON-1|erd1ghost"] = []byte(`{"kyc":"approved"}`)
 	adapter.ensureHolderIndexed("CARBON-1", "erd1ghost")
 	envelope := &drwaSyncEnvelope{
+		SchemaVersion: drwaSyncEnvelopeSchemaVersionWithRecovery,
 		CallerDomain:  drwaSyncCallerRecoveryAdmin,
 		RecoveryScope: []string{"CARBON-1"},
 		Operations: []drwaSyncOperation{{
@@ -950,7 +991,13 @@ func TestApplyDRWASyncEnvelopeDeletesUnexpectedHolderMirror(t *testing.T) {
 			Version:       6,
 		}},
 	}
-	hash, _ := computeDRWASyncHash(envelope.CallerDomain, envelope.Operations)
+	stateHash, stateHashErr := computeDRWARecoveryStateHash(adapter, &drwaRecoveryManifest{
+		TokenID: "CARBON-1",
+		Holders: []drwaRecoveryHolder{{Address: "erd1ghost"}},
+	})
+	require.NoError(t, stateHashErr)
+	envelope.PreRecoveryStateHash = stateHash
+	hash, _ := computeDRWASyncEnvelopeHash(envelope)
 	envelope.PayloadHash = hash
 
 	result, err := applyDRWASyncEnvelope(adapter, envelope, 16, testDRWACallerAddress(drwaSyncCallerRecoveryAdmin))
@@ -1333,8 +1380,10 @@ func TestApplyDRWASyncEnvelopeRejectsMultiTokenRecoveryScope(t *testing.T) {
 	adapter.tokenVersions[drwaF1TokenB] = 0
 
 	envelope := &drwaSyncEnvelope{
-		CallerDomain:  drwaSyncCallerRecoveryAdmin,
-		RecoveryScope: []string{drwaF1TokenA, drwaF1TokenB},
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		PreRecoveryStateHash: bytes.Repeat([]byte{1}, 32),
+		RecoveryScope:        []string{drwaF1TokenA, drwaF1TokenB},
 		Operations: []drwaSyncOperation{
 			{
 				OperationType: drwaSyncOpTokenPolicy,
@@ -1350,7 +1399,7 @@ func TestApplyDRWASyncEnvelopeRejectsMultiTokenRecoveryScope(t *testing.T) {
 			},
 		},
 	}
-	hash, err := computeDRWASyncHash(envelope.CallerDomain, envelope.Operations)
+	hash, err := computeDRWASyncEnvelopeHash(envelope)
 	require.NoError(t, err)
 	envelope.PayloadHash = hash
 
@@ -1369,10 +1418,17 @@ func TestApplyDRWASyncEnvelopeRejectsMultiTokenRecoveryScope(t *testing.T) {
 // test asserts they continue to work.
 func TestApplyDRWASyncEnvelopeAcceptsSingleTokenRecoveryScope(t *testing.T) {
 	adapter := newMockDRWASyncStateAdapter()
+	stateHash, err := computeDRWARecoveryStateHash(
+		adapter,
+		&drwaRecoveryManifest{TokenID: drwaF1TokenA},
+	)
+	require.NoError(t, err)
 
 	envelope := &drwaSyncEnvelope{
-		CallerDomain:  drwaSyncCallerRecoveryAdmin,
-		RecoveryScope: []string{drwaF1TokenA},
+		SchemaVersion:        drwaSyncEnvelopeSchemaVersionWithRecovery,
+		CallerDomain:         drwaSyncCallerRecoveryAdmin,
+		PreRecoveryStateHash: stateHash,
+		RecoveryScope:        []string{drwaF1TokenA},
 		Operations: []drwaSyncOperation{{
 			OperationType: drwaSyncOpTokenPolicy,
 			TokenID:       drwaF1TokenA,
@@ -1380,7 +1436,7 @@ func TestApplyDRWASyncEnvelopeAcceptsSingleTokenRecoveryScope(t *testing.T) {
 			Body:          []byte(drwaF1PolicyBodyOn),
 		}},
 	}
-	hash, err := computeDRWASyncHash(envelope.CallerDomain, envelope.Operations)
+	hash, err := computeDRWASyncEnvelopeHash(envelope)
 	require.NoError(t, err)
 	envelope.PayloadHash = hash
 

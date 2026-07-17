@@ -15,23 +15,24 @@ import (
 	builtInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 )
 
-// drwaBlockNonceProvider supplies the current block nonce to the state adapter.
-// Implemented by BlockChainHookImpl; nil in test contexts where time-lock is
-// not under test.
-type drwaBlockNonceProvider interface {
+// drwaBlockTimeProvider supplies current block time/nonce data to the state
+// adapter. Implemented by BlockChainHookImpl; nil in test contexts where
+// time-lock/governance timing is not under test.
+type drwaBlockTimeProvider interface {
 	CurrentNonce() uint64
+	CurrentTimeStamp() uint64
 }
 
 type drwaHookStateAdapter struct {
 	accounts         state.AccountsAdapter
-	nonceProvider    drwaBlockNonceProvider
+	nonceProvider    drwaBlockTimeProvider
 	governanceEngine *DRWAGovernanceEngine
 }
 
 const (
-	drwaStoredValueBinaryV1       byte   = 0x01
-	drwaStoredValueNilBodyLength  uint32 = ^uint32(0)
-	drwaStoredValueBinaryHeaderLen       = 1 + 8 + 4
+	drwaStoredValueBinaryV1        byte   = 0x01
+	drwaStoredValueNilBodyLength   uint32 = ^uint32(0)
+	drwaStoredValueBinaryHeaderLen        = 1 + 8 + 4
 )
 
 func newDRWAHookStateAdapter(accounts state.AccountsAdapter) (*drwaHookStateAdapter, error) {
@@ -647,40 +648,48 @@ func (d *drwaHookStateAdapter) persistArtifact(
 
 // --- C-1: drwaSyncRecoveryTimelockProvider implementation ---
 
-// GetRecoveryLastBlock reads the block nonce of the last recovery_admin write
+// GetRecoveryLastTimestamp reads the timestamp of the last recovery_admin write
 // for the given token from the system account. Returns 0 if no prior recovery.
-func (d *drwaHookStateAdapter) GetRecoveryLastBlock(tokenID string) (uint64, error) {
+func (d *drwaHookStateAdapter) GetRecoveryLastTimestamp(tokenID string) (uint64, error) {
 	systemAccount, err := d.getUserAccount(core.SystemAccountAddress)
 	if err != nil {
 		return 0, err
 	}
 
-	value, _, err := d.retrieveValueAllowingFreshNilTrie(systemAccount, buildDRWARecoveryLastBlockKey(tokenID))
+	value, _, err := d.retrieveValueAllowingFreshNilTrie(systemAccount, buildDRWARecoveryLastTimestampKey(tokenID))
 	if err != nil {
 		return 0, err
 	}
 	if len(value) == 0 {
+		legacyValue, _, legacyErr := d.retrieveValueAllowingFreshNilTrie(systemAccount, buildDRWARecoveryLegacyLastBlockKey(tokenID))
+		if legacyErr != nil {
+			return 0, legacyErr
+		}
+		if len(legacyValue) != 0 {
+			return 0, fmt.Errorf("legacy recovery last-block state requires timestamp migration for token %s", tokenID)
+		}
+
 		return 0, nil
 	}
 	if len(value) != 8 {
-		return 0, fmt.Errorf("corrupt recovery last block value: expected 8 bytes, got %d", len(value))
+		return 0, fmt.Errorf("corrupt recovery last timestamp value: expected 8 bytes, got %d", len(value))
 	}
 
 	return binary.BigEndian.Uint64(value), nil
 }
 
-// PutRecoveryLastBlock writes the current block nonce as the last recovery
-// block for the given token into the system account.
-func (d *drwaHookStateAdapter) PutRecoveryLastBlock(tokenID string, blockNonce uint64) error {
+// PutRecoveryLastTimestamp writes the current block timestamp as the last
+// recovery timestamp for the given token into the system account.
+func (d *drwaHookStateAdapter) PutRecoveryLastTimestamp(tokenID string, timestamp uint64) error {
 	systemAccount, err := d.getUserAccount(core.SystemAccountAddress)
 	if err != nil {
 		return err
 	}
 
 	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, blockNonce)
+	binary.BigEndian.PutUint64(buf, timestamp)
 
-	err = systemAccount.AccountDataHandler().SaveKeyValue(buildDRWARecoveryLastBlockKey(tokenID), buf)
+	err = systemAccount.AccountDataHandler().SaveKeyValue(buildDRWARecoveryLastTimestampKey(tokenID), buf)
 	if err != nil {
 		return err
 	}
@@ -696,4 +705,13 @@ func (d *drwaHookStateAdapter) GetCurrentBlockNonce() (uint64, error) {
 		return 0, fmt.Errorf("no block nonce provider configured")
 	}
 	return d.nonceProvider.CurrentNonce(), nil
+}
+
+// GetCurrentBlockTimestamp returns the timestamp of the block currently being
+// processed.
+func (d *drwaHookStateAdapter) GetCurrentBlockTimestamp() (uint64, error) {
+	if d.nonceProvider == nil {
+		return 0, fmt.Errorf("no block timestamp provider configured")
+	}
+	return d.nonceProvider.CurrentTimeStamp(), nil
 }

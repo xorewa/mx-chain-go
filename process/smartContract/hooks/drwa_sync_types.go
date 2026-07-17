@@ -105,11 +105,11 @@ const (
 	// holders must use multiple sync envelopes across multiple transactions.
 	drwaSyncMaxPayloadBytes = 1 << 20
 
-	// drwaSyncRecoveryTimelockBlocks is the minimum number of blocks that must
-	// elapse between consecutive recovery_admin writes for the same token.
-	// At ~6 seconds per block, 600 blocks ≈ 1 hour. This limits the blast
-	// radius of a compromised recovery key by rate-limiting state overwrites.
-	drwaSyncRecoveryTimelockBlocks uint64 = 600
+	// drwaSyncRecoveryTimelockSeconds is the minimum wall-clock interval that
+	// must elapse between consecutive recovery_admin writes for the same token.
+	// This limits the blast radius of a compromised recovery key without
+	// depending on round/block duration.
+	drwaSyncRecoveryTimelockSeconds uint64 = 3600
 
 	// drwaSyncMaxTokenIDLen caps tokenID length in binary payloads to prevent
 	// abuse. MultiversX token identifiers are at most ~32 chars (ticker-hex).
@@ -140,7 +140,7 @@ const (
 //   present, and fail closed with DRWA_SYNC_GOVERNANCE_REQUIRED otherwise.
 //
 // Compensating controls active today:
-//   1. Recovery timelock rate-limits writes (drwaSyncRecoveryTimelockBlocks = 600 blocks).
+//   1. Recovery timelock rate-limits writes (drwaSyncRecoveryTimelockSeconds = 3600 seconds).
 //   2. All sync operations require hash verification (keccak256 envelope).
 //   3. Recovery envelopes are restricted to a single token in scope (F1 fix).
 //   4. Authorized caller addresses are registered via migration manifests with
@@ -163,7 +163,8 @@ type drwaSyncEnvelope struct {
 	// PreRecoveryStateHash binds a recovery_admin envelope to the on-chain
 	// state that was inspected when the envelope was built. If state changes
 	// between inspection and apply, the hash mismatch rejects the apply.
-	// This field does NOT participate in PayloadHash computation.
+	// Schema-v2 payload hashing commits this field together with recovery scope
+	// and operations. Recovery envelopes with an unbound legacy hash are rejected.
 	PreRecoveryStateHash []byte `json:"pre_recovery_state_hash,omitempty"`
 	// RecoveryScope restricts a recovery_admin envelope to specific token IDs.
 	// Required for recovery_admin callers — empty scope is rejected (C-7 fix).
