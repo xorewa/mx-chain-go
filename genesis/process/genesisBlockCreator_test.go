@@ -196,6 +196,7 @@ func createMockArgument(
 		GenesisNodePrice:    nodePrice,
 		EpochConfig: config.EpochConfig{
 			EnableEpochs: config.EnableEpochs{
+				DRWAEnforcementEnableEpoch:        unreachableEpoch,
 				SCDeployEnableEpoch:               unreachableEpoch,
 				CleanUpInformativeSCRsEnableEpoch: unreachableEpoch,
 				SCProcessorV2EnableEpoch:          unreachableEpoch,
@@ -743,12 +744,18 @@ func TestGenesisBlockCreator_CreateGenesisBlocksFailsForInvalidDRWAConfig(t *tes
 			},
 			expected: "missing DRWA authorized caller for domain auth_admin",
 		},
+		{
+			name:     "genesis enforcement with DRWA disabled",
+			config:   config.DRWAConfig{Enabled: false},
+			expected: "DRWA enforcement is enabled at genesis but DRWA caller provisioning is disabled",
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
 			arg.DRWAConfig = testCase.config
+			arg.EpochConfig.EnableEpochs.DRWAEnforcementEnableEpoch = 0
 			creator, err := NewGenesisBlockCreator(arg)
 			require.NoError(t, err)
 

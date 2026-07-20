@@ -95,6 +95,10 @@ func CreateShardGenesisBlock(
 		return createShardGenesisBlockAfterHardFork(arg, body, hardForkBlockProcessor)
 	}
 
+	if err := validateDRWAActivationConfig(arg); err != nil {
+		return nil, nil, nil, err
+	}
+
 	indexingData := &genesis.IndexingData{
 		DelegationTxs:      make([]data.TransactionHandler, 0),
 		ScrsTxs:            make(map[string]data.TransactionHandler),
@@ -409,6 +413,19 @@ func setupDRWAAuthorizedCallers(arg ArgsGenesisBlockCreator) error {
 
 	log.Info("DRWA genesis provisioning complete", "domains", loadedDomains)
 	return nil
+}
+
+// validateDRWAActivationConfig prevents a genesis-live enforcement gate from
+// starting without the authorized sync callers that compliance mutations need.
+// Delayed enforcement remains compatible with an intentionally disabled DRWA
+// configuration; the activation deployment must provision callers before that
+// epoch and is validated by the deployment manifest checks.
+func validateDRWAActivationConfig(arg ArgsGenesisBlockCreator) error {
+	if arg.EpochConfig.EnableEpochs.DRWAEnforcementEnableEpoch != 0 || arg.DRWAConfig.Enabled {
+		return nil
+	}
+
+	return fmt.Errorf("DRWA enforcement is enabled at genesis but DRWA caller provisioning is disabled")
 }
 
 // setupDRWARecoveryGovernance seeds explicitly configured per-token recovery
