@@ -131,6 +131,11 @@ func CreateShardGenesisBlock(
 		return nil, nil, nil, fmt.Errorf("%w encountered when creating genesis block for shard %d while provisioning DRWA authorized callers",
 			err, arg.ShardCoordinator.SelfId())
 	}
+	err = setupDRWARecoveryGovernance(arg)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("%w encountered when creating genesis block for shard %d while provisioning DRWA recovery governance",
+			err, arg.ShardCoordinator.SelfId())
+	}
 
 	numStaked, err := increaseStakersNonces(processors, arg)
 	if err != nil {
@@ -403,6 +408,62 @@ func setupDRWAAuthorizedCallers(arg ArgsGenesisBlockCreator) error {
 	}
 
 	log.Info("DRWA genesis provisioning complete", "domains", loadedDomains)
+	return nil
+}
+
+// setupDRWARecoveryGovernance seeds explicitly configured per-token recovery
+// quorums at genesis. It never derives or supplies signers itself: omitted
+// entries leave recovery unavailable for that token, preserving fail-closed
+// behaviour until a deliberate configuration is deployed.
+func setupDRWARecoveryGovernance(arg ArgsGenesisBlockCreator) error {
+	if !arg.DRWAConfig.Enabled || len(arg.DRWAConfig.RecoveryGovernance) == 0 {
+		return nil
+	}
+
+	type resolvedGovernanceConfig struct {
+		tokenID string
+		config  *hooks.DRWAGovernanceConfig
+	}
+
+	seenTokens := make(map[string]struct{}, len(arg.DRWAConfig.RecoveryGovernance))
+	resolvedConfigs := make([]resolvedGovernanceConfig, 0, len(arg.DRWAConfig.RecoveryGovernance))
+	for _, configured := range arg.DRWAConfig.RecoveryGovernance {
+		tokenID := strings.TrimSpace(configured.TokenID)
+		if tokenID == "" {
+			return fmt.Errorf("DRWA recovery governance token ID is empty")
+		}
+		if _, exists := seenTokens[tokenID]; exists {
+			return fmt.Errorf("duplicate DRWA recovery governance token ID %q", tokenID)
+		}
+		seenTokens[tokenID] = struct{}{}
+
+		cfg := &hooks.DRWAGovernanceConfig{
+			Threshold:   configured.Threshold,
+			ProposalTTL: configured.ProposalTTL,
+			MaxSigners:  configured.MaxSigners,
+			Signers:     make([][]byte, 0, len(configured.Signers)),
+		}
+		for _, configuredSigner := range configured.Signers {
+			signer, err := hooks.NormalizeDRWAAuthorizedCallerAddress(configuredSigner)
+			if err != nil {
+				return fmt.Errorf("invalid DRWA recovery governance signer for token %s: %w", tokenID, err)
+			}
+			cfg.Signers = append(cfg.Signers, signer)
+		}
+		if err := hooks.ValidateGovernanceConfig(cfg); err != nil {
+			return fmt.Errorf("invalid DRWA recovery governance config for token %s: %w", tokenID, err)
+		}
+		resolvedConfigs = append(resolvedConfigs, resolvedGovernanceConfig{tokenID: tokenID, config: cfg})
+	}
+
+	// All entries have passed parsing and validation before state is touched.
+	for _, resolved := range resolvedConfigs {
+		if err := hooks.ProvisionDRWARecoveryGovernance(arg.Accounts, resolved.tokenID, resolved.config); err != nil {
+			return err
+		}
+	}
+
+	log.Info("DRWA recovery governance genesis provisioning complete", "tokens", len(seenTokens))
 	return nil
 }
 

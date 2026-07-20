@@ -188,11 +188,29 @@ type DRWAAuthorizedCallersConfig struct {
 	RecoveryAdmin    string
 }
 
+// DRWARecoveryGovernanceConfig declares the initial native recovery quorum for
+// one token. It is consumed only during genesis provisioning; subsequent
+// changes must use the governed recovery flow and its version checks.
+//
+// Signers use the same accepted address forms as DRWA authorized callers
+// (bech32 or a 32-byte hexadecimal address).
+type DRWARecoveryGovernanceConfig struct {
+	TokenID     string
+	Threshold   uint32
+	Signers     []string
+	ProposalTTL uint64
+	MaxSigners  uint32
+}
+
 // DRWAConfig holds native DRWA governance and enforcement configuration
 type DRWAConfig struct {
 	Enabled            bool
 	KeyManagementModel string
 	AuthorizedCallers  DRWAAuthorizedCallersConfig
+	// RecoveryGovernance is deliberately optional: a token without an entry
+	// remains without a native recovery quorum rather than receiving an
+	// implicit or single-key default.
+	RecoveryGovernance []DRWARecoveryGovernanceConfig
 }
 
 // Config will hold the entire application configuration parameters

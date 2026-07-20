@@ -148,6 +148,15 @@
         Attestation = ""
         RecoveryAdmin = ""
 
+    # Optional, explicit per-token recovery quorum seeded at genesis. Entries
+    # are never inferred; a token without one remains fail-closed for recovery.
+    # [[DRWA.RecoveryGovernance]]
+    #     TokenID = "RWA-abcdef"
+    #     Threshold = 3
+    #     Signers = ["0x...", "0x...", "0x..."]
+    #     ProposalTTL = 2400
+    #     MaxSigners = 5
+
 [Versions]
     DefaultVersion = "default"
     VersionsByEpochs = [

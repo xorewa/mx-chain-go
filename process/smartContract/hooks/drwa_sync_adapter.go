@@ -60,6 +60,30 @@ func ProvisionDRWAAuthorizedCaller(accounts state.AccountsAdapter, domain string
 	return adapter.SetAuthorizedCallerAddressVersioned(domain, address, version)
 }
 
+// ProvisionDRWARecoveryGovernance stores an initial M-of-N recovery
+// configuration for a token. It is intended for deterministic genesis
+// provisioning only: expected version zero prevents replacing an existing
+// token configuration outside the governed update path.
+func ProvisionDRWARecoveryGovernance(accounts state.AccountsAdapter, tokenID string, cfg *DRWAGovernanceConfig) error {
+	if tokenID == "" {
+		return fmt.Errorf("DRWA recovery governance token ID is empty")
+	}
+	if err := ValidateGovernanceConfig(cfg); err != nil {
+		return fmt.Errorf("invalid DRWA recovery governance config for token %s: %w", tokenID, err)
+	}
+
+	store, err := newDRWAGovernanceTrieStore(accounts)
+	if err != nil {
+		return err
+	}
+
+	if err = store.SaveGovernanceConfig(tokenID, cfg, 0); err != nil {
+		return fmt.Errorf("cannot provision DRWA recovery governance for token %s: %w", tokenID, err)
+	}
+
+	return nil
+}
+
 // IsInterfaceNil returns true if there is no value under the interface
 func (a *drwaHookStateAdapter) IsInterfaceNil() bool {
 	return a == nil

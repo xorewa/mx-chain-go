@@ -55,6 +55,14 @@ type drwaAuthorizedCallerRecordForTest struct {
 	Address []byte `json:"address"`
 }
 
+type drwaRecoveryGovernanceRecordForTest struct {
+	Version     uint64   `json:"version"`
+	Threshold   uint32   `json:"threshold"`
+	Signers     [][]byte `json:"signers"`
+	ProposalTTL uint64   `json:"proposal_ttl"`
+	MaxSigners  uint32   `json:"max_signers"`
+}
+
 var nodePrice = big.NewInt(5000)
 
 // TODO improve code coverage of this package
@@ -562,6 +570,215 @@ func TestSetupDRWAAuthorizedCallers_ProvisionedToSystemAccount(t *testing.T) {
 	expectedAddr, err := hooks.NormalizeDRWAAuthorizedCallerAddress(arg.DRWAConfig.AuthorizedCallers.AuthAdmin)
 	require.NoError(t, err)
 	require.Equal(t, expectedAddr, record.Address)
+}
+
+func TestSetupDRWARecoveryGovernance_ProvisionedToSystemAccount(t *testing.T) {
+	arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
+	initializeDRWASystemAccountForRecoveryGovernanceTest(t, arg)
+	arg.DRWAConfig = config.DRWAConfig{
+		Enabled: true,
+		RecoveryGovernance: []config.DRWARecoveryGovernanceConfig{
+			{
+				TokenID:     "RWA-abcdef",
+				Threshold:   2,
+				Signers:     []string{"0x1111111111111111111111111111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222222222222222222222222222", "0x3333333333333333333333333333333333333333333333333333333333333333"},
+				ProposalTTL: 2400,
+				MaxSigners:  5,
+			},
+		},
+	}
+
+	err := setupDRWARecoveryGovernance(arg)
+	require.NoError(t, err)
+
+	systemAccount, err := arg.Accounts.LoadAccount(core.SystemAccountAddress)
+	require.NoError(t, err)
+	key := []byte("DRWA_GOV_" + hex.EncodeToString([]byte("RWA-abcdef")))
+	rawValue, _, err := systemAccount.(vmcommon.UserAccountHandler).AccountDataHandler().RetrieveValue(key)
+	require.NoError(t, err)
+	require.NotEmpty(t, rawValue)
+
+	record := &drwaRecoveryGovernanceRecordForTest{}
+	require.NoError(t, json.Unmarshal(rawValue, record))
+	require.Equal(t, uint64(1), record.Version)
+	require.Equal(t, uint32(2), record.Threshold)
+	require.Equal(t, uint64(2400), record.ProposalTTL)
+	require.Equal(t, uint32(5), record.MaxSigners)
+	require.Len(t, record.Signers, 3)
+
+	expectedSigner, err := hooks.NormalizeDRWAAuthorizedCallerAddress(arg.DRWAConfig.RecoveryGovernance[0].Signers[0])
+	require.NoError(t, err)
+	require.Equal(t, expectedSigner, record.Signers[0])
+
+	// Bootstrap is write-once: it must not become a post-genesis config
+	// replacement path.
+	require.Error(t, setupDRWARecoveryGovernance(arg))
+	rawValue, _, err = systemAccount.(vmcommon.UserAccountHandler).AccountDataHandler().RetrieveValue(key)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(rawValue, record))
+	require.Equal(t, uint64(1), record.Version)
+}
+
+func TestSetupDRWARecoveryGovernance_RejectsInvalidConfiguration(t *testing.T) {
+	validSigner := "0x1111111111111111111111111111111111111111111111111111111111111111"
+	testCases := []struct {
+		name       string
+		governance []config.DRWARecoveryGovernanceConfig
+		expected   string
+	}{
+		{
+			name: "duplicate token ID",
+			governance: []config.DRWARecoveryGovernanceConfig{
+				{TokenID: "RWA-abcdef", Threshold: 2, Signers: []string{validSigner, "0x2222222222222222222222222222222222222222222222222222222222222222"}, ProposalTTL: 1, MaxSigners: 2},
+				{TokenID: "RWA-abcdef", Threshold: 2, Signers: []string{validSigner, "0x3333333333333333333333333333333333333333333333333333333333333333"}, ProposalTTL: 1, MaxSigners: 2},
+			},
+			expected: "duplicate DRWA recovery governance token ID",
+		},
+		{
+			name: "invalid signer",
+			governance: []config.DRWARecoveryGovernanceConfig{
+				{TokenID: "RWA-abcdef", Threshold: 2, Signers: []string{validSigner, "not-an-address"}, ProposalTTL: 1, MaxSigners: 2},
+			},
+			expected: "invalid DRWA recovery governance signer",
+		},
+		{
+			name: "invalid quorum",
+			governance: []config.DRWARecoveryGovernanceConfig{
+				{TokenID: "RWA-abcdef", Threshold: 1, Signers: []string{validSigner}, ProposalTTL: 1, MaxSigners: 1},
+			},
+			expected: "invalid DRWA recovery governance config",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
+			initializeDRWASystemAccountForRecoveryGovernanceTest(t, arg)
+			arg.DRWAConfig = config.DRWAConfig{Enabled: true, RecoveryGovernance: testCase.governance}
+
+			err := setupDRWARecoveryGovernance(arg)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), testCase.expected)
+		})
+	}
+}
+
+func TestSetupDRWARecoveryGovernance_InvalidBatchDoesNotProvisionAnyToken(t *testing.T) {
+	arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
+	initializeDRWASystemAccountForRecoveryGovernanceTest(t, arg)
+	arg.DRWAConfig = config.DRWAConfig{
+		Enabled: true,
+		RecoveryGovernance: []config.DRWARecoveryGovernanceConfig{
+			{
+				TokenID:     "RWA-valid",
+				Threshold:   2,
+				Signers:     []string{"0x1111111111111111111111111111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222222222222222222222222222"},
+				ProposalTTL: 1,
+				MaxSigners:  2,
+			},
+			{
+				TokenID:     "RWA-invalid",
+				Threshold:   1,
+				Signers:     []string{"0x3333333333333333333333333333333333333333333333333333333333333333"},
+				ProposalTTL: 1,
+				MaxSigners:  1,
+			},
+		},
+	}
+
+	require.Error(t, setupDRWARecoveryGovernance(arg))
+	systemAccount, err := arg.Accounts.LoadAccount(core.SystemAccountAddress)
+	require.NoError(t, err)
+	key := []byte("DRWA_GOV_" + hex.EncodeToString([]byte("RWA-valid")))
+	rawValue, _, err := systemAccount.(vmcommon.UserAccountHandler).AccountDataHandler().RetrieveValue(key)
+	require.NoError(t, err)
+	require.Empty(t, rawValue)
+}
+
+func TestSetupDRWARecoveryGovernance_DisabledOrUnconfiguredDoesNothing(t *testing.T) {
+	arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
+	arg.DRWAConfig = config.DRWAConfig{
+		Enabled: false,
+		RecoveryGovernance: []config.DRWARecoveryGovernanceConfig{
+			{TokenID: "RWA-abcdef", Threshold: 2, Signers: []string{"not-an-address"}, ProposalTTL: 1, MaxSigners: 2},
+		},
+	}
+
+	require.NoError(t, setupDRWARecoveryGovernance(arg))
+	arg.DRWAConfig = config.DRWAConfig{Enabled: true}
+	require.NoError(t, setupDRWARecoveryGovernance(arg))
+}
+
+func initializeDRWASystemAccountForRecoveryGovernanceTest(t *testing.T, arg ArgsGenesisBlockCreator) {
+	t.Helper()
+	require.NoError(t, hooks.ProvisionDRWAAuthorizedCaller(arg.Accounts, "auth_admin", bytes.Repeat([]byte{0x11}, 32), 1))
+}
+
+func TestGenesisBlockCreator_CreateGenesisBlocksFailsForInvalidDRWAConfig(t *testing.T) {
+	testCases := []struct {
+		name     string
+		config   config.DRWAConfig
+		expected string
+	}{
+		{
+			name: "invalid key management model",
+			config: config.DRWAConfig{
+				Enabled:            true,
+				KeyManagementModel: "single_key",
+			},
+			expected: "invalid DRWA key management model",
+		},
+		{
+			name: "missing authorized caller",
+			config: config.DRWAConfig{
+				Enabled:            true,
+				KeyManagementModel: drwaKeyManagementModelMultisig3of5Contract,
+				AuthorizedCallers: config.DRWAAuthorizedCallersConfig{
+					PolicyRegistry:   "0x1111111111111111111111111111111111111111111111111111111111111111",
+					AssetManager:     "0x2222222222222222222222222222222222222222222222222222222222222222",
+					IdentityRegistry: "0x3333333333333333333333333333333333333333333333333333333333333333",
+					Attestation:      "0x4444444444444444444444444444444444444444444444444444444444444444",
+					RecoveryAdmin:    "0x5555555555555555555555555555555555555555555555555555555555555555",
+				},
+			},
+			expected: "missing DRWA authorized caller for domain auth_admin",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
+			arg.DRWAConfig = testCase.config
+			creator, err := NewGenesisBlockCreator(arg)
+			require.NoError(t, err)
+
+			_, err = creator.CreateGenesisBlocks()
+			require.Error(t, err)
+			require.Contains(t, err.Error(), testCase.expected)
+		})
+	}
+}
+
+func TestGenesisBlockCreator_CreateGenesisBlocksAcceptsValidDRWAConfig(t *testing.T) {
+	arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
+	arg.DRWAConfig = config.DRWAConfig{
+		Enabled:            true,
+		KeyManagementModel: drwaKeyManagementModelMultisig3of5Contract,
+		AuthorizedCallers: config.DRWAAuthorizedCallersConfig{
+			AuthAdmin:        "0x1111111111111111111111111111111111111111111111111111111111111111",
+			PolicyRegistry:   "0x2222222222222222222222222222222222222222222222222222222222222222",
+			AssetManager:     "0x3333333333333333333333333333333333333333333333333333333333333333",
+			IdentityRegistry: "0x4444444444444444444444444444444444444444444444444444444444444444",
+			Attestation:      "0x5555555555555555555555555555555555555555555555555555555555555555",
+			RecoveryAdmin:    "0x6666666666666666666666666666666666666666666666666666666666666666",
+		},
+	}
+	creator, err := NewGenesisBlockCreator(arg)
+	require.NoError(t, err)
+
+	blocks, err := creator.CreateGenesisBlocks()
+	require.NoError(t, err)
+	require.NotEmpty(t, blocks)
 }
 
 func TestGenesisBlockCreator_CreateGenesisBlockAfterHardForkShouldCreateSCResultingAddresses(t *testing.T) {
