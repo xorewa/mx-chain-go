@@ -4148,6 +4148,7 @@ func GetDefaultEnableEpochsConfig() *config.EnableEpochs {
 		StakingV4Step3EnableEpoch:                       UnreachableEpoch,
 		AndromedaEnableEpoch:                            UnreachableEpoch,
 		SupernovaEnableEpoch:                            UnreachableEpoch,
+		DRWAEnforcementEnableEpoch:                      UnreachableEpoch,
 	}
 }
 

@@ -95,6 +95,7 @@ func TestChainSimulator_MakeNewContractFromValidatorData(t *testing.T) {
 				blsMultiSignerEnableEpoch := cfg.EpochConfig.EnableEpochs.BLSMultiSignerEnableEpoch
 
 				cfg.EpochConfig.EnableEpochs = config.EnableEpochs{}
+				cfg.EpochConfig.EnableEpochs.DRWAEnforcementEnableEpoch = ^uint32(0)
 				cfg.EpochConfig.EnableEpochs.MaxNodesChangeEnableEpoch = maxNodesChangeEnableEpoch
 				cfg.EpochConfig.EnableEpochs.BLSMultiSignerEnableEpoch = blsMultiSignerEnableEpoch
 
@@ -145,6 +146,7 @@ func TestChainSimulator_MakeNewContractFromValidatorData(t *testing.T) {
 
 				// set all activation epoch values on 0
 				cfg.EpochConfig.EnableEpochs = config.EnableEpochs{}
+				cfg.EpochConfig.EnableEpochs.DRWAEnforcementEnableEpoch = ^uint32(0)
 				cfg.EpochConfig.EnableEpochs.MaxNodesChangeEnableEpoch = maxNodesChangeEnableEpoch
 				cfg.EpochConfig.EnableEpochs.BLSMultiSignerEnableEpoch = blsMultiSignerEnableEpoch
 

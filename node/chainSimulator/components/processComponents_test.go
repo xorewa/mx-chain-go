@@ -70,6 +70,9 @@ func createArgsProcessComponentsHolder() ArgsProcessComponentsHolder {
 	args := ArgsProcessComponentsHolder{
 		Config: testscommon.GetGeneralConfig(),
 		EpochConfig: config.EpochConfig{
+			EnableEpochs: config.EnableEpochs{
+				DRWAEnforcementEnableEpoch: ^uint32(0),
+			},
 			GasSchedule: config.GasScheduleConfig{
 				GasScheduleByEpochs: []config.GasScheduleByEpochs{
 					{

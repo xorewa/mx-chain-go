@@ -87,6 +87,7 @@ func createMockProcessComponentsFactoryArgs() processComp.ProcessComponentsFacto
 		Config: testscommon.GetGeneralConfig(),
 		EpochConfig: config.EpochConfig{
 			EnableEpochs: config.EnableEpochs{
+				DRWAEnforcementEnableEpoch: ^uint32(0),
 				MaxNodesChangeEnableEpoch: []config.MaxNodesChangeConfig{
 					{
 						EpochEnable:            0,

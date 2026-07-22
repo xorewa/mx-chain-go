@@ -100,6 +100,11 @@ func GetCoreArgs() coreComp.CoreComponentsFactoryArgs {
 		WorkingDirectory:    "home",
 		ChanStopNodeProcess: make(chan endProcess.ArgEndProcess),
 		EpochConfig: config.EpochConfig{
+			EnableEpochs: config.EnableEpochs{
+				// Keep generic fixtures DRWA-inert. Production genesis must
+				// explicitly configure the enforcement activation epoch.
+				DRWAEnforcementEnableEpoch: ^uint32(0),
+			},
 			GasSchedule: config.GasScheduleConfig{
 				GasScheduleByEpochs: []config.GasScheduleByEpochs{
 					{
@@ -631,6 +636,7 @@ func GetProcessArgs(
 		TxExecutionOrderHandler: &commonMocks.TxExecutionOrderHandlerStub{},
 		EpochConfig: config.EpochConfig{
 			EnableEpochs: config.EnableEpochs{
+				DRWAEnforcementEnableEpoch: ^uint32(0),
 				MaxNodesChangeEnableEpoch: []config.MaxNodesChangeConfig{
 					{
 						EpochEnable:            0,

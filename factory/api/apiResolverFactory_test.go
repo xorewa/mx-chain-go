@@ -92,8 +92,10 @@ func createMockArgs(t *testing.T) *api.ApiResolverArgs {
 			FlagsConfig: &config.ContextFlagsConfig{
 				WorkingDir: "",
 			},
-			GeneralConfig:   &cfg,
-			EpochConfig:     &config.EpochConfig{},
+			GeneralConfig: &cfg,
+			EpochConfig: &config.EpochConfig{EnableEpochs: config.EnableEpochs{
+				DRWAEnforcementEnableEpoch: ^uint32(0),
+			}},
 			EconomicsConfig: &economicsConfig,
 		},
 		CoreComponents:       coreComponents,
