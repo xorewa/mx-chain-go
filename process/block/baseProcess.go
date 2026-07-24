@@ -266,7 +266,12 @@ func NewBaseProcessor(arguments ArgBaseProcessor) (*baseProcessor, error) {
 		closingNodeStarted:                 arguments.CoreComponents.ClosingNodeStarted(),
 	}
 
-	err = base.OnExecutedBlock(genesisHdr, genesisHdr.GetRootHash())
+	genesisRootHash, err := common.GetHeaderStateRootHash(genesisHdr)
+	if err != nil {
+		return nil, err
+	}
+
+	err = base.OnExecutedBlock(genesisHdr, genesisRootHash)
 	if err != nil {
 		return nil, err
 	}
@@ -3035,7 +3040,19 @@ func (bp *baseProcessor) OnProposedBlock(
 		return err
 	}
 
-	return bp.dataPool.Transactions().OnProposedBlock(proposedHash, proposedBodyPtr, proposedHeader, accountsProvider, lastExecResHandler.GetHeaderHash())
+	latestExecutedHash := lastExecResHandler.GetHeaderHash()
+	if len(latestExecutedHash) == 0 {
+		if !bp.isV3GenesisExecutionCheckpoint(lastExecResHandler) {
+			return process.ErrMissingHashForHeaderNonce
+		}
+
+		// A V3 genesis execution record cannot include the genesis header hash
+		// without creating a circular hash dependency. This is the only valid
+		// missing-hash case; later checkpoints must carry their actual hash.
+		latestExecutedHash = bp.blockChain.GetGenesisHeaderHash()
+	}
+
+	return bp.dataPool.Transactions().OnProposedBlock(proposedHash, proposedBodyPtr, proposedHeader, accountsProvider, latestExecutedHash)
 }
 
 // OnBackfilledBlock adds a previously consensus-agreed block as tracked without breadcrumb validation.
@@ -3056,7 +3073,15 @@ func (bp *baseProcessor) prepareAccountsForProposal() (data.BaseExecutionResultH
 	prevHeader := bp.blockChain.GetCurrentBlockHeader()
 	prevHeaderHash := bp.blockChain.GetCurrentBlockHeaderHash()
 	if check.IfNil(prevHeader) || len(prevHeaderHash) == 0 {
-		return nil, process.ErrNilHeaderHandler
+		// The first Supernova proposal is built immediately after genesis, before
+		// the chain has a current block. In that case the genesis header is the
+		// previous execution anchor, just as it is for execution-result
+		// verification and proposal construction elsewhere in this package.
+		prevHeader = bp.blockChain.GetGenesisHeader()
+		prevHeaderHash = bp.blockChain.GetGenesisHeaderHash()
+		if check.IfNil(prevHeader) || len(prevHeaderHash) == 0 {
+			return nil, process.ErrNilHeaderHandler
+		}
 	}
 	lastExecResHandler, err := common.GetOrCreateLastExecutionResultForPrevHeader(prevHeader, prevHeaderHash)
 	if err != nil {
@@ -3090,7 +3115,11 @@ func (bp *baseProcessor) recreateTrieIfNeeded() error {
 	rootHash := bp.blockChain.GetCurrentBlockRootHash()
 	if len(rootHash) == 0 {
 		genesisBlock := bp.blockChain.GetGenesisHeader()
-		rootHash = genesisBlock.GetRootHash()
+		genesisRootHash, err := common.GetHeaderStateRootHash(genesisBlock)
+		if err != nil {
+			return err
+		}
+		rootHash = genesisRootHash
 	}
 
 	rh := holders.NewDefaultRootHashesHolder(rootHash)
@@ -3928,6 +3957,14 @@ func (bp *baseProcessor) getLastExecutionResultHeader(
 		return nil, err
 	}
 
+	if len(lastExecutionResult.GetHeaderHash()) == 0 && bp.isV3GenesisExecutionCheckpoint(lastExecutionResult) {
+		// A V3 genesis execution record cannot contain the hash of the genesis
+		// header itself without creating a circular hash dependency. Its fully
+		// matching checkpoint therefore identifies genesis as the previous
+		// executed header for the first post-genesis block.
+		return bp.blockChain.GetGenesisHeader(), nil
+	}
+
 	return process.GetHeader(
 		lastExecutionResult.GetHeaderHash(),
 		bp.dataPool.Headers(),
@@ -3935,6 +3972,23 @@ func (bp *baseProcessor) getLastExecutionResultHeader(
 		bp.marshalizer,
 		currentHeader.GetShardID(),
 	)
+}
+
+func (bp *baseProcessor) isV3GenesisExecutionCheckpoint(lastExecutionResult data.BaseExecutionResultHandler) bool {
+	genesisHeader := bp.blockChain.GetGenesisHeader()
+	if check.IfNil(genesisHeader) || !genesisHeader.IsHeaderV3() {
+		return false
+	}
+
+	genesisRootHash, err := common.GetHeaderStateRootHash(genesisHeader)
+	if err != nil {
+		return false
+	}
+
+	return lastExecutionResult.GetHeaderNonce() == genesisHeader.GetNonce() &&
+		lastExecutionResult.GetHeaderRound() == genesisHeader.GetRound() &&
+		lastExecutionResult.GetHeaderEpoch() == genesisHeader.GetEpoch() &&
+		bytes.Equal(lastExecutionResult.GetRootHash(), genesisRootHash)
 }
 
 func (bp *baseProcessor) checkAndUpdateContextBeforeExecution(header data.HeaderHandler, headerHash []byte) error {
@@ -4314,6 +4368,12 @@ func (bp *baseProcessor) PruneTrieAsyncHeader() {
 
 	header := bp.blockChain.GetCurrentBlockHeader()
 	headerHash := bp.blockChain.GetCurrentBlockHeaderHash()
+	// Async execution can be scheduled immediately after node startup, before
+	// the chain has installed its first current header. There is nothing to
+	// prune in that interval; wait for the next execution cycle instead.
+	if check.IfNil(header) {
+		return
+	}
 
 	if len(bp.lastPrunedHeaderHash) == 0 {
 		// last pruned header hash not set, trigger prune trie for the provided header

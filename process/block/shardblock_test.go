@@ -7074,6 +7074,51 @@ func TestShardProcessor_GetLastExecutionResultHeader(t *testing.T) {
 		require.Nil(t, retHeader)
 	})
 
+	t.Run("should return genesis header for first V3 block with genesis execution checkpoint", func(t *testing.T) {
+		t.Parallel()
+
+		rootHash := []byte("genesis root hash")
+		genesisHeader := &block.HeaderV3{
+			Nonce: 0,
+			Round: 0,
+			Epoch: 0,
+			LastExecutionResult: &block.ExecutionResultInfo{
+				ExecutionResult: &block.BaseExecutionResult{
+					HeaderNonce: 0,
+					HeaderRound: 0,
+					HeaderEpoch: 0,
+					RootHash:    rootHash,
+				},
+			},
+		}
+		currentHeader := &block.HeaderV3{
+			LastExecutionResult: &block.ExecutionResultInfo{
+				ExecutionResult: &block.BaseExecutionResult{
+					HeaderNonce: 0,
+					HeaderRound: 0,
+					HeaderEpoch: 0,
+					RootHash:    rootHash,
+				},
+			},
+		}
+
+		arguments := CreateMockArguments(createComponentHolderMocks())
+		arguments.DataComponents = &mock.DataComponentsMock{
+			Storage:  initStore(),
+			DataPool: initDataPool(),
+			BlockChain: &testscommon.ChainHandlerStub{
+				GetGenesisHeaderCalled: func() data.HeaderHandler {
+					return genesisHeader
+				},
+			},
+		}
+
+		sp, _ := blproc.NewShardProcessor(arguments)
+		retHeader, err := sp.GetLastExecutionResultHeader(currentHeader)
+		require.NoError(t, err)
+		require.Same(t, genesisHeader, retHeader)
+	})
+
 	t.Run("should try to get from storage if not found in pool", func(t *testing.T) {
 		t.Parallel()
 

@@ -215,21 +215,50 @@ func setInitialDataInHeader(
 	}
 
 	setErrors := make([]error, 0)
-	setErrors = append(setErrors, shardHeaderHandler.SetEpoch(epoch))
-	setErrors = append(setErrors, shardHeaderHandler.SetNonce(nonce))
-	setErrors = append(setErrors, shardHeaderHandler.SetRound(round))
-	setErrors = append(setErrors, shardHeaderHandler.SetShardID(arg.ShardCoordinator.SelfId()))
-	setErrors = append(setErrors, shardHeaderHandler.SetBlockBodyTypeInt32(int32(dataBlock.StateBlock)))
-	setErrors = append(setErrors, shardHeaderHandler.SetPubKeysBitmap([]byte{1}))
-	setErrors = append(setErrors, shardHeaderHandler.SetSignature(rootHash))
-	setErrors = append(setErrors, shardHeaderHandler.SetRootHash(rootHash))
-	setErrors = append(setErrors, shardHeaderHandler.SetPrevRandSeed(rootHash))
-	setErrors = append(setErrors, shardHeaderHandler.SetRandSeed(rootHash))
-	setErrors = append(setErrors, shardHeaderHandler.SetTimeStamp(arg.GenesisTime))
-	setErrors = append(setErrors, shardHeaderHandler.SetAccumulatedFees(big.NewInt(0)))
-	setErrors = append(setErrors, shardHeaderHandler.SetDeveloperFees(big.NewInt(0)))
-	setErrors = append(setErrors, shardHeaderHandler.SetChainID([]byte(arg.Core.ChainID())))
-	setErrors = append(setErrors, shardHeaderHandler.SetSoftwareVersion([]byte("")))
+	appendMandatory := func(err error) {
+		setErrors = append(setErrors, err)
+	}
+	// Header V3, used by Supernova, removes legacy root, signature and fee
+	// fields. Genesis has no consensus signatures or fees, and its state root is
+	// derived by V3, so those setters are optional only when the header explicitly
+	// declares them unsupported. Every other initialization failure remains fatal.
+	appendIfSupported := func(err error) {
+		if !errors.Is(err, data.ErrFieldNotSupported) {
+			setErrors = append(setErrors, err)
+		}
+	}
+
+	appendMandatory(shardHeaderHandler.SetEpoch(epoch))
+	appendMandatory(shardHeaderHandler.SetNonce(nonce))
+	appendMandatory(shardHeaderHandler.SetRound(round))
+	appendMandatory(shardHeaderHandler.SetShardID(arg.ShardCoordinator.SelfId()))
+	appendMandatory(shardHeaderHandler.SetBlockBodyTypeInt32(int32(dataBlock.StateBlock)))
+	appendIfSupported(shardHeaderHandler.SetPubKeysBitmap([]byte{1}))
+	appendIfSupported(shardHeaderHandler.SetSignature(rootHash))
+	appendIfSupported(shardHeaderHandler.SetRootHash(rootHash))
+	appendMandatory(shardHeaderHandler.SetPrevRandSeed(rootHash))
+	appendMandatory(shardHeaderHandler.SetRandSeed(rootHash))
+	appendMandatory(shardHeaderHandler.SetTimeStamp(arg.GenesisTime))
+	appendIfSupported(shardHeaderHandler.SetAccumulatedFees(big.NewInt(0)))
+	appendIfSupported(shardHeaderHandler.SetDeveloperFees(big.NewInt(0)))
+	appendMandatory(shardHeaderHandler.SetChainID([]byte(arg.Core.ChainID())))
+	appendMandatory(shardHeaderHandler.SetSoftwareVersion([]byte("")))
+
+	// Header V3 carries the state root through its last execution result rather
+	// than through the legacy RootHash field. The first post-genesis V3 block
+	// uses this value as its execution anchor, so a V3 genesis header must seed
+	// it explicitly.
+	if headerHandler.IsHeaderV3() {
+		appendMandatory(shardHeaderHandler.SetLastExecutionResultHandler(&dataBlock.ExecutionResultInfo{
+			NotarizedInRound: round,
+			ExecutionResult: &dataBlock.BaseExecutionResult{
+				HeaderNonce: nonce,
+				HeaderRound: round,
+				HeaderEpoch: epoch,
+				RootHash:    rootHash,
+			},
+		}))
+	}
 
 	for _, err := range setErrors {
 		if err != nil {

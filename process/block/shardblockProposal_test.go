@@ -4172,6 +4172,102 @@ func TestShardProcessor_OnProposedBlock(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, wasOnProposedBlockCalled)
 	})
+	t.Run("should work with V3 genesis header when there is no current block", func(t *testing.T) {
+		t.Parallel()
+
+		wasOnProposedBlockCalled := false
+		genesisHash := []byte("genesis header hash")
+		genesisHeader := &testscommon.HeaderHandlerStub{
+			IsHeaderV3Called: func() bool {
+				return true
+			},
+			GetNonceCalled: func() uint64 {
+				return 0
+			},
+			GetLastExecutionResultHandlerCalled: func() data.LastExecutionResultHandler {
+				return &block.ExecutionResultInfo{
+					ExecutionResult: &block.BaseExecutionResult{},
+				}
+			},
+		}
+		coreComponents, dataComponents, bootstrapComponents, statusComponents := createComponentHolderMocks()
+		dataPool, ok := dataComponents.DataPool.(*dataRetriever.PoolsHolderStub)
+		require.True(t, ok)
+		dataPool.TransactionsCalled = func() retriever.ShardedDataCacherNotifier {
+			return &testscommon.ShardedDataStub{
+				OnProposedBlockCalled: func(blockHash []byte, blockBody *block.Body, blockHeader data.HeaderHandler, accountsProvider common.AccountNonceAndBalanceProvider, latestExecutedHash []byte) error {
+					wasOnProposedBlockCalled = true
+					require.Equal(t, genesisHash, latestExecutedHash)
+					return nil
+				},
+			}
+		}
+		dataComponents.DataPool = dataPool
+		dataComponents.BlockChain = &testscommon.ChainHandlerStub{
+			GetCurrentBlockHeaderCalled: func() data.HeaderHandler {
+				return nil
+			},
+			GetCurrentBlockHeaderHashCalled: func() []byte {
+				return nil
+			},
+			GetGenesisHeaderCalled: func() data.HeaderHandler {
+				return genesisHeader
+			},
+			GetGenesisHeaderHashCalled: func() []byte {
+				return genesisHash
+			},
+		}
+
+		arguments := CreateMockArguments(coreComponents, dataComponents, bootstrapComponents, statusComponents)
+		sp, err := blproc.NewShardProcessor(arguments)
+		require.NoError(t, err)
+
+		err = sp.OnProposedBlock(&block.Body{}, getSimpleHeaderV3Mock(), []byte("proposedHash"))
+		require.NoError(t, err)
+		require.True(t, wasOnProposedBlockCalled)
+	})
+	t.Run("should reject a non-genesis V3 execution checkpoint with no hash", func(t *testing.T) {
+		t.Parallel()
+
+		coreComponents, dataComponents, bootstrapComponents, statusComponents := createComponentHolderMocks()
+		dataPool, ok := dataComponents.DataPool.(*dataRetriever.PoolsHolderStub)
+		require.True(t, ok)
+		dataPool.TransactionsCalled = func() retriever.ShardedDataCacherNotifier {
+			return &testscommon.ShardedDataStub{
+				OnProposedBlockCalled: func(_ []byte, _ *block.Body, _ data.HeaderHandler, _ common.AccountNonceAndBalanceProvider, _ []byte) error {
+					require.Fail(t, "malformed execution checkpoint must not reach transaction tracking")
+					return nil
+				},
+			}
+		}
+		dataComponents.DataPool = dataPool
+		dataComponents.BlockChain = &testscommon.ChainHandlerStub{
+			GetCurrentBlockHeaderCalled: func() data.HeaderHandler {
+				return getSimpleHeaderV3Mock()
+			},
+			GetCurrentBlockHeaderHashCalled: func() []byte {
+				return []byte("malformed V3 header hash")
+			},
+			GetGenesisHeaderCalled: func() data.HeaderHandler {
+				return &testscommon.HeaderHandlerStub{
+					IsHeaderV3Called: func() bool { return true },
+					GetNonceCalled:   func() uint64 { return 0 },
+					GetLastExecutionResultHandlerCalled: func() data.LastExecutionResultHandler {
+						return &block.ExecutionResultInfo{
+							ExecutionResult: &block.BaseExecutionResult{RootHash: []byte("genesis root")},
+						}
+					},
+				}
+			},
+		}
+
+		arguments := CreateMockArguments(coreComponents, dataComponents, bootstrapComponents, statusComponents)
+		sp, err := blproc.NewShardProcessor(arguments)
+		require.NoError(t, err)
+
+		err = sp.OnProposedBlock(&block.Body{}, getSimpleHeaderV3Mock(), []byte("proposedHash"))
+		require.Equal(t, process.ErrMissingHashForHeaderNonce, err)
+	})
 	t.Run("should work with previous V2 header", func(t *testing.T) {
 		t.Parallel()
 

@@ -435,6 +435,26 @@ func GetLastBaseExecutionResultHandler(header data.HeaderHandler) (data.BaseExec
 	return ExtractBaseExecutionResultHandler(lastExecResultsHandler)
 }
 
+// GetHeaderStateRootHash returns the state root associated with a header.
+// Header V3 deliberately no longer stores the state root on the header itself;
+// it is carried by the last execution result instead.
+func GetHeaderStateRootHash(header data.HeaderHandler) ([]byte, error) {
+	if check.IfNil(header) {
+		return nil, ErrNilHeaderHandler
+	}
+
+	if !header.IsHeaderV3() {
+		return header.GetRootHash(), nil
+	}
+
+	lastExecutionResult, err := GetLastBaseExecutionResultHandler(header)
+	if err != nil {
+		return nil, err
+	}
+
+	return lastExecutionResult.GetRootHash(), nil
+}
+
 // GetOrCreateLastExecutionResultForPrevHeader extracts base execution result from
 // header if header v3. Otherwise, it will create last execution result based
 // on the provided header
@@ -443,7 +463,27 @@ func GetOrCreateLastExecutionResultForPrevHeader(
 	prevHeaderHash []byte,
 ) (data.BaseExecutionResultHandler, error) {
 	if prevHeader.IsHeaderV3() {
-		return ExtractBaseExecutionResultHandler(prevHeader.GetLastExecutionResultHandler())
+		lastExecutionResult, err := ExtractBaseExecutionResultHandler(prevHeader.GetLastExecutionResultHandler())
+		if err != nil {
+			return nil, err
+		}
+
+		// A HeaderV3 genesis header cannot embed its own hash in the execution
+		// result without creating a circular dependency. Bootstrap callers still
+		// need a hash-bearing execution-result anchor, so synthesize one only for
+		// that exact in-memory genesis case. Do not mutate the persisted header.
+		if prevHeader.GetNonce() == 0 && len(lastExecutionResult.GetHeaderHash()) == 0 && len(prevHeaderHash) > 0 {
+			return &block.BaseExecutionResult{
+				HeaderHash:  prevHeaderHash,
+				HeaderNonce: lastExecutionResult.GetHeaderNonce(),
+				HeaderRound: lastExecutionResult.GetHeaderRound(),
+				HeaderEpoch: lastExecutionResult.GetHeaderEpoch(),
+				RootHash:    lastExecutionResult.GetRootHash(),
+				GasUsed:     lastExecutionResult.GetGasUsed(),
+			}, nil
+		}
+
+		return lastExecutionResult, nil
 	}
 
 	lastExecResult, err := CreateLastExecutionResultFromPrevHeader(prevHeader, prevHeaderHash)

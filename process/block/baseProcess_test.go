@@ -6560,6 +6560,26 @@ func TestBaseProcessor_WaitForExecutionResultsVerification(t *testing.T) {
 func TestBaseProcessor_PruneTrieAsyncHeader(t *testing.T) {
 	t.Parallel()
 
+	t.Run("should skip pruning before the first current header is installed", func(t *testing.T) {
+		t.Parallel()
+
+		coreComponents, dataComponents, bootstrapComponents, statusComponents := createComponentHolderMocks()
+		arguments := CreateMockArguments(coreComponents, dataComponents, bootstrapComponents, statusComponents)
+		blkc := createTestBlockchain()
+		blkc.GetCurrentBlockHeaderCalled = func() data.HeaderHandler {
+			return nil
+		}
+		blkc.GetCurrentBlockHeaderHashCalled = func() []byte {
+			return []byte("no-current-header")
+		}
+		dataComponents.BlockChain = blkc
+
+		bp, err := blproc.NewShardProcessor(arguments)
+		require.NoError(t, err)
+		require.NotPanics(t, func() { bp.PruneTrieAsyncHeader() })
+		require.Nil(t, bp.GetLastPrunedHash())
+	})
+
 	// header 1
 
 	headerHash1 := []byte("headerHash1")

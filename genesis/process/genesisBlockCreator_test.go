@@ -65,6 +65,21 @@ type drwaRecoveryGovernanceRecordForTest struct {
 
 var nodePrice = big.NewInt(5000)
 
+func TestSetInitialDataInHeaderHeaderV3ShouldIgnoreRemovedFeeFields(t *testing.T) {
+	t.Parallel()
+
+	arg := createMockArgument(t, "testdata/genesisTest1.json", &mock.InitialNodesHandlerStub{}, big.NewInt(22000))
+	header := &block.HeaderV3{}
+
+	err := setInitialDataInHeader(header, arg, 0, 0, 0, []byte("root-hash"))
+
+	require.NoError(t, err)
+	require.Equal(t, arg.Core.ChainID(), string(header.GetChainID()))
+	require.Equal(t, uint64(0), header.GetNonce())
+	require.NotNil(t, header.LastExecutionResult)
+	require.Equal(t, []byte("root-hash"), header.LastExecutionResult.GetExecutionResult().GetRootHash())
+}
+
 // TODO improve code coverage of this package
 func createMockArgument(
 	t *testing.T,

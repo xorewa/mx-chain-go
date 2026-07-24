@@ -54,7 +54,9 @@ var (
 func TestChainSimulatorCheckSupernova(t *testing.T) {
 	chainSimulator, err := NewChainSimulator(ArgsChainSimulator{
 		BypassTxSignatureCheck:         true,
-		BypassCreateBlockTimeCheck:     true,
+		// Exercise the same HeaderV3 proposal-time budget used by the simulator
+		// command, rather than bypassing it in this regression coverage.
+		BypassCreateBlockTimeCheck:     false,
 		TempDir:                        t.TempDir(),
 		PathToInitialConfig:            defaultPathToInitialConfig,
 		NumOfShards:                    defaultNumOfShards,
@@ -90,6 +92,44 @@ func TestChainSimulatorCheckSupernova(t *testing.T) {
 	time.Sleep(time.Second)
 
 	chainSimulator.Close()
+}
+
+func TestChainSimulator_SupernovaFromGenesisKeepsExecutionResultsWithinNonceGap(t *testing.T) {
+	chainSimulator, err := NewChainSimulator(ArgsChainSimulator{
+		BypassTxSignatureCheck:         true,
+		BypassCreateBlockTimeCheck:     true,
+		TempDir:                        t.TempDir(),
+		PathToInitialConfig:            defaultPathToInitialConfig,
+		NumOfShards:                    defaultNumOfShards,
+		RoundDurationInMillis:          defaultRoundDurationInMillis,
+		SupernovaRoundDurationInMillis: defaultSupernovaRoundDurationInMillis,
+		RoundsPerEpoch:                 defaultRoundsPerEpoch,
+		SupernovaRoundsPerEpoch:        defaultSupernovaRoundsPerEpoch,
+		ApiInterface:                   api.NewNoApiInterface(),
+		MinNodesPerShard:               defaultMinNodesPerShard,
+		MetaChainMinNodes:              defaultMetaChainMinNodes,
+		AlterConfigsFunction: func(cfg *config.Configs) {
+			cfg.EpochConfig.EnableEpochs.AndromedaEnableEpoch = 0
+			cfg.EpochConfig.EnableEpochs.SupernovaEnableEpoch = 0
+		},
+	})
+	require.NoError(t, err)
+	defer chainSimulator.Close()
+
+	const generatedBlocks = 30
+	require.NoError(t, chainSimulator.GenerateBlocks(generatedBlocks))
+
+	for shardID := uint32(0); shardID < defaultNumOfShards; shardID++ {
+		header := chainSimulator.GetNodeHandler(shardID).GetChainHandler().GetCurrentBlockHeader()
+		require.True(t, header.IsHeaderV3())
+		require.Equal(t, uint64(generatedBlocks), header.GetNonce())
+		require.Equal(t, uint64(generatedBlocks-1), common.GetLastExecutionResultNonce(header))
+	}
+
+	metaHeader := chainSimulator.GetNodeHandler(core.MetachainShardId).GetChainHandler().GetCurrentBlockHeader()
+	require.True(t, metaHeader.IsHeaderV3())
+	require.Equal(t, uint64(generatedBlocks), metaHeader.GetNonce())
+	require.Equal(t, uint64(generatedBlocks-1), common.GetLastExecutionResultNonce(metaHeader))
 }
 
 func TestNewChainSimulator(t *testing.T) {

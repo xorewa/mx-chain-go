@@ -23,6 +23,7 @@ import (
 	"github.com/multiversx/mx-chain-crypto-go/signing/mcl"
 	logger "github.com/multiversx/mx-chain-logger-go"
 
+	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/factory"
 	"github.com/multiversx/mx-chain-go/node/chainSimulator/components"
@@ -34,6 +35,13 @@ import (
 )
 
 const delaySendTxs = time.Millisecond
+
+// asyncExecutionCompletionTimeout bounds the simulator-only wait between
+// consecutive HeaderV3 rounds. In a live network the next proposal naturally
+// occurs in a later round; the simulator creates rounds synchronously and must
+// give the existing asynchronous execution pipeline a chance to publish the
+// previous round's result before constructing the next header.
+const asyncExecutionCompletionTimeout = time.Second
 
 var log = logger.GetOrCreate("chainSimulator")
 
@@ -207,7 +215,47 @@ func (s *simulator) createChainHandlers(args ArgsBaseChainSimulator) error {
 		}
 
 		genesisBlock := node.GetDataComponents().Blockchain().GetGenesisHeader()
-		err = node.GetDataComponents().Datapool().Transactions().OnExecutedBlock(genesisBlock, genesisBlock.GetRootHash())
+		genesisRootHash, err := common.GetHeaderStateRootHash(genesisBlock)
+		if err != nil {
+			return err
+		}
+		// The in-memory simulator does not restore a persisted chain head as a
+		// normal node bootstrap does. Genesis is therefore both the current and
+		// last-executed block when the simulated chain starts. Keeping those
+		// values together is especially important for Header V3, whose execution
+		// tracker validates proposals against the current chain state.
+		err = node.GetDataComponents().Blockchain().SetCurrentBlockHeaderAndRootHash(
+			genesisBlock,
+			genesisRootHash,
+		)
+		if err != nil {
+			return err
+		}
+		node.GetDataComponents().Blockchain().SetCurrentBlockHeaderHash(
+			node.GetDataComponents().Blockchain().GetGenesisHeaderHash(),
+		)
+		// Header V3 starts its asynchronous execution tracker from the last
+		// executed block. A normal node learns that state while bootstrapping
+		// persisted chain data; the simulator creates genesis in-memory, so it
+		// must seed the equivalent state explicitly.
+		node.GetDataComponents().Blockchain().SetLastExecutedBlockHeaderAndRootHash(
+			genesisBlock,
+			node.GetDataComponents().Blockchain().GetGenesisHeaderHash(),
+			genesisRootHash,
+		)
+		genesisExecutionResult, err := common.GetOrCreateLastExecutionResultForPrevHeader(
+			genesisBlock,
+			node.GetDataComponents().Blockchain().GetGenesisHeaderHash(),
+		)
+		if err != nil {
+			return err
+		}
+		err = node.GetProcessComponents().ExecutionManager().SetLastNotarizedResult(genesisExecutionResult)
+		if err != nil {
+			return err
+		}
+
+		err = node.GetDataComponents().Datapool().Transactions().OnExecutedBlock(genesisBlock, genesisRootHash)
 		if err != nil {
 			return err
 		}
@@ -440,6 +488,35 @@ func (s *simulator) allNodesCreateBlocks() error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	err := s.waitForAsyncExecution(headers)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *simulator) waitForAsyncExecution(headers map[uint32]*dtos.BroadcastData) error {
+	for shardID, pair := range headers {
+		if !pair.Header.IsHeaderV3() {
+			continue
+		}
+
+		completionChan := s.nodes[shardID].GetProcessComponents().ExecutionManager().GetSignalProcessCompletionChan()
+		if completionChan == nil {
+			return fmt.Errorf("missing asynchronous execution completion channel for shard %d", shardID)
+		}
+
+		select {
+		case completedNonce := <-completionChan:
+			if completedNonce != pair.Header.GetNonce() {
+				return fmt.Errorf("asynchronous execution completed unexpected nonce %d for shard %d, expected %d", completedNonce, shardID, pair.Header.GetNonce())
+			}
+		case <-time.After(asyncExecutionCompletionTimeout):
+			return fmt.Errorf("asynchronous execution did not complete within %s for shard %d nonce %d", asyncExecutionCompletionTimeout, shardID, pair.Header.GetNonce())
 		}
 	}
 

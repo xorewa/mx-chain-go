@@ -602,6 +602,40 @@ func TestGetLastBaseExecutionResultHandler(t *testing.T) {
 	})
 }
 
+func TestGetHeaderStateRootHash(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should use the header root before V3", func(t *testing.T) {
+		t.Parallel()
+
+		rootHash, err := common.GetHeaderStateRootHash(&block.Header{RootHash: []byte("legacy-root")})
+		require.NoError(t, err)
+		require.Equal(t, []byte("legacy-root"), rootHash)
+	})
+
+	t.Run("should use the last execution result root for V3", func(t *testing.T) {
+		t.Parallel()
+
+		header := &block.HeaderV3{
+			LastExecutionResult: &block.ExecutionResultInfo{
+				ExecutionResult: &block.BaseExecutionResult{RootHash: []byte("v3-root")},
+			},
+		}
+
+		rootHash, err := common.GetHeaderStateRootHash(header)
+		require.NoError(t, err)
+		require.Equal(t, []byte("v3-root"), rootHash)
+	})
+
+	t.Run("should fail for V3 without an execution result", func(t *testing.T) {
+		t.Parallel()
+
+		rootHash, err := common.GetHeaderStateRootHash(&block.HeaderV3{})
+		require.Nil(t, rootHash)
+		require.Equal(t, common.ErrNilLastExecutionResultHandler, err)
+	})
+}
+
 func TestGetMiniBlockHeaderHandlersFromExecResults(t *testing.T) {
 	t.Parallel()
 
@@ -855,6 +889,35 @@ func TestGetOrCreateLastExecutionResultForPrevHeader(t *testing.T) {
 		require.Nil(t, err)
 
 		require.Equal(t, baseExecResult, execResult)
+	})
+
+	t.Run("should synthesize a hash-bearing execution result for header v3 genesis", func(t *testing.T) {
+		t.Parallel()
+
+		baseExecResult := &block.BaseExecutionResult{
+			HeaderNonce: 0,
+			HeaderRound: 7,
+			HeaderEpoch: 0,
+			RootHash:    []byte("genesisRootHash"),
+			GasUsed:     11,
+		}
+		header := &block.HeaderV3{
+			Nonce: 0,
+			LastExecutionResult: &block.ExecutionResultInfo{
+				ExecutionResult: baseExecResult,
+			},
+		}
+		headerHash := []byte("genesisHeaderHash")
+
+		execResult, err := common.GetOrCreateLastExecutionResultForPrevHeader(header, headerHash)
+		require.NoError(t, err)
+		require.NotSame(t, baseExecResult, execResult)
+		require.Equal(t, headerHash, execResult.GetHeaderHash())
+		require.Equal(t, baseExecResult.GetHeaderNonce(), execResult.GetHeaderNonce())
+		require.Equal(t, baseExecResult.GetHeaderRound(), execResult.GetHeaderRound())
+		require.Equal(t, baseExecResult.GetHeaderEpoch(), execResult.GetHeaderEpoch())
+		require.Equal(t, baseExecResult.GetRootHash(), execResult.GetRootHash())
+		require.Equal(t, baseExecResult.GetGasUsed(), execResult.GetGasUsed())
 	})
 
 	t.Run("should work for header v2", func(t *testing.T) {
