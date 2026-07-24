@@ -180,7 +180,11 @@ func updateSupernovaConfigs(configs *config.Configs, args ArgsChainSimulatorConf
 	}
 	isSupernovaFromGenesis := configs.EpochConfig.EnableEpochs.SupernovaEnableEpoch == 0
 	if isSupernovaFromGenesis {
-		// if supernova is from genesis, remove other ChainParametersByEpoch entries
+		// A Supernova-at-genesis simulation must use the post-Supernova schedule from
+		// its first block. Keeping pre-Supernova entries would make the configuration
+		// internally inconsistent: chain parameters would be 600 ms, while process,
+		// consensus, antiflood and header-version handlers would still select their
+		// legacy epoch-zero values.
 		configs.GeneralConfig.GeneralSettings.ChainParametersByEpoch = []config.ChainParametersByEpochConfig{
 			configs.GeneralConfig.GeneralSettings.ChainParametersByEpoch[2],
 		}
@@ -225,6 +229,55 @@ func updateSupernovaConfigs(configs *config.Configs, args ArgsChainSimulatorConf
 	configs.GeneralConfig.Versions.VersionsByEpochs[2].StartEpoch = configs.EpochConfig.EnableEpochs.SupernovaEnableEpoch
 	supernovaRound, _ := strconv.ParseUint(configs.RoundConfig.RoundActivations[string(common.SupernovaRoundFlag)].Round, 10, 64)
 	configs.GeneralConfig.Versions.VersionsByEpochs[2].StartRound = supernovaRound
+
+	if isSupernovaFromGenesis {
+		promoteSupernovaConfigsAtGenesis(configs)
+	}
+}
+
+// promoteSupernovaConfigsAtGenesis makes each time-dependent node schedule use
+// the existing post-Supernova entry at epoch/round zero. This is intentionally
+// scoped to the chain simulator: it lets an isolated genesis network exercise
+// the same runtime profile that a production network reaches after Supernova.
+func promoteSupernovaConfigsAtGenesis(configs *config.Configs) {
+	generalSettings := &configs.GeneralConfig.GeneralSettings
+
+	lastEpochChangeGracePeriod := generalSettings.EpochChangeGracePeriodByEpoch[len(generalSettings.EpochChangeGracePeriodByEpoch)-1]
+	lastEpochChangeGracePeriod.EnableEpoch = 0
+	generalSettings.EpochChangeGracePeriodByEpoch = []config.EpochChangeGracePeriodByEpoch{lastEpochChangeGracePeriod}
+
+	lastProcessByEpoch := generalSettings.ProcessConfigsByEpoch[len(generalSettings.ProcessConfigsByEpoch)-1]
+	lastProcessByEpoch.EnableEpoch = 0
+	generalSettings.ProcessConfigsByEpoch = []config.ProcessConfigByEpoch{lastProcessByEpoch}
+
+	lastProcessByRound := generalSettings.ProcessConfigsByRound[len(generalSettings.ProcessConfigsByRound)-1]
+	lastProcessByRound.EnableRound = 0
+	generalSettings.ProcessConfigsByRound = []config.ProcessConfigByRound{lastProcessByRound}
+
+	lastEpochStartByEpoch := generalSettings.EpochStartConfigsByEpoch[len(generalSettings.EpochStartConfigsByEpoch)-1]
+	lastEpochStartByEpoch.EnableEpoch = 0
+	generalSettings.EpochStartConfigsByEpoch = []config.EpochStartConfigByEpoch{lastEpochStartByEpoch}
+
+	lastEpochStartByRound := generalSettings.EpochStartConfigsByRound[len(generalSettings.EpochStartConfigsByRound)-1]
+	lastEpochStartByRound.EnableRound = 0
+	generalSettings.EpochStartConfigsByRound = []config.EpochStartConfigByRound{lastEpochStartByRound}
+
+	lastConsensusByEpoch := generalSettings.ConsensusConfigsByEpoch[len(generalSettings.ConsensusConfigsByEpoch)-1]
+	lastConsensusByEpoch.EnableEpoch = 0
+	generalSettings.ConsensusConfigsByEpoch = []config.ConsensusConfigByEpoch{lastConsensusByEpoch}
+
+	lastConsensusByRound := generalSettings.ConsensusConfigsByRound[len(generalSettings.ConsensusConfigsByRound)-1]
+	lastConsensusByRound.EnableRound = 0
+	generalSettings.ConsensusConfigsByRound = []config.ConsensusConfigByRound{lastConsensusByRound}
+
+	lastAntifloodByRound := configs.GeneralConfig.Antiflood.ConfigsByRound[len(configs.GeneralConfig.Antiflood.ConfigsByRound)-1]
+	lastAntifloodByRound.Round = 0
+	configs.GeneralConfig.Antiflood.ConfigsByRound = []config.AntifloodConfigByRound{lastAntifloodByRound}
+
+	lastVersion := configs.GeneralConfig.Versions.VersionsByEpochs[len(configs.GeneralConfig.Versions.VersionsByEpochs)-1]
+	lastVersion.StartEpoch = 0
+	lastVersion.StartRound = 0
+	configs.GeneralConfig.Versions.VersionsByEpochs = []config.VersionByEpochs{lastVersion}
 }
 
 func updateConfigsChainParameters(args ArgsChainSimulatorConfigs, configs *config.Configs) {
