@@ -3,10 +3,9 @@ name: Code-coverage
 on:
   push:
     branches:
-      - master
+      - NewArc
   pull_request:
-    branches: [ master, feat/*, rc/* ]
-  workflow_dispatch:
+    branches: [NewArc]
 
 permissions:
   contents: read
@@ -27,19 +26,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Get dependencies
-        run: |
-          go get -v -t -d ./...
-          if [ -f Gopkg.toml ]; then
-              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-              dep ensure
-          fi
+        run: go mod download
       - name: Run unit tests
         run: |
           make test-coverage
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v5
-        with:
-          fail_ci_if_error: true
-          files: coverage.txt
-          token: ${{ secrets.CODECOV_TOKEN }}

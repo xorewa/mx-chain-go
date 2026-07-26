@@ -2,10 +2,10 @@ name: Check CLI.md files
 
 on:
   pull_request:
-    branches: [ master, rc/*, feat/* ]
+    branches: [NewArc]
     types: [opened, ready_for_review]
   push:
-  workflow_dispatch:
+    branches: [NewArc]
 
 permissions:
   contents: read
@@ -28,12 +28,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Get dependencies
-        run: |
-          go get -v -t -d ./...
-          if [ -f Gopkg.toml ]; then
-              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-              dep ensure
-          fi
+        run: go mod download
       - name: Check
         run: |
           make check-cli-md
