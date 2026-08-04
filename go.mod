@@ -1,6 +1,6 @@
 module github.com/multiversx/mx-chain-go
 
-go 1.26
+go 1.26.2
 
 require (
 	github.com/beevik/ntp v1.3.0
