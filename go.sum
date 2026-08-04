@@ -743,6 +743,8 @@ github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260723153919-73ae973bf328 h1:L
 github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260723153919-73ae973bf328/go.mod h1:9R7G5lTu5L3ZvfRWekok74d9tASefVx4R9Ca4vurmjI=
 github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260801180101-296b31231794 h1:OXpFB65UYf8dP7sFt/xLaXK/vYE61JG9dbDomVxJj3c=
 github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260801180101-296b31231794/go.mod h1:ntt0jgKA95vrmsRSmIoC+Myqy5NkIe6gtrE2FqV0VYE=
+github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260804110617-40a39e2ab1dc h1:cAiLX6nidCdC0zVsOv37afJc620m7TIJs6o16vwOrL8=
+github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260804110617-40a39e2ab1dc/go.mod h1:ntt0jgKA95vrmsRSmIoC+Myqy5NkIe6gtrE2FqV0VYE=
 github.com/xorewa/mx-chain-logger-go v0.0.0-20260731095302-f59311a3ecf5 h1:N3bgeMbxuyi12Lz7+4euixYqsH7kMKTQU1DZz8Tua/s=
 github.com/xorewa/mx-chain-logger-go v0.0.0-20260731095302-f59311a3ecf5/go.mod h1:6WxJYAAK+jAk6XtXb/Yem6FDb8o2wBs/1O9cDKISBbU=
 github.com/xorewa/mx-chain-logger-go v0.0.0-20260801081807-1372e2ba679d h1:azWc++njsm9OXz7wfMhj8t9W8uWr9Mq3nLl0meD+zlk=
