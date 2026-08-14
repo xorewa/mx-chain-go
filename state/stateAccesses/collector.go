@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	data "github.com/multiversx/mx-chain-core-go/data/stateChange"
 	logger "github.com/multiversx/mx-chain-logger-go"
@@ -277,15 +278,24 @@ func (c *collector) CommitCollectedAccesses(rootHash []byte) error {
 		retained := c.stateAccessesForHeader[string(headerHash)]
 		c.retainedMut.RUnlock()
 		if retained != nil {
-			if bytes.Equal(retained.rootHash, rootHash) {
-				return nil
+			if !bytes.Equal(retained.rootHash, rootHash) {
+				return &state.StateAccessesRootMismatchError{
+					HeaderHash:   headerHash,
+					ExpectedRoot: append([]byte(nil), retained.rootHash...),
+					ActualRoot:   append([]byte(nil), rootHash...),
+				}
 			}
 
-			return &state.StateAccessesRootMismatchError{
-				HeaderHash:   headerHash,
-				ExpectedRoot: append([]byte(nil), retained.rootHash...),
-				ActualRoot:   append([]byte(nil), rootHash...),
+			if !equalStateAccessesForTxs(retained.accesses, collectedStateAccesses) {
+				// keep the conflicting payload in the working set so it is not
+				// silently lost together with the error
+				c.restoreCollectedStateAccesses(collectedStateAccesses)
+				return fmt.Errorf("%w for header hash %s",
+					state.ErrStateAccessesExecutionConflict, hex.EncodeToString(headerHash))
 			}
+
+			// identical retry: idempotent success, no double store
+			return nil
 		}
 	}
 
@@ -311,6 +321,29 @@ func (c *collector) CommitCollectedAccesses(rootHash []byte) error {
 	}
 
 	return nil
+}
+
+func (c *collector) restoreCollectedStateAccesses(collected stateAccessesForTxs) {
+	c.stateAccessesMut.Lock()
+	defer c.stateAccessesMut.Unlock()
+	for txHash, accesses := range collected {
+		if _, exists := c.stateAccessesForTxs[txHash]; !exists {
+			c.stateAccessesForTxs[txHash] = accesses
+		}
+	}
+}
+
+func equalStateAccessesForTxs(first, second map[string]*data.StateAccesses) bool {
+	if len(first) != len(second) {
+		return false
+	}
+	for txHash, firstAccesses := range first {
+		secondAccesses, exists := second[txHash]
+		if !exists || !proto.Equal(firstAccesses, secondAccesses) {
+			return false
+		}
+	}
+	return true
 }
 
 // AddTxHashToCollectedStateAccesses will try to set txHash field to each state access
@@ -355,17 +388,18 @@ func (c *collector) SetIndexToLatestStateAccesses(index int) error {
 
 // RevertToIndex will revert to index
 func (c *collector) RevertToIndex(index int) error {
+	c.stateAccessesMut.Lock()
+	defer c.stateAccessesMut.Unlock()
+
 	if index < 0 {
 		return fmt.Errorf("RevertToIndex: %w for index %v, num state accesses %v", state.ErrStateAccessesIndexOutOfBounds, index, len(c.stateAccesses))
 	}
 
 	if index == 0 {
-		c.Reset()
+		c.stateAccesses = make([]*data.StateAccess, 0)
+		c.stateAccessesForTxs = make(map[string]*data.StateAccesses)
 		return nil
 	}
-
-	c.stateAccessesMut.Lock()
-	defer c.stateAccessesMut.Unlock()
 
 	log.Trace("num state accesses before revert", "num", len(c.stateAccesses))
 	for i := len(c.stateAccesses) - 1; i >= 0; i-- {

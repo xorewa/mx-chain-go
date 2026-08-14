@@ -85,8 +85,10 @@ func TestCollector_CommitCollectedAccessesSameRootDoesNotOverwrite(t *testing.T)
 	c.AddStateAccess(&data.StateAccess{Type: data.Write, TxHash: firstTxHash})
 	require.NoError(t, commitCollectedAccessesForTest(c, rootHash))
 
+	// a same-identity retry with a different payload must not silently drop the
+	// new payload: it keeps the first commit intact and reports a typed conflict
 	c.AddStateAccess(&data.StateAccess{Type: data.Write, TxHash: secondTxHash})
-	require.NoError(t, commitCollectedAccessesForTest(c, rootHash))
+	require.ErrorIs(t, commitCollectedAccessesForTest(c, rootHash), state.ErrStateAccessesExecutionConflict)
 
 	stateAccesses := getStateAccessesForHeaderForTest(c, rootHash)
 	require.Contains(t, stateAccesses, string(firstTxHash))
@@ -108,7 +110,7 @@ func TestCollector_ResetAfterSameRootCommitKeepsPreviousStateAccesses(t *testing
 	require.NoError(t, commitCollectedAccessesForTest(c, rootHash))
 
 	c.AddStateAccess(&data.StateAccess{Type: data.Write, TxHash: secondTxHash})
-	require.NoError(t, commitCollectedAccessesForTest(c, rootHash))
+	require.ErrorIs(t, commitCollectedAccessesForTest(c, rootHash), state.ErrStateAccessesExecutionConflict)
 
 	// The second commit did not own the existing root-hash entry, so reverting it
 	// must not remove the accesses collected by the first commit.

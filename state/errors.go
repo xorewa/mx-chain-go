@@ -178,6 +178,9 @@ var ErrNilStateAccessesStorer = errors.New("nil state accesses storer")
 // ErrStateAccessesRootMismatch signals that retained state accesses have an unexpected root hash
 var ErrStateAccessesRootMismatch = errors.New("state accesses root hash mismatch")
 
+// ErrStateAccessesExecutionConflict signals a non-idempotent reuse of an execution identity
+var ErrStateAccessesExecutionConflict = errors.New("state accesses execution conflict")
+
 // StateAccessesRootMismatchError contains state-access identity diagnostics
 type StateAccessesRootMismatchError struct {
 	HeaderHash   []byte
