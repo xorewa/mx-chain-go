@@ -789,10 +789,18 @@ func (host *vmContext) AddCode(address []byte, code []byte) {
 func (host *vmContext) AddTxValueToSmartContract(value *big.Int, scAddress []byte) {
 	destAcc, exists := host.outputAccounts[string(scAddress)]
 	if !exists {
+		persistedBalance := big.NewInt(0)
+		account, err := host.blockChainHook.GetUserAccount(scAddress)
+		if err == nil {
+			accountBalance := account.GetBalance()
+			if accountBalance != nil {
+				persistedBalance.Set(accountBalance)
+			}
+		}
 		destAcc = &vmcommon.OutputAccount{
 			Address:      scAddress,
 			BalanceDelta: big.NewInt(0),
-			Balance:      big.NewInt(0),
+			Balance:      persistedBalance,
 		}
 		host.outputAccounts[string(destAcc.Address)] = destAcc
 	}

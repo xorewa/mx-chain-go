@@ -153,6 +153,35 @@ func TestVmContext_GetBalance(t *testing.T) {
 	assert.Equal(t, res.Uint64(), balance.Uint64())
 }
 
+func TestVmContext_AddTxValueToSmartContractPreservesPersistedBalance(t *testing.T) {
+	t.Parallel()
+
+	addr := []byte("system smart contract")
+	persistedBalance := big.NewInt(100)
+	callValue := big.NewInt(7)
+	account, _ := accounts.NewUserAccount(
+		[]byte("account"), &trie.DataTrieTrackerStub{}, &trie.TrieLeafParserStub{})
+	_ = account.AddToBalance(persistedBalance)
+
+	args := createDefaultEeiArgs()
+	args.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(address []byte) (vmcommon.UserAccountHandler, error) {
+			if bytes.Equal(address, addr) {
+				return account, nil
+			}
+			return nil, errors.New("account not found")
+		},
+	}
+	vmCtx, _ := NewVMContext(args)
+
+	vmCtx.AddTxValueToSmartContract(callValue, addr)
+
+	assert.Equal(t, uint64(107), vmCtx.GetBalance(addr).Uint64())
+	output := vmCtx.CreateVMOutput()
+	assert.Contains(t, output.OutputAccounts, string(addr))
+	assert.Equal(t, callValue, output.OutputAccounts[string(addr)].BalanceDelta)
+}
+
 func TestVmContext_CreateVMOutput_Empty(t *testing.T) {
 	t.Parallel()
 
