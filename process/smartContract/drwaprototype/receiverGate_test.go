@@ -7,6 +7,7 @@ import (
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	trieMock "github.com/multiversx/mx-chain-go/testscommon/trie"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,6 +55,7 @@ func TestPrototypeReceiverGateKeyIsDomainSeparatedAndInputBounded(t *testing.T) 
 	require.NotEqual(t, keyA, keyB)
 	require.NotEqual(t, keyA, OpenEffectStorageKey([32]byte{1}))
 	require.NotEqual(t, keyA, append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier), tokenA...))
+	require.False(t, vmcommon.IsAllowedToSaveUnderKey(keyA))
 
 	called := false
 	handler := &trieMock.DataTrieTrackerStub{RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) {
