@@ -163,6 +163,7 @@ func CreateApiResolver(args *ApiResolverArgs) (facade.ApiResolver, error) {
 		convertedAddresses,
 		args.Configs.GeneralConfig.BuiltInFunctions.MaxNumAddressesInTransferRole,
 		convertedDNSV2Addresses,
+		prototypeDRWANetworkDomain(args.ProcessComponents),
 	)
 	if err != nil {
 		return nil, err
@@ -384,6 +385,7 @@ func createScQueryElement(
 		convertedAddresses,
 		args.generalConfig.BuiltInFunctions.MaxNumAddressesInTransferRole,
 		convertedDNSV2Addresses,
+		prototypeDRWANetworkDomain(args.processComponents),
 	)
 	if err != nil {
 		return nil, nil, err
@@ -660,6 +662,7 @@ func createBuiltinFuncs(
 	automaticCrawlerAddresses [][]byte,
 	maxNumAddressesInTransferRole uint32,
 	dnsV2Addresses [][]byte,
+	prototypeNetworkDomain [32]byte,
 ) (vmcommon.BuiltInFunctionFactory, error) {
 	mapDNSV2Addresses := make(map[string]struct{})
 	for _, address := range dnsV2Addresses {
@@ -667,19 +670,35 @@ func createBuiltinFuncs(
 	}
 
 	argsBuiltIn := builtInFunctions.ArgsCreateBuiltInFunctionContainer{
-		GasSchedule:               gasScheduleNotifier,
-		MapDNSAddresses:           make(map[string]struct{}),
-		MapDNSV2Addresses:         mapDNSV2Addresses,
-		Marshalizer:               marshalizer,
-		Accounts:                  accnts,
-		ShardCoordinator:          shardCoordinator,
-		EpochNotifier:             epochNotifier,
-		EnableEpochsHandler:       enableEpochsHandler,
-		GuardedAccountHandler:     guardedAccountHandler,
-		AutomaticCrawlerAddresses: automaticCrawlerAddresses,
-		MaxNumNodesInTransferRole: maxNumAddressesInTransferRole,
+		GasSchedule:                gasScheduleNotifier,
+		MapDNSAddresses:            make(map[string]struct{}),
+		MapDNSV2Addresses:          mapDNSV2Addresses,
+		Marshalizer:                marshalizer,
+		Accounts:                   accnts,
+		ShardCoordinator:           shardCoordinator,
+		EpochNotifier:              epochNotifier,
+		EnableEpochsHandler:        enableEpochsHandler,
+		GuardedAccountHandler:      guardedAccountHandler,
+		AutomaticCrawlerAddresses:  automaticCrawlerAddresses,
+		MaxNumNodesInTransferRole:  maxNumAddressesInTransferRole,
+		PrototypeDRWANetworkDomain: prototypeNetworkDomain,
 	}
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)
+}
+
+type prototypeDRWANetworkDomainProvider interface {
+	PrototypeDRWANetworkDomain() [32]byte
+}
+
+func prototypeDRWANetworkDomain(processComponents factory.ProcessComponentsHolder) [32]byte {
+	if processComponents == nil || processComponents.IsInterfaceNil() {
+		return [32]byte{}
+	}
+	provider, ok := processComponents.(prototypeDRWANetworkDomainProvider)
+	if !ok {
+		return [32]byte{}
+	}
+	return provider.PrototypeDRWANetworkDomain()
 }
 
 func createAPIBlockProcessor(args *ApiResolverArgs, apiTransactionHandler external.APITransactionHandler) (blockAPI.APIBlockHandler, error) {

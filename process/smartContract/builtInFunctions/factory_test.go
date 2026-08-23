@@ -38,8 +38,9 @@ func createMockArguments() ArgsCreateBuiltInFunctionContainer {
 		AutomaticCrawlerAddresses: [][]byte{
 			bytes.Repeat([]byte{1}, 32),
 		},
-		MaxNumNodesInTransferRole: 100,
-		GuardedAccountHandler:     &guardianMocks.GuardedAccountHandlerStub{},
+		MaxNumNodesInTransferRole:  100,
+		GuardedAccountHandler:      &guardianMocks.GuardedAccountHandlerStub{},
+		PrototypeDRWANetworkDomain: [32]byte{1, 2, 3},
 	}
 
 	return args
@@ -173,6 +174,9 @@ func TestCreateBuiltInFunctionContainer(t *testing.T) {
 		args := createMockArguments()
 		builtInFuncFactory, err := CreateBuiltInFunctionsFactory(args)
 		assert.Nil(t, err)
+		prototypeFactory, ok := builtInFuncFactory.(*prototypeGuardedBuiltInFunctionFactory)
+		assert.True(t, ok)
+		assert.Equal(t, args.PrototypeDRWANetworkDomain, prototypeFactory.PrototypeDRWANetworkDomain())
 		assert.Equal(t, 42, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
 
 		err = builtInFuncFactory.SetPayableHandler(&testscommon.BlockChainHookStub{})

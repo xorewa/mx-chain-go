@@ -1579,17 +1579,18 @@ func (pcf *processComponentsFactory) createBuiltInFunctionContainer(
 	}
 
 	argsBuiltIn := builtInFunctions.ArgsCreateBuiltInFunctionContainer{
-		GasSchedule:               pcf.gasSchedule,
-		MapDNSAddresses:           mapDNSAddresses,
-		MapDNSV2Addresses:         mapDNSV2Addresses,
-		Marshalizer:               pcf.coreData.InternalMarshalizer(),
-		Accounts:                  accounts,
-		ShardCoordinator:          pcf.bootstrapComponents.ShardCoordinator(),
-		EpochNotifier:             pcf.coreData.EpochNotifier(),
-		EnableEpochsHandler:       pcf.coreData.EnableEpochsHandler(),
-		GuardedAccountHandler:     pcf.bootstrapComponents.GuardedAccountHandler(),
-		AutomaticCrawlerAddresses: convertedAddresses,
-		MaxNumNodesInTransferRole: pcf.config.BuiltInFunctions.MaxNumAddressesInTransferRole,
+		GasSchedule:                pcf.gasSchedule,
+		MapDNSAddresses:            mapDNSAddresses,
+		MapDNSV2Addresses:          mapDNSV2Addresses,
+		Marshalizer:                pcf.coreData.InternalMarshalizer(),
+		Accounts:                   accounts,
+		ShardCoordinator:           pcf.bootstrapComponents.ShardCoordinator(),
+		EpochNotifier:              pcf.coreData.EpochNotifier(),
+		EnableEpochsHandler:        pcf.coreData.EnableEpochsHandler(),
+		GuardedAccountHandler:      pcf.bootstrapComponents.GuardedAccountHandler(),
+		AutomaticCrawlerAddresses:  convertedAddresses,
+		MaxNumNodesInTransferRole:  pcf.config.BuiltInFunctions.MaxNumAddressesInTransferRole,
+		PrototypeDRWANetworkDomain: pcf.prototypeDRWANetworkDomain,
 	}
 
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)

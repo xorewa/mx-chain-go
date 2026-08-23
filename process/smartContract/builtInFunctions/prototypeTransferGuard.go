@@ -163,9 +163,18 @@ func prototypeMultiTransferTokenIDs(vmInput *vmcommon.ContractCallInput) ([][]by
 }
 
 type prototypeGuardedBuiltInFunctionFactory struct {
-	delegate            vmcommon.BuiltInFunctionFactory
-	accounts            vmcommon.AccountsAdapter
-	enableEpochsHandler vmcommon.EnableEpochsHandler
+	delegate                   vmcommon.BuiltInFunctionFactory
+	accounts                   vmcommon.AccountsAdapter
+	enableEpochsHandler        vmcommon.EnableEpochsHandler
+	prototypeDRWANetworkDomain [32]byte
+}
+
+// PrototypeDRWANetworkDomain returns the immutable value injected into this prototype factory.
+func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeDRWANetworkDomain() [32]byte {
+	if factory == nil {
+		return [32]byte{}
+	}
+	return factory.prototypeDRWANetworkDomain
 }
 
 func (factory *prototypeGuardedBuiltInFunctionFactory) ESDTGlobalSettingsHandler() vmcommon.ESDTGlobalSettingsHandler {

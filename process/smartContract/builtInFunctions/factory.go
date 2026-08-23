@@ -18,18 +18,19 @@ var log = logger.GetOrCreate("process/smartcontract/builtInFunctions")
 
 // ArgsCreateBuiltInFunctionContainer defines the argument structure to create new built in function container
 type ArgsCreateBuiltInFunctionContainer struct {
-	GasSchedule               core.GasScheduleNotifier
-	MapDNSAddresses           map[string]struct{}
-	MapDNSV2Addresses         map[string]struct{}
-	EnableUserNameChange      bool
-	Marshalizer               marshal.Marshalizer
-	Accounts                  state.AccountsAdapter
-	ShardCoordinator          sharding.Coordinator
-	EpochNotifier             vmcommon.EpochNotifier
-	EnableEpochsHandler       vmcommon.EnableEpochsHandler
-	GuardedAccountHandler     vmcommon.GuardedAccountHandler
-	AutomaticCrawlerAddresses [][]byte
-	MaxNumNodesInTransferRole uint32
+	GasSchedule                core.GasScheduleNotifier
+	MapDNSAddresses            map[string]struct{}
+	MapDNSV2Addresses          map[string]struct{}
+	EnableUserNameChange       bool
+	Marshalizer                marshal.Marshalizer
+	Accounts                   state.AccountsAdapter
+	ShardCoordinator           sharding.Coordinator
+	EpochNotifier              vmcommon.EpochNotifier
+	EnableEpochsHandler        vmcommon.EnableEpochsHandler
+	GuardedAccountHandler      vmcommon.GuardedAccountHandler
+	AutomaticCrawlerAddresses  [][]byte
+	MaxNumNodesInTransferRole  uint32
+	PrototypeDRWANetworkDomain [32]byte
 }
 
 // CreateBuiltInFunctionsFactory creates a container that will hold all the available built in functions
@@ -96,9 +97,10 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	}
 
 	guardedFactory := &prototypeGuardedBuiltInFunctionFactory{
-		delegate:            bContainerFactory,
-		accounts:            vmcommonAccounts,
-		enableEpochsHandler: args.EnableEpochsHandler,
+		delegate:                   bContainerFactory,
+		accounts:                   vmcommonAccounts,
+		enableEpochsHandler:        args.EnableEpochsHandler,
+		prototypeDRWANetworkDomain: args.PrototypeDRWANetworkDomain,
 	}
 	err = guardedFactory.CreateBuiltInFunctionContainer()
 	if err != nil {

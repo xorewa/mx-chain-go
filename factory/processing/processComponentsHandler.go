@@ -750,6 +750,28 @@ func (m *managedProcessComponents) TransactionProcessor() process.TransactionPro
 	return m.processComponents.transactionProcessor
 }
 
+// PrototypeDRWANetworkDomain returns the immutable, locally derived S1 prototype network domain.
+func (m *managedProcessComponents) PrototypeDRWANetworkDomain() [32]byte {
+	m.mutProcessComponents.RLock()
+	defer m.mutProcessComponents.RUnlock()
+
+	if m.processComponents == nil {
+		return [32]byte{}
+	}
+	return m.processComponents.prototypeDRWANetworkDomain
+}
+
+// PrototypeCanonicalGenesisHash returns the final metachain genesis hash used by the S1 prototype.
+func (m *managedProcessComponents) PrototypeCanonicalGenesisHash() [32]byte {
+	m.mutProcessComponents.RLock()
+	defer m.mutProcessComponents.RUnlock()
+
+	if m.processComponents == nil {
+		return [32]byte{}
+	}
+	return m.processComponents.prototypeCanonicalGenesisHash
+}
+
 // IsInterfaceNil returns true if the interface is nil
 func (m *managedProcessComponents) IsInterfaceNil() bool {
 	return m == nil

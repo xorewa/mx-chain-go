@@ -148,6 +148,8 @@ func TestManagedProcessComponents_Create(t *testing.T) {
 		require.False(t, check.IfNil(managedProcessComponents.FullArchiveInterceptorsContainer()))
 		require.False(t, check.IfNil(managedProcessComponents.SentSignaturesTracker()))
 		require.False(t, check.IfNil(managedProcessComponents.EpochSystemSCProcessor()))
+		require.NotEqual(t, [32]byte{}, managedProcessComponents.PrototypeCanonicalGenesisHash())
+		require.NotEqual(t, [32]byte{}, managedProcessComponents.PrototypeDRWANetworkDomain())
 
 		require.Equal(t, factory.ProcessComponentsName, managedProcessComponents.String())
 	})

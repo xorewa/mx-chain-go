@@ -1,6 +1,7 @@
 package processing_test
 
 import (
+	"bytes"
 	"fmt"
 	"sync"
 	"testing"
@@ -124,7 +125,7 @@ func Test_newBlockProcessorCreatorForMeta(t *testing.T) {
 		PeerAccountsCalled: func() state.AccountsAdapter {
 			return &stateMock.AccountsStub{
 				RootHashCalled: func() ([]byte, error) {
-					return make([]byte, 0), nil
+					return bytes.Repeat([]byte{0x42}, 32), nil
 				},
 				CommitCalled: func() ([]byte, error) {
 					return make([]byte, 0), nil
