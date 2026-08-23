@@ -18,19 +18,21 @@ var log = logger.GetOrCreate("process/smartcontract/builtInFunctions")
 
 // ArgsCreateBuiltInFunctionContainer defines the argument structure to create new built in function container
 type ArgsCreateBuiltInFunctionContainer struct {
-	GasSchedule                core.GasScheduleNotifier
-	MapDNSAddresses            map[string]struct{}
-	MapDNSV2Addresses          map[string]struct{}
-	EnableUserNameChange       bool
-	Marshalizer                marshal.Marshalizer
-	Accounts                   state.AccountsAdapter
-	ShardCoordinator           sharding.Coordinator
-	EpochNotifier              vmcommon.EpochNotifier
-	EnableEpochsHandler        vmcommon.EnableEpochsHandler
-	GuardedAccountHandler      vmcommon.GuardedAccountHandler
-	AutomaticCrawlerAddresses  [][]byte
-	MaxNumNodesInTransferRole  uint32
-	PrototypeDRWANetworkDomain [32]byte
+	GasSchedule                           core.GasScheduleNotifier
+	MapDNSAddresses                       map[string]struct{}
+	MapDNSV2Addresses                     map[string]struct{}
+	EnableUserNameChange                  bool
+	Marshalizer                           marshal.Marshalizer
+	Accounts                              state.AccountsAdapter
+	ShardCoordinator                      sharding.Coordinator
+	EpochNotifier                         vmcommon.EpochNotifier
+	EnableEpochsHandler                   vmcommon.EnableEpochsHandler
+	GuardedAccountHandler                 vmcommon.GuardedAccountHandler
+	AutomaticCrawlerAddresses             [][]byte
+	MaxNumNodesInTransferRole             uint32
+	PrototypeDRWANetworkDomain            [32]byte
+	PrototypeDRWACEBEpoch                 uint32
+	PrototypeDRWASettlementLifetimeRounds uint64
 }
 
 // CreateBuiltInFunctionsFactory creates a container that will hold all the available built in functions
@@ -101,12 +103,15 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	}
 
 	guardedFactory := &prototypeGuardedBuiltInFunctionFactory{
-		delegate:                    bContainerFactory,
-		accounts:                    vmcommonAccounts,
-		enableEpochsHandler:         args.EnableEpochsHandler,
-		prototypeDRWANetworkDomain:  args.PrototypeDRWANetworkDomain,
-		prototypeGasScheduleCatalog: prototypeGasScheduleCatalog,
-		gasScheduleNotifier:         args.GasSchedule,
+		delegate:                              bContainerFactory,
+		accounts:                              vmcommonAccounts,
+		enableEpochsHandler:                   args.EnableEpochsHandler,
+		prototypeDRWANetworkDomain:            args.PrototypeDRWANetworkDomain,
+		prototypeGasScheduleCatalog:           prototypeGasScheduleCatalog,
+		gasScheduleNotifier:                   args.GasSchedule,
+		prototypeDRWACEBEpoch:                 args.PrototypeDRWACEBEpoch,
+		prototypeDRWASettlementLifetimeRounds: args.PrototypeDRWASettlementLifetimeRounds,
+		shardCoordinator:                      args.ShardCoordinator,
 	}
 	if prototypeGasScheduleCatalog != nil {
 		currentIdentity, identityErr := guardedFactory.PrototypeCurrentGasScheduleIdentity()

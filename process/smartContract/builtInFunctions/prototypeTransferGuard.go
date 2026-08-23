@@ -10,6 +10,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
+	"github.com/multiversx/mx-chain-go/sharding"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
 
@@ -163,12 +164,16 @@ func prototypeMultiTransferTokenIDs(vmInput *vmcommon.ContractCallInput) ([][]by
 }
 
 type prototypeGuardedBuiltInFunctionFactory struct {
-	delegate                    vmcommon.BuiltInFunctionFactory
-	accounts                    vmcommon.AccountsAdapter
-	enableEpochsHandler         vmcommon.EnableEpochsHandler
-	prototypeDRWANetworkDomain  [32]byte
-	prototypeGasScheduleCatalog *drwaprototype.GasScheduleCatalog
-	gasScheduleNotifier         core.GasScheduleNotifier
+	delegate                              vmcommon.BuiltInFunctionFactory
+	accounts                              vmcommon.AccountsAdapter
+	enableEpochsHandler                   vmcommon.EnableEpochsHandler
+	prototypeDRWANetworkDomain            [32]byte
+	prototypeGasScheduleCatalog           *drwaprototype.GasScheduleCatalog
+	gasScheduleNotifier                   core.GasScheduleNotifier
+	prototypeDRWACEBEpoch                 uint32
+	prototypeDRWASettlementLifetimeRounds uint64
+	shardCoordinator                      sharding.Coordinator
+	prototypeSourceDebit                  *prototypeSourceDebit
 }
 
 // PrototypeDRWANetworkDomain returns the immutable value injected into this prototype factory.
@@ -234,7 +239,15 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) SetPayableHandler(handler
 }
 
 func (factory *prototypeGuardedBuiltInFunctionFactory) SetBlockchainHook(handler vmcommon.BlockchainDataHook) error {
-	return factory.delegate.SetBlockchainHook(handler)
+	err := factory.delegate.SetBlockchainHook(handler)
+	if err != nil {
+		return err
+	}
+	if factory.prototypeSourceDebit == nil {
+		return nil
+	}
+
+	return factory.prototypeSourceDebit.setBlockchainHook(handler)
 }
 
 func (factory *prototypeGuardedBuiltInFunctionFactory) CreateBuiltInFunctionContainer() error {
@@ -252,6 +265,10 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) IsInterfaceNil() bool {
 
 func (factory *prototypeGuardedBuiltInFunctionFactory) installPrototypeTransferGuards() error {
 	container := factory.delegate.BuiltInFunctionContainer()
+	sourceDebitDelegate, err := container.Get(core.BuiltInFunctionESDTTransfer)
+	if err != nil {
+		return err
+	}
 	classifier := func(tokenID []byte) (bool, error) {
 		return drwaprototype.IsPrototypeRegulatedToken(factory.accounts, tokenID)
 	}
@@ -276,5 +293,19 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) installPrototypeTransferG
 		}
 	}
 
-	return nil
+	factory.prototypeSourceDebit, err = newPrototypeSourceDebit(prototypeSourceDebitArgs{
+		delegate:                   sourceDebitDelegate,
+		classifier:                 classifier,
+		enableEpochsHandler:        factory.enableEpochsHandler,
+		shardCoordinator:           factory.shardCoordinator,
+		networkDomain:              factory.prototypeDRWANetworkDomain,
+		cebEpoch:                   factory.prototypeDRWACEBEpoch,
+		settlementLifetimeRounds:   factory.prototypeDRWASettlementLifetimeRounds,
+		currentWorkBudgetsProvider: factory.PrototypeCurrentWorkBudgets,
+	})
+	if err != nil {
+		return err
+	}
+
+	return container.Add(PrototypeSourceDebitFunction, factory.prototypeSourceDebit)
 }

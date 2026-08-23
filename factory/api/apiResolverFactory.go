@@ -164,6 +164,8 @@ func CreateApiResolver(args *ApiResolverArgs) (facade.ApiResolver, error) {
 		args.Configs.GeneralConfig.BuiltInFunctions.MaxNumAddressesInTransferRole,
 		convertedDNSV2Addresses,
 		prototypeDRWANetworkDomain(args.ProcessComponents),
+		args.Configs.GeneralConfig.BuiltInFunctions.PrototypeDRWACEBEpoch,
+		args.Configs.GeneralConfig.BuiltInFunctions.PrototypeDRWASettlementLifetimeRounds,
 	)
 	if err != nil {
 		return nil, err
@@ -386,6 +388,8 @@ func createScQueryElement(
 		args.generalConfig.BuiltInFunctions.MaxNumAddressesInTransferRole,
 		convertedDNSV2Addresses,
 		prototypeDRWANetworkDomain(args.processComponents),
+		args.generalConfig.BuiltInFunctions.PrototypeDRWACEBEpoch,
+		args.generalConfig.BuiltInFunctions.PrototypeDRWASettlementLifetimeRounds,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -663,6 +667,8 @@ func createBuiltinFuncs(
 	maxNumAddressesInTransferRole uint32,
 	dnsV2Addresses [][]byte,
 	prototypeNetworkDomain [32]byte,
+	prototypeCEBEpoch uint32,
+	prototypeSettlementLifetimeRounds uint64,
 ) (vmcommon.BuiltInFunctionFactory, error) {
 	mapDNSV2Addresses := make(map[string]struct{})
 	for _, address := range dnsV2Addresses {
@@ -670,18 +676,20 @@ func createBuiltinFuncs(
 	}
 
 	argsBuiltIn := builtInFunctions.ArgsCreateBuiltInFunctionContainer{
-		GasSchedule:                gasScheduleNotifier,
-		MapDNSAddresses:            make(map[string]struct{}),
-		MapDNSV2Addresses:          mapDNSV2Addresses,
-		Marshalizer:                marshalizer,
-		Accounts:                   accnts,
-		ShardCoordinator:           shardCoordinator,
-		EpochNotifier:              epochNotifier,
-		EnableEpochsHandler:        enableEpochsHandler,
-		GuardedAccountHandler:      guardedAccountHandler,
-		AutomaticCrawlerAddresses:  automaticCrawlerAddresses,
-		MaxNumNodesInTransferRole:  maxNumAddressesInTransferRole,
-		PrototypeDRWANetworkDomain: prototypeNetworkDomain,
+		GasSchedule:                           gasScheduleNotifier,
+		MapDNSAddresses:                       make(map[string]struct{}),
+		MapDNSV2Addresses:                     mapDNSV2Addresses,
+		Marshalizer:                           marshalizer,
+		Accounts:                              accnts,
+		ShardCoordinator:                      shardCoordinator,
+		EpochNotifier:                         epochNotifier,
+		EnableEpochsHandler:                   enableEpochsHandler,
+		GuardedAccountHandler:                 guardedAccountHandler,
+		AutomaticCrawlerAddresses:             automaticCrawlerAddresses,
+		MaxNumNodesInTransferRole:             maxNumAddressesInTransferRole,
+		PrototypeDRWANetworkDomain:            prototypeNetworkDomain,
+		PrototypeDRWACEBEpoch:                 prototypeCEBEpoch,
+		PrototypeDRWASettlementLifetimeRounds: prototypeSettlementLifetimeRounds,
 	}
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)
 }

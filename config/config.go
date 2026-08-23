@@ -616,9 +616,11 @@ type VirtualMachineGasConfig struct {
 
 // BuiltInFunctionsConfig holds the configuration for the built-in functions
 type BuiltInFunctionsConfig struct {
-	AutomaticCrawlerAddresses     []string
-	MaxNumAddressesInTransferRole uint32
-	DNSV2Addresses                []string
+	AutomaticCrawlerAddresses             []string
+	MaxNumAddressesInTransferRole         uint32
+	DNSV2Addresses                        []string
+	PrototypeDRWACEBEpoch                 uint32
+	PrototypeDRWASettlementLifetimeRounds uint64
 }
 
 // HardforkConfig holds the configuration for the hardfork trigger

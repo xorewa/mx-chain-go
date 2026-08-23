@@ -181,7 +181,20 @@ func TestCreateBuiltInFunctionContainer(t *testing.T) {
 		assert.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
 		_, err = prototypeFactory.PrototypeCurrentGasScheduleIdentity()
 		assert.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
-		assert.Equal(t, 42, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
+		assert.Equal(t, 43, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
+		function, err := builtInFuncFactory.BuiltInFunctionContainer().Get(PrototypeSourceDebitFunction)
+		assert.NoError(t, err)
+		sourceDebit, ok := function.(*prototypeSourceDebit)
+		assert.True(t, ok)
+		assert.False(t, sourceDebit.IsActive())
+
+		err = builtInFuncFactory.SetBlockchainHook(&testscommon.BlockChainHookStub{
+			CurrentRoundCalled: func() uint64 { return 17 },
+		})
+		assert.NoError(t, err)
+		currentRound, err := sourceDebit.currentRound()
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(17), currentRound)
 
 		err = builtInFuncFactory.SetPayableHandler(&testscommon.BlockChainHookStub{})
 		assert.Nil(t, err)

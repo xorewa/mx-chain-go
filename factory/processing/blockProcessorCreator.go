@@ -1579,18 +1579,20 @@ func (pcf *processComponentsFactory) createBuiltInFunctionContainer(
 	}
 
 	argsBuiltIn := builtInFunctions.ArgsCreateBuiltInFunctionContainer{
-		GasSchedule:                pcf.gasSchedule,
-		MapDNSAddresses:            mapDNSAddresses,
-		MapDNSV2Addresses:          mapDNSV2Addresses,
-		Marshalizer:                pcf.coreData.InternalMarshalizer(),
-		Accounts:                   accounts,
-		ShardCoordinator:           pcf.bootstrapComponents.ShardCoordinator(),
-		EpochNotifier:              pcf.coreData.EpochNotifier(),
-		EnableEpochsHandler:        pcf.coreData.EnableEpochsHandler(),
-		GuardedAccountHandler:      pcf.bootstrapComponents.GuardedAccountHandler(),
-		AutomaticCrawlerAddresses:  convertedAddresses,
-		MaxNumNodesInTransferRole:  pcf.config.BuiltInFunctions.MaxNumAddressesInTransferRole,
-		PrototypeDRWANetworkDomain: pcf.prototypeDRWANetworkDomain,
+		GasSchedule:                           pcf.gasSchedule,
+		MapDNSAddresses:                       mapDNSAddresses,
+		MapDNSV2Addresses:                     mapDNSV2Addresses,
+		Marshalizer:                           pcf.coreData.InternalMarshalizer(),
+		Accounts:                              accounts,
+		ShardCoordinator:                      pcf.bootstrapComponents.ShardCoordinator(),
+		EpochNotifier:                         pcf.coreData.EpochNotifier(),
+		EnableEpochsHandler:                   pcf.coreData.EnableEpochsHandler(),
+		GuardedAccountHandler:                 pcf.bootstrapComponents.GuardedAccountHandler(),
+		AutomaticCrawlerAddresses:             convertedAddresses,
+		MaxNumNodesInTransferRole:             pcf.config.BuiltInFunctions.MaxNumAddressesInTransferRole,
+		PrototypeDRWANetworkDomain:            pcf.prototypeDRWANetworkDomain,
+		PrototypeDRWACEBEpoch:                 pcf.config.BuiltInFunctions.PrototypeDRWACEBEpoch,
+		PrototypeDRWASettlementLifetimeRounds: pcf.config.BuiltInFunctions.PrototypeDRWASettlementLifetimeRounds,
 	}
 
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)
