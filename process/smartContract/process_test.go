@@ -1819,6 +1819,44 @@ func TestScProcessor_CreateVMCallInput(t *testing.T) {
 	input, err := sc.createVMCallInput(tx, []byte{}, false)
 	require.NotNil(t, input)
 	require.Nil(t, err)
+	require.Equal(t, vmcommon.NativeCallOriginOriginalUserTransaction, input.NativeCallOrigin)
+}
+
+func TestScProcessor_CreateVMCallInputPrototypeNativeOriginFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	arguments := createMockSmartContractProcessorArguments()
+	arguments.VmContainer = &mock.VMContainerMock{}
+	arguments.ArgsParser = &testscommon.ArgumentParserMock{}
+	sc, err := NewSmartContractProcessor(arguments)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		tx   data.TransactionHandler
+	}{
+		{
+			name: "smart contract result",
+			tx: &smartContractResult.SmartContractResult{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+			},
+		},
+		{
+			name: "relayed v3 transaction",
+			tx: &transaction.Transaction{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+				RelayerAddr: []byte("RELAYER"), RelayerSignature: []byte("signature"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			input, inputErr := sc.createVMCallInput(test.tx, make([]byte, 32), false)
+			require.NoError(t, inputErr)
+			require.Equal(t, vmcommon.NativeCallOriginUnknown, input.NativeCallOrigin)
+		})
+	}
 }
 
 func TestScProcessor_CreateVMDeployBadCode(t *testing.T) {

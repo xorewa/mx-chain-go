@@ -109,6 +109,9 @@ func (sc *scProcessor) createVMCallInput(
 		vmCallInput.OriginalTxHash = txHash
 		vmCallInput.PrevTxHash = txHash
 	}
+	if !isSCR && !common.IsRelayedTxV3(tx) {
+		vmCallInput.NativeCallOrigin = vmcommon.NativeCallOriginOriginalUserTransaction
+	}
 
 	vmCallInput.ReturnCallAfterError = isSCR && len(scr.ReturnMessage) > 0
 
