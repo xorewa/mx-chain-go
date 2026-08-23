@@ -38,6 +38,7 @@ var (
 )
 
 type prototypeCurrentWorkBudgetsProvider func() ([32]byte, drwaprototype.WorkBudgets, uint64, error)
+type prototypeOpenEffectCreator func(vmcommon.AccountDataHandler, drwaprototype.OpenEffect) error
 
 type prototypeSourceDebitArgs struct {
 	delegate                   vmcommon.BuiltinFunction
@@ -48,6 +49,7 @@ type prototypeSourceDebitArgs struct {
 	cebEpoch                   uint32
 	settlementLifetimeRounds   uint64
 	currentWorkBudgetsProvider prototypeCurrentWorkBudgetsProvider
+	createOpenEffect           prototypeOpenEffectCreator
 }
 
 type prototypeSourceDebit struct {
@@ -59,6 +61,7 @@ type prototypeSourceDebit struct {
 	cebEpoch                   uint32
 	settlementLifetimeRounds   uint64
 	currentWorkBudgetsProvider prototypeCurrentWorkBudgetsProvider
+	createOpenEffect           prototypeOpenEffectCreator
 
 	mutBlockchainHook sync.RWMutex
 	blockchainHook    vmcommon.BlockchainDataHook
@@ -72,6 +75,10 @@ func newPrototypeSourceDebit(args prototypeSourceDebitArgs) (*prototypeSourceDeb
 		args.currentWorkBudgetsProvider == nil {
 		return nil, ErrInvalidPrototypeSourceDebitDelegate
 	}
+	createOpenEffect := args.createOpenEffect
+	if createOpenEffect == nil {
+		createOpenEffect = drwaprototype.CreateOpenEffect
+	}
 
 	return &prototypeSourceDebit{
 		delegate:                   args.delegate,
@@ -82,6 +89,7 @@ func newPrototypeSourceDebit(args prototypeSourceDebitArgs) (*prototypeSourceDeb
 		cebEpoch:                   args.cebEpoch,
 		settlementLifetimeRounds:   args.settlementLifetimeRounds,
 		currentWorkBudgetsProvider: args.currentWorkBudgetsProvider,
+		createOpenEffect:           createOpenEffect,
 	}, nil
 }
 
@@ -182,7 +190,7 @@ func (sourceDebit *prototypeSourceDebit) ProcessBuiltinFunction(
 		return nil, fmt.Errorf("%w: nil source data handler", ErrPrototypeSourceDebitDenied)
 	}
 
-	err = drwaprototype.CreateOpenEffect(dataHandler, artifacts.OpenEffect)
+	err = sourceDebit.createOpenEffect(dataHandler, artifacts.OpenEffect)
 	if err != nil {
 		return nil, fmt.Errorf("%w: create OpenEffect: %w", ErrPrototypeSourceDebitMutation, err)
 	}
