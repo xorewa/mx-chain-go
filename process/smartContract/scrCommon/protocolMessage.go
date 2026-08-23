@@ -14,6 +14,10 @@ import (
 
 // ValidateProtocolMessageAdmission rejects protocol-kind SCRs before account loading or mutation unless
 // the kind, activation state, native function and cross-shard route are the declared prototype values.
+//
+// NON_NORMATIVE_DRWA_PROTOTYPE
+// DO_NOT_EXPOSE_AS_PUBLIC_WIRE_FORMAT
+// REPLACED_BY_PART_B
 func ValidateProtocolMessageAdmission(
 	scr *smartContractResult.SmartContractResult,
 	enableEpochsHandler common.EnableEpochsHandler,
