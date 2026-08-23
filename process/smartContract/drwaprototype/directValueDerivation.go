@@ -1,6 +1,7 @@
 package drwaprototype
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -29,6 +30,9 @@ const (
 
 // ErrInvalidDirectValueIntent signals an invalid S1 prototype direct-value intent.
 var ErrInvalidDirectValueIntent = errors.New("invalid non-normative DRWA prototype direct-value intent")
+
+// ErrOpenEffectContextMismatch signals that direct-value OpenEffect identity does not match its context.
+var ErrOpenEffectContextMismatch = errors.New("non-normative DRWA prototype OpenEffect/context mismatch")
 
 // DirectValueIntent is the caller-independent input to the pure S1 direct-value derivation.
 type DirectValueIntent struct {
@@ -120,9 +124,14 @@ func BuildDirectValueArtifacts(
 		OriginExecutionIdentity: originTxHash,
 		SourceSubject:           intent.SourceHolder,
 		CEBEpoch:                intent.CEBEpoch,
+		GasScheduleIdentity:     intent.GasScheduleIdentity,
 		ContextHash:             contextHash,
 		TerminalKind:            OpenEffectTerminalKindValueResult,
 		State:                   OpenEffectStatePendingDestination,
+	}
+	err = ValidateDirectValueOpenEffectContext(networkDomain, openEffect, context)
+	if err != nil {
+		return nil, fmt.Errorf("validate prototype direct-value OpenEffect/context: %w", err)
 	}
 
 	return &DirectValueArtifacts{
@@ -131,6 +140,48 @@ func BuildDirectValueArtifacts(
 		Envelope:               envelope,
 		OpenEffect:             openEffect,
 	}, nil
+}
+
+// ValidateDirectValueOpenEffectContext verifies the explicit OpenEffect fields against the exact
+// value context and the context hash that commits its gas-schedule identity.
+func ValidateDirectValueOpenEffectContext(
+	networkDomain [prototypeDigestLength]byte,
+	effect OpenEffect,
+	context ValueContext,
+) error {
+	if isZeroPrototypeDigest(networkDomain) {
+		return fmt.Errorf("%w: zero network domain", ErrOpenEffectContextMismatch)
+	}
+	if err := validateOpenEffect(effect); err != nil {
+		return fmt.Errorf("%w: %v", ErrOpenEffectContextMismatch, err)
+	}
+	if err := validateValueContext(context); err != nil {
+		return fmt.Errorf("%w: %v", ErrOpenEffectContextMismatch, err)
+	}
+	if effect.EffectID != context.EffectID ||
+		effect.EffectKind != context.EffectKind ||
+		!bytes.Equal(effect.RegulatedTokenID, context.RegulatedTokenID) ||
+		effect.RegulatedTokenType != context.RegulatedTokenType ||
+		effect.OriginExecutionIdentity != context.OriginExecutionIdentity ||
+		effect.SourceSubject != context.SourceHolder ||
+		effect.CEBEpoch != context.CEBEpoch ||
+		effect.GasScheduleIdentity != context.GasScheduleIdentity {
+		return fmt.Errorf("%w: explicit field", ErrOpenEffectContextMismatch)
+	}
+
+	contextBytes, err := EncodeValueContext(context)
+	if err != nil {
+		return fmt.Errorf("%w: encode context: %v", ErrOpenEffectContextMismatch, err)
+	}
+	contextPreimage := make([]byte, 0, len(prototypeValueContextDomain)+prototypeDigestLength+len(contextBytes))
+	contextPreimage = append(contextPreimage, prototypeValueContextDomain...)
+	contextPreimage = append(contextPreimage, networkDomain[:]...)
+	contextPreimage = append(contextPreimage, contextBytes...)
+	if sha256.Sum256(contextPreimage) != effect.ContextHash {
+		return fmt.Errorf("%w: context hash", ErrOpenEffectContextMismatch)
+	}
+
+	return nil
 }
 
 func validateDirectValueIntent(

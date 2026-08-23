@@ -19,7 +19,7 @@ import (
 // prototype. None is a production state-layout, wire-format or numeric-bound commitment.
 
 const (
-	prototypeOpenEffectVersion = byte(1)
+	prototypeOpenEffectVersion = byte(2)
 
 	prototypeOpenEffectKeySuffix = "drwa/open-effect/"
 )
@@ -60,6 +60,7 @@ type OpenEffect struct {
 	OriginExecutionIdentity [prototypeDigestLength]byte
 	SourceSubject           [prototypeAddressLength]byte
 	CEBEpoch                uint32
+	GasScheduleIdentity     [prototypeDigestLength]byte
 	ContextHash             [prototypeDigestLength]byte
 	TerminalKind            OpenEffectTerminalKind
 	State                   OpenEffectState
@@ -81,6 +82,7 @@ func EncodeOpenEffect(effect OpenEffect) ([]byte, error) {
 	encoded = append(encoded, effect.OriginExecutionIdentity[:]...)
 	encoded = append(encoded, effect.SourceSubject[:]...)
 	encoded = binary.BigEndian.AppendUint32(encoded, effect.CEBEpoch)
+	encoded = append(encoded, effect.GasScheduleIdentity[:]...)
 	encoded = append(encoded, effect.ContextHash[:]...)
 	encoded = append(encoded, byte(effect.TerminalKind))
 	encoded = append(encoded, byte(effect.State))
@@ -128,6 +130,10 @@ func DecodeOpenEffect(encoded []byte) (*OpenEffect, error) {
 		return nil, err
 	}
 	effect.CEBEpoch, err = reader.readUint32()
+	if err != nil {
+		return nil, err
+	}
+	err = reader.readFixed(effect.GasScheduleIdentity[:])
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +236,9 @@ func validateOpenEffect(effect OpenEffect) error {
 	if effect.RegulatedTokenType != TokenTypeFungible {
 		return fmt.Errorf("%w: unsupported token type", ErrInvalidOpenEffect)
 	}
+	if isZeroPrototypeDigest(effect.GasScheduleIdentity) {
+		return fmt.Errorf("%w: zero gas-schedule identity", ErrInvalidOpenEffect)
+	}
 	if effect.TerminalKind != OpenEffectTerminalKindValueResult {
 		return fmt.Errorf("%w: unsupported terminal kind", ErrInvalidOpenEffect)
 	}
@@ -242,5 +251,5 @@ func validateOpenEffect(effect OpenEffect) error {
 
 func prototypeOpenEffectMaximumLength() int {
 	return 1 + prototypeDigestLength + 1 + 2 + prototypeTokenIDLimit + 1 +
-		prototypeDigestLength + prototypeAddressLength + 4 + prototypeDigestLength + 1 + 1
+		prototypeDigestLength + prototypeAddressLength + 4 + 2*prototypeDigestLength + 1 + 1
 }

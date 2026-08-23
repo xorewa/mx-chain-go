@@ -24,9 +24,9 @@ func TestOpenEffectPrototypeDeterministicFixture(t *testing.T) {
 	encoded, err := EncodeOpenEffect(fixture)
 	require.NoError(t, err)
 
-	require.Equal(t, "010102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2001000c544f4b454e2d616263646566012122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60000000076162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f800101", hex.EncodeToString(encoded))
+	require.Equal(t, "020102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2001000c544f4b454e2d616263646566012122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60000000078182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa06162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f800101", hex.EncodeToString(encoded))
 	digest := sha256.Sum256(encoded)
-	require.Equal(t, "cfbc44400d96ea628b4ad9fb8a8ab491b0e9e2cec58627fa07c4bf5a5f10f847", hex.EncodeToString(digest[:]))
+	require.Equal(t, "cc8f0747dde4774d3f5a79db9078f34ab8e41094842f3166ea1d4f5196c86aa4", hex.EncodeToString(digest[:]))
 
 	decoded, err := DecodeOpenEffect(encoded)
 	require.NoError(t, err)
@@ -89,6 +89,12 @@ func TestEncodeOpenEffectPrototypeRejectsUnsupportedFields(t *testing.T) {
 			},
 		},
 		{
+			name: "zero gas schedule identity",
+			mutate: func(effect *OpenEffect) {
+				clear(effect.GasScheduleIdentity[:])
+			},
+		},
+		{
 			name: "unsupported terminal kind",
 			mutate: func(effect *OpenEffect) {
 				effect.TerminalKind = OpenEffectTerminalKind(2)
@@ -134,7 +140,7 @@ func TestDecodeOpenEffectPrototypeRejectsMalformedBytes(t *testing.T) {
 		{
 			name: "unsupported version",
 			mutate: func(value []byte) []byte {
-				value[0] = 2
+				value[0] = 3
 				return value
 			},
 		},
@@ -172,6 +178,13 @@ func TestDecodeOpenEffectPrototypeRejectsMalformedBytes(t *testing.T) {
 			name: "unsupported token type",
 			mutate: func(value []byte) []byte {
 				value[offsets.tokenType] = 2
+				return value
+			},
+		},
+		{
+			name: "zero gas schedule identity",
+			mutate: func(value []byte) []byte {
+				clear(value[offsets.gasScheduleIdentity : offsets.gasScheduleIdentity+prototypeDigestLength])
 				return value
 			},
 		},
@@ -311,25 +324,28 @@ func TestLoadOpenEffectPrototypeRejectsAbsenceMalformedAndKeyMismatch(t *testing
 }
 
 type openEffectOffsets struct {
-	effectKind   int
-	tokenLength  int
-	tokenType    int
-	terminalKind int
-	state        int
+	effectKind          int
+	tokenLength         int
+	tokenType           int
+	gasScheduleIdentity int
+	terminalKind        int
+	state               int
 }
 
 func openEffectFixtureOffsets(fixture OpenEffect) openEffectOffsets {
 	effectKind := 1 + prototypeDigestLength
 	tokenLength := effectKind + 1
 	tokenType := tokenLength + 2 + len(fixture.RegulatedTokenID)
-	terminalKind := tokenType + 1 + prototypeDigestLength + prototypeAddressLength + 4 + prototypeDigestLength
+	gasScheduleIdentity := tokenType + 1 + prototypeDigestLength + prototypeAddressLength + 4
+	terminalKind := gasScheduleIdentity + 2*prototypeDigestLength
 
 	return openEffectOffsets{
-		effectKind:   effectKind,
-		tokenLength:  tokenLength,
-		tokenType:    tokenType,
-		terminalKind: terminalKind,
-		state:        terminalKind + 1,
+		effectKind:          effectKind,
+		tokenLength:         tokenLength,
+		tokenType:           tokenType,
+		gasScheduleIdentity: gasScheduleIdentity,
+		terminalKind:        terminalKind,
+		state:               terminalKind + 1,
 	}
 }
 
@@ -347,6 +363,7 @@ func createOpenEffectFixture() OpenEffect {
 		effect.OriginExecutionIdentity[index] = byte(index + 33)
 		effect.SourceSubject[index] = byte(index + 65)
 		effect.ContextHash[index] = byte(index + 97)
+		effect.GasScheduleIdentity[index] = byte(index + 129)
 	}
 
 	return effect

@@ -35,13 +35,62 @@ func TestBuildDirectValueArtifactsPrototypeDeterministicFixture(t *testing.T) {
 
 	encodedOpenEffect, err := EncodeOpenEffect(artifacts.OpenEffect)
 	require.NoError(t, err)
-	require.Equal(t, "01b4bbcc32826fc24506e0e7527a690464fdd6ca4f3958bee22973978ecbfd65a301000c544f4b454e2d616263646566012122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f600000000722f2f3d65b09dde3aa8acb55732c00077d082cee913dc89994be5edc8115ebbf0101", hex.EncodeToString(encodedOpenEffect))
+	require.Equal(t, "02b4bbcc32826fc24506e0e7527a690464fdd6ca4f3958bee22973978ecbfd65a301000c544f4b454e2d616263646566012122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60000000078182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa022f2f3d65b09dde3aa8acb55732c00077d082cee913dc89994be5edc8115ebbf0101", hex.EncodeToString(encodedOpenEffect))
 
 	require.Equal(t, artifacts.Envelope.Context.EffectID, artifacts.OpenEffect.EffectID)
 	require.Equal(t, artifacts.Envelope.Context.OriginExecutionIdentity, artifacts.OpenEffect.OriginExecutionIdentity)
 	require.Equal(t, artifacts.Envelope.Context.RegulatedTokenID, artifacts.OpenEffect.RegulatedTokenID)
 	require.Equal(t, artifacts.Envelope.Context.CEBEpoch, artifacts.OpenEffect.CEBEpoch)
+	require.Equal(t, artifacts.Envelope.Context.GasScheduleIdentity, artifacts.OpenEffect.GasScheduleIdentity)
 	require.Equal(t, artifacts.ContextHash, artifacts.OpenEffect.ContextHash)
+	require.NoError(t, ValidateDirectValueOpenEffectContext(networkDomain, artifacts.OpenEffect, artifacts.Envelope.Context))
+}
+
+func TestValidateDirectValueOpenEffectContextPrototypeRejectsEveryBindingMismatch(t *testing.T) {
+	t.Parallel()
+
+	networkDomain, originTxHash, intent := createDirectValueDerivationFixture()
+	artifacts, err := BuildDirectValueArtifacts(networkDomain, originTxHash, intent)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name   string
+		mutate func(effect *OpenEffect, context *ValueContext, domain *[prototypeDigestLength]byte)
+	}{
+		{name: "network domain", mutate: func(_ *OpenEffect, _ *ValueContext, domain *[prototypeDigestLength]byte) { domain[0] ^= 0xff }},
+		{name: "effect ID", mutate: func(effect *OpenEffect, _ *ValueContext, _ *[prototypeDigestLength]byte) { effect.EffectID[0] ^= 0xff }},
+		{name: "origin", mutate: func(effect *OpenEffect, _ *ValueContext, _ *[prototypeDigestLength]byte) {
+			effect.OriginExecutionIdentity[0] ^= 0xff
+		}},
+		{name: "source", mutate: func(effect *OpenEffect, _ *ValueContext, _ *[prototypeDigestLength]byte) {
+			effect.SourceSubject[0] ^= 0xff
+		}},
+		{name: "CEB epoch", mutate: func(effect *OpenEffect, _ *ValueContext, _ *[prototypeDigestLength]byte) { effect.CEBEpoch++ }},
+		{name: "gas identity", mutate: func(effect *OpenEffect, _ *ValueContext, _ *[prototypeDigestLength]byte) {
+			effect.GasScheduleIdentity[0] ^= 0xff
+		}},
+		{name: "context gas identity", mutate: func(_ *OpenEffect, context *ValueContext, _ *[prototypeDigestLength]byte) {
+			context.GasScheduleIdentity[0] ^= 0xff
+		}},
+		{name: "context hash", mutate: func(effect *OpenEffect, _ *ValueContext, _ *[prototypeDigestLength]byte) {
+			effect.ContextHash[0] ^= 0xff
+		}},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			effect := artifacts.OpenEffect
+			effect.RegulatedTokenID = append([]byte(nil), artifacts.OpenEffect.RegulatedTokenID...)
+			context := artifacts.Envelope.Context
+			context.RegulatedTokenID = append([]byte(nil), artifacts.Envelope.Context.RegulatedTokenID...)
+			context.Quantity = append([]byte(nil), artifacts.Envelope.Context.Quantity...)
+			domain := networkDomain
+			test.mutate(&effect, &context, &domain)
+			require.ErrorIs(t, ValidateDirectValueOpenEffectContext(domain, effect, context), ErrOpenEffectContextMismatch)
+		})
+	}
 }
 
 func TestBuildDirectValueArtifactsPrototypeArchitectureFormulaRecomputation(t *testing.T) {
