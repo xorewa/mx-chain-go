@@ -185,6 +185,21 @@ func TestPrototypeRetainedWorkBudgetsAcceptsOldExactIdentityAndRejectsUnknown(t 
 	_, _, err = retainedPrototypeWorkBudgets([32]byte{0xff}, catalog)
 	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
 	require.ErrorIs(t, err, drwaprototype.ErrGasScheduleNotFound)
+
+	_, _, err = retainedPrototypeWorkBudgets(oldIdentity, nil)
+	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
+
+	missingCosts := fillGasMapInternal(make(map[string]map[string]uint64), 3)
+	invalidCatalog, err := drwaprototype.SealGasScheduleCatalog([]drwaprototype.GasScheduleProfile{{
+		StartEpoch: 0,
+		Schedule:   missingCosts,
+	}})
+	require.NoError(t, err)
+	invalidIdentity, err := drwaprototype.GasScheduleIdentity(missingCosts)
+	require.NoError(t, err)
+	_, _, err = retainedPrototypeWorkBudgets(invalidIdentity, invalidCatalog)
+	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
+	require.ErrorIs(t, err, drwaprototype.ErrInvalidGasScheduleWorkBudget)
 }
 
 func TestPrototypeCurrentWorkBudgetsRejectsUnavailableConfiguredCosts(t *testing.T) {
