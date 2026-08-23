@@ -163,10 +163,12 @@ func prototypeMultiTransferTokenIDs(vmInput *vmcommon.ContractCallInput) ([][]by
 }
 
 type prototypeGuardedBuiltInFunctionFactory struct {
-	delegate                   vmcommon.BuiltInFunctionFactory
-	accounts                   vmcommon.AccountsAdapter
-	enableEpochsHandler        vmcommon.EnableEpochsHandler
-	prototypeDRWANetworkDomain [32]byte
+	delegate                    vmcommon.BuiltInFunctionFactory
+	accounts                    vmcommon.AccountsAdapter
+	enableEpochsHandler         vmcommon.EnableEpochsHandler
+	prototypeDRWANetworkDomain  [32]byte
+	prototypeGasScheduleCatalog *drwaprototype.GasScheduleCatalog
+	gasScheduleNotifier         core.GasScheduleNotifier
 }
 
 // PrototypeDRWANetworkDomain returns the immutable value injected into this prototype factory.
@@ -175,6 +177,26 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeDRWANetworkDomai
 		return [32]byte{}
 	}
 	return factory.prototypeDRWANetworkDomain
+}
+
+// PrototypeGasScheduleCatalogIdentity returns the sealed configured timeline identity.
+func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeGasScheduleCatalogIdentity() ([32]byte, error) {
+	if factory == nil || factory.prototypeGasScheduleCatalog == nil {
+		return [32]byte{}, ErrPrototypeGasScheduleUnavailable
+	}
+	return factory.prototypeGasScheduleCatalog.Identity()
+}
+
+// PrototypeCurrentGasScheduleIdentity verifies that the notifier's current map is retained.
+func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeCurrentGasScheduleIdentity() ([32]byte, error) {
+	if factory == nil || factory.prototypeGasScheduleCatalog == nil || factory.gasScheduleNotifier == nil {
+		return [32]byte{}, ErrPrototypeGasScheduleUnavailable
+	}
+	provider, ok := factory.gasScheduleNotifier.(prototypeConfiguredGasScheduleProvider)
+	if !ok {
+		return [32]byte{}, ErrPrototypeGasScheduleUnavailable
+	}
+	return currentPrototypeGasScheduleIdentity(provider, factory.prototypeGasScheduleCatalog)
 }
 
 func (factory *prototypeGuardedBuiltInFunctionFactory) ESDTGlobalSettingsHandler() vmcommon.ESDTGlobalSettingsHandler {

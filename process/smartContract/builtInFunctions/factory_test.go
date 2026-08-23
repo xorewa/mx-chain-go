@@ -177,6 +177,10 @@ func TestCreateBuiltInFunctionContainer(t *testing.T) {
 		prototypeFactory, ok := builtInFuncFactory.(*prototypeGuardedBuiltInFunctionFactory)
 		assert.True(t, ok)
 		assert.Equal(t, args.PrototypeDRWANetworkDomain, prototypeFactory.PrototypeDRWANetworkDomain())
+		_, err = prototypeFactory.PrototypeGasScheduleCatalogIdentity()
+		assert.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
+		_, err = prototypeFactory.PrototypeCurrentGasScheduleIdentity()
+		assert.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
 		assert.Equal(t, 42, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
 
 		err = builtInFuncFactory.SetPayableHandler(&testscommon.BlockChainHookStub{})

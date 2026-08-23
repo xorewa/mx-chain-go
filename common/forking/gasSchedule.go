@@ -22,6 +22,7 @@ type gasScheduleNotifier struct {
 	gasScheduleConfig  config.GasScheduleConfig
 	currentEpoch       uint32
 	lastGasSchedule    GasScheduleMap
+	versionedSchedules []common.PrototypeDRWAGasScheduleVersion
 	handlers           []core.GasScheduleSubscribeHandler
 	wasmVMChangeLocker common.Locker
 }
@@ -46,26 +47,37 @@ func NewGasScheduleNotifier(args ArgsNewGasScheduleNotifier) (*gasScheduleNotifi
 		return nil, common.ErrNilWasmChangeLocker
 	}
 
+	gasScheduleByEpochs := append([]config.GasScheduleByEpochs(nil), args.GasScheduleConfig.GasScheduleByEpochs...)
 	g := &gasScheduleNotifier{
-		gasScheduleConfig:  args.GasScheduleConfig,
+		gasScheduleConfig: config.GasScheduleConfig{
+			GasScheduleByEpochs: gasScheduleByEpochs,
+		},
 		handlers:           make([]core.GasScheduleSubscribeHandler, 0),
 		configDir:          args.ConfigDir,
 		wasmVMChangeLocker: args.WasmVMChangeLocker,
+		versionedSchedules: make([]common.PrototypeDRWAGasScheduleVersion, 0, len(gasScheduleByEpochs)),
 	}
 	log.Debug("gasSchedule: enable epoch for gas schedule directories paths epoch", "epoch", g.gasScheduleConfig.GasScheduleByEpochs)
 
 	for _, gasScheduleConf := range g.gasScheduleConfig.GasScheduleByEpochs {
-		_, err := common.LoadGasScheduleConfig(filepath.Join(g.configDir, gasScheduleConf.FileName))
+		loadedSchedule, err := common.LoadGasScheduleConfig(filepath.Join(g.configDir, gasScheduleConf.FileName))
 		if err != nil {
 			return nil, err
 		}
+		g.versionedSchedules = append(g.versionedSchedules, common.PrototypeDRWAGasScheduleVersion{
+			StartEpoch: gasScheduleConf.StartEpoch,
+			Schedule:   copyLatestGasScheduleMap(loadedSchedule),
+		})
 	}
 
 	sort.Slice(g.gasScheduleConfig.GasScheduleByEpochs, func(i, j int) bool {
 		return g.gasScheduleConfig.GasScheduleByEpochs[i].StartEpoch < g.gasScheduleConfig.GasScheduleByEpochs[j].StartEpoch
 	})
+	sort.Slice(g.versionedSchedules, func(i, j int) bool {
+		return g.versionedSchedules[i].StartEpoch < g.versionedSchedules[j].StartEpoch
+	})
 	var err error
-	g.lastGasSchedule, err = common.LoadGasScheduleConfig(filepath.Join(g.configDir, args.GasScheduleConfig.GasScheduleByEpochs[0].FileName))
+	g.lastGasSchedule, err = common.LoadGasScheduleConfig(filepath.Join(g.configDir, g.gasScheduleConfig.GasScheduleByEpochs[0].FileName))
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +181,24 @@ func (g *gasScheduleNotifier) LatestGasScheduleCopy() map[string]map[string]uint
 	defer g.mutNotifier.RUnlock()
 
 	return copyLatestGasScheduleMap(g.lastGasSchedule)
+}
+
+// NON_NORMATIVE_DRWA_PROTOTYPE
+// REPLACED_BY_PART_B
+// PrototypeDRWAVersionedGasSchedules returns deep copies of every exact schedule map loaded at startup.
+func (g *gasScheduleNotifier) PrototypeDRWAVersionedGasSchedules() []common.PrototypeDRWAGasScheduleVersion {
+	g.mutNotifier.RLock()
+	defer g.mutNotifier.RUnlock()
+
+	result := make([]common.PrototypeDRWAGasScheduleVersion, len(g.versionedSchedules))
+	for index, version := range g.versionedSchedules {
+		result[index] = common.PrototypeDRWAGasScheduleVersion{
+			StartEpoch: version.StartEpoch,
+			Schedule:   copyLatestGasScheduleMap(version.Schedule),
+		}
+	}
+
+	return result
 }
 
 func copyLatestGasScheduleMap(src map[string]map[string]uint64) map[string]map[string]uint64 {

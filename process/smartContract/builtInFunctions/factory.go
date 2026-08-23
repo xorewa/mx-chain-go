@@ -71,6 +71,10 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	if err != nil {
 		return nil, err
 	}
+	prototypeGasScheduleCatalog, err := sealPrototypeConfiguredGasScheduleCatalog(args.GasSchedule)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Debug("createBuiltInFunctionsFactory",
 		"shardId", args.ShardCoordinator.SelfId(),
@@ -97,10 +101,27 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	}
 
 	guardedFactory := &prototypeGuardedBuiltInFunctionFactory{
-		delegate:                   bContainerFactory,
-		accounts:                   vmcommonAccounts,
-		enableEpochsHandler:        args.EnableEpochsHandler,
-		prototypeDRWANetworkDomain: args.PrototypeDRWANetworkDomain,
+		delegate:                    bContainerFactory,
+		accounts:                    vmcommonAccounts,
+		enableEpochsHandler:         args.EnableEpochsHandler,
+		prototypeDRWANetworkDomain:  args.PrototypeDRWANetworkDomain,
+		prototypeGasScheduleCatalog: prototypeGasScheduleCatalog,
+		gasScheduleNotifier:         args.GasSchedule,
+	}
+	if prototypeGasScheduleCatalog != nil {
+		currentIdentity, identityErr := guardedFactory.PrototypeCurrentGasScheduleIdentity()
+		if identityErr != nil {
+			return nil, identityErr
+		}
+		catalogIdentity, identityErr := prototypeGasScheduleCatalog.Identity()
+		if identityErr != nil {
+			return nil, identityErr
+		}
+		log.Info("NON_NORMATIVE_DRWA_PROTOTYPE gas schedule catalog sealed",
+			"shardId", args.ShardCoordinator.SelfId(),
+			"catalogIdentity", fmt.Sprintf("%x", catalogIdentity),
+			"currentIdentity", fmt.Sprintf("%x", currentIdentity),
+		)
 	}
 	err = guardedFactory.CreateBuiltInFunctionContainer()
 	if err != nil {

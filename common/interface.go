@@ -313,6 +313,20 @@ type GasScheduleNotifierAPI interface {
 	LatestGasScheduleCopy() map[string]map[string]uint64
 }
 
+// NON_NORMATIVE_DRWA_PROTOTYPE
+// REPLACED_BY_PART_B
+
+// PrototypeDRWAGasScheduleVersion binds one configured activation epoch to the exact map loaded at startup.
+type PrototypeDRWAGasScheduleVersion struct {
+	StartEpoch uint32
+	Schedule   map[string]map[string]uint64
+}
+
+// PrototypeDRWAGasScheduleProvider exposes an immutable-by-copy startup view without changing the core notifier API.
+type PrototypeDRWAGasScheduleProvider interface {
+	PrototypeDRWAVersionedGasSchedules() []PrototypeDRWAGasScheduleVersion
+}
+
 // PidQueueHandler defines the behavior of a queue of pids
 type PidQueueHandler interface {
 	Push(pid core.PeerID)
