@@ -103,6 +103,25 @@ func TestCreateBuiltInFunctionsFactorySealsConfiguredGasCatalog(t *testing.T) {
 	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
 }
 
+func TestPrototypeCurrentGasScheduleIdentityRejectsCurrentMapNotRetained(t *testing.T) {
+	t.Parallel()
+
+	configured := fillGasMapInternal(make(map[string]map[string]uint64), 1)
+	notifier := &prototypeConfiguredGasScheduleStub{
+		GasScheduleNotifierMock: testscommon.NewGasScheduleNotifierMock(configured),
+		versions: []common.PrototypeDRWAGasScheduleVersion{
+			{StartEpoch: 0, Schedule: configured},
+		},
+	}
+	catalog, err := sealPrototypeConfiguredGasScheduleCatalog(notifier)
+	require.NoError(t, err)
+
+	notifier.GasSchedule = fillGasMapInternal(make(map[string]map[string]uint64), 2)
+	_, err = currentPrototypeGasScheduleIdentity(notifier, catalog)
+	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
+	require.ErrorIs(t, err, drwaprototype.ErrGasScheduleNotFound)
+}
+
 func TestCreateBuiltInFunctionsFactoryRejectsInvalidConfiguredGasCatalog(t *testing.T) {
 	t.Parallel()
 
