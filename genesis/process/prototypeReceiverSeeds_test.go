@@ -1,11 +1,14 @@
 package process
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
+	"math/big"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/data/esdt"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/require"
 
@@ -13,9 +16,11 @@ import (
 	genesisMock "github.com/multiversx/mx-chain-go/genesis/mock"
 	processErrors "github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
+	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/state/accounts"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
+	trieMock "github.com/multiversx/mx-chain-go/testscommon/trie"
 )
 
 func TestValidateAndCanonicalizePrototypeDRWAReceiverSeeds(t *testing.T) {
@@ -44,14 +49,36 @@ func TestValidateAndCanonicalizePrototypeDRWAReceiverSeeds(t *testing.T) {
 	require.Equal(t, []byte("TOKEN-abcdef"), canonical[2].tokenID)
 
 	for _, seed := range canonical {
-		require.Equal(t, drwaprototype.ReceiverGateStorageKey(seed.tokenID), seed.storageKey)
-		record, decodeErr := drwaprototype.DecodeReceiverGateRecord(seed.encodedRecord)
+		require.Equal(t, drwaprototype.ReceiverGateStorageKey(seed.tokenID), seed.receiverStorageKey)
+		record, decodeErr := drwaprototype.DecodeReceiverGateRecord(seed.encodedReceiverRecord)
 		require.NoError(t, decodeErr)
 		require.Equal(t, seed.holderAddress, record.Holder[:])
 		require.Equal(t, uint32(7), record.CEBEpoch)
 		require.Equal(t, string(seed.tokenID) != "TOKEN-abcdef", record.Admitted)
 		require.Equal(t, uint64(1000), record.ValidThroughRound)
 	}
+}
+
+func TestValidateAndCanonicalizePrototypeDRWAReceiverSeedsEncodesCanonicalInitialBalance(t *testing.T) {
+	t.Parallel()
+
+	configured := prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(1), "TOKEN-abcdef")
+	configured.InitialBalance = "340282366920938463463374607431768211455"
+	arg := prototypeReceiverSeedArgs([]config.PrototypeDRWAReceiverSeedConfig{configured})
+	arg.Core.(*genesisMock.CoreComponentsMock).IntMarsh = &testscommon.ProtoMarshalizerMock{}
+
+	canonical, err := validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg)
+	require.NoError(t, err)
+	require.Len(t, canonical, 1)
+	require.Equal(t,
+		[]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier+configured.TokenIdentifier),
+		canonical[0].balanceStorageKey,
+	)
+
+	decoded := &esdt.ESDigitalToken{}
+	require.NoError(t, arg.Core.InternalMarshalizer().Unmarshal(decoded, canonical[0].encodedBalance))
+	require.Equal(t, configured.InitialBalance, decoded.Value.String())
+	require.Equal(t, uint32(core.Fungible), decoded.Type)
 }
 
 func TestValidateAndCanonicalizePrototypeDRWAReceiverSeedsRejectsEveryInvalidClass(t *testing.T) {
@@ -102,6 +129,21 @@ func TestValidateAndCanonicalizePrototypeDRWAReceiverSeedsRejectsEveryInvalidCla
 		"duplicate holder and token": func(arg *ArgsGenesisBlockCreator) {
 			arg.PrototypeReceiverSeeds = append(arg.PrototypeReceiverSeeds, arg.PrototypeReceiverSeeds[0])
 		},
+		"zero initial balance": func(arg *ArgsGenesisBlockCreator) {
+			arg.PrototypeReceiverSeeds[0].InitialBalance = "0"
+		},
+		"leading-zero initial balance": func(arg *ArgsGenesisBlockCreator) {
+			arg.PrototypeReceiverSeeds[0].InitialBalance = "01"
+		},
+		"signed initial balance": func(arg *ArgsGenesisBlockCreator) {
+			arg.PrototypeReceiverSeeds[0].InitialBalance = "+1"
+		},
+		"non-decimal initial balance": func(arg *ArgsGenesisBlockCreator) {
+			arg.PrototypeReceiverSeeds[0].InitialBalance = "1a"
+		},
+		"over-32-byte initial balance": func(arg *ArgsGenesisBlockCreator) {
+			arg.PrototypeReceiverSeeds[0].InitialBalance = new(big.Int).Lsh(big.NewInt(1), 256).String()
+		},
 	}
 
 	for name, mutate := range tests {
@@ -115,6 +157,56 @@ func TestValidateAndCanonicalizePrototypeDRWAReceiverSeedsRejectsEveryInvalidCla
 			require.ErrorIs(t, err, ErrInvalidPrototypeDRWAReceiverSeeds)
 		})
 	}
+}
+
+func TestApplyPrototypeDRWARegulatedTokenMarkersSortsDeduplicatesAndPreservesFailures(t *testing.T) {
+	t.Parallel()
+
+	configured := []config.PrototypeDRWAReceiverSeedConfig{
+		prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(0), "ZETA-abcdef"),
+		prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(1), "ALPHA-abcdef"),
+		prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(2), "ZETA-abcdef"),
+	}
+	arg := prototypeReceiverSeedArgs(configured)
+	canonical, err := validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg)
+	require.NoError(t, err)
+
+	observedKeys := make([]string, 0)
+	markerData := &trieMock.DataTrieTrackerStub{
+		RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) { return nil, 0, nil },
+		SaveKeyValueCalled: func(key []byte, _ []byte) error {
+			observedKeys = append(observedKeys, string(key))
+			return nil
+		},
+	}
+	markerAccount := &stateMock.UserAccountStub{
+		Address: vmcommon.SystemAccountAddress,
+		AccountDataHandlerCalled: func() vmcommon.AccountDataHandler {
+			return markerData
+		},
+	}
+	arg.Accounts = &stateMock.AccountsStub{
+		GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			require.Equal(t, vmcommon.SystemAccountAddress, address)
+			return markerAccount, nil
+		},
+	}
+
+	count, err := applyPrototypeDRWARegulatedTokenMarkers(arg, canonical)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	require.Equal(t, []string{
+		string(mustPrototypeRegulatedTokenKey(t, "ALPHA-abcdef")),
+		string(mustPrototypeRegulatedTokenKey(t, "ZETA-abcdef")),
+	}, observedKeys)
+
+	injected := errors.New("injected marker failure")
+	arg.Accounts = &stateMock.AccountsStub{GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+		return nil, injected
+	}}
+	count, err = applyPrototypeDRWARegulatedTokenMarkers(arg, canonical)
+	require.Zero(t, count)
+	require.ErrorIs(t, err, injected)
 }
 
 func TestApplyPrototypeDRWAReceiverSeedsFiltersEachShardAndPersistsExactRecord(t *testing.T) {
@@ -234,6 +326,178 @@ func TestApplyPrototypeDRWAReceiverSeedsPreservesEveryStorageFailure(t *testing.
 	}
 }
 
+func TestApplyPrototypeDRWAReceiverSeedsWritesBalanceBeforeReceiverAndRejectsExisting(t *testing.T) {
+	t.Parallel()
+
+	configured := prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(0), "TOKEN-abcdef")
+	configured.InitialBalance = "1000"
+	arg := prototypeReceiverSeedArgs([]config.PrototypeDRWAReceiverSeedConfig{configured})
+	arg.Core.(*genesisMock.CoreComponentsMock).IntMarsh = &testscommon.ProtoMarshalizerMock{}
+	canonical, err := validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg)
+	require.NoError(t, err)
+
+	var keys [][]byte
+	arg.Accounts = &stateMock.AccountsStub{
+		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			return &stateMock.UserAccountStub{
+				Address: address,
+				RetrieveValueCalled: func(key []byte) ([]byte, uint32, error) {
+					require.Equal(t, canonical[0].balanceStorageKey, key)
+					return nil, 0, nil
+				},
+				SaveKeyValueCalled: func(key []byte, _ []byte) error {
+					keys = append(keys, append([]byte(nil), key...))
+					return nil
+				},
+			}, nil
+		},
+	}
+	count, err := applyPrototypeDRWAReceiverSeeds(arg, canonical)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	require.Equal(t, [][]byte{canonical[0].balanceStorageKey, canonical[0].receiverStorageKey}, keys)
+
+	arg.Accounts = &stateMock.AccountsStub{LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+		return &stateMock.UserAccountStub{
+			Address:             address,
+			RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) { return []byte{1}, 0, nil },
+		}, nil
+	}}
+	count, err = applyPrototypeDRWAReceiverSeeds(arg, canonical)
+	require.Zero(t, count)
+	require.ErrorIs(t, err, ErrInvalidPrototypeDRWAReceiverSeeds)
+}
+
+func TestApplyPrototypeDRWAReceiverSeedsAcceptsNilTrieOnlyForEmptyDataRoot(t *testing.T) {
+	t.Parallel()
+
+	configured := prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(0), "TOKEN-abcdef")
+	configured.InitialBalance = "1000"
+	arg := prototypeReceiverSeedArgs([]config.PrototypeDRWAReceiverSeedConfig{configured})
+	arg.Core.(*genesisMock.CoreComponentsMock).IntMarsh = &testscommon.ProtoMarshalizerMock{}
+	canonical, err := validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg)
+	require.NoError(t, err)
+
+	unrelatedRetrieveFailure := errors.New("injected unrelated retrieve failure")
+	tests := map[string]struct {
+		rootHash      []byte
+		retrieved     []byte
+		retrieveError error
+		expectedError error
+	}{
+		"empty root proves absence after exact-key nil-trie result": {
+			retrieveError: state.ErrNilTrie,
+		},
+		"non-empty root preserves nil-trie failure": {
+			rootHash:      []byte("persisted-data-root"),
+			retrieveError: state.ErrNilTrie,
+			expectedError: state.ErrNilTrie,
+		},
+		"empty root preserves unrelated retrieve failure": {
+			retrieveError: unrelatedRetrieveFailure,
+			expectedError: unrelatedRetrieveFailure,
+		},
+		"dirty exact-key collision remains rejected": {
+			retrieved:     []byte("existing"),
+			expectedError: ErrInvalidPrototypeDRWAReceiverSeeds,
+		},
+		"persisted exact-key collision remains rejected": {
+			rootHash:      []byte("persisted-data-root"),
+			retrieved:     []byte("existing"),
+			expectedError: ErrInvalidPrototypeDRWAReceiverSeeds,
+		},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var savedKeys [][]byte
+			localArg := arg
+			localArg.Accounts = &stateMock.AccountsStub{
+				LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+					return &stateMock.UserAccountStub{
+						Address: address,
+						GetRootHashCalled: func() []byte {
+							return append([]byte(nil), test.rootHash...)
+						},
+						RetrieveValueCalled: func(key []byte) ([]byte, uint32, error) {
+							require.Equal(t, canonical[0].balanceStorageKey, key)
+							return append([]byte(nil), test.retrieved...), 0, test.retrieveError
+						},
+						SaveKeyValueCalled: func(key []byte, _ []byte) error {
+							savedKeys = append(savedKeys, append([]byte(nil), key...))
+							return nil
+						},
+					}, nil
+				},
+			}
+
+			count, applyErr := applyPrototypeDRWAReceiverSeeds(localArg, canonical)
+			if test.expectedError != nil {
+				require.Zero(t, count)
+				require.ErrorIs(t, applyErr, test.expectedError)
+				require.Empty(t, savedKeys)
+				return
+			}
+
+			require.NoError(t, applyErr)
+			require.Equal(t, 1, count)
+			require.Equal(t, [][]byte{canonical[0].balanceStorageKey, canonical[0].receiverStorageKey}, savedKeys)
+		})
+	}
+}
+
+func TestApplyPrototypeDRWAReceiverSeedsPreservesBalanceAndReceiverWriteFailures(t *testing.T) {
+	t.Parallel()
+
+	configured := prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(0), "TOKEN-abcdef")
+	configured.InitialBalance = "1000"
+	arg := prototypeReceiverSeedArgs([]config.PrototypeDRWAReceiverSeedConfig{configured})
+	arg.Core.(*genesisMock.CoreComponentsMock).IntMarsh = &testscommon.ProtoMarshalizerMock{}
+	canonical, err := validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg)
+	require.NoError(t, err)
+
+	injectedBalanceSave := errors.New("injected initial balance save failure")
+	receiverWriteCalled := false
+	arg.Accounts = &stateMock.AccountsStub{LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+		return &stateMock.UserAccountStub{
+			Address: address,
+			SaveKeyValueCalled: func(key []byte, _ []byte) error {
+				if bytes.Equal(key, canonical[0].balanceStorageKey) {
+					return injectedBalanceSave
+				}
+				receiverWriteCalled = true
+				return nil
+			},
+		}, nil
+	}}
+	count, err := applyPrototypeDRWAReceiverSeeds(arg, canonical)
+	require.Zero(t, count)
+	require.ErrorIs(t, err, injectedBalanceSave)
+	require.False(t, receiverWriteCalled)
+
+	injectedReceiverSave := errors.New("injected receiver record save failure")
+	var observedKeys [][]byte
+	arg.Accounts = &stateMock.AccountsStub{LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+		return &stateMock.UserAccountStub{
+			Address: address,
+			SaveKeyValueCalled: func(key []byte, _ []byte) error {
+				observedKeys = append(observedKeys, append([]byte(nil), key...))
+				if bytes.Equal(key, canonical[0].receiverStorageKey) {
+					return injectedReceiverSave
+				}
+				return nil
+			},
+		}, nil
+	}}
+	count, err = applyPrototypeDRWAReceiverSeeds(arg, canonical)
+	require.Zero(t, count)
+	require.ErrorIs(t, err, injectedReceiverSave)
+	require.Equal(t, [][]byte{canonical[0].balanceStorageKey, canonical[0].receiverStorageKey}, observedKeys)
+}
+
 func TestCreateShardGenesisBlockRejectsReceiverSeedsOnHardForkBeforeDependencies(t *testing.T) {
 	t.Parallel()
 
@@ -283,4 +547,11 @@ func prototypeReceiverSeedAddress(lastByte byte) string {
 	address[0] = 1
 	address[len(address)-1] = lastByte
 	return hex.EncodeToString(address)
+}
+
+func mustPrototypeRegulatedTokenKey(t *testing.T, token string) []byte {
+	t.Helper()
+	key, err := drwaprototype.PrototypeRegulatedTokenKey([]byte(token))
+	require.NoError(t, err)
+	return key
 }

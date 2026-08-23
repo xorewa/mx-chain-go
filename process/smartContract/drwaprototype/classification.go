@@ -8,6 +8,8 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+
+	"github.com/multiversx/mx-chain-go/state"
 )
 
 // NON_NORMATIVE_DRWA_PROTOTYPE
@@ -83,16 +85,34 @@ func MarkPrototypeRegulatedToken(accounts vmcommon.AccountsAdapter, tokenID []by
 		return err
 	}
 
-	systemAccount, dataHandler, err := loadPrototypeClassificationSystemAccount(accounts)
+	if check.IfNil(accounts) {
+		return ErrNilPrototypeClassificationAccounts
+	}
+
+	account, err := accounts.GetExistingAccount(vmcommon.SystemAccountAddress)
+	isNewAccount := errors.Is(err, state.ErrAccNotFound)
+	if err != nil && !isNewAccount {
+		return fmt.Errorf("get existing prototype classification system account: %w", err)
+	}
+	if isNewAccount {
+		account, err = accounts.LoadAccount(vmcommon.SystemAccountAddress)
+		if err != nil {
+			return fmt.Errorf("load prototype classification system account: %w", err)
+		}
+	}
+
+	systemAccount, dataHandler, err := validatePrototypeClassificationSystemAccount(account)
 	if err != nil {
 		return err
 	}
-	existing, _, err := dataHandler.RetrieveValue(key)
-	if err != nil {
-		return fmt.Errorf("retrieve prototype classification marker: %w", err)
-	}
-	if len(existing) != 0 {
-		return ErrPrototypeClassificationAlreadyExists
+	if !isNewAccount {
+		existing, _, retrieveErr := dataHandler.RetrieveValue(key)
+		if retrieveErr != nil {
+			return fmt.Errorf("retrieve prototype classification marker: %w", retrieveErr)
+		}
+		if len(existing) != 0 {
+			return ErrPrototypeClassificationAlreadyExists
+		}
 	}
 	err = dataHandler.SaveKeyValue(key, []byte(prototypeRegulatedMarkerValue))
 	if err != nil {
@@ -114,6 +134,11 @@ func loadPrototypeClassificationSystemAccount(accounts vmcommon.AccountsAdapter)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load prototype classification system account: %w", err)
 	}
+
+	return validatePrototypeClassificationSystemAccount(account)
+}
+
+func validatePrototypeClassificationSystemAccount(account vmcommon.AccountHandler) (vmcommon.UserAccountHandler, vmcommon.AccountDataHandler, error) {
 	userAccount, ok := account.(vmcommon.UserAccountHandler)
 	if !ok || check.IfNil(userAccount) || !bytes.Equal(userAccount.AddressBytes(), vmcommon.SystemAccountAddress) {
 		return nil, nil, ErrInvalidPrototypeClassificationAccount

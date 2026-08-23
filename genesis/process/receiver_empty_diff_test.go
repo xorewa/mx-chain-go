@@ -12,6 +12,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/data/esdt"
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/genesis/mock"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
@@ -54,6 +56,7 @@ func TestPrototypeDRWAReceiverSeedsFreshGenesisStoresExactRecordAndLeavesControl
 	arg.PrototypeReceiverSeeds = []config.PrototypeDRWAReceiverSeedConfig{{
 		HolderAddress:     holderAddress,
 		TokenIdentifier:   "TOKEN-abcdef",
+		InitialBalance:    "1000",
 		CEBEpoch:          7,
 		Admitted:          true,
 		ValidThroughRound: 1000,
@@ -78,10 +81,24 @@ func TestPrototypeDRWAReceiverSeedsFreshGenesisStoresExactRecordAndLeavesControl
 	require.Equal(t, uint32(7), record.CEBEpoch)
 	require.True(t, record.Admitted)
 	require.Equal(t, uint64(1000), record.ValidThroughRound)
+	regulated, err := drwaprototype.IsPrototypeRegulatedToken(arg.Accounts, []byte("TOKEN-abcdef"))
+	require.NoError(t, err)
+	require.True(t, regulated)
+
+	balanceKey := []byte(core.ProtectedKeyPrefix + core.ESDTKeyIdentifier + "TOKEN-abcdef")
+	encodedBalance, _, err := account.RetrieveValue(balanceKey)
+	require.NoError(t, err)
+	canonicalBalance := &esdt.ESDigitalToken{}
+	require.NoError(t, arg.Core.InternalMarshalizer().Unmarshal(canonicalBalance, encodedBalance))
+	require.Equal(t, "1000", canonicalBalance.Value.String())
+	require.Equal(t, uint32(core.Fungible), canonicalBalance.Type)
 
 	control, _, err := account.RetrieveValue(drwaprototype.ReceiverGateStorageKey([]byte("OTHER-abcdef")))
 	require.NoError(t, err)
 	require.Empty(t, control)
+	regulated, err = drwaprototype.IsPrototypeRegulatedToken(arg.Accounts, []byte("OTHER-abcdef"))
+	require.NoError(t, err)
+	require.False(t, regulated)
 }
 
 func prototypeReceiverGenesisArgument(t *testing.T) ArgsGenesisBlockCreator {

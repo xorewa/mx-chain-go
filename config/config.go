@@ -630,6 +630,7 @@ type BuiltInFunctionsConfig struct {
 type PrototypeDRWAReceiverSeedConfig struct {
 	HolderAddress     string
 	TokenIdentifier   string
+	InitialBalance    string
 	CEBEpoch          uint32
 	Admitted          bool
 	ValidThroughRound uint64

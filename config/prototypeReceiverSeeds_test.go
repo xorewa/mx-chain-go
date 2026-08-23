@@ -33,6 +33,7 @@ func TestPrototypeDRWAReceiverSeedsTOMLDecoding(t *testing.T) {
 [[BuiltInFunctions.PrototypeDRWAReceiverSeeds]]
 HolderAddress = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 TokenIdentifier = "TOKEN-abcdef"
+InitialBalance = "1000000"
 CEBEpoch = 7
 Admitted = true
 ValidThroughRound = 1234
@@ -40,6 +41,7 @@ ValidThroughRound = 1234
 			expected: []PrototypeDRWAReceiverSeedConfig{{
 				HolderAddress:     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 				TokenIdentifier:   "TOKEN-abcdef",
+				InitialBalance:    "1000000",
 				CEBEpoch:          7,
 				Admitted:          true,
 				ValidThroughRound: 1234,

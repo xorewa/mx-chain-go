@@ -11,6 +11,7 @@ import (
 	vmcommonMock "github.com/multiversx/mx-chain-vm-common-go/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/multiversx/mx-chain-go/state"
 	trieMock "github.com/multiversx/mx-chain-go/testscommon/trie"
 )
 
@@ -104,6 +105,68 @@ func TestMarkPrototypeRegulatedTokenSavesSystemAccountAndRejectsEveryDuplicate(t
 	require.Len(t, *savedAccounts, 1)
 }
 
+func TestMarkPrototypeRegulatedTokenCreatesProvenAbsentSystemAccountWithoutRetrieving(t *testing.T) {
+	t.Parallel()
+
+	retrieveCalled := false
+	loadCalled := false
+	saveCalled := false
+	handler := &trieMock.DataTrieTrackerStub{
+		RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) {
+			retrieveCalled = true
+			return nil, 0, state.ErrNilTrie
+		},
+	}
+	account := &vmcommonMock.UserAccountStub{
+		Address: vmcommon.SystemAccountAddress,
+		AccountDataHandlerCalled: func() vmcommon.AccountDataHandler {
+			return handler
+		},
+	}
+	accounts := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			require.Equal(t, vmcommon.SystemAccountAddress, address)
+			return nil, state.ErrAccNotFound
+		},
+		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			loadCalled = true
+			require.Equal(t, vmcommon.SystemAccountAddress, address)
+			return account, nil
+		},
+		SaveAccountCalled: func(saved vmcommon.AccountHandler) error {
+			saveCalled = true
+			require.Same(t, account, saved)
+			return nil
+		},
+	}
+
+	require.NoError(t, MarkPrototypeRegulatedToken(accounts, []byte("TOKEN-abcdef")))
+	require.True(t, loadCalled)
+	require.True(t, saveCalled)
+	require.False(t, retrieveCalled)
+}
+
+func TestMarkPrototypeRegulatedTokenPropagatesUnexpectedExistingAccountFailure(t *testing.T) {
+	t.Parallel()
+
+	injected := errors.New("injected existing account lookup failure")
+	loadCalled := false
+	accounts := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			require.Equal(t, vmcommon.SystemAccountAddress, address)
+			return nil, injected
+		},
+		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			loadCalled = true
+			return nil, nil
+		},
+	}
+
+	err := MarkPrototypeRegulatedToken(accounts, []byte("TOKEN-abcdef"))
+	require.ErrorIs(t, err, injected)
+	require.False(t, loadCalled)
+}
+
 func TestPrototypeClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	t.Parallel()
 
@@ -126,6 +189,9 @@ func TestPrototypeClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	require.ErrorIs(t, err, injectedLoad)
 
 	wrongType := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return &prototypeNonUserAccount{}, nil
+		},
 		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
 			return &prototypeNonUserAccount{}, nil
 		},
@@ -133,8 +199,17 @@ func TestPrototypeClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	regulated, err = IsPrototypeRegulatedToken(wrongType, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrInvalidPrototypeClassificationAccount)
+	require.ErrorIs(t, MarkPrototypeRegulatedToken(wrongType, tokenID), ErrInvalidPrototypeClassificationAccount)
 
 	wrongAddress := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return &vmcommonMock.UserAccountStub{
+				Address: []byte("not-the-system-account"),
+				AccountDataHandlerCalled: func() vmcommon.AccountDataHandler {
+					return &trieMock.DataTrieTrackerStub{}
+				},
+			}, nil
+		},
 		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
 			return &vmcommonMock.UserAccountStub{
 				Address: []byte("not-the-system-account"),
@@ -147,15 +222,36 @@ func TestPrototypeClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	regulated, err = IsPrototypeRegulatedToken(wrongAddress, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrInvalidPrototypeClassificationAccount)
+	require.ErrorIs(t, MarkPrototypeRegulatedToken(wrongAddress, tokenID), ErrInvalidPrototypeClassificationAccount)
 
 	nilDataHandler := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return &vmcommonMock.UserAccountStub{Address: vmcommon.SystemAccountAddress}, nil
+		},
 		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
-			return &vmcommonMock.UserAccountStub{}, nil
+			return &vmcommonMock.UserAccountStub{Address: vmcommon.SystemAccountAddress}, nil
 		},
 	}
 	regulated, err = IsPrototypeRegulatedToken(nilDataHandler, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrInvalidPrototypeClassificationAccount)
+	require.ErrorIs(t, MarkPrototypeRegulatedToken(nilDataHandler, tokenID), ErrInvalidPrototypeClassificationAccount)
+}
+
+func TestMarkPrototypeRegulatedTokenPropagatesAbsentAccountLoadFailure(t *testing.T) {
+	t.Parallel()
+
+	injected := errors.New("injected absent account load failure")
+	accounts := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return nil, state.ErrAccNotFound
+		},
+		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return nil, injected
+		},
+	}
+
+	require.ErrorIs(t, MarkPrototypeRegulatedToken(accounts, []byte("TOKEN-abcdef")), injected)
 }
 
 func TestPrototypeClassificationPropagatesStorageFailures(t *testing.T) {
@@ -220,6 +316,9 @@ func newPrototypeClassificationMemoryAccounts() (*vmcommonMock.AccountsStub, map
 		},
 	}
 	accounts := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return account, nil
+		},
 		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
 			loadedAddresses = append(loadedAddresses, append([]byte(nil), address...))
 			return account, nil
@@ -242,6 +341,9 @@ func newPrototypeClassificationAccountsWithHandler(handler vmcommon.AccountDataH
 	}
 
 	return &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return account, nil
+		},
 		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
 			return account, nil
 		},
