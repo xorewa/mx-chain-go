@@ -137,7 +137,7 @@ func DecodeValueEnvelope(encoded []byte) (*ValueEnvelope, error) {
 		return nil, fmt.Errorf("%w: total length", ErrInvalidValueEnvelope)
 	}
 
-	reader := prototypeReader{data: encoded}
+	reader := prototypeReader{data: encoded, invalidError: ErrInvalidValueEnvelope}
 	version, err := reader.readByte()
 	if err != nil || version != prototypeEnvelopeVersion {
 		return nil, fmt.Errorf("%w: envelope version", ErrInvalidValueEnvelope)
@@ -216,8 +216,9 @@ func prototypeEnvelopeMaximumLength() int {
 }
 
 type prototypeReader struct {
-	data   []byte
-	offset int
+	data         []byte
+	offset       int
+	invalidError error
 }
 
 func (reader *prototypeReader) readValueContext() (ValueContext, error) {
@@ -301,7 +302,7 @@ func (reader *prototypeReader) readValueContext() (ValueContext, error) {
 
 func (reader *prototypeReader) readByte() (byte, error) {
 	if reader.remaining() < 1 {
-		return 0, fmt.Errorf("%w: truncated byte", ErrInvalidValueEnvelope)
+		return 0, reader.invalid("truncated byte")
 	}
 	value := reader.data[reader.offset]
 	reader.offset++
@@ -310,7 +311,7 @@ func (reader *prototypeReader) readByte() (byte, error) {
 
 func (reader *prototypeReader) readUint16Bytes(maximum int) ([]byte, error) {
 	if reader.remaining() < 2 {
-		return nil, fmt.Errorf("%w: truncated uint16 length", ErrInvalidValueEnvelope)
+		return nil, reader.invalid("truncated uint16 length")
 	}
 	length := int(binary.BigEndian.Uint16(reader.data[reader.offset:]))
 	reader.offset += 2
@@ -319,19 +320,19 @@ func (reader *prototypeReader) readUint16Bytes(maximum int) ([]byte, error) {
 
 func (reader *prototypeReader) readUint32Bytes(maximum int) ([]byte, error) {
 	if reader.remaining() < 4 {
-		return nil, fmt.Errorf("%w: truncated uint32 length", ErrInvalidValueEnvelope)
+		return nil, reader.invalid("truncated uint32 length")
 	}
 	length := binary.BigEndian.Uint32(reader.data[reader.offset:])
 	reader.offset += 4
 	if length > uint32(maximum) {
-		return nil, fmt.Errorf("%w: variable field limit", ErrInvalidValueEnvelope)
+		return nil, reader.invalid("variable field limit")
 	}
 	return reader.readCopiedBytes(int(length), maximum)
 }
 
 func (reader *prototypeReader) readCopiedBytes(length int, maximum int) ([]byte, error) {
 	if length < 0 || length > maximum || reader.remaining() < length {
-		return nil, fmt.Errorf("%w: variable field length", ErrInvalidValueEnvelope)
+		return nil, reader.invalid("variable field length")
 	}
 	value := make([]byte, length)
 	copy(value, reader.data[reader.offset:reader.offset+length])
@@ -341,7 +342,7 @@ func (reader *prototypeReader) readCopiedBytes(length int, maximum int) ([]byte,
 
 func (reader *prototypeReader) readFixed(destination []byte) error {
 	if reader.remaining() < len(destination) {
-		return fmt.Errorf("%w: truncated fixed field", ErrInvalidValueEnvelope)
+		return reader.invalid("truncated fixed field")
 	}
 	copy(destination, reader.data[reader.offset:reader.offset+len(destination)])
 	reader.offset += len(destination)
@@ -350,7 +351,7 @@ func (reader *prototypeReader) readFixed(destination []byte) error {
 
 func (reader *prototypeReader) readUint32() (uint32, error) {
 	if reader.remaining() < 4 {
-		return 0, fmt.Errorf("%w: truncated uint32", ErrInvalidValueEnvelope)
+		return 0, reader.invalid("truncated uint32")
 	}
 	value := binary.BigEndian.Uint32(reader.data[reader.offset:])
 	reader.offset += 4
@@ -359,7 +360,7 @@ func (reader *prototypeReader) readUint32() (uint32, error) {
 
 func (reader *prototypeReader) readUint64() (uint64, error) {
 	if reader.remaining() < 8 {
-		return 0, fmt.Errorf("%w: truncated uint64", ErrInvalidValueEnvelope)
+		return 0, reader.invalid("truncated uint64")
 	}
 	value := binary.BigEndian.Uint64(reader.data[reader.offset:])
 	reader.offset += 8
@@ -368,4 +369,8 @@ func (reader *prototypeReader) readUint64() (uint64, error) {
 
 func (reader *prototypeReader) remaining() int {
 	return len(reader.data) - reader.offset
+}
+
+func (reader *prototypeReader) invalid(reason string) error {
+	return fmt.Errorf("%w: %s", reader.invalidError, reason)
 }
