@@ -381,6 +381,18 @@ var ErrNotEnoughValidBlocksInStorage = errors.New("not enough valid blocks to st
 // ErrNilSmartContractResult signals that the smart contract result is nil
 var ErrNilSmartContractResult = errors.New("smart contract result is nil")
 
+// ErrUnknownProtocolMessageKind signals that an SCR carries a protocol-message kind unknown to this binary.
+var ErrUnknownProtocolMessageKind = errors.New("unknown protocol message kind")
+
+// ErrProtocolMessageBeforeActivation signals that an SCR carries a protocol message before its feature activation.
+var ErrProtocolMessageBeforeActivation = errors.New("protocol message received before activation")
+
+// ErrInvalidProtocolMessageFunction signals that a protocol-kind SCR does not use its exact native function.
+var ErrInvalidProtocolMessageFunction = errors.New("invalid protocol message function")
+
+// ErrInvalidProtocolMessageRoute signals that a protocol-kind SCR is not on the required cross-shard route.
+var ErrInvalidProtocolMessageRoute = errors.New("invalid protocol message route")
+
 // ErrNilRewardTransaction signals that the reward transaction is nil
 var ErrNilRewardTransaction = errors.New("reward transaction is nil")
 

@@ -140,6 +140,7 @@ func createEnableEpochsConfig() config.EnableEpochs {
 		ConsumedGasInEconomicsFixEnableEpoch:                     120,
 		AttributeExtraGasUsageEnableEpoch:                        121,
 		SupernovaEnableEpoch:                                     122,
+		DRWAEnforcementEnableEpoch:                               123,
 	}
 }
 
@@ -202,6 +203,8 @@ func TestEnableEpochsHandler_IsFlagEnabledInEpoch(t *testing.T) {
 	require.True(t, handler.IsFlagEnabledInEpoch(common.BuiltInFunctionsFlag, cfg.BuiltInFunctionsEnableEpoch))
 	require.True(t, handler.IsFlagEnabledInEpoch(common.BuiltInFunctionsFlag, cfg.BuiltInFunctionsEnableEpoch+1))
 	require.False(t, handler.IsFlagEnabledInEpoch(common.BuiltInFunctionsFlag, cfg.BuiltInFunctionsEnableEpoch-1))
+	require.True(t, handler.IsFlagEnabledInEpoch(common.DRWAEnforcementFlag, cfg.DRWAEnforcementEnableEpoch))
+	require.False(t, handler.IsFlagEnabledInEpoch(common.DRWAEnforcementFlag, cfg.DRWAEnforcementEnableEpoch-1))
 	require.False(t, handler.IsFlagEnabledInEpoch("new flag", 0))
 }
 
@@ -489,6 +492,7 @@ func TestEnableEpochsHandler_GetActivationEpoch(t *testing.T) {
 	require.Equal(t, cfg.ConsumedGasInEconomicsFixEnableEpoch, handler.GetActivationEpoch(common.ConsumedGasInEconomicsFlag))
 	require.Equal(t, cfg.AttributeExtraGasUsageEnableEpoch, handler.GetActivationEpoch(common.AttributeExtraGasUsageFlag))
 	require.Equal(t, cfg.SupernovaEnableEpoch, handler.GetActivationEpoch(common.SupernovaFlag))
+	require.Equal(t, cfg.DRWAEnforcementEnableEpoch, handler.GetActivationEpoch(common.DRWAEnforcementFlag))
 }
 
 func TestEnableEpochsHandler_GetAllEnableEpochs(t *testing.T) {

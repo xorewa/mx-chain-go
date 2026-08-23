@@ -2995,6 +2995,19 @@ func TestScProcessor_ProcessSmartContractResultNilScr(t *testing.T) {
 	require.Equal(t, process.ErrNilSmartContractResult, err)
 }
 
+func TestScProcessor_ProcessSmartContractResultRejectsUnknownProtocolKindBeforeProcessing(t *testing.T) {
+	t.Parallel()
+
+	sc := &scProcessor{}
+	scr := &smartContractResult.SmartContractResult{
+		ProtocolMessageKind: vmData.ProtocolMessageKind(2),
+	}
+
+	returnCode, err := sc.ProcessSmartContractResult(scr)
+	require.Equal(t, vmcommon.UserError, returnCode)
+	require.ErrorIs(t, err, process.ErrUnknownProtocolMessageKind)
+}
+
 func TestScProcessor_ProcessSmartContractResultErrGetAccount(t *testing.T) {
 	t.Parallel()
 

@@ -2801,10 +2801,13 @@ func (sc *scProcessor) ProcessSmartContractResult(scr *smartContractResult.Smart
 	if check.IfNil(scr) {
 		return 0, process.ErrNilSmartContractResult
 	}
+	err := scrCommon.ValidateProtocolMessageAdmission(scr, sc.enableEpochsHandler, sc.shardCoordinator)
+	if err != nil {
+		return vmcommon.UserError, err
+	}
 
 	log.Trace("scProcessor.ProcessSmartContractResult()", "sender", scr.GetSndAddr(), "receiver", scr.GetRcvAddr(), "data", string(scr.GetData()))
 
-	var err error
 	returnCode := vmcommon.UserError
 	txHash, err := core.CalculateHash(sc.marshalizer, sc.hasher, scr)
 	if err != nil {
