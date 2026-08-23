@@ -2,6 +2,7 @@ package scrCommon
 
 import (
 	"bytes"
+	"encoding/hex"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
@@ -12,6 +13,7 @@ import (
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process"
 	processMock "github.com/multiversx/mx-chain-go/process/mock"
+	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
 	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 )
 
@@ -31,11 +33,12 @@ func TestValidateProtocolMessageAdmission(t *testing.T) {
 	}
 	disabled := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
 	enabled := enableEpochsHandlerMock.NewEnableEpochsHandlerStub(common.DRWAEnforcementFlag)
+	validCallData := createPrototypeEnvelopeCallData(t)
 	valid := func() *smartContractResult.SmartContractResult {
 		return &smartContractResult.SmartContractResult{
 			SndAddr:             sourceAddress,
 			RcvAddr:             destinationAddress,
-			Data:                []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope + "@00"),
+			Data:                validCallData,
 			ProtocolMessageKind: vmData.ProtocolMessageKindDRWA,
 		}
 	}
@@ -68,6 +71,58 @@ func TestValidateProtocolMessageAdmission(t *testing.T) {
 		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageFunction)
 	})
 
+	t.Run("exact function without envelope rejects", func(t *testing.T) {
+		scr := valid()
+		scr.Data = []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
+	t.Run("empty envelope argument rejects", func(t *testing.T) {
+		scr := valid()
+		scr.Data = []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope + "@")
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
+	t.Run("odd-length hex rejects", func(t *testing.T) {
+		scr := valid()
+		scr.Data = []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope + "@0")
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
+	t.Run("non-hex argument rejects", func(t *testing.T) {
+		scr := valid()
+		scr.Data = []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope + "@zz")
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
+	t.Run("uppercase hex rejects as alternate prototype spelling", func(t *testing.T) {
+		scr := valid()
+		separatorIndex := bytes.IndexByte(scr.Data, '@')
+		scr.Data = append(append([]byte(nil), scr.Data[:separatorIndex+1]...), bytes.ToUpper(scr.Data[separatorIndex+1:])...)
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
+	t.Run("extra argument rejects", func(t *testing.T) {
+		scr := valid()
+		scr.Data = append(append([]byte(nil), scr.Data...), []byte("@00")...)
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
+	t.Run("oversized envelope rejects before decode", func(t *testing.T) {
+		scr := valid()
+		scr.Data = append(
+			[]byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope+"@"),
+			bytes.Repeat([]byte{'0'}, 2*drwaprototype.PrototypeValueEnvelopeMaximumLength()+2)...,
+		)
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
+	t.Run("invalid decoded envelope rejects", func(t *testing.T) {
+		scr := valid()
+		scr.Data = []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope + "@00")
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+
 	t.Run("same-shard source rejects", func(t *testing.T) {
 		scr := valid()
 		scr.SndAddr = destinationAddress
@@ -83,4 +138,30 @@ func TestValidateProtocolMessageAdmission(t *testing.T) {
 	t.Run("exact active cross-shard carrier reaches later validation", func(t *testing.T) {
 		require.NoError(t, ValidateProtocolMessageAdmission(valid(), enabled, coordinator))
 	})
+}
+
+func createPrototypeEnvelopeCallData(t *testing.T) []byte {
+	t.Helper()
+
+	context := drwaprototype.ValueContext{
+		EffectKind:               drwaprototype.ValueEffectKindDirectTransfer,
+		RegulatedTokenID:         []byte("TOKEN-abcdef"),
+		RegulatedTokenType:       drwaprototype.TokenTypeFungible,
+		Quantity:                 []byte{1},
+		CEBEpoch:                 7,
+		TransferMode:             drwaprototype.TransferModeGatedDirect,
+		SettlementExpiry:         1,
+		DestinationGateGasLimit:  1,
+		SuccessReceiptGasLimit:   1,
+		RefundGenerationGasLimit: 1,
+		SourceCompletionGasLimit: 1,
+	}
+	encoded, err := drwaprototype.EncodeValueEnvelope(drwaprototype.ValueEnvelope{
+		OriginalTransferPayload: []byte("ESDTTransfer@544f4b454e2d616263646566@01"),
+		Context:                 context,
+	})
+	require.NoError(t, err)
+
+	callData := []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope + "@")
+	return append(callData, []byte(hex.EncodeToString(encoded))...)
 }

@@ -2,6 +2,7 @@ package scrCommon
 
 import (
 	"bytes"
+	"encoding/hex"
 
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process"
+	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
 	"github.com/multiversx/mx-chain-go/sharding"
 )
 
@@ -34,12 +36,37 @@ func ValidateProtocolMessageAdmission(
 		return process.ErrProtocolMessageBeforeActivation
 	}
 
-	function := scr.GetData()
-	if separatorIndex := bytes.IndexByte(function, '@'); separatorIndex >= 0 {
-		function = function[:separatorIndex]
+	callData := scr.GetData()
+	separatorIndex := bytes.IndexByte(callData, '@')
+	function := callData
+	if separatorIndex >= 0 {
+		function = callData[:separatorIndex]
 	}
 	if !bytes.Equal(function, []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)) {
 		return process.ErrInvalidProtocolMessageFunction
+	}
+	if separatorIndex < 0 {
+		return process.ErrInvalidProtocolMessageEnvelope
+	}
+
+	envelopeHex := callData[separatorIndex+1:]
+	if len(envelopeHex) == 0 ||
+		len(envelopeHex)%2 != 0 ||
+		len(envelopeHex) > 2*drwaprototype.PrototypeValueEnvelopeMaximumLength() ||
+		bytes.IndexByte(envelopeHex, '@') >= 0 {
+		return process.ErrInvalidProtocolMessageEnvelope
+	}
+	envelopeBytes := make([]byte, hex.DecodedLen(len(envelopeHex)))
+	decodedLength, err := hex.Decode(envelopeBytes, envelopeHex)
+	if err != nil || decodedLength != len(envelopeBytes) {
+		return process.ErrInvalidProtocolMessageEnvelope
+	}
+	if !bytes.Equal(envelopeHex, []byte(hex.EncodeToString(envelopeBytes))) {
+		return process.ErrInvalidProtocolMessageEnvelope
+	}
+	_, err = drwaprototype.DecodeValueEnvelope(envelopeBytes)
+	if err != nil {
+		return process.ErrInvalidProtocolMessageEnvelope
 	}
 
 	selfShardID := coordinator.SelfId()

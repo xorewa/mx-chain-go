@@ -393,6 +393,9 @@ var ErrInvalidProtocolMessageFunction = errors.New("invalid protocol message fun
 // ErrInvalidProtocolMessageRoute signals that a protocol-kind SCR is not on the required cross-shard route.
 var ErrInvalidProtocolMessageRoute = errors.New("invalid protocol message route")
 
+// ErrInvalidProtocolMessageEnvelope signals that a protocol-kind SCR has invalid prototype envelope bytes.
+var ErrInvalidProtocolMessageEnvelope = errors.New("invalid protocol message envelope")
+
 // ErrNilRewardTransaction signals that the reward transaction is nil
 var ErrNilRewardTransaction = errors.New("reward transaction is nil")
 
