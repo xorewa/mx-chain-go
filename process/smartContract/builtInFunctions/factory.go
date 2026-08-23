@@ -95,14 +95,19 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 		return nil, err
 	}
 
-	err = bContainerFactory.CreateBuiltInFunctionContainer()
+	guardedFactory := &prototypeGuardedBuiltInFunctionFactory{
+		delegate:            bContainerFactory,
+		accounts:            vmcommonAccounts,
+		enableEpochsHandler: args.EnableEpochsHandler,
+	}
+	err = guardedFactory.CreateBuiltInFunctionContainer()
 	if err != nil {
 		return nil, err
 	}
 
 	args.GasSchedule.RegisterNotifyHandler(bContainerFactory)
 
-	return bContainerFactory, nil
+	return guardedFactory, nil
 }
 
 // GetAllowedAddress returns the allowed crawler address on the current shard

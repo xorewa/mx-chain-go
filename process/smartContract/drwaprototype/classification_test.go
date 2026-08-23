@@ -48,11 +48,11 @@ func TestPrototypeRegulatedTokenKeyIsProtectedBoundedAndFresh(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, byte(core.ProtectedKeyPrefix[0]), fresh[0])
 
-	maximumTokenID := make([]byte, prototypeTokenIDLimit)
-	maximumTokenID[0] = 1
-	_, err = PrototypeRegulatedTokenKey(maximumTokenID)
+	_, err = PrototypeRegulatedTokenKey([]byte("ABCDEFGHIJ-abcdef"))
 	require.NoError(t, err)
 	_, err = PrototypeRegulatedTokenKey(nil)
+	require.ErrorIs(t, err, ErrInvalidPrototypeRegulatedTokenID)
+	_, err = PrototypeRegulatedTokenKey([]byte("invalid"))
 	require.ErrorIs(t, err, ErrInvalidPrototypeRegulatedTokenID)
 	_, err = PrototypeRegulatedTokenKey(make([]byte, prototypeTokenIDLimit+1))
 	require.ErrorIs(t, err, ErrInvalidPrototypeRegulatedTokenID)

@@ -23,7 +23,7 @@ const (
 )
 
 var (
-	// ErrInvalidPrototypeRegulatedTokenID signals an empty or over-limit prototype token ID.
+	// ErrInvalidPrototypeRegulatedTokenID signals a malformed or over-limit prototype token ID.
 	ErrInvalidPrototypeRegulatedTokenID = errors.New("invalid non-normative DRWA prototype regulated token ID")
 	// ErrNilPrototypeClassificationAccounts signals that the prototype classifier has no accounts adapter.
 	ErrNilPrototypeClassificationAccounts = errors.New("nil non-normative DRWA prototype classification accounts adapter")
@@ -37,7 +37,7 @@ var (
 
 // PrototypeRegulatedTokenKey returns a fresh protected key for one bounded prototype token ID.
 func PrototypeRegulatedTokenKey(tokenID []byte) ([]byte, error) {
-	if len(tokenID) == 0 || len(tokenID) > prototypeTokenIDLimit {
+	if len(tokenID) == 0 || len(tokenID) > prototypeTokenIDLimit || !vmcommon.ValidateToken(tokenID) {
 		return nil, ErrInvalidPrototypeRegulatedTokenID
 	}
 
