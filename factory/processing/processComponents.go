@@ -987,6 +987,16 @@ func (pcf *processComponentsFactory) newEpochStartTrigger(requestHandler epochSt
 }
 
 func (pcf *processComponentsFactory) generateGenesisHeadersAndApplyInitialBalances() (map[uint32]data.HeaderHandler, map[uint32]*genesis.IndexingData, error) {
+	startEpoch := pcf.bootstrapComponents.EpochBootstrapParams().Epoch()
+	err := validatePrototypeDRWAReceiverSeedingMode(
+		pcf.config.BuiltInFunctions.PrototypeDRWAReceiverSeeds,
+		pcf.config.Hardfork,
+		startEpoch,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	genesisVmConfig := pcf.config.VirtualMachine.Execution
 	conversionBase := 10
 	genesisNodePrice, ok := big.NewInt(0).SetString(pcf.systemSCConfig.StakingSystemSCConfig.GenesisNodePrice, conversionBase)
@@ -996,7 +1006,7 @@ func (pcf *processComponentsFactory) generateGenesisHeadersAndApplyInitialBalanc
 
 	arg := processGenesis.ArgsGenesisBlockCreator{
 		GenesisTime:             uint64(pcf.coreData.GenesisNodesSetup().GetStartTime()),
-		StartEpochNum:           pcf.bootstrapComponents.EpochBootstrapParams().Epoch(),
+		StartEpochNum:           startEpoch,
 		Data:                    pcf.data,
 		Core:                    pcf.coreData,
 		Accounts:                pcf.state.AccountsAdapter(),
@@ -1026,6 +1036,11 @@ func (pcf *processComponentsFactory) generateGenesisHeadersAndApplyInitialBalanc
 		GenesisNonce:            pcf.genesisNonce,
 		GenesisRound:            pcf.genesisRound,
 		TxCacheSelectionConfig:  pcf.config.TxCacheSelection,
+		PrototypeDRWACEBEpoch:   pcf.config.BuiltInFunctions.PrototypeDRWACEBEpoch,
+		PrototypeReceiverSeeds: append(
+			[]config.PrototypeDRWAReceiverSeedConfig(nil),
+			pcf.config.BuiltInFunctions.PrototypeDRWAReceiverSeeds...,
+		),
 	}
 
 	gbc, err := processGenesis.NewGenesisBlockCreator(arg)
@@ -1041,6 +1056,21 @@ func (pcf *processComponentsFactory) generateGenesisHeadersAndApplyInitialBalanc
 	indexingData := gbc.GetIndexingData()
 
 	return genesisBlocks, indexingData, nil
+}
+
+func validatePrototypeDRWAReceiverSeedingMode(
+	seeds []config.PrototypeDRWAReceiverSeedConfig,
+	hardForkConfig config.HardforkConfig,
+	startEpoch uint32,
+) error {
+	if len(seeds) == 0 {
+		return nil
+	}
+	if hardForkConfig.AfterHardFork && startEpoch <= hardForkConfig.StartEpoch {
+		return fmt.Errorf("%w: non-empty list cannot be combined with hard-fork import", processGenesis.ErrInvalidPrototypeDRWAReceiverSeeds)
+	}
+
+	return nil
 }
 
 func (pcf *processComponentsFactory) indexAndReturnGenesisAccounts() (map[string]*alteredAccount.AlteredAccount, error) {

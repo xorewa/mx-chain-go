@@ -1,16 +1,20 @@
 package process
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 	"sync"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-core-go/data"
 	dataBlock "github.com/multiversx/mx-chain-core-go/data/block"
 	logger "github.com/multiversx/mx-chain-logger-go"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 
 	"github.com/multiversx/mx-chain-go/common"
@@ -35,6 +39,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/rewardTransaction"
 	"github.com/multiversx/mx-chain-go/process/smartContract"
 	"github.com/multiversx/mx-chain-go/process/smartContract/builtInFunctions"
+	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
 	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
 	"github.com/multiversx/mx-chain-go/process/smartContract/hooks/counters"
 	"github.com/multiversx/mx-chain-go/process/smartContract/processProxy"
@@ -56,6 +61,14 @@ var zero = big.NewInt(0)
 type deployedScMetrics struct {
 	numDelegation int
 	numOtherTypes int
+}
+
+type prototypeDRWAReceiverSeed struct {
+	holderAddress []byte
+	tokenID       []byte
+	storageKey    []byte
+	encodedRecord []byte
+	shardID       uint32
 }
 
 func createGenesisConfig(providedEnableEpochs config.EnableEpochs) config.EnableEpochs {
@@ -88,6 +101,14 @@ func CreateShardGenesisBlock(
 	nodesListSplitter genesis.NodesListSplitter,
 	hardForkBlockProcessor update.HardForkBlockProcessor,
 ) (data.HeaderHandler, [][]byte, *genesis.IndexingData, error) {
+	if len(arg.PrototypeReceiverSeeds) > 0 && mustDoHardForkImportProcess(arg) {
+		return nil, nil, nil, fmt.Errorf("%w: non-empty list cannot be combined with hard-fork import", ErrInvalidPrototypeDRWAReceiverSeeds)
+	}
+	prototypeReceiverSeeds, err := validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	if mustDoHardForkImportProcess(arg) {
 		return createShardGenesisBlockAfterHardFork(arg, body, hardForkBlockProcessor)
 	}
@@ -120,6 +141,12 @@ func CreateShardGenesisBlock(
 	numSetBalances, err := setBalancesToTrie(arg)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("%w encountered when creating genesis block for shard %d while setting the balances to trie",
+			err, arg.ShardCoordinator.SelfId())
+	}
+
+	numReceiverSeeds, err := applyPrototypeDRWAReceiverSeeds(arg, prototypeReceiverSeeds)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("%w encountered when creating genesis block for shard %d while applying prototype receiver seeds",
 			err, arg.ShardCoordinator.SelfId())
 	}
 
@@ -156,6 +183,7 @@ func CreateShardGenesisBlock(
 		"num delegation SC deployed", deployMetrics.numDelegation,
 		"num other SC deployed", deployMetrics.numOtherTypes,
 		"num set balances", numSetBalances,
+		"num prototype receiver seeds", numReceiverSeeds,
 		"num staked directly", numStaked,
 		"total staked on a delegation SC", delegationResult.NumTotalStaked,
 		"total delegation nodes", delegationResult.NumTotalDelegated,
@@ -181,6 +209,107 @@ func CreateShardGenesisBlock(
 	}
 
 	return headerHandler, scAddresses, indexingData, nil
+}
+
+func validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg ArgsGenesisBlockCreator) ([]prototypeDRWAReceiverSeed, error) {
+	if len(arg.PrototypeReceiverSeeds) == 0 {
+		return nil, nil
+	}
+
+	canonical := make([]prototypeDRWAReceiverSeed, 0, len(arg.PrototypeReceiverSeeds))
+	seen := make(map[string]struct{}, len(arg.PrototypeReceiverSeeds))
+	for index, configured := range arg.PrototypeReceiverSeeds {
+		holderAddress, err := arg.Core.AddressPubKeyConverter().Decode(configured.HolderAddress)
+		if err != nil {
+			return nil, fmt.Errorf("%w: seed %d holder decode: %v", ErrInvalidPrototypeDRWAReceiverSeeds, index, err)
+		}
+		var holder [32]byte
+		if len(holderAddress) != len(holder) {
+			return nil, fmt.Errorf("%w: seed %d holder length", ErrInvalidPrototypeDRWAReceiverSeeds, index)
+		}
+		copy(holder[:], holderAddress)
+		if holder == ([32]byte{}) || core.IsSystemAccountAddress(holderAddress) || core.IsSmartContractAddress(holderAddress) {
+			return nil, fmt.Errorf("%w: seed %d holder is not a non-zero EOA", ErrInvalidPrototypeDRWAReceiverSeeds, index)
+		}
+
+		tokenID := []byte(configured.TokenIdentifier)
+		if !vmcommon.ValidateToken(tokenID) {
+			return nil, fmt.Errorf("%w: seed %d token identifier", ErrInvalidPrototypeDRWAReceiverSeeds, index)
+		}
+		if configured.CEBEpoch == 0 || configured.CEBEpoch != arg.PrototypeDRWACEBEpoch {
+			return nil, fmt.Errorf("%w: seed %d CEB", ErrInvalidPrototypeDRWAReceiverSeeds, index)
+		}
+		if configured.ValidThroughRound == 0 {
+			return nil, fmt.Errorf("%w: seed %d valid-through round", ErrInvalidPrototypeDRWAReceiverSeeds, index)
+		}
+
+		shardID := arg.ShardCoordinator.ComputeId(holderAddress)
+		if shardID >= arg.ShardCoordinator.NumberOfShards() {
+			return nil, fmt.Errorf("%w: seed %d holder is not in an ordinary shard", ErrInvalidPrototypeDRWAReceiverSeeds, index)
+		}
+		uniqueKey := string(holderAddress) + "\x00" + configured.TokenIdentifier
+		if _, exists := seen[uniqueKey]; exists {
+			return nil, fmt.Errorf("%w: seed %d duplicate holder/token", ErrInvalidPrototypeDRWAReceiverSeeds, index)
+		}
+		seen[uniqueKey] = struct{}{}
+
+		encodedRecord, err := drwaprototype.EncodeReceiverGateRecord(drwaprototype.ReceiverGateRecord{
+			Holder:            holder,
+			CEBEpoch:          configured.CEBEpoch,
+			Admitted:          configured.Admitted,
+			ValidThroughRound: configured.ValidThroughRound,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%w: seed %d record encoding: %v", ErrInvalidPrototypeDRWAReceiverSeeds, index, err)
+		}
+
+		canonical = append(canonical, prototypeDRWAReceiverSeed{
+			holderAddress: append([]byte(nil), holderAddress...),
+			tokenID:       append([]byte(nil), tokenID...),
+			storageKey:    drwaprototype.ReceiverGateStorageKey(tokenID),
+			encodedRecord: encodedRecord,
+			shardID:       shardID,
+		})
+	}
+
+	sort.Slice(canonical, func(first, second int) bool {
+		holderComparison := bytes.Compare(canonical[first].holderAddress, canonical[second].holderAddress)
+		if holderComparison != 0 {
+			return holderComparison < 0
+		}
+		return bytes.Compare(canonical[first].tokenID, canonical[second].tokenID) < 0
+	})
+
+	return canonical, nil
+}
+
+func applyPrototypeDRWAReceiverSeeds(arg ArgsGenesisBlockCreator, seeds []prototypeDRWAReceiverSeed) (int, error) {
+	numApplied := 0
+	for _, seed := range seeds {
+		if seed.shardID != arg.ShardCoordinator.SelfId() {
+			continue
+		}
+
+		accountHandler, err := arg.Accounts.LoadAccount(seed.holderAddress)
+		if err != nil {
+			return numApplied, err
+		}
+		account, ok := accountHandler.(state.UserAccountHandler)
+		if !ok {
+			return numApplied, process.ErrWrongTypeAssertion
+		}
+		err = account.SaveKeyValue(seed.storageKey, seed.encodedRecord)
+		if err != nil {
+			return numApplied, err
+		}
+		err = arg.Accounts.SaveAccount(account)
+		if err != nil {
+			return numApplied, err
+		}
+		numApplied++
+	}
+
+	return numApplied, nil
 }
 
 func setInitialDataInHeader(

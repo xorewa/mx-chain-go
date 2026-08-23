@@ -990,6 +990,8 @@
     # NON_NORMATIVE_DRWA_PROTOTYPE: zero keeps the S1 source-debit route disabled.
     PrototypeDRWACEBEpoch = 0
     PrototypeDRWASettlementLifetimeRounds = 0
+    # NON_NORMATIVE_DRWA_PROTOTYPE: stock configuration has no
+    # [[BuiltInFunctions.PrototypeDRWAReceiverSeeds]] entries and creates no receiver state.
     AutomaticCrawlerAddresses =[
         "erd1he8wwxn4az3j82p7wwqsdk794dm7hcrwny6f8dfegkfla34udx7qrf7xje", #shard 0
         "erd1fpkcgel4gcmh8zqqdt043yfcn5tyx8373kg6q2qmkxzu4dqamc0swts65c", #shard 1

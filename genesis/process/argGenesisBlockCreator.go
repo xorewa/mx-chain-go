@@ -1,6 +1,7 @@
 package process
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -20,6 +21,10 @@ import (
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/update"
 )
+
+// ErrInvalidPrototypeDRWAReceiverSeeds signals an invalid or unsupported S1 qualification seed list.
+// NON_NORMATIVE_DRWA_PROTOTYPE
+var ErrInvalidPrototypeDRWAReceiverSeeds = errors.New("invalid non-normative DRWA prototype receiver seeds")
 
 type coreComponentsHandler interface {
 	InternalMarshalizer() marshal.Marshalizer
@@ -75,6 +80,8 @@ type ArgsGenesisBlockCreator struct {
 	BlockSignKeyGen         crypto.KeyGenerator
 	HistoryRepository       dblookupext.HistoryRepository
 	TxExecutionOrderHandler common.TxExecutionOrderHandler
+	PrototypeDRWACEBEpoch   uint32
+	PrototypeReceiverSeeds  []config.PrototypeDRWAReceiverSeedConfig
 
 	GenesisNodePrice *big.Int
 	GenesisString    string
