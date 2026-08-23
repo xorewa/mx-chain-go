@@ -45,6 +45,60 @@ type prototypeProcessorGasObservations struct {
 	penalized []uint64
 }
 
+const prototypeOrdinaryControlFunction = "prototypeOrdinaryControl"
+
+func TestPrototypeAccountingSeamPreservesOrdinaryBuiltInAcrossBothProcessors(t *testing.T) {
+	processors := []struct {
+		name   string
+		create func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error)
+	}{
+		{name: "legacy", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return smartContract.NewSmartContractProcessor(args)
+		}},
+		{name: "v2", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return processorV2.NewSmartContractProcessorV2(args)
+		}},
+	}
+
+	for _, processorCase := range processors {
+		t.Run(processorCase.name, func(t *testing.T) {
+			processor, accountsDB, tokenID, destinationAddress, forwarded, observations := newPrototypeDestinationProcessorFixture(
+				t, processorCase.create, true, false, false,
+			)
+			scr := &smartContractResult.SmartContractResult{
+				Value:          big.NewInt(0),
+				SndAddr:        bytes.Repeat([]byte{0x11}, prototypeAddressLength),
+				RcvAddr:        append([]byte(nil), destinationAddress...),
+				GasPrice:       1,
+				GasLimit:       100,
+				Data:           []byte(prototypeOrdinaryControlFunction),
+				OriginalTxHash: bytes.Repeat([]byte{0x61}, prototypeHashLength),
+				PrevTxHash:     bytes.Repeat([]byte{0x61}, prototypeHashLength),
+				CallType:       vmData.DirectCall,
+			}
+
+			returnCode, err := processor.ProcessSmartContractResult(scr)
+			require.NoError(t, err)
+			require.Equal(t, vmcommon.Ok, returnCode)
+			require.Len(t, *forwarded, 1)
+			require.Equal(t, vmData.ProtocolMessageKindNone, (*forwarded)[0].GetProtocolMessageKind())
+			require.False(t, bytes.Contains((*forwarded)[0].GetData(), []byte("DRWA")))
+			require.Len(t, observations.fees, 1)
+			require.Zero(t, observations.fees[0].Sign())
+			require.Zero(t, observations.devFees[0].Sign())
+			require.Equal(t, []uint64{70}, observations.refunded)
+			require.Empty(t, observations.penalized)
+
+			canonical := loadPrototypeJournalAccount(t, accountsDB, destinationAddress)
+			esdtBytes, _, err := canonical.AccountDataHandler().RetrieveValue(
+				append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier), tokenID...),
+			)
+			require.NoError(t, err)
+			require.Empty(t, esdtBytes)
+		})
+	}
+}
+
 func TestPrototypeDestinationProcessorSuccessAndRollbackControls(t *testing.T) {
 	processors := []struct {
 		name   string
@@ -212,6 +266,9 @@ func newPrototypeDestinationProcessorFixture(
 	hook = &testscommon.BlockChainHookStub{
 		CurrentRoundCalled: func() uint64 { return 7 },
 		ProcessBuiltInFunctionCalled: func(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+			if input.Function == prototypeOrdinaryControlFunction {
+				return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: 70}, nil
+			}
 			output, processErr := destination.ProcessBuiltinFunction(nil, destinationAccount, input)
 			if processErr == nil {
 				if accountingFault {
@@ -287,6 +344,7 @@ func newPrototypeDestinationProcessorArgs(
 	require.NoError(t, builtIns.Add(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope, destination))
 	require.NoError(t, builtIns.Add(PrototypeSettlementReceiptFunction, &processMock.BuiltInFunctionStub{}))
 	require.NoError(t, builtIns.Add(PrototypeRefundEnvelopeFunction, &processMock.BuiltInFunctionStub{}))
+	require.NoError(t, builtIns.Add(prototypeOrdinaryControlFunction, &processMock.BuiltInFunctionStub{}))
 
 	return scrCommon.ArgsNewSmartContractProcessor{
 		VmContainer:      &processMock.VMContainerMock{},

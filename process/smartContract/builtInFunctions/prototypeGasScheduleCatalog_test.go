@@ -157,6 +157,36 @@ func TestPrototypeCurrentWorkBudgetsUsesRetainedIdentityAndWholeCatalogMaximum(t
 	require.Equal(t, uint64(1100), total)
 }
 
+func TestPrototypeRetainedWorkBudgetsAcceptsOldExactIdentityAndRejectsUnknown(t *testing.T) {
+	t.Parallel()
+
+	first := fillGasMapInternal(make(map[string]map[string]uint64), 1)
+	first[drwaprototype.PrototypeWorkBudgetSection] = prototypeBudgetSection(100, 220, 300, 440)
+	second := fillGasMapInternal(make(map[string]map[string]uint64), 2)
+	second[drwaprototype.PrototypeWorkBudgetSection] = prototypeBudgetSection(110, 210, 330, 410)
+	catalog, err := drwaprototype.SealGasScheduleCatalog([]drwaprototype.GasScheduleProfile{
+		{StartEpoch: 0, Schedule: first},
+		{StartEpoch: 7, Schedule: second},
+	})
+	require.NoError(t, err)
+
+	oldIdentity, err := drwaprototype.GasScheduleIdentity(first)
+	require.NoError(t, err)
+	budgets, total, err := retainedPrototypeWorkBudgets(oldIdentity, catalog)
+	require.NoError(t, err)
+	require.Equal(t, drwaprototype.WorkBudgets{
+		DestinationGate:  110,
+		SuccessReceipt:   220,
+		RefundGeneration: 330,
+		SourceCompletion: 440,
+	}, budgets)
+	require.Equal(t, uint64(1100), total)
+
+	_, _, err = retainedPrototypeWorkBudgets([32]byte{0xff}, catalog)
+	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
+	require.ErrorIs(t, err, drwaprototype.ErrGasScheduleNotFound)
+}
+
 func TestPrototypeCurrentWorkBudgetsRejectsUnavailableConfiguredCosts(t *testing.T) {
 	t.Parallel()
 

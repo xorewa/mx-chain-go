@@ -2,6 +2,7 @@ package drwaprototype
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -43,4 +44,32 @@ func TestPrototypeReceiverGateFailsClosed(t *testing.T) {
 	}}
 	_, err = LoadReceiverGateRecord(handler, []byte("TOKEN-abcdef"))
 	require.ErrorIs(t, err, ErrReceiverGateNotFound)
+}
+
+func TestPrototypeReceiverGateKeyIsDomainSeparatedAndInputBounded(t *testing.T) {
+	tokenA := []byte("TOKEN-abcdef")
+	tokenB := []byte("TOKEN-fedcba")
+	keyA := ReceiverGateStorageKey(tokenA)
+	keyB := ReceiverGateStorageKey(tokenB)
+	require.NotEqual(t, keyA, keyB)
+	require.NotEqual(t, keyA, OpenEffectStorageKey([32]byte{1}))
+	require.NotEqual(t, keyA, append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier), tokenA...))
+
+	called := false
+	handler := &trieMock.DataTrieTrackerStub{RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) {
+		called = true
+		return nil, 0, nil
+	}}
+	_, err := LoadReceiverGateRecord(handler, []byte("invalid token"))
+	require.ErrorIs(t, err, ErrInvalidReceiverGate)
+	require.False(t, called)
+}
+
+func TestPrototypeReceiverGatePreservesStorageFailure(t *testing.T) {
+	injected := errors.New("receiver trie unavailable")
+	handler := &trieMock.DataTrieTrackerStub{RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) {
+		return nil, 0, injected
+	}}
+	_, err := LoadReceiverGateRecord(handler, []byte("TOKEN-abcdef"))
+	require.ErrorIs(t, err, injected)
 }

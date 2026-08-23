@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
@@ -51,6 +52,48 @@ func TestPrototypeExecutionGasUsedOrdinaryAndFailedRoutesRetainBaseline(t *testi
 		require.False(t, refund)
 		require.Zero(t, gasUsed)
 	})
+
+	for _, isCrossShard := range []bool{false, true} {
+		name := "local"
+		if isCrossShard {
+			name = "cross shard"
+		}
+		t.Run("ordinary gas-bearing output remains on baseline path/"+name, func(t *testing.T) {
+			input := &vmcommon.ContractCallInput{
+				Function: core.BuiltInFunctionESDTTransfer,
+				VMInput: vmcommon.VMInput{
+					GasProvided: 100,
+				},
+			}
+			output := &vmcommon.VMOutput{
+				ReturnCode:   vmcommon.Ok,
+				GasRemaining: 20,
+				OutputAccounts: map[string]*vmcommon.OutputAccount{
+					"ordinary": {
+						Address: []byte("ordinary"),
+						OutputTransfers: []vmcommon.OutputTransfer{{
+							Index:    1,
+							Value:    big.NewInt(0),
+							GasLimit: 30,
+							Data:     []byte("ordinary@00"),
+							CallType: vmData.DirectCall,
+						}},
+					},
+				},
+			}
+			beforeRemaining := output.GasRemaining
+			beforeForwarded := output.OutputAccounts["ordinary"].OutputTransfers[0].GasLimit
+
+			gasUsed, matched, refund, err := PrototypeExecutionGasUsed(process.BuiltInFunctionCall, isCrossShard, input, output)
+			require.NoError(t, err)
+			require.False(t, matched)
+			require.False(t, refund)
+			require.Zero(t, gasUsed)
+			require.Equal(t, beforeRemaining, output.GasRemaining)
+			require.Equal(t, beforeForwarded, output.OutputAccounts["ordinary"].OutputTransfers[0].GasLimit)
+			require.Nil(t, output.ProtocolExecution)
+		})
+	}
 
 	t.Run("source denial before output", func(t *testing.T) {
 		input, _ := prototypeSourceGasFixture(t)
