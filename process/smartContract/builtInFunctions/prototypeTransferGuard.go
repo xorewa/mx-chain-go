@@ -199,6 +199,24 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeCurrentGasSchedu
 	return currentPrototypeGasScheduleIdentity(provider, factory.prototypeGasScheduleCatalog)
 }
 
+// PrototypeCurrentWorkBudgets returns the retained current identity and conservative S1 work reserve.
+func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeCurrentWorkBudgets() (
+	[32]byte,
+	drwaprototype.WorkBudgets,
+	uint64,
+	error,
+) {
+	if factory == nil || factory.prototypeGasScheduleCatalog == nil || factory.gasScheduleNotifier == nil {
+		return [32]byte{}, drwaprototype.WorkBudgets{}, 0, ErrPrototypeGasScheduleUnavailable
+	}
+	provider, ok := factory.gasScheduleNotifier.(prototypeConfiguredGasScheduleProvider)
+	if !ok {
+		return [32]byte{}, drwaprototype.WorkBudgets{}, 0, ErrPrototypeGasScheduleUnavailable
+	}
+
+	return currentPrototypeWorkBudgets(provider, factory.prototypeGasScheduleCatalog)
+}
+
 func (factory *prototypeGuardedBuiltInFunctionFactory) ESDTGlobalSettingsHandler() vmcommon.ESDTGlobalSettingsHandler {
 	return factory.delegate.ESDTGlobalSettingsHandler()
 }

@@ -1,6 +1,7 @@
 package builtInFunctions
 
 import (
+	"math"
 	"sync"
 	"testing"
 
@@ -50,6 +51,9 @@ func TestCreateBuiltInFunctionsFactorySealsConcreteNotifierCatalog(t *testing.T)
 	expectedCurrentIdentity, err := drwaprototype.GasScheduleIdentity(notifier.LatestGasScheduleCopy())
 	require.NoError(t, err)
 	require.Equal(t, expectedCurrentIdentity, currentIdentity)
+	_, _, _, err = prototypeFactory.PrototypeCurrentWorkBudgets()
+	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
+	require.ErrorIs(t, err, drwaprototype.ErrInvalidGasScheduleWorkBudget)
 }
 
 func (stub *prototypeConfiguredGasScheduleStub) PrototypeDRWAVersionedGasSchedules() []common.PrototypeDRWAGasScheduleVersion {
@@ -122,6 +126,91 @@ func TestPrototypeCurrentGasScheduleIdentityRejectsCurrentMapNotRetained(t *test
 	require.ErrorIs(t, err, drwaprototype.ErrGasScheduleNotFound)
 }
 
+func TestPrototypeCurrentWorkBudgetsUsesRetainedIdentityAndWholeCatalogMaximum(t *testing.T) {
+	t.Parallel()
+
+	first := fillGasMapInternal(make(map[string]map[string]uint64), 1)
+	first[drwaprototype.PrototypeWorkBudgetSection] = prototypeBudgetSection(100, 220, 300, 440)
+	second := fillGasMapInternal(make(map[string]map[string]uint64), 2)
+	second[drwaprototype.PrototypeWorkBudgetSection] = prototypeBudgetSection(110, 210, 330, 410)
+	notifier := &prototypeConfiguredGasScheduleStub{
+		GasScheduleNotifierMock: testscommon.NewGasScheduleNotifierMock(first),
+		versions: []common.PrototypeDRWAGasScheduleVersion{
+			{StartEpoch: 7, Schedule: second},
+			{StartEpoch: 0, Schedule: first},
+		},
+	}
+	catalog, err := sealPrototypeConfiguredGasScheduleCatalog(notifier)
+	require.NoError(t, err)
+
+	identity, budgets, total, err := currentPrototypeWorkBudgets(notifier, catalog)
+	require.NoError(t, err)
+	expectedIdentity, err := drwaprototype.GasScheduleIdentity(first)
+	require.NoError(t, err)
+	require.Equal(t, expectedIdentity, identity)
+	require.Equal(t, drwaprototype.WorkBudgets{
+		DestinationGate:  110,
+		SuccessReceipt:   220,
+		RefundGeneration: 330,
+		SourceCompletion: 440,
+	}, budgets)
+	require.Equal(t, uint64(1100), total)
+}
+
+func TestPrototypeCurrentWorkBudgetsRejectsUnavailableConfiguredCosts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func(schedule map[string]map[string]uint64)
+	}{
+		{
+			name: "profile missing section",
+			mutate: func(schedule map[string]map[string]uint64) {
+				delete(schedule, drwaprototype.PrototypeWorkBudgetSection)
+			},
+		},
+		{
+			name: "profile zero component",
+			mutate: func(schedule map[string]map[string]uint64) {
+				schedule[drwaprototype.PrototypeWorkBudgetSection][drwaprototype.PrototypeRefundGenerationCost] = 0
+			},
+		},
+		{
+			name: "profile total overflow",
+			mutate: func(schedule map[string]map[string]uint64) {
+				schedule[drwaprototype.PrototypeWorkBudgetSection][drwaprototype.PrototypeDestinationGateCost] = math.MaxUint64
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			first := fillGasMapInternal(make(map[string]map[string]uint64), 1)
+			first[drwaprototype.PrototypeWorkBudgetSection] = prototypeBudgetSection(100, 200, 300, 400)
+			second := fillGasMapInternal(make(map[string]map[string]uint64), 2)
+			second[drwaprototype.PrototypeWorkBudgetSection] = prototypeBudgetSection(110, 210, 310, 410)
+			test.mutate(second)
+			notifier := &prototypeConfiguredGasScheduleStub{
+				GasScheduleNotifierMock: testscommon.NewGasScheduleNotifierMock(first),
+				versions: []common.PrototypeDRWAGasScheduleVersion{
+					{StartEpoch: 0, Schedule: first},
+					{StartEpoch: 7, Schedule: second},
+				},
+			}
+			catalog, err := sealPrototypeConfiguredGasScheduleCatalog(notifier)
+			require.NoError(t, err)
+
+			_, _, _, err = currentPrototypeWorkBudgets(notifier, catalog)
+			require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
+			require.ErrorIs(t, err, drwaprototype.ErrInvalidGasScheduleWorkBudget)
+		})
+	}
+}
+
 func TestCreateBuiltInFunctionsFactoryRejectsInvalidConfiguredGasCatalog(t *testing.T) {
 	t.Parallel()
 
@@ -139,4 +228,13 @@ func TestCreateBuiltInFunctionsFactoryRejectsInvalidConfiguredGasCatalog(t *test
 	require.Nil(t, builtInFactory)
 	require.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
 	require.ErrorIs(t, err, drwaprototype.ErrInvalidGasScheduleCatalog)
+}
+
+func prototypeBudgetSection(destination, success, refund, completion uint64) map[string]uint64 {
+	return map[string]uint64{
+		drwaprototype.PrototypeDestinationGateCost:  destination,
+		drwaprototype.PrototypeSuccessReceiptCost:   success,
+		drwaprototype.PrototypeRefundGenerationCost: refund,
+		drwaprototype.PrototypeSourceCompletionCost: completion,
+	}
 }

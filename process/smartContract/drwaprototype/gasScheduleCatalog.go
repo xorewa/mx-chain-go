@@ -20,6 +20,17 @@ const (
 	prototypeGasScheduleProfileLimit = 256
 	prototypeGasScheduleMapDomain    = "DRWA/PROTOTYPE/GAS_SCHEDULE/v1"
 	prototypeGasCatalogDomain        = "DRWA/PROTOTYPE/GAS_CATALOG/v1"
+
+	// PrototypeWorkBudgetSection is the dedicated non-normative S1 gas-schedule section.
+	PrototypeWorkBudgetSection = "DRWAPrototypeCost"
+	// PrototypeDestinationGateCost is the configured destination-gate work key.
+	PrototypeDestinationGateCost = "DestinationGate"
+	// PrototypeSuccessReceiptCost is the configured success-receipt work key.
+	PrototypeSuccessReceiptCost = "SuccessReceipt"
+	// PrototypeRefundGenerationCost is the configured refund-generation work key.
+	PrototypeRefundGenerationCost = "RefundGeneration"
+	// PrototypeSourceCompletionCost is the configured source-completion work key.
+	PrototypeSourceCompletionCost = "SourceCompletion"
 )
 
 var (
@@ -27,6 +38,8 @@ var (
 	ErrInvalidGasScheduleCatalog = errors.New("invalid non-normative DRWA prototype gas-schedule catalog")
 	// ErrGasScheduleNotFound signals that the sealed catalog does not contain an identity.
 	ErrGasScheduleNotFound = errors.New("non-normative DRWA prototype gas schedule not found")
+	// ErrInvalidGasScheduleWorkBudget signals missing, zero or overflowing explicit S1 work costs.
+	ErrInvalidGasScheduleWorkBudget = errors.New("invalid non-normative DRWA prototype gas-schedule work budget")
 )
 
 // GasScheduleMap is the S1 prototype view of one baseline gas-schedule map.
@@ -36,6 +49,14 @@ type GasScheduleMap map[string]map[string]uint64
 type GasScheduleProfile struct {
 	StartEpoch uint32
 	Schedule   GasScheduleMap
+}
+
+// WorkBudgets holds the four separately reserved S1 protocol work components.
+type WorkBudgets struct {
+	DestinationGate  uint64
+	SuccessReceipt   uint64
+	RefundGeneration uint64
+	SourceCompletion uint64
 }
 
 type sealedGasScheduleEntry struct {
@@ -139,6 +160,81 @@ func (catalog *GasScheduleCatalog) Schedule(identity [prototypeDigestLength]byte
 		return nil, ErrGasScheduleNotFound
 	}
 	return cloneGasScheduleMap(schedule), nil
+}
+
+// MaximumWorkBudgets returns the componentwise maximum explicit cost across every sealed profile.
+func (catalog *GasScheduleCatalog) MaximumWorkBudgets() (WorkBudgets, error) {
+	if catalog == nil || len(catalog.entries) == 0 {
+		return WorkBudgets{}, fmt.Errorf("%w: unavailable catalog", ErrInvalidGasScheduleWorkBudget)
+	}
+
+	maximum := WorkBudgets{}
+	for index, entry := range catalog.entries {
+		schedule, exists := catalog.schedules[entry.identity]
+		if !exists {
+			return WorkBudgets{}, fmt.Errorf("%w: missing retained profile %d", ErrInvalidGasScheduleWorkBudget, index)
+		}
+		section, exists := schedule[PrototypeWorkBudgetSection]
+		if !exists {
+			return WorkBudgets{}, fmt.Errorf("%w: missing section in profile %d", ErrInvalidGasScheduleWorkBudget, index)
+		}
+
+		profile, err := workBudgetsFromSection(section)
+		if err != nil {
+			return WorkBudgets{}, fmt.Errorf("%w: profile %d: %v", ErrInvalidGasScheduleWorkBudget, index, err)
+		}
+		maximum.DestinationGate = max(maximum.DestinationGate, profile.DestinationGate)
+		maximum.SuccessReceipt = max(maximum.SuccessReceipt, profile.SuccessReceipt)
+		maximum.RefundGeneration = max(maximum.RefundGeneration, profile.RefundGeneration)
+		maximum.SourceCompletion = max(maximum.SourceCompletion, profile.SourceCompletion)
+	}
+
+	_, err := maximum.Total()
+	if err != nil {
+		return WorkBudgets{}, err
+	}
+
+	return maximum, nil
+}
+
+// Total returns the overflow-checked sum required before source mutation.
+func (budgets WorkBudgets) Total() (uint64, error) {
+	total := uint64(0)
+	components := []uint64{
+		budgets.DestinationGate,
+		budgets.SuccessReceipt,
+		budgets.RefundGeneration,
+		budgets.SourceCompletion,
+	}
+	for _, component := range components {
+		if component == 0 {
+			return 0, fmt.Errorf("%w: zero component", ErrInvalidGasScheduleWorkBudget)
+		}
+		if math.MaxUint64-total < component {
+			return 0, fmt.Errorf("%w: total overflow", ErrInvalidGasScheduleWorkBudget)
+		}
+		total += component
+	}
+
+	return total, nil
+}
+
+func workBudgetsFromSection(section map[string]uint64) (WorkBudgets, error) {
+	if section == nil {
+		return WorkBudgets{}, fmt.Errorf("%w: nil section", ErrInvalidGasScheduleWorkBudget)
+	}
+	budgets := WorkBudgets{
+		DestinationGate:  section[PrototypeDestinationGateCost],
+		SuccessReceipt:   section[PrototypeSuccessReceiptCost],
+		RefundGeneration: section[PrototypeRefundGenerationCost],
+		SourceCompletion: section[PrototypeSourceCompletionCost],
+	}
+	_, err := budgets.Total()
+	if err != nil {
+		return WorkBudgets{}, err
+	}
+
+	return budgets, nil
 }
 
 func canonicalGasScheduleIdentity(schedule GasScheduleMap) ([prototypeDigestLength]byte, []byte, error) {

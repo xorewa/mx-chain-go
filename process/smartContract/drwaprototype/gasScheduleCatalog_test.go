@@ -2,6 +2,7 @@ package drwaprototype
 
 import (
 	"encoding/hex"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -119,6 +120,122 @@ func TestGasScheduleCatalogPrototypeRejectsUnknownAndNilAccess(t *testing.T) {
 	require.ErrorIs(t, err, ErrGasScheduleNotFound)
 }
 
+func TestGasScheduleCatalogMaximumWorkBudgetsUsesWholeCatalogComponentwiseMaximum(t *testing.T) {
+	t.Parallel()
+
+	profiles := prototypeWorkBudgetProfiles()
+	catalog, err := SealGasScheduleCatalog([]GasScheduleProfile{profiles[1], profiles[0]})
+	require.NoError(t, err)
+
+	budgets, err := catalog.MaximumWorkBudgets()
+	require.NoError(t, err)
+	require.Equal(t, WorkBudgets{
+		DestinationGate:  110,
+		SuccessReceipt:   220,
+		RefundGeneration: 330,
+		SourceCompletion: 440,
+	}, budgets)
+	total, err := budgets.Total()
+	require.NoError(t, err)
+	require.Equal(t, uint64(1100), total)
+}
+
+func TestGasScheduleCatalogMaximumWorkBudgetsRejectsMissingZeroAndOverflow(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func(schedule GasScheduleMap)
+	}{
+		{
+			name: "missing section",
+			mutate: func(schedule GasScheduleMap) {
+				delete(schedule, PrototypeWorkBudgetSection)
+			},
+		},
+		{
+			name: "missing destination gate",
+			mutate: func(schedule GasScheduleMap) {
+				delete(schedule[PrototypeWorkBudgetSection], PrototypeDestinationGateCost)
+			},
+		},
+		{
+			name: "zero success receipt",
+			mutate: func(schedule GasScheduleMap) {
+				schedule[PrototypeWorkBudgetSection][PrototypeSuccessReceiptCost] = 0
+			},
+		},
+		{
+			name: "missing refund generation",
+			mutate: func(schedule GasScheduleMap) {
+				delete(schedule[PrototypeWorkBudgetSection], PrototypeRefundGenerationCost)
+			},
+		},
+		{
+			name: "zero source completion",
+			mutate: func(schedule GasScheduleMap) {
+				schedule[PrototypeWorkBudgetSection][PrototypeSourceCompletionCost] = 0
+			},
+		},
+		{
+			name: "total overflow",
+			mutate: func(schedule GasScheduleMap) {
+				schedule[PrototypeWorkBudgetSection][PrototypeDestinationGateCost] = math.MaxUint64
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			profiles := prototypeWorkBudgetProfiles()
+			test.mutate(profiles[1].Schedule)
+			catalog, err := SealGasScheduleCatalog(profiles)
+			require.NoError(t, err)
+			_, err = catalog.MaximumWorkBudgets()
+			require.ErrorIs(t, err, ErrInvalidGasScheduleWorkBudget)
+		})
+	}
+
+	var nilCatalog *GasScheduleCatalog
+	_, err := nilCatalog.MaximumWorkBudgets()
+	require.ErrorIs(t, err, ErrInvalidGasScheduleWorkBudget)
+}
+
+func TestWorkBudgetsTotalRejectsEveryZeroComponent(t *testing.T) {
+	t.Parallel()
+
+	valid := WorkBudgets{
+		DestinationGate:  1,
+		SuccessReceipt:   2,
+		RefundGeneration: 3,
+		SourceCompletion: 4,
+	}
+	tests := []struct {
+		name   string
+		mutate func(budgets *WorkBudgets)
+	}{
+		{name: "destination gate", mutate: func(budgets *WorkBudgets) { budgets.DestinationGate = 0 }},
+		{name: "success receipt", mutate: func(budgets *WorkBudgets) { budgets.SuccessReceipt = 0 }},
+		{name: "refund generation", mutate: func(budgets *WorkBudgets) { budgets.RefundGeneration = 0 }},
+		{name: "source completion", mutate: func(budgets *WorkBudgets) { budgets.SourceCompletion = 0 }},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			budgets := valid
+			test.mutate(&budgets)
+			_, err := budgets.Total()
+			require.ErrorIs(t, err, ErrInvalidGasScheduleWorkBudget)
+		})
+	}
+}
+
 func prototypeGasScheduleProfiles() []GasScheduleProfile {
 	return []GasScheduleProfile{
 		{
@@ -144,6 +261,35 @@ func prototypeGasScheduleProfiles() []GasScheduleProfile {
 				"BuiltInCost": {
 					"DRWARefundGeneration": 32,
 					"DRWASourceCompletion": 42,
+				},
+			},
+		},
+	}
+}
+
+func prototypeWorkBudgetProfiles() []GasScheduleProfile {
+	return []GasScheduleProfile{
+		{
+			StartEpoch: 0,
+			Schedule: GasScheduleMap{
+				"BaseOperationCost": {"StorePerByte": 10},
+				PrototypeWorkBudgetSection: {
+					PrototypeDestinationGateCost:  100,
+					PrototypeSuccessReceiptCost:   220,
+					PrototypeRefundGenerationCost: 300,
+					PrototypeSourceCompletionCost: 440,
+				},
+			},
+		},
+		{
+			StartEpoch: 7,
+			Schedule: GasScheduleMap{
+				"BaseOperationCost": {"StorePerByte": 11},
+				PrototypeWorkBudgetSection: {
+					PrototypeDestinationGateCost:  110,
+					PrototypeSuccessReceiptCost:   210,
+					PrototypeRefundGenerationCost: 330,
+					PrototypeSourceCompletionCost: 410,
 				},
 			},
 		},

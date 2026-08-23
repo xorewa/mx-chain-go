@@ -66,3 +66,25 @@ func currentPrototypeGasScheduleIdentity(
 
 	return identity, nil
 }
+
+func currentPrototypeWorkBudgets(
+	provider prototypeConfiguredGasScheduleProvider,
+	catalog *drwaprototype.GasScheduleCatalog,
+) ([32]byte, drwaprototype.WorkBudgets, uint64, error) {
+	identity, err := currentPrototypeGasScheduleIdentity(provider, catalog)
+	if err != nil {
+		return [32]byte{}, drwaprototype.WorkBudgets{}, 0, err
+	}
+	budgets, err := catalog.MaximumWorkBudgets()
+	if err != nil {
+		return [32]byte{}, drwaprototype.WorkBudgets{}, 0,
+			fmt.Errorf("%w: configured work budgets: %w", ErrPrototypeGasScheduleUnavailable, err)
+	}
+	total, err := budgets.Total()
+	if err != nil {
+		return [32]byte{}, drwaprototype.WorkBudgets{}, 0,
+			fmt.Errorf("%w: configured work total: %w", ErrPrototypeGasScheduleUnavailable, err)
+	}
+
+	return identity, budgets, total, nil
+}
