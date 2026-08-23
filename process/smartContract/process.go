@@ -2296,6 +2296,7 @@ func (sc *scProcessor) preprocessOutTransferToSCR(
 	result.Data = outputTransfer.Data
 	result.GasLimit = outputTransfer.GasLimit
 	result.CallType = outputTransfer.CallType
+	result.ProtocolMessageKind = outputTransfer.ProtocolMessageKind
 	setOriginalTxHash(result, txHash, tx)
 	if result.Value.Cmp(zero) > 0 {
 		result.OriginalSender = tx.GetSndAddr()

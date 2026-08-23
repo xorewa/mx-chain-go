@@ -2441,6 +2441,7 @@ func (sc *scProcessor) preprocessOutTransferToSCR(
 
 	result.GasLimit = outputTransfer.GasLimit
 	result.CallType = outputTransfer.CallType
+	result.ProtocolMessageKind = outputTransfer.ProtocolMessageKind
 	setOriginalTxHash(result, txHash, tx)
 	result.OriginalSender = GetOriginalSenderForTx(tx)
 	return result

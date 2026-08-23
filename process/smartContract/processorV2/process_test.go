@@ -3701,6 +3701,23 @@ func TestGasLockedInSmartContractProcessor(t *testing.T) {
 	require.Equal(t, gasLocked, uint64(0))
 }
 
+func TestSmartContractProcessor_preprocessOutTransferCopiesProtocolMessageKind(t *testing.T) {
+	t.Parallel()
+
+	result := (&scProcessor{}).preprocessOutTransferToSCR(
+		0,
+		vmcommon.OutputTransfer{
+			Value:               big.NewInt(0),
+			ProtocolMessageKind: vmData.ProtocolMessageKindDRWA,
+		},
+		&vmcommon.OutputAccount{Address: []byte("destination")},
+		&transaction.Transaction{RcvAddr: []byte("source")},
+		[]byte("hash"),
+	)
+
+	require.Equal(t, vmData.ProtocolMessageKindDRWA, result.ProtocolMessageKind)
+}
+
 func TestSmartContractProcessor_indexedOutputTransfers(t *testing.T) {
 	arguments := createMockSmartContractProcessorArguments()
 	arguments.ArgsParser = smartContract.NewArgumentParser()

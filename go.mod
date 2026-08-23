@@ -200,7 +200,7 @@ replace github.com/gogo/protobuf => github.com/multiversx/protobuf v1.3.2
 
 replace github.com/ipfs/go-log/v2 => github.com/xorewa/go-log/v2 v2.0.0-20260814192827-a7b09db391da
 
-replace github.com/multiversx/mx-chain-core-go => github.com/xorewa/mx-chain-core-go v0.0.0-20260722085155-20cd3d7fe94e
+replace github.com/multiversx/mx-chain-core-go => github.com/xorewa/mx-chain-core-go v0.0.0-20260823031619-7e2d415cb335
 
 replace github.com/multiversx/mx-chain-logger-go => github.com/xorewa/mx-chain-logger-go v0.0.0-20260714091540-93ee305f126a
 
@@ -208,7 +208,7 @@ replace github.com/multiversx/mx-chain-crypto-go => github.com/xorewa/mx-chain-c
 
 replace github.com/multiversx/mx-chain-storage-go => github.com/xorewa/mx-chain-storage-go v0.0.0-20260714091422-a9e4a9bb00bb
 
-replace github.com/multiversx/mx-chain-vm-common-go => github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260714091415-d7dae605cee2
+replace github.com/multiversx/mx-chain-vm-common-go => github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260823031743-b6a0dc267960
 
 replace github.com/multiversx/mx-chain-communication-go => github.com/xorewa/mx-chain-communication-go v0.0.0-20260814090644-5543dc3df655
 
@@ -222,7 +222,7 @@ replace github.com/multiversx/mx-chain-vm-v1_3-go => github.com/xorewa/mx-chain-
 
 replace github.com/multiversx/mx-chain-vm-v1_4-go => github.com/xorewa/mx-chain-vm-v1_4-go v0.0.0-20260714091537-b051efda6999
 
-replace github.com/multiversx/mx-chain-vm-go => github.com/xorewa/mx-chain-vm-go v0.0.0-20260730142721-5e8c7a0120df
+replace github.com/multiversx/mx-chain-vm-go => github.com/xorewa/mx-chain-vm-go v0.0.0-20260823031927-45047cd73c06
 
 replace github.com/multiversx/mx-chain-es-indexer-go => github.com/xorewa/mx-chain-es-indexer-go v0.0.0-20260727074737-1e9e222c21e6
 
