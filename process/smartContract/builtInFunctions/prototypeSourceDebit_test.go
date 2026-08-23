@@ -94,6 +94,7 @@ func TestPrototypeSourceDebitCreatesOpenEffectThenDebitsAndEmitsOneCarrier(t *te
 		CurrentRoundCalled: func() uint64 { return 7 },
 	}))
 	input := newPrototypeSourceInput(sourceAddress, destination)
+	input.AsyncArguments = &vmcommon.AsyncArguments{}
 
 	output, err := sourceDebit.ProcessBuiltinFunction(sourceAccount, sourceAccount, input)
 	require.NoError(t, err)
@@ -161,7 +162,7 @@ func TestPrototypeSourceDebitDeniesAdmissionAndAvailabilityBeforeMutation(t *tes
 		{name: "recipient not source", mutate: func(_ *prototypeSourceDebit, input *vmcommon.ContractCallInput) { input.RecipientAddr[0] ^= 0xff }},
 		{name: "return after error", mutate: func(_ *prototypeSourceDebit, input *vmcommon.ContractCallInput) { input.ReturnCallAfterError = true }},
 		{name: "async arguments", mutate: func(_ *prototypeSourceDebit, input *vmcommon.ContractCallInput) {
-			input.AsyncArguments = &vmcommon.AsyncArguments{}
+			input.AsyncArguments = &vmcommon.AsyncArguments{CallID: []byte{1}}
 		}},
 		{name: "parsed ESDT transfers", mutate: func(_ *prototypeSourceDebit, input *vmcommon.ContractCallInput) {
 			input.ESDTTransfers = []*vmcommon.ESDTTransfer{{}}

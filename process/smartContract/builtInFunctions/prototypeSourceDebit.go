@@ -231,7 +231,7 @@ func (sourceDebit *prototypeSourceDebit) validateAdmission(
 		vmInput.Function != PrototypeSourceDebitFunction ||
 		vmInput.CallValue == nil || vmInput.CallValue.Sign() != 0 ||
 		vmInput.GasLocked != 0 || vmInput.ReturnCallAfterError ||
-		vmInput.AsyncArguments != nil || len(vmInput.ESDTTransfers) != 0 {
+		hasPrototypeAsyncArguments(vmInput.AsyncArguments) || len(vmInput.ESDTTransfers) != 0 {
 		return nil, nil, nil, [prototypeHashLength]byte{}, fmt.Errorf("%w: execution origin", ErrPrototypeSourceDebitDenied)
 	}
 	if len(vmInput.CurrentTxHash) != prototypeHashLength ||
@@ -260,6 +260,14 @@ func (sourceDebit *prototypeSourceDebit) validateAdmission(
 	var originHash [prototypeHashLength]byte
 	copy(originHash[:], vmInput.CurrentTxHash)
 	return append([]byte(nil), destination...), append([]byte(nil), tokenID...), append([]byte(nil), quantity...), originHash, nil
+}
+
+func hasPrototypeAsyncArguments(arguments *vmcommon.AsyncArguments) bool {
+	return arguments != nil &&
+		(len(arguments.CallID) != 0 ||
+			len(arguments.CallerCallID) != 0 ||
+			len(arguments.CallbackAsyncInitiatorCallID) != 0 ||
+			arguments.GasAccumulated != 0)
 }
 
 func (sourceDebit *prototypeSourceDebit) currentRound() (uint64, error) {
