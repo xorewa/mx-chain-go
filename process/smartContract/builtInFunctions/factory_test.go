@@ -17,6 +17,7 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/epochNotifier"
 	"github.com/multiversx/mx-chain-go/testscommon/guardianMocks"
 	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -181,18 +182,26 @@ func TestCreateBuiltInFunctionContainer(t *testing.T) {
 		assert.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
 		_, err = prototypeFactory.PrototypeCurrentGasScheduleIdentity()
 		assert.ErrorIs(t, err, ErrPrototypeGasScheduleUnavailable)
-		assert.Equal(t, 43, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
+		assert.Equal(t, 46, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
 		function, err := builtInFuncFactory.BuiltInFunctionContainer().Get(PrototypeSourceDebitFunction)
 		assert.NoError(t, err)
 		sourceDebit, ok := function.(*prototypeSourceDebit)
 		assert.True(t, ok)
 		assert.False(t, sourceDebit.IsActive())
+		function, err = builtInFuncFactory.BuiltInFunctionContainer().Get(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)
+		assert.NoError(t, err)
+		destination, ok := function.(*prototypeDestination)
+		assert.True(t, ok)
+		assert.False(t, destination.IsActive())
 
 		err = builtInFuncFactory.SetBlockchainHook(&testscommon.BlockChainHookStub{
 			CurrentRoundCalled: func() uint64 { return 17 },
 		})
 		assert.NoError(t, err)
 		currentRound, err := sourceDebit.currentRound()
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(17), currentRound)
+		currentRound, err = destination.currentRound()
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(17), currentRound)
 

@@ -46,6 +46,25 @@ func TestBuildDirectValueArtifactsPrototypeDeterministicFixture(t *testing.T) {
 	require.NoError(t, ValidateDirectValueOpenEffectContext(networkDomain, artifacts.OpenEffect, artifacts.Envelope.Context))
 }
 
+func TestDecodeDirectValueTransferPayloadAcceptsOnlyCanonicalCommittedShape(t *testing.T) {
+	tokenID, quantity, err := DecodeDirectValueTransferPayload(
+		[]byte("ESDTTransfer@544f4b454e2d616263646566@0100"),
+	)
+	require.NoError(t, err)
+	require.Equal(t, []byte("TOKEN-abcdef"), tokenID)
+	require.Equal(t, []byte{1, 0}, quantity)
+
+	for _, malformed := range [][]byte{
+		[]byte("ESDTTransfer@544F4B454E2D616263646566@0100"),
+		[]byte("ESDTTransfer@544f4b454e2d616263646566@00"),
+		[]byte("ESDTNFTTransfer@544f4b454e2d616263646566@0100"),
+		[]byte("ESDTTransfer@544f4b454e2d616263646566@0100@00"),
+	} {
+		_, _, err = DecodeDirectValueTransferPayload(malformed)
+		require.ErrorIs(t, err, ErrInvalidDirectValueIntent)
+	}
+}
+
 func TestValidateDirectValueOpenEffectContextPrototypeRejectsEveryBindingMismatch(t *testing.T) {
 	t.Parallel()
 

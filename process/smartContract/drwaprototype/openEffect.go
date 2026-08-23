@@ -226,6 +226,20 @@ func LoadOpenEffect(dataHandler vmcommon.AccountDataHandler, effectID [prototype
 	return effect, nil
 }
 
+// RemoveOpenEffect removes one exact protected prototype record. The caller must validate the
+// loaded effect and perform any terminal value mutation in the same enclosing account journal.
+func RemoveOpenEffect(dataHandler vmcommon.AccountDataHandler, effectID [prototypeDigestLength]byte) error {
+	_, err := LoadOpenEffect(dataHandler, effectID)
+	if err != nil {
+		return err
+	}
+	err = dataHandler.SaveKeyValue(OpenEffectStorageKey(effectID), nil)
+	if err != nil {
+		return fmt.Errorf("remove prototype OpenEffect: %w", err)
+	}
+	return nil
+}
+
 func validateOpenEffect(effect OpenEffect) error {
 	if effect.EffectKind != ValueEffectKindDirectTransfer {
 		return fmt.Errorf("%w: unsupported effect kind", ErrInvalidOpenEffect)

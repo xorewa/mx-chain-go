@@ -254,6 +254,38 @@ func buildPrototypeESDTTransferPayload(tokenID []byte, quantity []byte) []byte {
 	return payload
 }
 
+// DecodeDirectValueTransferPayload validates and decodes the exact canonical baseline payload
+// committed by the direct-value context.
+func DecodeDirectValueTransferPayload(payload []byte) ([]byte, []byte, error) {
+	parts := bytes.Split(payload, []byte{'@'})
+	if len(parts) != 3 || !bytes.Equal(parts[0], []byte(core.BuiltInFunctionESDTTransfer)) {
+		return nil, nil, ErrInvalidDirectValueIntent
+	}
+	tokenID, err := decodePrototypeCanonicalHex(parts[1])
+	if err != nil || !vmcommon.ValidateToken(tokenID) || len(tokenID) > prototypeTokenIDLimit {
+		return nil, nil, ErrInvalidDirectValueIntent
+	}
+	quantity, err := decodePrototypeCanonicalHex(parts[2])
+	if err != nil || len(quantity) == 0 || len(quantity) > prototypeQuantityLimit || quantity[0] == 0 {
+		return nil, nil, ErrInvalidDirectValueIntent
+	}
+	if !bytes.Equal(payload, buildPrototypeESDTTransferPayload(tokenID, quantity)) {
+		return nil, nil, ErrInvalidDirectValueIntent
+	}
+	return tokenID, quantity, nil
+}
+
+func decodePrototypeCanonicalHex(encoded []byte) ([]byte, error) {
+	if len(encoded) == 0 || len(encoded)%2 != 0 {
+		return nil, ErrInvalidDirectValueIntent
+	}
+	decoded := make([]byte, hex.DecodedLen(len(encoded)))
+	if _, err := hex.Decode(decoded, encoded); err != nil || !bytes.Equal(encoded, []byte(hex.EncodeToString(decoded))) {
+		return nil, ErrInvalidDirectValueIntent
+	}
+	return decoded, nil
+}
+
 func appendDomain(domain string, value []byte) []byte {
 	result := make([]byte, 0, len(domain)+len(value))
 	result = append(result, domain...)

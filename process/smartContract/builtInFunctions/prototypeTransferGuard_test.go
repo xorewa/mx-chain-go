@@ -361,22 +361,34 @@ func TestPrototypeTransferGuardForwardsLifecycleMethods(t *testing.T) {
 	require.True(t, nilGuard.IsInterfaceNil())
 }
 
-func TestPrototypeGuardedFactoryInstallsAndReinstallsExactlyThreeGuards(t *testing.T) {
+func TestPrototypeGuardedFactoryInstallsAndReinstallsProtocolHandlers(t *testing.T) {
 	t.Parallel()
 
 	args := createMockArguments()
 	factory, err := CreateBuiltInFunctionsFactory(args)
 	require.NoError(t, err)
 	require.IsType(t, &prototypeGuardedBuiltInFunctionFactory{}, factory)
-	require.Len(t, factory.BuiltInFunctionContainer().Keys(), 43)
+	require.Len(t, factory.BuiltInFunctionContainer().Keys(), 46)
 	require.Equal(t, 3, countPrototypeTransferGuards(t, factory.BuiltInFunctionContainer()))
 	requirePrototypeTransferGuardNames(t, factory.BuiltInFunctionContainer())
+	function, err := factory.BuiltInFunctionContainer().Get(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)
+	require.NoError(t, err)
+	require.IsType(t, &prototypeDestination{}, function)
+	function, err = factory.BuiltInFunctionContainer().Get(PrototypeSettlementReceiptFunction)
+	require.NoError(t, err)
+	require.IsType(t, &prototypeSourceCompletion{}, function)
+	function, err = factory.BuiltInFunctionContainer().Get(PrototypeRefundEnvelopeFunction)
+	require.NoError(t, err)
+	require.IsType(t, &prototypeSourceCompletion{}, function)
 	require.NoError(t, factory.SetPayableHandler(&testscommon.BlockChainHookStub{}))
 
 	require.NoError(t, factory.CreateBuiltInFunctionContainer())
-	require.Len(t, factory.BuiltInFunctionContainer().Keys(), 43)
+	require.Len(t, factory.BuiltInFunctionContainer().Keys(), 46)
 	require.Equal(t, 3, countPrototypeTransferGuards(t, factory.BuiltInFunctionContainer()))
 	requirePrototypeTransferGuardNames(t, factory.BuiltInFunctionContainer())
+	function, err = factory.BuiltInFunctionContainer().Get(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)
+	require.NoError(t, err)
+	require.IsType(t, &prototypeDestination{}, function)
 	require.NoError(t, factory.SetPayableHandler(&testscommon.BlockChainHookStub{}))
 }
 

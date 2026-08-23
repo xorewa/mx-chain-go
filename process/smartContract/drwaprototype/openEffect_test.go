@@ -270,6 +270,18 @@ func TestCreateAndLoadOpenEffectPrototype(t *testing.T) {
 	require.NotEmpty(t, storedBytes)
 }
 
+func TestRemoveOpenEffectRequiresExistingExactRecord(t *testing.T) {
+	t.Parallel()
+
+	handler, _ := newOpenEffectMemoryHandler()
+	fixture := createOpenEffectFixture()
+	require.NoError(t, CreateOpenEffect(handler, fixture))
+	require.NoError(t, RemoveOpenEffect(handler, fixture.EffectID))
+	_, err := LoadOpenEffect(handler, fixture.EffectID)
+	require.ErrorIs(t, err, ErrOpenEffectNotFound)
+	require.ErrorIs(t, RemoveOpenEffect(handler, fixture.EffectID), ErrOpenEffectNotFound)
+}
+
 func TestCreateOpenEffectPrototypeRejectsDuplicateAndStorageFailures(t *testing.T) {
 	t.Parallel()
 

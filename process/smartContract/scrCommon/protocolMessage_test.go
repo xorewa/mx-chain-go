@@ -138,6 +138,44 @@ func TestValidateProtocolMessageAdmission(t *testing.T) {
 	t.Run("exact active cross-shard carrier reaches later validation", func(t *testing.T) {
 		require.NoError(t, ValidateProtocolMessageAdmission(valid(), enabled, coordinator))
 	})
+
+	t.Run("exact settlement and refund carriers reach source validation", func(t *testing.T) {
+		for _, refund := range []bool{false, true} {
+			scr := valid()
+			scr.Data = createPrototypeResultCallData(t, refund)
+			require.NoError(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator))
+		}
+	})
+
+	t.Run("malformed settlement carrier rejects before account loading", func(t *testing.T) {
+		scr := valid()
+		scr.Data = []byte(PrototypeSettlementReceiptFunction + "@00")
+		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageEnvelope)
+	})
+}
+
+func createPrototypeResultCallData(t *testing.T, refund bool) []byte {
+	t.Helper()
+	effectID := [32]byte{1}
+	contextHash := [32]byte{2}
+	destinationIdentity := [32]byte{3}
+	function := PrototypeSettlementReceiptFunction
+	receipt, err := drwaprototype.BuildSettlementReceipt([32]byte{4}, effectID, contextHash, destinationIdentity)
+	require.NoError(t, err)
+	payload, err := drwaprototype.EncodeSettlementReceipt(receipt)
+	require.NoError(t, err)
+	if refund {
+		function = PrototypeRefundEnvelopeFunction
+		payload, err = drwaprototype.EncodeRefundEnvelope(drwaprototype.RefundEnvelope{
+			EffectID:                     effectID,
+			ContextHash:                  contextHash,
+			DestinationExecutionIdentity: destinationIdentity,
+			OriginalTransferPayload:      []byte("ESDTTransfer@544f4b454e2d616263646566@01"),
+			RefundTo:                     [32]byte{5},
+		})
+		require.NoError(t, err)
+	}
+	return []byte(function + "@" + hex.EncodeToString(payload))
 }
 
 func createPrototypeEnvelopeCallData(t *testing.T) []byte {

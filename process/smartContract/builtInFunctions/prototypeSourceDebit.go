@@ -13,6 +13,7 @@ import (
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
+	"github.com/multiversx/mx-chain-go/process/smartContract/scrCommon"
 	"github.com/multiversx/mx-chain-go/sharding"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
@@ -23,7 +24,7 @@ import (
 
 const (
 	// PrototypeSourceDebitFunction is the bounded S1 source-only entry point.
-	PrototypeSourceDebitFunction = "DRWAPrototypeTransfer"
+	PrototypeSourceDebitFunction = scrCommon.PrototypeSourceDebitFunction
 	prototypeAddressLength       = 32
 	prototypeHashLength          = 32
 )
@@ -202,12 +203,22 @@ func (sourceDebit *prototypeSourceDebit) ProcessBuiltinFunction(
 	if err != nil {
 		return nil, fmt.Errorf("%w: baseline output: %w", ErrPrototypeSourceDebitMutation, err)
 	}
+	localGasUsed, err := core.SafeSubUint64(delegateGas, vmOutput.GasRemaining)
+	if err != nil || localGasUsed == 0 {
+		return nil, fmt.Errorf("%w: baseline gas partition", ErrPrototypeSourceDebitMutation)
+	}
 
 	vmOutput.OutputAccounts = map[string]*vmcommon.OutputAccount{
 		string(destination): {
 			Address:         append([]byte(nil), destination...),
 			OutputTransfers: []vmcommon.OutputTransfer{carrier},
 		},
+	}
+	vmOutput.ProtocolExecution = &vmcommon.ProtocolExecutionInfo{
+		MessageKind:  vmData.ProtocolMessageKindDRWA,
+		Outcome:      vmcommon.ProtocolExecutionOutcomeForward,
+		LocalGasUsed: localGasUsed,
+		ForwardedGas: reservedTotal,
 	}
 
 	return vmOutput, nil

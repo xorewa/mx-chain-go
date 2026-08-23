@@ -934,8 +934,31 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 	}
 
 	_, txTypeOnDst, _ := sc.txTypeHandler.ComputeTransactionType(tx)
-	builtInFuncGasUsed, err := sc.computeBuiltInFuncGasUsed(txTypeOnDst, vmInput.Function, vmInput.GasProvided, vmOutput.GasRemaining, check.IfNil(acntSnd))
-	log.LogIfError(err, "function", "ExecuteBuiltInFunction.computeBuiltInFuncGasUsed")
+	builtInFuncGasUsed, matchedPrototypeGas, prototypeRefund, prototypeGasErr := scrCommon.PrototypeExecutionGasUsed(
+		txTypeOnDst,
+		check.IfNil(acntSnd),
+		vmInput,
+		vmOutput,
+	)
+	if prototypeGasErr != nil {
+		revertErr := sc.accounts.RevertToSnapshot(failureContext.snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		return vmcommon.ExecutionFailed, prototypeGasErr
+	}
+	if prototypeRefund {
+		revertErr := sc.accounts.RevertToSnapshot(failureContext.snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		vmOutput.ReturnCode = vmcommon.Ok
+		vmOutput.ReturnMessage = ""
+	}
+	if !matchedPrototypeGas {
+		builtInFuncGasUsed, err = sc.computeBuiltInFuncGasUsed(txTypeOnDst, vmInput.Function, vmInput.GasProvided, vmOutput.GasRemaining, check.IfNil(acntSnd))
+		log.LogIfError(err, "function", "ExecuteBuiltInFunction.computeBuiltInFuncGasUsed")
+	}
 
 	if txTypeOnDst != process.SCInvoking {
 		vmOutput.GasRemaining += vmInput.GasLocked

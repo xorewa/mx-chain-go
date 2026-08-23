@@ -174,6 +174,8 @@ type prototypeGuardedBuiltInFunctionFactory struct {
 	prototypeDRWASettlementLifetimeRounds uint64
 	shardCoordinator                      sharding.Coordinator
 	prototypeSourceDebit                  *prototypeSourceDebit
+	prototypeDestination                  *prototypeDestination
+	prototypeSourceCompletion             *prototypeSourceCompletion
 }
 
 // PrototypeDRWANetworkDomain returns the immutable value injected into this prototype factory.
@@ -222,6 +224,16 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeCurrentWorkBudge
 	return currentPrototypeWorkBudgets(provider, factory.prototypeGasScheduleCatalog)
 }
 
+// PrototypeRetainedWorkBudgets validates one pinned identity and returns the approved maxima.
+func (factory *prototypeGuardedBuiltInFunctionFactory) PrototypeRetainedWorkBudgets(
+	identity [32]byte,
+) (drwaprototype.WorkBudgets, uint64, error) {
+	if factory == nil {
+		return drwaprototype.WorkBudgets{}, 0, ErrPrototypeGasScheduleUnavailable
+	}
+	return retainedPrototypeWorkBudgets(identity, factory.prototypeGasScheduleCatalog)
+}
+
 func (factory *prototypeGuardedBuiltInFunctionFactory) ESDTGlobalSettingsHandler() vmcommon.ESDTGlobalSettingsHandler {
 	return factory.delegate.ESDTGlobalSettingsHandler()
 }
@@ -243,11 +255,16 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) SetBlockchainHook(handler
 	if err != nil {
 		return err
 	}
-	if factory.prototypeSourceDebit == nil {
-		return nil
+	if factory.prototypeSourceDebit != nil {
+		err = factory.prototypeSourceDebit.setBlockchainHook(handler)
+		if err != nil {
+			return err
+		}
 	}
-
-	return factory.prototypeSourceDebit.setBlockchainHook(handler)
+	if factory.prototypeDestination != nil {
+		return factory.prototypeDestination.setBlockchainHook(handler)
+	}
+	return nil
 }
 
 func (factory *prototypeGuardedBuiltInFunctionFactory) CreateBuiltInFunctionContainer() error {
@@ -307,5 +324,42 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) installPrototypeTransferG
 		return err
 	}
 
-	return container.Add(PrototypeSourceDebitFunction, factory.prototypeSourceDebit)
+	err = container.Add(PrototypeSourceDebitFunction, factory.prototypeSourceDebit)
+	if err != nil {
+		return err
+	}
+
+	factory.prototypeDestination, err = newPrototypeDestination(prototypeDestinationArgs{
+		delegate:                    sourceDebitDelegate,
+		classifier:                  classifier,
+		enableEpochsHandler:         factory.enableEpochsHandler,
+		shardCoordinator:            factory.shardCoordinator,
+		networkDomain:               factory.prototypeDRWANetworkDomain,
+		cebEpoch:                    factory.prototypeDRWACEBEpoch,
+		retainedWorkBudgetsProvider: factory.PrototypeRetainedWorkBudgets,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = container.Add(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope, factory.prototypeDestination)
+	if err != nil {
+		return err
+	}
+
+	factory.prototypeSourceCompletion, err = newPrototypeSourceCompletion(prototypeSourceCompletionArgs{
+		delegate:                    sourceDebitDelegate,
+		enableEpochsHandler:         factory.enableEpochsHandler,
+		shardCoordinator:            factory.shardCoordinator,
+		networkDomain:               factory.prototypeDRWANetworkDomain,
+		retainedWorkBudgetsProvider: factory.PrototypeRetainedWorkBudgets,
+	})
+	if err != nil {
+		return err
+	}
+	err = container.Add(PrototypeSettlementReceiptFunction, factory.prototypeSourceCompletion)
+	if err != nil {
+		return err
+	}
+	return container.Add(PrototypeRefundEnvelopeFunction, factory.prototypeSourceCompletion)
 }

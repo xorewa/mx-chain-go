@@ -88,3 +88,28 @@ func currentPrototypeWorkBudgets(
 
 	return identity, budgets, total, nil
 }
+
+func retainedPrototypeWorkBudgets(
+	identity [32]byte,
+	catalog *drwaprototype.GasScheduleCatalog,
+) (drwaprototype.WorkBudgets, uint64, error) {
+	if catalog == nil {
+		return drwaprototype.WorkBudgets{}, 0, ErrPrototypeGasScheduleUnavailable
+	}
+	_, err := catalog.Schedule(identity)
+	if err != nil {
+		return drwaprototype.WorkBudgets{}, 0,
+			fmt.Errorf("%w: context map not retained: %w", ErrPrototypeGasScheduleUnavailable, err)
+	}
+	budgets, err := catalog.MaximumWorkBudgets()
+	if err != nil {
+		return drwaprototype.WorkBudgets{}, 0,
+			fmt.Errorf("%w: configured work budgets: %w", ErrPrototypeGasScheduleUnavailable, err)
+	}
+	total, err := budgets.Total()
+	if err != nil {
+		return drwaprototype.WorkBudgets{}, 0,
+			fmt.Errorf("%w: configured work total: %w", ErrPrototypeGasScheduleUnavailable, err)
+	}
+	return budgets, total, nil
+}

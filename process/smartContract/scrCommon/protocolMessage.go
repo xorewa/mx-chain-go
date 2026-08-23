@@ -42,7 +42,10 @@ func ValidateProtocolMessageAdmission(
 	if separatorIndex >= 0 {
 		function = callData[:separatorIndex]
 	}
-	if !bytes.Equal(function, []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)) {
+	isValueEnvelope := bytes.Equal(function, []byte(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope))
+	isSettlementReceipt := bytes.Equal(function, []byte(PrototypeSettlementReceiptFunction))
+	isRefundEnvelope := bytes.Equal(function, []byte(PrototypeRefundEnvelopeFunction))
+	if !isValueEnvelope && !isSettlementReceipt && !isRefundEnvelope {
 		return process.ErrInvalidProtocolMessageFunction
 	}
 	if separatorIndex < 0 {
@@ -64,7 +67,14 @@ func ValidateProtocolMessageAdmission(
 	if !bytes.Equal(envelopeHex, []byte(hex.EncodeToString(envelopeBytes))) {
 		return process.ErrInvalidProtocolMessageEnvelope
 	}
-	_, err = drwaprototype.DecodeValueEnvelope(envelopeBytes)
+	switch {
+	case isValueEnvelope:
+		_, err = drwaprototype.DecodeValueEnvelope(envelopeBytes)
+	case isSettlementReceipt:
+		_, err = drwaprototype.DecodeSettlementReceipt(envelopeBytes)
+	case isRefundEnvelope:
+		_, err = drwaprototype.DecodeRefundEnvelope(envelopeBytes)
+	}
 	if err != nil {
 		return process.ErrInvalidProtocolMessageEnvelope
 	}

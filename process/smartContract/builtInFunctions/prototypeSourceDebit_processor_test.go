@@ -32,6 +32,7 @@ import (
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	vmcommonBuiltInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	vmcommonMock "github.com/multiversx/mx-chain-vm-common-go/mock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,7 +77,25 @@ func TestPrototypeSourceDebitRealWrapperJournalRollbackMatrix(t *testing.T) {
 		configure           func(t *testing.T, sourceDebit *prototypeSourceDebit, baselineDelegate vmcommon.BuiltinFunction, capturedEffect *[32]byte, debitObserved *bool)
 		wantCreatorCalled   bool
 		wantDebitObserved   bool
+		wantSuccess         bool
+		accountingFault     bool
+		wantIntegrity       bool
 	}{
+		{
+			name:                "no injection success",
+			initialTokenBalance: 100,
+			configure:           capturePrototypeOpenEffect,
+			wantCreatorCalled:   true,
+			wantSuccess:         true,
+		},
+		{
+			name:                "after debit accounting output corruption",
+			initialTokenBalance: 100,
+			configure:           capturePrototypeOpenEffect,
+			wantCreatorCalled:   true,
+			accountingFault:     true,
+			wantIntegrity:       true,
+		},
 		{
 			name:                "before OpenEffect storage",
 			initialTokenBalance: 100,
@@ -204,6 +223,14 @@ func TestPrototypeSourceDebitRealWrapperJournalRollbackMatrix(t *testing.T) {
 					ProcessBuiltInFunctionCalled: func(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
 						output, processErr := sourceDebit.ProcessBuiltinFunction(sourceAccount, sourceAccount, input)
 						wrapperErr = processErr
+						if processErr == nil {
+							if test.accountingFault {
+								for _, outputAccount := range output.OutputAccounts {
+									outputAccount.OutputTransfers[0].ProtocolMessageKind = vmData.ProtocolMessageKindNone
+								}
+							}
+							require.NoError(t, accountsDB.SaveAccount(sourceAccount))
+						}
 						return output, processErr
 					},
 				}
@@ -225,6 +252,36 @@ func TestPrototypeSourceDebitRealWrapperJournalRollbackMatrix(t *testing.T) {
 					)),
 				}
 				returnCode, executionErr := processor.ExecuteBuiltInFunction(tx, sourceAccount, sourceAccount)
+				if test.wantIntegrity {
+					require.Equal(t, vmcommon.ExecutionFailed, returnCode)
+					require.ErrorIs(t, executionErr, scrCommon.ErrInvalidPrototypeForwardedGas)
+					require.Greater(t, accountsDB.revertCount, 0)
+					require.Zero(t, drwaOutputCount)
+					canonicalAccount := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+					canonicalTokenBytes, _, loadErr := canonicalAccount.AccountDataHandler().RetrieveValue(esdtKey)
+					require.NoError(t, loadErr)
+					canonicalToken := &esdt.ESDigitalToken{}
+					require.NoError(t, marshaller.Unmarshal(canonicalToken, canonicalTokenBytes))
+					require.Equal(t, "100", canonicalToken.Value.String())
+					_, loadErr = drwaprototype.LoadOpenEffect(canonicalAccount.AccountDataHandler(), capturedEffect)
+					require.ErrorIs(t, loadErr, drwaprototype.ErrOpenEffectNotFound)
+					return
+				}
+				if test.wantSuccess {
+					assert.Equal(t, vmcommon.Ok, returnCode)
+					assert.NoError(t, executionErr)
+
+					canonicalAccount := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+					canonicalTokenBytes, _, loadErr := canonicalAccount.AccountDataHandler().RetrieveValue(esdtKey)
+					require.NoError(t, loadErr)
+					canonicalToken := &esdt.ESDigitalToken{}
+					require.NoError(t, marshaller.Unmarshal(canonicalToken, canonicalTokenBytes))
+					assert.Equal(t, "98", canonicalToken.Value.String())
+					_, loadErr = drwaprototype.LoadOpenEffect(canonicalAccount.AccountDataHandler(), capturedEffect)
+					assert.NoError(t, loadErr)
+					assert.Equal(t, 1, drwaOutputCount)
+					return
+				}
 
 				require.Equal(t, vmcommon.UserError, returnCode)
 				require.ErrorIs(t, executionErr, process.ErrFailedTransaction)
@@ -304,6 +361,7 @@ func newPrototypeProcessorArgs(
 	}
 	builtIns := vmcommonBuiltInFunctions.NewBuiltInFunctionContainer()
 	require.NoError(t, builtIns.Add(PrototypeSourceDebitFunction, sourceDebit))
+	require.NoError(t, builtIns.Add(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope, &processMock.BuiltInFunctionStub{}))
 
 	return scrCommon.ArgsNewSmartContractProcessor{
 		VmContainer:      &processMock.VMContainerMock{},
@@ -336,7 +394,9 @@ func newPrototypeProcessorArgs(
 				return core.SafeMul(tx.GetGasPrice(), gasToUse)
 			},
 		},
-		TxTypeHandler:       &testscommon.TxTypeHandlerMock{},
+		TxTypeHandler: &testscommon.TxTypeHandlerMock{ComputeTransactionTypeCalled: func(_ data.TransactionHandler) (process.TransactionType, process.TransactionType, bool) {
+			return process.BuiltInFunctionCall, process.BuiltInFunctionCall, false
+		}},
 		GasHandler:          &testscommon.GasHandlerStub{},
 		GasSchedule:         testscommon.NewGasScheduleNotifierMock(gasSchedule),
 		EnableRoundsHandler: &testscommon.EnableRoundsHandlerStub{},
