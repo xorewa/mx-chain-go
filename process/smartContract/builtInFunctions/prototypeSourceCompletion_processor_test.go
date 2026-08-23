@@ -141,6 +141,7 @@ func newPrototypeCompletionProcessorFixture(
 		common.BuiltInFunctionsFlag,
 		common.CleanUpInformativeSCRsFlag,
 		common.DRWAEnforcementFlag,
+		common.EGLDInESDTMultiTransferFlag,
 	)
 	accountsDB := &prototypeTrackingAccountsDB{AccountsDB: testIntegration.CreateAccountsDB(testIntegration.CreateMemUnit(), enableEpochs)}
 	account := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
@@ -171,7 +172,7 @@ func newPrototypeCompletionProcessorFixture(
 		&vmcommonMock.GlobalSettingsHandlerStub{},
 		&vmcommonMock.ShardCoordinatorStub{ComputeIdCalled: coordinator.ComputeId},
 		&vmcommonMock.ESDTRoleHandlerStub{},
-		&vmcommonMock.EnableEpochsHandlerStub{},
+		enableEpochs,
 	)
 	require.NoError(t, err)
 	require.NoError(t, baselineDelegate.SetPayableChecker(&vmcommonMock.PayableHandlerStub{}))

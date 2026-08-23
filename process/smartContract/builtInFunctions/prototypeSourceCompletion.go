@@ -220,7 +220,11 @@ func (completion *prototypeSourceCompletion) applyRefund(
 	if err != nil {
 		return nil, fmt.Errorf("%w: baseline refund: %w", ErrPrototypeSourceCompletionMutation, err)
 	}
-	if !isValidPrototypeRefundDelegateOutput(delegateOutput) {
+	expectedDelegateGasRemaining := uint64(0)
+	if completion.enableEpochsHandler.IsFlagEnabled(common.EGLDInESDTMultiTransferFlag) {
+		expectedDelegateGasRemaining = budgets.SourceCompletion
+	}
+	if !isValidPrototypeRefundDelegateOutput(delegateOutput, expectedDelegateGasRemaining) {
 		return nil, fmt.Errorf("%w: baseline refund output", ErrPrototypeSourceCompletionMutation)
 	}
 	err = completion.removeOpenEffect(dataHandler, effect.EffectID)
@@ -236,8 +240,8 @@ func (completion *prototypeSourceCompletion) applyRefund(
 	return output, nil
 }
 
-func isValidPrototypeRefundDelegateOutput(output *vmcommon.VMOutput) bool {
-	return output != nil && output.ReturnCode == vmcommon.Ok && output.GasRemaining == 0 &&
+func isValidPrototypeRefundDelegateOutput(output *vmcommon.VMOutput, expectedGasRemaining uint64) bool {
+	return output != nil && output.ReturnCode == vmcommon.Ok && output.GasRemaining == expectedGasRemaining &&
 		output.ProtocolExecution == nil && len(output.OutputAccounts) == 0 &&
 		len(output.DeletedAccounts) == 0 && len(output.TouchedAccounts) == 0 &&
 		len(output.ReturnData) == 0 && (output.GasRefund == nil || output.GasRefund.Sign() == 0)

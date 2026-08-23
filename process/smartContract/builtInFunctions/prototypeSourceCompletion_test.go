@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-go/common"
 	processMock "github.com/multiversx/mx-chain-go/process/mock"
@@ -125,6 +126,104 @@ func TestPrototypeSourceCompletionRejectsRefundDelegateOutputDrift(t *testing.T)
 	require.Nil(t, output)
 	require.ErrorIs(t, err, ErrPrototypeSourceCompletionMutation)
 	require.NotEmpty(t, stored[string(drwaprototype.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
+}
+
+func TestPrototypeSourceCompletionRefundDelegateGasMatchesFeatureProfile(t *testing.T) {
+	tests := []struct {
+		name                 string
+		flagEnabled          bool
+		delegateGasRemaining uint64
+		wantSuccess          bool
+	}{
+		{name: "disabled accepts zero", delegateGasRemaining: 0, wantSuccess: true},
+		{name: "enabled accepts exact source completion", flagEnabled: true, delegateGasRemaining: 40, wantSuccess: true},
+		{name: "disabled rejects full remainder", delegateGasRemaining: 40},
+		{name: "enabled rejects zero", flagEnabled: true, delegateGasRemaining: 0},
+		{name: "enabled rejects partial remainder", flagEnabled: true, delegateGasRemaining: 1},
+		{name: "enabled rejects excessive remainder", flagEnabled: true, delegateGasRemaining: 41},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			completion, input, account, stored, artifacts := newPrototypeSourceCompletionFixture(t, true)
+			flags := []core.EnableEpochFlag{common.DRWAEnforcementFlag}
+			if test.flagEnabled {
+				flags = append(flags, common.EGLDInESDTMultiTransferFlag)
+			}
+			completion.enableEpochsHandler = enableEpochsHandlerMock.NewEnableEpochsHandlerStub(flags...)
+			completion.delegate = &processMock.BuiltInFunctionStub{ProcessBuiltinFunctionCalled: func(
+				_, _ vmcommon.UserAccountHandler,
+				_ *vmcommon.ContractCallInput,
+			) (*vmcommon.VMOutput, error) {
+				return &vmcommon.VMOutput{
+					ReturnCode:   vmcommon.Ok,
+					GasRemaining: test.delegateGasRemaining,
+				}, nil
+			}}
+
+			output, err := completion.ProcessBuiltinFunction(nil, account, input)
+			storedEffect := stored[string(drwaprototype.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))]
+			if test.wantSuccess {
+				require.NoError(t, err)
+				require.Equal(t, vmcommon.ProtocolExecutionOutcomeSourceRefunded, output.ProtocolExecution.Outcome)
+				require.Equal(t, uint64(40), output.ProtocolExecution.LocalGasUsed)
+				require.Equal(t, uint64(20), output.GasRemaining)
+				require.Empty(t, storedEffect)
+				return
+			}
+
+			require.Nil(t, output)
+			require.ErrorIs(t, err, ErrPrototypeSourceCompletionMutation)
+			require.NotEmpty(t, storedEffect)
+		})
+	}
+}
+
+func TestIsValidPrototypeRefundDelegateOutputRejectsMalformedShape(t *testing.T) {
+	validOutput := func() *vmcommon.VMOutput {
+		return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: 40}
+	}
+	tests := []struct {
+		name   string
+		mutate func(*vmcommon.VMOutput) *vmcommon.VMOutput
+	}{
+		{name: "nil output", mutate: func(_ *vmcommon.VMOutput) *vmcommon.VMOutput { return nil }},
+		{name: "non-ok return", mutate: func(output *vmcommon.VMOutput) *vmcommon.VMOutput {
+			output.ReturnCode = vmcommon.UserError
+			return output
+		}},
+		{name: "nested protocol contract", mutate: func(output *vmcommon.VMOutput) *vmcommon.VMOutput {
+			output.ProtocolExecution = &vmcommon.ProtocolExecutionInfo{}
+			return output
+		}},
+		{name: "output account", mutate: func(output *vmcommon.VMOutput) *vmcommon.VMOutput {
+			output.OutputAccounts = map[string]*vmcommon.OutputAccount{"unexpected": {}}
+			return output
+		}},
+		{name: "deleted account", mutate: func(output *vmcommon.VMOutput) *vmcommon.VMOutput {
+			output.DeletedAccounts = [][]byte{{1}}
+			return output
+		}},
+		{name: "touched account", mutate: func(output *vmcommon.VMOutput) *vmcommon.VMOutput {
+			output.TouchedAccounts = [][]byte{{1}}
+			return output
+		}},
+		{name: "return data", mutate: func(output *vmcommon.VMOutput) *vmcommon.VMOutput {
+			output.ReturnData = [][]byte{{1}}
+			return output
+		}},
+		{name: "gas refund", mutate: func(output *vmcommon.VMOutput) *vmcommon.VMOutput {
+			output.GasRefund = big.NewInt(1)
+			return output
+		}},
+	}
+
+	require.True(t, isValidPrototypeRefundDelegateOutput(validOutput(), 40))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.False(t, isValidPrototypeRefundDelegateOutput(test.mutate(validOutput()), 40))
+		})
+	}
 }
 
 const coreESDTTransfer = "ESDTTransfer"
