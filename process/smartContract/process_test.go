@@ -1859,6 +1859,24 @@ func TestScProcessor_CreateVMCallInputPrototypeNativeOriginFailsClosed(t *testin
 	}
 }
 
+func TestScProcessor_CreateVMCallInputAuthenticatesDRWAProtocolOrigin(t *testing.T) {
+	t.Parallel()
+
+	arguments := createMockSmartContractProcessorArguments()
+	arguments.VmContainer = &mock.VMContainerMock{}
+	arguments.ArgsParser = &testscommon.ArgumentParserMock{}
+	sc, err := NewSmartContractProcessor(arguments)
+	require.NoError(t, err)
+
+	scr := &smartContractResult.SmartContractResult{
+		SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+		ProtocolMessageKind: vmData.ProtocolMessageKindDRWA,
+	}
+	input, err := sc.createVMCallInput(scr, make([]byte, 32), true)
+	require.NoError(t, err)
+	require.Equal(t, vmcommon.NativeCallOriginDRWAProtocolMessage, input.NativeCallOrigin)
+}
+
 func TestScProcessor_CreateVMDeployBadCode(t *testing.T) {
 	t.Parallel()
 

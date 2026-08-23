@@ -618,6 +618,8 @@ github.com/xorewa/mx-chain-storage-go v0.0.0-20260714091422-a9e4a9bb00bb h1:vhCE
 github.com/xorewa/mx-chain-storage-go v0.0.0-20260714091422-a9e4a9bb00bb/go.mod h1:wiLHYsE7q6bYbj8r41RUnARGShYOcPdMRVmTuEpm0ss=
 github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260823060656-f3b0ef9180b8 h1:9Pk4aHLd/lBeML3W1CNRUuN9i4B5OexDf4qo18iRPro=
 github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260823060656-f3b0ef9180b8/go.mod h1:gNOQp8CiSW8PDp6gJ2j6wjqpDbcOqqoG34Ue+K4HvrQ=
+github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260823071929-5e3cf9dc118f h1:3BF+uMDbbPcloCtLtIJcpgt/wMBvK8Drhq3dAUMvYXQ=
+github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260823071929-5e3cf9dc118f/go.mod h1:gNOQp8CiSW8PDp6gJ2j6wjqpDbcOqqoG34Ue+K4HvrQ=
 github.com/xorewa/mx-chain-vm-go v0.0.0-20260823031927-45047cd73c06 h1:SyQQiXUTkxC5UWWzEmWLHjAdAUkgblraSjdyKy0IM0Q=
 github.com/xorewa/mx-chain-vm-go v0.0.0-20260823031927-45047cd73c06/go.mod h1:fGon696NAjE/QTo5e1/BJGkeBJee44CBSY+26VxYAbk=
 github.com/xorewa/mx-chain-vm-v1_2-go v0.0.0-20260714091524-e1184b970239 h1:ek/17NbK7/cQvUecpYbbhWNPSws2WQNnyntGzl5tZgo=

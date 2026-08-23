@@ -112,6 +112,9 @@ func (sc *scProcessor) createVMCallInput(
 	if !isSCR && !common.IsRelayedTxV3(tx) {
 		vmCallInput.NativeCallOrigin = vmcommon.NativeCallOriginOriginalUserTransaction
 	}
+	if isSCR && scr.GetProtocolMessageKind() == vm.ProtocolMessageKindDRWA {
+		vmCallInput.NativeCallOrigin = vmcommon.NativeCallOriginDRWAProtocolMessage
+	}
 
 	vmCallInput.ReturnCallAfterError = isSCR && len(scr.ReturnMessage) > 0
 
