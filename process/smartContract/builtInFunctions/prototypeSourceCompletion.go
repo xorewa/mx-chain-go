@@ -172,6 +172,7 @@ func (completion *prototypeSourceCompletion) applySettlementReceipt(
 		vmcommon.ProtocolExecutionOutcomeSourceSettled,
 		budgets.SourceCompletion,
 		gasRemaining,
+		effect.SourceSubject[:],
 	), nil
 }
 
@@ -235,6 +236,7 @@ func (completion *prototypeSourceCompletion) applyRefund(
 		vmcommon.ProtocolExecutionOutcomeSourceRefunded,
 		budgets.SourceCompletion,
 		budgets.SuccessReceipt,
+		effect.SourceSubject[:],
 	)
 	output.Logs = delegateOutput.Logs
 	return output, nil
@@ -268,15 +270,21 @@ func buildPrototypeCompletionOutput(
 	outcome vmcommon.ProtocolExecutionOutcome,
 	localGasUsed uint64,
 	gasRemaining uint64,
+	gasRefundRecipient []byte,
 ) *vmcommon.VMOutput {
+	var validatedGasRefundRecipient []byte
+	if gasRemaining != 0 {
+		validatedGasRefundRecipient = append([]byte(nil), gasRefundRecipient...)
+	}
 	return &vmcommon.VMOutput{
 		ReturnCode:   vmcommon.Ok,
 		GasRemaining: gasRemaining,
 		ProtocolExecution: &vmcommon.ProtocolExecutionInfo{
-			MessageKind:  vmData.ProtocolMessageKindDRWA,
-			Outcome:      outcome,
-			LocalGasUsed: localGasUsed,
-			ForwardedGas: 0,
+			MessageKind:        vmData.ProtocolMessageKindDRWA,
+			Outcome:            outcome,
+			LocalGasUsed:       localGasUsed,
+			ForwardedGas:       0,
+			GasRefundRecipient: validatedGasRefundRecipient,
 		},
 	}
 }

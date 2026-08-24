@@ -1,6 +1,7 @@
 package scrCommon
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"testing"
@@ -39,6 +40,85 @@ func TestPrototypeExecutionGasUsedValidRuledVectors(t *testing.T) {
 		require.True(t, matched)
 		require.True(t, refund)
 		require.Equal(t, uint64(40), gasUsed)
+	})
+
+	for _, refund := range []bool{false, true} {
+		name := "settlement completion"
+		if refund {
+			name = "refund completion"
+		}
+		t.Run(name+" returns unused gas to source payer", func(t *testing.T) {
+			input, output := prototypeCompletionGasFixture(t, refund, 30)
+			gasUsed, matched, isRefund, err := PrototypeExecutionGasUsed(process.BuiltInFunctionCall, true, input, output)
+			require.NoError(t, err)
+			require.True(t, matched)
+			require.False(t, isRefund)
+			require.Equal(t, uint64(40), gasUsed)
+
+			_, _, _, recipient, err := PrototypeExecutionGasAccounting(process.BuiltInFunctionCall, true, input, output)
+			require.NoError(t, err)
+			require.Equal(t, input.RecipientAddr, recipient)
+			recipient[0] ^= 0xff
+			require.NotEqual(t, recipient, output.ProtocolExecution.GasRefundRecipient)
+		})
+	}
+}
+
+func TestPrototypeGasRefundRecipientRejectsEveryNearMiss(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(input *vmcommon.ContractCallInput, output *vmcommon.VMOutput)
+	}{
+		{name: "missing with remainder", mutate: func(_ *vmcommon.ContractCallInput, output *vmcommon.VMOutput) {
+			output.ProtocolExecution.GasRefundRecipient = nil
+		}},
+		{name: "wrong source payer", mutate: func(_ *vmcommon.ContractCallInput, output *vmcommon.VMOutput) {
+			output.ProtocolExecution.GasRefundRecipient = bytes.Repeat([]byte{0x55}, 32)
+		}},
+		{name: "short source payer", mutate: func(_ *vmcommon.ContractCallInput, output *vmcommon.VMOutput) {
+			output.ProtocolExecution.GasRefundRecipient = bytes.Repeat([]byte{0x44}, 31)
+		}},
+		{name: "smart contract source payer", mutate: func(_ *vmcommon.ContractCallInput, output *vmcommon.VMOutput) {
+			output.ProtocolExecution.GasRefundRecipient = make([]byte, 32)
+		}},
+		{name: "recipient with zero remainder", mutate: func(input *vmcommon.ContractCallInput, output *vmcommon.VMOutput) {
+			output.GasRemaining = 0
+			input.GasProvided = output.ProtocolExecution.LocalGasUsed
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			input, output := prototypeCompletionGasFixture(t, false, 30)
+			test.mutate(input, output)
+			gasUsed, matched, refund, err := PrototypeExecutionGasUsed(process.BuiltInFunctionCall, true, input, output)
+			require.ErrorIs(t, err, ErrInvalidPrototypeForwardedGas)
+			require.True(t, matched)
+			require.False(t, refund)
+			require.Zero(t, gasUsed)
+		})
+	}
+
+	t.Run("recipient on non-completion outcome", func(t *testing.T) {
+		input, output := prototypeSourceGasFixture(t)
+		output.ProtocolExecution.GasRefundRecipient = append([]byte(nil), input.RecipientAddr...)
+		gasUsed, matched, refund, err := PrototypeExecutionGasUsed(process.BuiltInFunctionCall, false, input, output)
+		require.ErrorIs(t, err, ErrInvalidPrototypeForwardedGas)
+		require.True(t, matched)
+		require.False(t, refund)
+		require.Zero(t, gasUsed)
+	})
+
+	t.Run("zero remainder has no recipient", func(t *testing.T) {
+		input, output := prototypeCompletionGasFixture(t, false, 0)
+		gasUsed, matched, refund, err := PrototypeExecutionGasUsed(process.BuiltInFunctionCall, true, input, output)
+		require.NoError(t, err)
+		require.True(t, matched)
+		require.False(t, refund)
+		require.Equal(t, uint64(40), gasUsed)
+		_, _, _, recipient, err := PrototypeExecutionGasAccounting(process.BuiltInFunctionCall, true, input, output)
+		require.NoError(t, err)
+		require.Nil(t, recipient)
 	})
 }
 
@@ -256,6 +336,67 @@ func prototypeDestinationRefundGasFixture(t *testing.T) (*vmcommon.ContractCallI
 		Outcome:      vmcommon.ProtocolExecutionOutcomeRefundEnvelope,
 		LocalGasUsed: 40,
 		ForwardedGas: 60,
+	}
+	return input, output
+}
+
+func prototypeCompletionGasFixture(
+	t *testing.T,
+	refund bool,
+	gasRemaining uint64,
+) (*vmcommon.ContractCallInput, *vmcommon.VMOutput) {
+	t.Helper()
+	envelope := prototypeGasEnvelope()
+	destinationIdentity := [32]byte{9}
+	function := PrototypeSettlementReceiptFunction
+	outcome := vmcommon.ProtocolExecutionOutcomeSourceSettled
+	receipt, err := drwaprototype.BuildSettlementReceipt(
+		[32]byte{8},
+		envelope.Context.EffectID,
+		[32]byte{7},
+		destinationIdentity,
+	)
+	require.NoError(t, err)
+	payload, err := drwaprototype.EncodeSettlementReceipt(receipt)
+	require.NoError(t, err)
+	if refund {
+		function = PrototypeRefundEnvelopeFunction
+		outcome = vmcommon.ProtocolExecutionOutcomeSourceRefunded
+		payload, err = drwaprototype.EncodeRefundEnvelope(drwaprototype.RefundEnvelope{
+			EffectID:                     envelope.Context.EffectID,
+			ContextHash:                  [32]byte{7},
+			DestinationExecutionIdentity: destinationIdentity,
+			OriginalTransferPayload:      envelope.OriginalTransferPayload,
+			RefundTo:                     envelope.Context.SourceHolder,
+		})
+		require.NoError(t, err)
+	}
+	input := &vmcommon.ContractCallInput{
+		RecipientAddr: append([]byte(nil), envelope.Context.SourceHolder[:]...),
+		Function:      function,
+		VMInput: vmcommon.VMInput{
+			CallerAddr:       append([]byte(nil), envelope.Context.DestinationHolder[:]...),
+			Arguments:        [][]byte{payload},
+			CallValue:        big.NewInt(0),
+			CallType:         vmData.DirectCall,
+			GasProvided:      40 + gasRemaining,
+			PrevTxHash:       append([]byte(nil), destinationIdentity[:]...),
+			NativeCallOrigin: vmcommon.NativeCallOriginDRWAProtocolMessage,
+		},
+	}
+	var recipient []byte
+	if gasRemaining != 0 {
+		recipient = append([]byte(nil), input.RecipientAddr...)
+	}
+	output := &vmcommon.VMOutput{
+		ReturnCode:   vmcommon.Ok,
+		GasRemaining: gasRemaining,
+		ProtocolExecution: &vmcommon.ProtocolExecutionInfo{
+			MessageKind:        vmData.ProtocolMessageKindDRWA,
+			Outcome:            outcome,
+			LocalGasUsed:       40,
+			GasRefundRecipient: recipient,
+		},
 	}
 	return input, output
 }

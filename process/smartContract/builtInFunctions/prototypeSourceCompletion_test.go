@@ -26,6 +26,7 @@ func TestPrototypeSourceCompletionReceiptRemovesExactEffect(t *testing.T) {
 	require.Equal(t, vmcommon.ProtocolExecutionOutcomeSourceSettled, output.ProtocolExecution.Outcome)
 	require.Equal(t, uint64(40), output.ProtocolExecution.LocalGasUsed)
 	require.Equal(t, uint64(30), output.GasRemaining)
+	require.Equal(t, input.RecipientAddr, output.ProtocolExecution.GasRefundRecipient)
 	require.Empty(t, stored[string(drwaprototype.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
 }
 
@@ -79,9 +80,32 @@ func TestPrototypeSourceCompletionRefundUsesBaselineReturnThenRemovesEffect(t *t
 	require.Equal(t, vmcommon.ProtocolExecutionOutcomeSourceRefunded, output.ProtocolExecution.Outcome)
 	require.Equal(t, uint64(40), output.ProtocolExecution.LocalGasUsed)
 	require.Equal(t, uint64(20), output.GasRemaining)
+	require.Equal(t, input.RecipientAddr, output.ProtocolExecution.GasRefundRecipient)
 	require.Len(t, output.Logs, 1)
 	require.Equal(t, []byte("ESDTTransfer"), output.Logs[0].Identifier)
 	require.Empty(t, stored[string(drwaprototype.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
+}
+
+func TestBuildPrototypeCompletionOutputRefundRecipientContract(t *testing.T) {
+	recipient := bytes.Repeat([]byte{0x44}, prototypeAddressLength)
+	output := buildPrototypeCompletionOutput(
+		vmcommon.ProtocolExecutionOutcomeSourceSettled,
+		40,
+		30,
+		recipient,
+	)
+	require.Equal(t, recipient, output.ProtocolExecution.GasRefundRecipient)
+
+	recipient[0] ^= 0xff
+	require.NotEqual(t, recipient, output.ProtocolExecution.GasRefundRecipient)
+
+	zeroRemainder := buildPrototypeCompletionOutput(
+		vmcommon.ProtocolExecutionOutcomeSourceSettled,
+		40,
+		0,
+		bytes.Repeat([]byte{0x55}, prototypeAddressLength),
+	)
+	require.Empty(t, zeroRemainder.ProtocolExecution.GasRefundRecipient)
 }
 
 func TestPrototypeSourceCompletionRejectsMismatchBeforeMutation(t *testing.T) {
@@ -96,6 +120,37 @@ func TestPrototypeSourceCompletionRejectsMismatchBeforeMutation(t *testing.T) {
 	require.Nil(t, output)
 	require.ErrorIs(t, err, ErrPrototypeSourceCompletionDenied)
 	require.NotEmpty(t, stored[string(drwaprototype.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
+}
+
+func TestPrototypeSourceCompletionRejectsWrongShardAndLoadedAccountBeforeMutation(t *testing.T) {
+	t.Run("recipient is not local to source shard", func(t *testing.T) {
+		completion, input, account, stored, artifacts := newPrototypeSourceCompletionFixture(t, false)
+		completion.shardCoordinator = &testscommon.ShardsCoordinatorMock{
+			NoShards:     2,
+			CurrentShard: 0,
+			ComputeIdCalled: func(_ []byte) uint32 {
+				return 1
+			},
+		}
+
+		output, err := completion.ProcessBuiltinFunction(nil, account, input)
+		require.Nil(t, output)
+		require.ErrorIs(t, err, ErrPrototypeSourceCompletionDenied)
+		require.NotEmpty(t, stored[string(drwaprototype.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
+	})
+
+	t.Run("loaded account differs from recipient", func(t *testing.T) {
+		completion, input, account, stored, artifacts := newPrototypeSourceCompletionFixture(t, false)
+		wrongAccount := newPrototypeSourceAccount(
+			bytes.Repeat([]byte{0x33}, prototypeAddressLength),
+			account.AccountDataHandler(),
+		)
+
+		output, err := completion.ProcessBuiltinFunction(nil, wrongAccount, input)
+		require.Nil(t, output)
+		require.ErrorIs(t, err, ErrPrototypeSourceCompletionDenied)
+		require.NotEmpty(t, stored[string(drwaprototype.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
+	})
 }
 
 func TestPrototypeSourceCompletionRefundFailureDoesNotRemoveEffect(t *testing.T) {

@@ -142,6 +142,7 @@ func TestPrototypeLifecycleSourceDestinationReceiptCompletion(t *testing.T) {
 	require.Equal(t, vmcommon.ProtocolExecutionOutcomeSourceSettled, completionOutput.ProtocolExecution.Outcome)
 	require.Equal(t, uint64(40), completionOutput.ProtocolExecution.LocalGasUsed)
 	require.Equal(t, uint64(35), completionOutput.GasRemaining)
+	require.Equal(t, sourceAddress, completionOutput.ProtocolExecution.GasRefundRecipient)
 	_, err = drwaprototype.LoadOpenEffect(sourceHandler, envelope.Context.EffectID)
 	require.ErrorIs(t, err, drwaprototype.ErrOpenEffectNotFound)
 }
@@ -208,6 +209,7 @@ func TestPrototypeLifecycleDestinationDenialRefundCompletion(t *testing.T) {
 	require.True(t, refundApplied)
 	require.Equal(t, vmcommon.ProtocolExecutionOutcomeSourceRefunded, completionOutput.ProtocolExecution.Outcome)
 	require.Equal(t, uint64(20), completionOutput.GasRemaining)
+	require.Equal(t, sourceAddress, completionOutput.ProtocolExecution.GasRefundRecipient)
 	_, err = drwaprototype.LoadOpenEffect(sourceHandler, artifacts.OpenEffect.EffectID)
 	require.ErrorIs(t, err, drwaprototype.ErrOpenEffectNotFound)
 }

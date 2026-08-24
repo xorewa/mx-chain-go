@@ -3,6 +3,7 @@ package scrCommon
 import (
 	"bytes"
 	"encoding/hex"
+	"math/big"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
@@ -127,6 +128,24 @@ func TestValidateProtocolMessageAdmission(t *testing.T) {
 		scr := valid()
 		scr.SndAddr = destinationAddress
 		require.ErrorIs(t, ValidateProtocolMessageAdmission(scr, enabled, coordinator), process.ErrInvalidProtocolMessageRoute)
+	})
+
+	t.Run("relayer metadata rejects", func(t *testing.T) {
+		for _, mutate := range []func(*smartContractResult.SmartContractResult){
+			func(scr *smartContractResult.SmartContractResult) {
+				scr.RelayerAddr = bytes.Repeat([]byte{0x44}, 32)
+			},
+			func(scr *smartContractResult.SmartContractResult) {
+				scr.RelayedValue = big.NewInt(0)
+			},
+		} {
+			scr := valid()
+			mutate(scr)
+			require.ErrorIs(
+				t, ValidateProtocolMessageAdmission(scr, enabled, coordinator),
+				process.ErrInvalidProtocolMessageRoute,
+			)
+		}
 	})
 
 	t.Run("non-local destination rejects", func(t *testing.T) {

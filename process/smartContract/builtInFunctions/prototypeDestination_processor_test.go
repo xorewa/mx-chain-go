@@ -66,9 +66,10 @@ func TestPrototypeAccountingSeamPreservesOrdinaryBuiltInAcrossBothProcessors(t *
 			processor, accountsDB, tokenID, destinationAddress, forwarded, observations := newPrototypeDestinationProcessorFixture(
 				t, processorCase.create, true, false, false, false,
 			)
+			ordinarySender := bytes.Repeat([]byte{0x11}, prototypeAddressLength)
 			scr := &smartContractResult.SmartContractResult{
 				Value:          big.NewInt(0),
-				SndAddr:        bytes.Repeat([]byte{0x11}, prototypeAddressLength),
+				SndAddr:        ordinarySender,
 				RcvAddr:        append([]byte(nil), destinationAddress...),
 				GasPrice:       1,
 				GasLimit:       100,
@@ -84,6 +85,8 @@ func TestPrototypeAccountingSeamPreservesOrdinaryBuiltInAcrossBothProcessors(t *
 			require.Len(t, *forwarded, 1)
 			require.Equal(t, vmData.ProtocolMessageKindNone, (*forwarded)[0].GetProtocolMessageKind())
 			require.False(t, bytes.Contains((*forwarded)[0].GetData(), []byte("DRWA")))
+			require.Equal(t, ordinarySender, (*forwarded)[0].RcvAddr)
+			require.Equal(t, int64(70), (*forwarded)[0].Value.Int64())
 			require.Len(t, observations.fees, 1)
 			require.Zero(t, observations.fees[0].Sign())
 			require.Zero(t, observations.devFees[0].Sign())

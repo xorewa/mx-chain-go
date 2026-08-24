@@ -35,6 +35,9 @@ func ValidateProtocolMessageAdmission(
 	if !enableEpochsHandler.IsFlagEnabled(common.DRWAEnforcementFlag) {
 		return process.ErrProtocolMessageBeforeActivation
 	}
+	if len(scr.RelayerAddr) != 0 || scr.RelayedValue != nil {
+		return process.ErrInvalidProtocolMessageRoute
+	}
 
 	callData := scr.GetData()
 	separatorIndex := bytes.IndexByte(callData, '@')

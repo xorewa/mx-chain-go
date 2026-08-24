@@ -56,6 +56,10 @@ func PrototypeExecutionGasUsed(
 		protocolExecution.LocalGasUsed == 0 {
 		return 0, true, false, fmt.Errorf("%w: invalid execution contract", ErrInvalidPrototypeForwardedGas)
 	}
+	_, err = prototypeGasRefundRecipient(vmInput, vmOutput)
+	if err != nil {
+		return 0, true, false, err
+	}
 
 	isSourceFunction := vmInput.Function == PrototypeSourceDebitFunction
 	isDestinationFunction := vmInput.Function == vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope
@@ -127,6 +131,65 @@ func PrototypeExecutionGasUsed(
 	}
 
 	return protocolExecution.LocalGasUsed, true, refund, nil
+}
+
+// PrototypeExecutionGasAccounting validates one complete S1 gas contract and returns its
+// accounting result together with the source-payer recipient, if any. The recipient is never
+// returned independently of successful full-route validation.
+func PrototypeExecutionGasAccounting(
+	txTypeOnDestination process.TransactionType,
+	isCrossShard bool,
+	vmInput *vmcommon.ContractCallInput,
+	vmOutput *vmcommon.VMOutput,
+) (gasUsed uint64, matched bool, refund bool, gasRefundRecipient []byte, err error) {
+	gasUsed, matched, refund, err = PrototypeExecutionGasUsed(txTypeOnDestination, isCrossShard, vmInput, vmOutput)
+	if err != nil || !matched {
+		return gasUsed, matched, refund, nil, err
+	}
+
+	gasRefundRecipient, err = prototypeGasRefundRecipient(vmInput, vmOutput)
+	if err != nil {
+		return 0, true, false, nil, err
+	}
+	return gasUsed, matched, refund, gasRefundRecipient, nil
+}
+
+func prototypeGasRefundRecipient(
+	vmInput *vmcommon.ContractCallInput,
+	vmOutput *vmcommon.VMOutput,
+) ([]byte, error) {
+	if vmInput == nil || vmOutput == nil || vmOutput.ProtocolExecution == nil {
+		return nil, nil
+	}
+
+	protocolExecution := vmOutput.ProtocolExecution
+	isSettlementCompletion := vmInput.Function == PrototypeSettlementReceiptFunction &&
+		protocolExecution.Outcome == vmcommon.ProtocolExecutionOutcomeSourceSettled
+	isRefundCompletion := vmInput.Function == PrototypeRefundEnvelopeFunction &&
+		protocolExecution.Outcome == vmcommon.ProtocolExecutionOutcomeSourceRefunded
+	isCompletion := isSettlementCompletion || isRefundCompletion
+	if !isCompletion {
+		if len(protocolExecution.GasRefundRecipient) != 0 {
+			return nil, fmt.Errorf("%w: refund recipient on non-completion outcome", ErrInvalidPrototypeForwardedGas)
+		}
+		return nil, nil
+	}
+
+	if vmOutput.GasRemaining == 0 {
+		if len(protocolExecution.GasRefundRecipient) != 0 {
+			return nil, fmt.Errorf("%w: completion refund recipient without remainder", ErrInvalidPrototypeForwardedGas)
+		}
+		return nil, nil
+	}
+
+	if len(protocolExecution.GasRefundRecipient) != len(vmInput.RecipientAddr) ||
+		len(protocolExecution.GasRefundRecipient) != 32 ||
+		!bytes.Equal(protocolExecution.GasRefundRecipient, vmInput.RecipientAddr) ||
+		core.IsSmartContractAddress(protocolExecution.GasRefundRecipient) {
+		return nil, fmt.Errorf("%w: invalid completion refund recipient", ErrInvalidPrototypeForwardedGas)
+	}
+
+	return append([]byte(nil), protocolExecution.GasRefundRecipient...), nil
 }
 
 func validatePrototypeCompletionGasOutput(

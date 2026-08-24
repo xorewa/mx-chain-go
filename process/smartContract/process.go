@@ -956,7 +956,7 @@ func (sc *scProcessor) doExecuteBuiltInFunction(
 	}
 
 	_, txTypeOnDst, _ := sc.txTypeHandler.ComputeTransactionType(tx)
-	builtInFuncGasUsed, matchedPrototypeGas, prototypeRefund, prototypeGasErr := scrCommon.PrototypeExecutionGasUsed(
+	builtInFuncGasUsed, matchedPrototypeGas, prototypeRefund, prototypeGasRefundRecipient, prototypeGasErr := scrCommon.PrototypeExecutionGasAccounting(
 		txTypeOnDst,
 		check.IfNil(acntSnd),
 		vmInput,
@@ -1064,7 +1064,13 @@ func (sc *scProcessor) doExecuteBuiltInFunction(
 			sc.penalizeUserIfNeeded(tx, txHash, newVMInput.CallType, newVMInput.GasProvided, newVMOutput)
 		}
 
-		scrForSender, scrForRelayer, errCreateSCR := sc.processSCRForSenderAfterBuiltIn(tx, txHash, vmInput, newVMOutput)
+		scrForSender, scrForRelayer, errCreateSCR := sc.processSCRForSenderAfterBuiltIn(
+			tx,
+			txHash,
+			vmInput,
+			newVMOutput,
+			prototypeGasRefundRecipient,
+		)
 		if errCreateSCR != nil {
 			return 0, errCreateSCR
 		}
@@ -1090,7 +1096,15 @@ func (sc *scProcessor) doExecuteBuiltInFunction(
 		}
 	}
 
-	return sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	returnCode, finishErr := sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	if finishErr != nil && len(prototypeGasRefundRecipient) != 0 {
+		revertErr := sc.accounts.RevertToSnapshot(snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		return vmcommon.ExecutionFailed, finishErr
+	}
+	return returnCode, finishErr
 }
 
 func mergeVMOutputLogs(newVMOutput *vmcommon.VMOutput, vmOutput *vmcommon.VMOutput) {
@@ -1110,6 +1124,7 @@ func (sc *scProcessor) processSCRForSenderAfterBuiltIn(
 	txHash []byte,
 	vmInput *vmcommon.ContractCallInput,
 	vmOutput *vmcommon.VMOutput,
+	prototypeGasRefundRecipient []byte,
 ) (*smartContractResult.SmartContractResult, *smartContractResult.SmartContractResult, error) {
 	sc.penalizeUserIfNeeded(tx, txHash, vmInput.CallType, vmInput.GasProvided, vmOutput)
 	scrForSender, scrForRelayer := sc.createSCRForSenderAndRelayer(
@@ -1118,6 +1133,9 @@ func (sc *scProcessor) processSCRForSenderAfterBuiltIn(
 		txHash,
 		vmInput.CallType,
 	)
+	if len(prototypeGasRefundRecipient) != 0 {
+		scrForSender.RcvAddr = append([]byte(nil), prototypeGasRefundRecipient...)
+	}
 
 	err := sc.addGasRefundIfInShard(scrForSender.RcvAddr, scrForSender.Value)
 	if err != nil {

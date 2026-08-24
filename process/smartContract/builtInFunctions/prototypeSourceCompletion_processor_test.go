@@ -9,10 +9,13 @@ import (
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/esdt"
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/process"
+	processMock "github.com/multiversx/mx-chain-go/process/mock"
 	"github.com/multiversx/mx-chain-go/process/smartContract"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
 	"github.com/multiversx/mx-chain-go/process/smartContract/processorV2"
@@ -46,9 +49,10 @@ func TestPrototypeSourceCompletionProcessorAtomicMatrix(t *testing.T) {
 		wantEffect          bool
 		wantReturnCode      vmcommon.ReturnCode
 		wantRemaining       uint64
+		wantEGLDRefund      int64
 	}{
-		{name: "receipt success", wantBalance: 98, wantReturnCode: vmcommon.Ok, wantRemaining: 30},
-		{name: "refund success", refund: true, wantBalance: 100, wantReturnCode: vmcommon.Ok, wantRemaining: 20},
+		{name: "receipt success", wantBalance: 98, wantReturnCode: vmcommon.Ok, wantRemaining: 30, wantEGLDRefund: 30},
+		{name: "refund success", refund: true, wantBalance: 100, wantReturnCode: vmcommon.Ok, wantRemaining: 20, wantEGLDRefund: 20},
 		{name: "receipt removal failure rolls back", failAfterTerminalIO: true, wantBalance: 98, wantEffect: true, wantReturnCode: vmcommon.UserError},
 		{name: "refund post-credit failure rolls back", refund: true, failAfterTerminalIO: true, wantBalance: 98, wantEffect: true, wantReturnCode: vmcommon.UserError},
 	}
@@ -56,8 +60,8 @@ func TestPrototypeSourceCompletionProcessorAtomicMatrix(t *testing.T) {
 	for _, processorCase := range processors {
 		for _, test := range tests {
 			t.Run(processorCase.name+"/"+test.name, func(t *testing.T) {
-				processor, accountsDB, sourceAddress, tokenID, effectID, scr, observations := newPrototypeCompletionProcessorFixture(
-					t, processorCase.create, test.refund, test.failAfterTerminalIO,
+				processor, accountsDB, sourceAddress, tokenID, effectID, scr, observations, forwarded := newPrototypeCompletionProcessorFixture(
+					t, processorCase.create, test.refund, test.failAfterTerminalIO, nil, false,
 				)
 				returnCode, executionErr := processor.ProcessSmartContractResult(scr)
 				require.Equal(t, test.wantReturnCode, returnCode)
@@ -70,6 +74,7 @@ func TestPrototypeSourceCompletionProcessorAtomicMatrix(t *testing.T) {
 
 				account := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
 				require.Equal(t, test.wantBalance, loadPrototypeTokenBalance(t, account, tokenID))
+				require.Equal(t, test.wantEGLDRefund, account.GetBalance().Int64())
 				_, effectErr := drwaprototype.LoadOpenEffect(account.AccountDataHandler(), effectID)
 				if test.wantEffect {
 					require.NoError(t, effectErr)
@@ -80,6 +85,9 @@ func TestPrototypeSourceCompletionProcessorAtomicMatrix(t *testing.T) {
 					require.Equal(t, []uint64{test.wantRemaining}, observations.refunded)
 					require.Len(t, observations.fees, 1)
 					require.Zero(t, observations.fees[0].Sign())
+					require.Len(t, *forwarded, 1)
+					require.Equal(t, sourceAddress, (*forwarded)[0].RcvAddr)
+					require.Equal(t, test.wantEGLDRefund, (*forwarded)[0].Value.Int64())
 				}
 			})
 		}
@@ -87,12 +95,14 @@ func TestPrototypeSourceCompletionProcessorAtomicMatrix(t *testing.T) {
 }
 
 func TestPrototypeSourceCompletionDuplicateCannotMutateAfterEffectRemoval(t *testing.T) {
-	processor, accountsDB, sourceAddress, tokenID, effectID, scr, _ := newPrototypeCompletionProcessorFixture(
+	processor, accountsDB, sourceAddress, tokenID, effectID, scr, _, forwarded := newPrototypeCompletionProcessorFixture(
 		t,
 		func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
 			return processorV2.NewSmartContractProcessorV2(args)
 		},
 		true,
+		false,
+		nil,
 		false,
 	)
 	returnCode, err := processor.ProcessSmartContractResult(scr)
@@ -104,8 +114,136 @@ func TestPrototypeSourceCompletionDuplicateCannotMutateAfterEffectRemoval(t *tes
 
 	account := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
 	require.Equal(t, int64(100), loadPrototypeTokenBalance(t, account, tokenID))
+	require.Equal(t, int64(20), account.GetBalance().Int64())
+	creditedRefunds := 0
+	for _, result := range *forwarded {
+		if bytes.Equal(result.RcvAddr, sourceAddress) && result.Value.Cmp(big.NewInt(20)) == 0 {
+			creditedRefunds++
+		}
+	}
+	require.Equal(t, 1, creditedRefunds)
 	_, effectErr := drwaprototype.LoadOpenEffect(account.AccountDataHandler(), effectID)
 	require.ErrorIs(t, effectErr, drwaprototype.ErrOpenEffectNotFound)
+}
+
+func TestPrototypeSourceCompletionProcessorRejectsInvalidGasRefundRecipient(t *testing.T) {
+	processors := []struct {
+		name   string
+		create func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error)
+	}{
+		{name: "legacy", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return smartContract.NewSmartContractProcessor(args)
+		}},
+		{name: "v2", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return processorV2.NewSmartContractProcessorV2(args)
+		}},
+	}
+	mutations := []struct {
+		name   string
+		mutate func(output *vmcommon.VMOutput)
+	}{
+		{name: "missing", mutate: func(output *vmcommon.VMOutput) {
+			output.ProtocolExecution.GasRefundRecipient = nil
+		}},
+		{name: "wrong account", mutate: func(output *vmcommon.VMOutput) {
+			output.ProtocolExecution.GasRefundRecipient = bytes.Repeat([]byte{0x33}, prototypeAddressLength)
+		}},
+		{name: "smart contract", mutate: func(output *vmcommon.VMOutput) {
+			output.ProtocolExecution.GasRefundRecipient = make([]byte, prototypeAddressLength)
+		}},
+	}
+
+	for _, processorCase := range processors {
+		for _, mutation := range mutations {
+			t.Run(processorCase.name+"/"+mutation.name, func(t *testing.T) {
+				processor, accountsDB, sourceAddress, tokenID, effectID, scr, observations, forwarded := newPrototypeCompletionProcessorFixture(
+					t, processorCase.create, false, false, mutation.mutate, false,
+				)
+				returnCode, err := processor.ProcessSmartContractResult(scr)
+				require.Equal(t, vmcommon.ExecutionFailed, returnCode)
+				require.ErrorIs(t, err, scrCommon.ErrInvalidPrototypeForwardedGas)
+				require.Greater(t, accountsDB.revertCount, 0)
+
+				account := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+				require.Equal(t, int64(98), loadPrototypeTokenBalance(t, account, tokenID))
+				require.Zero(t, account.GetBalance().Sign())
+				_, effectErr := drwaprototype.LoadOpenEffect(account.AccountDataHandler(), effectID)
+				require.NoError(t, effectErr)
+				require.Empty(t, *forwarded)
+				require.Empty(t, observations.refunded)
+			})
+		}
+	}
+}
+
+func TestPrototypeSourceCompletionProcessorRollsBackAfterLocalRefundCredit(t *testing.T) {
+	processors := []struct {
+		name   string
+		create func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error)
+	}{
+		{name: "legacy", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return smartContract.NewSmartContractProcessor(args)
+		}},
+		{name: "v2", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return processorV2.NewSmartContractProcessorV2(args)
+		}},
+	}
+
+	for _, processorCase := range processors {
+		t.Run(processorCase.name, func(t *testing.T) {
+			processor, accountsDB, sourceAddress, tokenID, effectID, scr, _, forwarded := newPrototypeCompletionProcessorFixture(
+				t, processorCase.create, false, false, nil, true,
+			)
+			returnCode, err := processor.ProcessSmartContractResult(scr)
+			require.Equal(t, vmcommon.ExecutionFailed, returnCode)
+			require.ErrorContains(t, err, "injected result-forwarding failure")
+			require.Greater(t, accountsDB.revertCount, 0)
+
+			account := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+			require.Equal(t, int64(98), loadPrototypeTokenBalance(t, account, tokenID))
+			require.Zero(t, account.GetBalance().Sign())
+			_, effectErr := drwaprototype.LoadOpenEffect(account.AccountDataHandler(), effectID)
+			require.NoError(t, effectErr)
+			require.Empty(t, *forwarded)
+		})
+	}
+}
+
+func TestPrototypeSourceCompletionProcessorRejectsRelayerMetadataBeforeMutation(t *testing.T) {
+	processors := []struct {
+		name   string
+		create func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error)
+	}{
+		{name: "legacy", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return smartContract.NewSmartContractProcessor(args)
+		}},
+		{name: "v2", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error) {
+			return processorV2.NewSmartContractProcessorV2(args)
+		}},
+	}
+
+	for _, processorCase := range processors {
+		t.Run(processorCase.name, func(t *testing.T) {
+			processor, accountsDB, sourceAddress, tokenID, effectID, scr, observations, forwarded := newPrototypeCompletionProcessorFixture(
+				t, processorCase.create, false, false, nil, false,
+			)
+			scr.RelayerAddr = bytes.Repeat([]byte{0x44}, prototypeAddressLength)
+			scr.RelayedValue = big.NewInt(0)
+
+			returnCode, err := processor.ProcessSmartContractResult(scr)
+			require.Equal(t, vmcommon.UserError, returnCode)
+			require.ErrorIs(t, err, process.ErrInvalidProtocolMessageRoute)
+			require.Zero(t, accountsDB.revertCount)
+
+			account := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+			require.Equal(t, int64(98), loadPrototypeTokenBalance(t, account, tokenID))
+			require.Zero(t, account.GetBalance().Sign())
+			_, effectErr := drwaprototype.LoadOpenEffect(account.AccountDataHandler(), effectID)
+			require.NoError(t, effectErr)
+			require.Empty(t, *forwarded)
+			require.Empty(t, observations.refunded)
+		})
+	}
 }
 
 func newPrototypeCompletionProcessorFixture(
@@ -113,7 +251,9 @@ func newPrototypeCompletionProcessorFixture(
 	create func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeResultProcessor, error),
 	refund bool,
 	failAfterTerminalIO bool,
-) (prototypeResultProcessor, *prototypeTrackingAccountsDB, []byte, []byte, [32]byte, *smartContractResult.SmartContractResult, *prototypeProcessorGasObservations) {
+	completionOutputMutation func(output *vmcommon.VMOutput),
+	forwardingFault bool,
+) (prototypeResultProcessor, *prototypeTrackingAccountsDB, []byte, []byte, [32]byte, *smartContractResult.SmartContractResult, *prototypeProcessorGasObservations, *[]*smartContractResult.SmartContractResult) {
 	t.Helper()
 	sourceAddress := bytes.Repeat([]byte{0x11}, prototypeAddressLength)
 	destinationAddress := bytes.Repeat([]byte{0x22}, prototypeAddressLength)
@@ -230,12 +370,20 @@ func newPrototypeCompletionProcessorFixture(
 		output, processErr := completion.ProcessBuiltinFunction(nil, account, input)
 		if processErr == nil {
 			require.NoError(t, accountsDB.SaveAccount(account))
+			if completionOutputMutation != nil {
+				completionOutputMutation(output)
+			}
 		}
 		return output, processErr
 	}}
 	observations := &prototypeProcessorGasObservations{}
 	forwarded := make([]*smartContractResult.SmartContractResult, 0)
 	args := newPrototypeDestinationProcessorArgs(t, accountsDB, coordinator, enableEpochs, hook, completion, &forwarded, observations)
+	if forwardingFault {
+		args.ScrForwarder = &processMock.IntermediateTransactionHandlerMock{AddIntermediateTransactionsCalled: func(_ []data.TransactionHandler, _ []byte) error {
+			return errors.New("injected result-forwarding failure")
+		}}
+	}
 	builtIns := vmcommonBuiltInFunctions.NewBuiltInFunctionContainer()
 	require.NoError(t, builtIns.Add(PrototypeSettlementReceiptFunction, completion))
 	require.NoError(t, builtIns.Add(PrototypeRefundEnvelopeFunction, completion))
@@ -243,7 +391,7 @@ func newPrototypeCompletionProcessorFixture(
 	processor, err := create(args)
 	require.NoError(t, err)
 
-	return processor, accountsDB, sourceAddress, tokenID, artifacts.OpenEffect.EffectID, scr, observations
+	return processor, accountsDB, sourceAddress, tokenID, artifacts.OpenEffect.EffectID, scr, observations, &forwarded
 }
 
 func loadPrototypeTokenBalance(t *testing.T, account prototypeJournalAccount, tokenID []byte) int64 {

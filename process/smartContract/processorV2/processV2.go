@@ -934,7 +934,7 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 	}
 
 	_, txTypeOnDst, _ := sc.txTypeHandler.ComputeTransactionType(tx)
-	builtInFuncGasUsed, matchedPrototypeGas, prototypeRefund, prototypeGasErr := scrCommon.PrototypeExecutionGasUsed(
+	builtInFuncGasUsed, matchedPrototypeGas, prototypeRefund, prototypeGasRefundRecipient, prototypeGasErr := scrCommon.PrototypeExecutionGasAccounting(
 		txTypeOnDst,
 		check.IfNil(acntSnd),
 		vmInput,
@@ -1052,14 +1052,15 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 	if !isSCCallCrossShard /* isSCCallSelfShard || txTypeOnDst != process.SCInvoking */ {
 		scrResults, errReturnCode, err = sc.completeOutputProcessingAndCreateCallback(
 			&outputDataFromCall{
-				vmInput:              &vmInput.VMInput,
-				vmOutput:             newVMOutput,
-				txHash:               txHash,
-				tx:                   tx,
-				scrTxs:               scrResults,
-				acntSnd:              acntSnd,
-				createdAsyncCallback: createdAsyncCallback,
-				failureContext:       failureContext,
+				vmInput:                     &vmInput.VMInput,
+				vmOutput:                    newVMOutput,
+				txHash:                      txHash,
+				tx:                          tx,
+				scrTxs:                      scrResults,
+				acntSnd:                     acntSnd,
+				createdAsyncCallback:        createdAsyncCallback,
+				failureContext:              failureContext,
+				prototypeGasRefundRecipient: prototypeGasRefundRecipient,
 			})
 		if errReturnCode != vmcommon.Ok || err != nil {
 			return errReturnCode, nil
@@ -1072,7 +1073,15 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 		return vmcommon.UserError, nil
 	}
 
-	return sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	returnCode, finishErr := sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	if finishErr != nil && len(prototypeGasRefundRecipient) != 0 {
+		revertErr := sc.accounts.RevertToSnapshot(failureContext.snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		return vmcommon.ExecutionFailed, finishErr
+	}
+	return returnCode, finishErr
 }
 
 func mergeOutputResultsWithBuiltinResults(results *outputResultsToBeMerged) (bool, []data.TransactionHandler) {
@@ -2074,14 +2083,15 @@ func (sc *scProcessor) processVMOutput(
 }
 
 type outputDataFromCall struct {
-	vmInput              *vmcommon.VMInput
-	vmOutput             *vmcommon.VMOutput
-	txHash               []byte
-	tx                   data.TransactionHandler
-	scrTxs               []data.TransactionHandler
-	acntSnd              state.UserAccountHandler
-	createdAsyncCallback bool
-	failureContext       *failureContext
+	vmInput                     *vmcommon.VMInput
+	vmOutput                    *vmcommon.VMOutput
+	txHash                      []byte
+	tx                          data.TransactionHandler
+	scrTxs                      []data.TransactionHandler
+	acntSnd                     state.UserAccountHandler
+	createdAsyncCallback        bool
+	failureContext              *failureContext
+	prototypeGasRefundRecipient []byte
 }
 
 func (sc *scProcessor) completeOutputProcessingAndCreateCallback(
@@ -2126,6 +2136,9 @@ func (sc *scProcessor) createSCRForSenderAndRelayerAndRefundGas(outData *outputD
 		outData.txHash,
 		outData.vmInput.CallType,
 	)
+	if len(outData.prototypeGasRefundRecipient) != 0 {
+		scrForSender.RcvAddr = append([]byte(nil), outData.prototypeGasRefundRecipient...)
+	}
 
 	var err error
 	if !check.IfNil(scrForRelayer) {
