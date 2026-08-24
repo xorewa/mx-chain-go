@@ -19,6 +19,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
 	"github.com/multiversx/mx-chain-go/sharding/nodesCoordinator"
 	"github.com/multiversx/mx-chain-go/state"
+	vmcommonBuiltInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,6 +93,7 @@ func TestPrototypeDRWAReceiverSeedsFreshGenesisStoresExactRecordAndLeavesControl
 	require.NoError(t, arg.Core.InternalMarshalizer().Unmarshal(canonicalBalance, encodedBalance))
 	require.Equal(t, "1000", canonicalBalance.Value.String())
 	require.Equal(t, uint32(core.Fungible), canonicalBalance.Type)
+	require.Empty(t, canonicalBalance.Properties)
 
 	control, _, err := account.RetrieveValue(drwaprototype.ReceiverGateStorageKey([]byte("OTHER-abcdef")))
 	require.NoError(t, err)
@@ -99,6 +101,46 @@ func TestPrototypeDRWAReceiverSeedsFreshGenesisStoresExactRecordAndLeavesControl
 	regulated, err = drwaprototype.IsPrototypeRegulatedToken(arg.Accounts, []byte("OTHER-abcdef"))
 	require.NoError(t, err)
 	require.False(t, regulated)
+}
+
+func TestPrototypeDRWAReceiverSeedsFreshGenesisStoresCanonicalFrozenDestinationState(t *testing.T) {
+	arg := prototypeReceiverGenesisArgument(t)
+	holderAddress := "a00102030405060708090001020304050607080900010203040506070809000a"
+	arg.PrototypeDRWACEBEpoch = 7
+	arg.PrototypeReceiverSeeds = []config.PrototypeDRWAReceiverSeedConfig{{
+		HolderAddress:     holderAddress,
+		TokenIdentifier:   "TOKEN-abcdef",
+		InitialFrozen:     true,
+		CEBEpoch:          7,
+		Admitted:          true,
+		ValidThroughRound: 1000,
+	}}
+
+	creator, err := NewGenesisBlockCreator(arg)
+	require.NoError(t, err)
+	_, err = creator.CreateGenesisBlocks()
+	require.NoError(t, err)
+
+	holderBytes, err := arg.Core.AddressPubKeyConverter().Decode(holderAddress)
+	require.NoError(t, err)
+	accountHandler, err := arg.Accounts.GetExistingAccount(holderBytes)
+	require.NoError(t, err)
+	account, ok := accountHandler.(state.UserAccountHandler)
+	require.True(t, ok)
+	balanceKey := []byte(core.ProtectedKeyPrefix + core.ESDTKeyIdentifier + "TOKEN-abcdef")
+	encodedToken, _, err := account.RetrieveValue(balanceKey)
+	require.NoError(t, err)
+	tokenState := &esdt.ESDigitalToken{}
+	require.NoError(t, arg.Core.InternalMarshalizer().Unmarshal(tokenState, encodedToken))
+	require.Zero(t, tokenState.Value.Sign())
+	require.Equal(t, uint32(core.Fungible), tokenState.Type)
+	require.True(t, vmcommonBuiltInFunctions.ESDTUserMetadataFromBytes(tokenState.Properties).Frozen)
+
+	receiverBytes, _, err := account.RetrieveValue(drwaprototype.ReceiverGateStorageKey([]byte("TOKEN-abcdef")))
+	require.NoError(t, err)
+	receiver, err := drwaprototype.DecodeReceiverGateRecord(receiverBytes)
+	require.NoError(t, err)
+	require.True(t, receiver.Admitted)
 }
 
 func prototypeReceiverGenesisArgument(t *testing.T) ArgsGenesisBlockCreator {

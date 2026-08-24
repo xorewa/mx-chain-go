@@ -14,6 +14,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
 	"github.com/multiversx/mx-chain-core-go/data/transaction"
+	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
@@ -2116,7 +2117,6 @@ func TestTxProcessor_ProcessRelayedTransaction(t *testing.T) {
 	returnCode, err := execTx.ProcessTransaction(&tx)
 	assert.Nil(t, err)
 	assert.Equal(t, vmcommon.Ok, returnCode)
-
 	tx.Nonce = tx.Nonce + 1
 	userTx.Nonce = userTx.Nonce + 1
 	userTx.Value = big.NewInt(200)
@@ -3169,6 +3169,16 @@ func TestTxProcessor_ProcessUserTxOfTypeBuiltInFunctionCallShouldWork(t *testing
 		return nil, errors.New("failure")
 	}
 	args.Accounts = adb
+	var relayedInner *smartContractResult.SmartContractResult
+	args.ScProcessor = &testscommon.SCProcessorMock{ExecuteBuiltInFunctionCalled: func(
+		inner data.TransactionHandler,
+		_, _ state.UserAccountHandler,
+	) (vmcommon.ReturnCode, error) {
+		var ok bool
+		relayedInner, ok = inner.(*smartContractResult.SmartContractResult)
+		require.True(t, ok)
+		return vmcommon.Ok, nil
+	}}
 	args.TxTypeHandler = &testscommon.TxTypeHandlerMock{ComputeTransactionTypeCalled: func(tx data.TransactionHandler) (transactionType, destinationTransactionType process.TransactionType, isRelayedV3 bool) {
 		return process.BuiltInFunctionCall, process.BuiltInFunctionCall, false
 	}}
@@ -3178,6 +3188,12 @@ func TestTxProcessor_ProcessUserTxOfTypeBuiltInFunctionCallShouldWork(t *testing
 	returnCode, err := execTx.ProcessUserTx(&tx, &userTx, tx.Value, tx.Nonce, tx.SndAddr, txHash)
 	assert.Nil(t, err)
 	assert.Equal(t, vmcommon.Ok, returnCode)
+	require.NotNil(t, relayedInner)
+	require.Equal(t, tx.SndAddr, relayedInner.RelayerAddr)
+	require.Equal(t, vmData.DirectCall, relayedInner.CallType)
+	require.Equal(t, vmData.ProtocolMessageKindNone, relayedInner.ProtocolMessageKind)
+	require.Equal(t, txHash, relayedInner.OriginalTxHash)
+	require.Equal(t, txHash, relayedInner.PrevTxHash)
 }
 
 func TestTxProcessor_ProcessUserTxErrNotPayableShouldFailRelayTx(t *testing.T) {

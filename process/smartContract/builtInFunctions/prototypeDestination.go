@@ -36,6 +36,8 @@ var (
 	ErrPrototypeDestinationMutation = errors.New("non-normative DRWA prototype destination mutation failed")
 	// ErrInvalidPrototypeDestinationDelegate signals unusable destination construction dependencies or output.
 	ErrInvalidPrototypeDestinationDelegate = errors.New("invalid non-normative DRWA prototype destination delegate")
+	// ErrPrototypeReceiverDenied signals a missing, malformed or ineligible S1 receiver binding.
+	ErrPrototypeReceiverDenied = errors.New("non-normative DRWA prototype receiver denied")
 )
 
 type prototypeRetainedWorkBudgetsProvider func([32]byte) (drwaprototype.WorkBudgets, uint64, error)
@@ -303,18 +305,43 @@ func (destination *prototypeDestination) validateDestinationProgram(
 		return fmt.Errorf("%w: gas identity, budget or total", ErrPrototypeDestinationDenied)
 	}
 
-	dataHandler := acntDst.AccountDataHandler()
-	if check.IfNil(dataHandler) {
-		return fmt.Errorf("%w: nil destination data handler", ErrPrototypeDestinationDenied)
-	}
-	receiverGate, err := drwaprototype.LoadReceiverGateRecord(dataHandler, context.RegulatedTokenID)
+	err = validatePrototypeReceiver(
+		acntDst,
+		context.RegulatedTokenID,
+		context.DestinationHolder[:],
+		context.CEBEpoch,
+		currentRound,
+	)
 	if err != nil {
 		return fmt.Errorf("%w: receiver gate: %w", ErrPrototypeDestinationDenied, err)
 	}
-	if receiverGate.Holder != context.DestinationHolder ||
-		receiverGate.CEBEpoch != context.CEBEpoch ||
+
+	return nil
+}
+
+func validatePrototypeReceiver(
+	account vmcommon.UserAccountHandler,
+	tokenID []byte,
+	expectedHolder []byte,
+	expectedCEBEpoch uint32,
+	currentRound uint64,
+) error {
+	if check.IfNil(account) || len(expectedHolder) != prototypeAddressLength || expectedCEBEpoch == 0 {
+		return ErrPrototypeReceiverDenied
+	}
+	dataHandler := account.AccountDataHandler()
+	if check.IfNil(dataHandler) {
+		return fmt.Errorf("%w: nil data handler", ErrPrototypeReceiverDenied)
+	}
+	receiverGate, err := drwaprototype.LoadReceiverGateRecord(dataHandler, tokenID)
+	if err != nil {
+		return fmt.Errorf("%w: record: %w", ErrPrototypeReceiverDenied, err)
+	}
+	var holder [prototypeAddressLength]byte
+	copy(holder[:], expectedHolder)
+	if receiverGate.Holder != holder || receiverGate.CEBEpoch != expectedCEBEpoch ||
 		!receiverGate.Admitted || currentRound > receiverGate.ValidThroughRound {
-		return fmt.Errorf("%w: receiver gate binding", ErrPrototypeDestinationDenied)
+		return ErrPrototypeReceiverDenied
 	}
 
 	return nil

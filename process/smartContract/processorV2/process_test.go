@@ -1864,6 +1864,20 @@ func TestScProcessor_CreateVMCallInputPrototypeNativeOriginFailsClosed(t *testin
 			},
 		},
 		{
+			name: "relayed v1 inner smart contract result",
+			tx: &smartContractResult.SmartContractResult{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+				RelayerAddr: []byte("RELAYER"), RelayedValue: big.NewInt(1),
+			},
+		},
+		{
+			name: "relayed v2 inner smart contract result",
+			tx: &smartContractResult.SmartContractResult{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+				RelayerAddr: []byte("RELAYER"), RelayedValue: big.NewInt(0),
+			},
+		},
+		{
 			name: "relayed v3 transaction",
 			tx: &transaction.Transaction{
 				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),

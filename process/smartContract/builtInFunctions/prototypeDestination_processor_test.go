@@ -43,6 +43,7 @@ type prototypeProcessorGasObservations struct {
 	devFees   []*big.Int
 	refunded  []uint64
 	penalized []uint64
+	returns   []string
 }
 
 const prototypeOrdinaryControlFunction = "prototypeOrdinaryControl"
@@ -63,7 +64,7 @@ func TestPrototypeAccountingSeamPreservesOrdinaryBuiltInAcrossBothProcessors(t *
 	for _, processorCase := range processors {
 		t.Run(processorCase.name, func(t *testing.T) {
 			processor, accountsDB, tokenID, destinationAddress, forwarded, observations := newPrototypeDestinationProcessorFixture(
-				t, processorCase.create, true, false, false,
+				t, processorCase.create, true, false, false, false,
 			)
 			scr := &smartContractResult.SmartContractResult{
 				Value:          big.NewInt(0),
@@ -116,6 +117,7 @@ func TestPrototypeDestinationProcessorSuccessAndRollbackControls(t *testing.T) {
 		admitted        bool
 		postCreditFault bool
 		accountingFault bool
+		initialFrozen   bool
 		wantBalance     int64
 		wantFunction    string
 		wantReturnCode  vmcommon.ReturnCode
@@ -125,10 +127,12 @@ func TestPrototypeDestinationProcessorSuccessAndRollbackControls(t *testing.T) {
 		wantObservedFee int64
 		wantFeeCalls    int
 		wantRefunded    []uint64
+		wantReturnText  string
 	}{
 		{name: "no injection success", admitted: true, wantBalance: 2, wantFunction: PrototypeSettlementReceiptFunction, wantReturnCode: vmcommon.Ok, wantForwardGas: 70, wantFeeCalls: 1, wantRefunded: []uint64{0}},
 		{name: "receiver denial", admitted: false, wantBalance: 0, wantFunction: PrototypeRefundEnvelopeFunction, wantReturnCode: vmcommon.Ok, wantRevert: true, wantForwardGas: 60, wantFeeCalls: 1, wantRefunded: []uint64{0}},
 		{name: "after credit output failure", admitted: true, postCreditFault: true, wantBalance: 0, wantFunction: PrototypeRefundEnvelopeFunction, wantReturnCode: vmcommon.Ok, wantRevert: true, wantForwardGas: 60, wantFeeCalls: 1, wantRefunded: []uint64{0}},
+		{name: "wrapped baseline frozen account failure", admitted: true, initialFrozen: true, wantBalance: 0, wantFunction: PrototypeRefundEnvelopeFunction, wantReturnCode: vmcommon.Ok, wantRevert: true, wantForwardGas: 60, wantFeeCalls: 1, wantRefunded: []uint64{0}, wantReturnText: vmcommonBuiltInFunctions.ErrESDTIsFrozenForAccount.Error()},
 		{name: "after credit accounting output corruption", admitted: true, accountingFault: true, wantBalance: 0, wantReturnCode: vmcommon.ExecutionFailed, wantRevert: true, wantIntegrity: true},
 	}
 
@@ -138,7 +142,7 @@ func TestPrototypeDestinationProcessorSuccessAndRollbackControls(t *testing.T) {
 			test := test
 			t.Run(processorCase.name+"/"+test.name, func(t *testing.T) {
 				processor, accountsDB, tokenID, destinationAddress, forwarded, observations := newPrototypeDestinationProcessorFixture(
-					t, processorCase.create, test.admitted, test.postCreditFault, test.accountingFault,
+					t, processorCase.create, test.admitted, test.postCreditFault, test.accountingFault, test.initialFrozen,
 				)
 				scr := newPrototypeDestinationSCR(t, tokenID, destinationAddress)
 				returnCode, executionErr := processor.ProcessSmartContractResult(scr)
@@ -185,6 +189,10 @@ func TestPrototypeDestinationProcessorSuccessAndRollbackControls(t *testing.T) {
 				}
 				require.Equal(t, test.wantRefunded, observations.refunded)
 				require.Empty(t, observations.penalized)
+				if test.wantReturnText != "" {
+					require.Len(t, observations.returns, 1)
+					require.Contains(t, observations.returns[0], test.wantReturnText)
+				}
 			})
 		}
 	}
@@ -196,6 +204,7 @@ func newPrototypeDestinationProcessorFixture(
 	admitted bool,
 	postCreditFault bool,
 	accountingFault bool,
+	initialFrozen bool,
 ) (prototypeResultProcessor, *prototypeTrackingAccountsDB, []byte, []byte, *[]*smartContractResult.SmartContractResult, *prototypeProcessorGasObservations) {
 	t.Helper()
 	sourceAddress := bytes.Repeat([]byte{0x11}, prototypeAddressLength)
@@ -219,6 +228,17 @@ func newPrototypeDestinationProcessorFixture(
 	require.NoError(t, destinationAccount.AccountDataHandler().SaveKeyValue(
 		drwaprototype.ReceiverGateStorageKey(tokenID), receiverBytes,
 	))
+	if initialFrozen {
+		encodedToken, marshalErr := testIntegration.TestMarshalizer.Marshal(&esdt.ESDigitalToken{
+			Value:      big.NewInt(0),
+			Type:       uint32(core.Fungible),
+			Properties: (&vmcommonBuiltInFunctions.ESDTUserMetadata{Frozen: true}).ToBytes(),
+		})
+		require.NoError(t, marshalErr)
+		require.NoError(t, destinationAccount.AccountDataHandler().SaveKeyValue(
+			append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier), tokenID...), encodedToken,
+		))
+	}
 	require.NoError(t, accountsDB.SaveAccount(destinationAccount))
 	_, err = accountsDB.Commit()
 	require.NoError(t, err)
@@ -262,6 +282,7 @@ func newPrototypeDestinationProcessorFixture(
 		}}
 	}
 
+	observations := &prototypeProcessorGasObservations{}
 	var hook *testscommon.BlockChainHookStub
 	hook = &testscommon.BlockChainHookStub{
 		CurrentRoundCalled: func() uint64 { return 7 },
@@ -270,6 +291,9 @@ func newPrototypeDestinationProcessorFixture(
 				return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: 70}, nil
 			}
 			output, processErr := destination.ProcessBuiltinFunction(nil, destinationAccount, input)
+			if output != nil {
+				observations.returns = append(observations.returns, output.ReturnMessage)
+			}
 			if processErr == nil {
 				if accountingFault {
 					for _, outputAccount := range output.OutputAccounts {
@@ -283,7 +307,6 @@ func newPrototypeDestinationProcessorFixture(
 	}
 	require.NoError(t, destination.setBlockchainHook(hook))
 	forwarded := make([]*smartContractResult.SmartContractResult, 0, 1)
-	observations := &prototypeProcessorGasObservations{}
 	args := newPrototypeDestinationProcessorArgs(t, accountsDB, coordinator, enableEpochs, hook, destination, &forwarded, observations)
 	processor, err := create(args)
 	require.NoError(t, err)

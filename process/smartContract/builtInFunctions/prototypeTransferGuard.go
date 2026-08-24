@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
+	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
 	"github.com/multiversx/mx-chain-go/sharding"
@@ -28,15 +30,21 @@ var (
 	ErrPrototypeRegulatedTransferRequiresDRWA = errors.New("non-normative DRWA prototype regulated token requires the DRWA transfer path")
 	// ErrInvalidPrototypeTransferGuardDelegate signals a baseline transfer that cannot preserve required factory behavior.
 	ErrInvalidPrototypeTransferGuardDelegate = errors.New("invalid non-normative DRWA prototype transfer guard delegate")
+	// ErrPrototypeSameShardTransferDenied signals fail-closed rejection of a marked local fungible route.
+	ErrPrototypeSameShardTransferDenied = errors.New("non-normative DRWA prototype same-shard transfer denied")
 )
 
 type prototypeTokenClassifier func(tokenID []byte) (bool, error)
+type prototypeCurrentRoundProvider func() (uint64, error)
 
 type prototypeTransferGuard struct {
-	functionName        string
-	delegate            vmcommon.BuiltinFunction
-	classifier          prototypeTokenClassifier
-	enableEpochsHandler vmcommon.EnableEpochsHandler
+	functionName         string
+	delegate             vmcommon.BuiltinFunction
+	classifier           prototypeTokenClassifier
+	enableEpochsHandler  vmcommon.EnableEpochsHandler
+	shardCoordinator     sharding.Coordinator
+	cebEpoch             uint32
+	currentRoundProvider prototypeCurrentRoundProvider
 }
 
 func newPrototypeTransferGuard(
@@ -44,8 +52,12 @@ func newPrototypeTransferGuard(
 	delegate vmcommon.BuiltinFunction,
 	classifier prototypeTokenClassifier,
 	enableEpochsHandler vmcommon.EnableEpochsHandler,
+	shardCoordinator sharding.Coordinator,
+	cebEpoch uint32,
+	currentRoundProvider prototypeCurrentRoundProvider,
 ) (*prototypeTransferGuard, error) {
-	if check.IfNil(delegate) || classifier == nil || check.IfNil(enableEpochsHandler) {
+	if check.IfNil(delegate) || classifier == nil || check.IfNil(enableEpochsHandler) ||
+		check.IfNil(shardCoordinator) || currentRoundProvider == nil {
 		return nil, ErrInvalidPrototypeTransferGuardDelegate
 	}
 	_, ok := delegate.(vmcommon.AcceptPayableChecker)
@@ -54,10 +66,13 @@ func newPrototypeTransferGuard(
 	}
 
 	return &prototypeTransferGuard{
-		functionName:        functionName,
-		delegate:            delegate,
-		classifier:          classifier,
-		enableEpochsHandler: enableEpochsHandler,
+		functionName:         functionName,
+		delegate:             delegate,
+		classifier:           classifier,
+		enableEpochsHandler:  enableEpochsHandler,
+		shardCoordinator:     shardCoordinator,
+		cebEpoch:             cebEpoch,
+		currentRoundProvider: currentRoundProvider,
 	}, nil
 }
 
@@ -83,11 +98,87 @@ func (guard *prototypeTransferGuard) ProcessBuiltinFunction(
 			return nil, fmt.Errorf("classify ordinary transfer token for non-normative DRWA prototype: %w", err)
 		}
 		if regulated {
+			if guard.isSameShardFungibleCandidate(acntSnd, acntDst, vmInput) {
+				return guard.processSameShardFungible(acntSnd, acntDst, vmInput, tokenID)
+			}
 			return nil, ErrPrototypeRegulatedTransferRequiresDRWA
 		}
 	}
 
 	return guard.delegate.ProcessBuiltinFunction(acntSnd, acntDst, vmInput)
+}
+
+func (guard *prototypeTransferGuard) isSameShardFungibleCandidate(
+	acntSnd, acntDst vmcommon.UserAccountHandler,
+	vmInput *vmcommon.ContractCallInput,
+) bool {
+	if guard.functionName != core.BuiltInFunctionESDTTransfer || vmInput == nil ||
+		check.IfNil(acntSnd) || check.IfNil(acntDst) {
+		return false
+	}
+	source := acntSnd.AddressBytes()
+	destination := acntDst.AddressBytes()
+	return guard.shardCoordinator.ComputeId(source) == guard.shardCoordinator.SelfId() &&
+		guard.shardCoordinator.ComputeId(destination) == guard.shardCoordinator.SelfId()
+}
+
+func (guard *prototypeTransferGuard) processSameShardFungible(
+	acntSnd, acntDst vmcommon.UserAccountHandler,
+	vmInput *vmcommon.ContractCallInput,
+	tokenID []byte,
+) (*vmcommon.VMOutput, error) {
+	err := guard.validateSameShardAdmission(acntSnd, acntDst, vmInput, tokenID)
+	if err != nil {
+		return nil, err
+	}
+	currentRound, err := guard.currentRoundProvider()
+	if err != nil {
+		return nil, fmt.Errorf("%w: current round: %w", ErrPrototypeSameShardTransferDenied, err)
+	}
+	err = validatePrototypeReceiver(acntDst, tokenID, acntDst.AddressBytes(), guard.cebEpoch, currentRound)
+	if err != nil {
+		return nil, fmt.Errorf("%w: receiver: %w", ErrPrototypeSameShardTransferDenied, err)
+	}
+
+	return guard.delegate.ProcessBuiltinFunction(acntSnd, acntDst, vmInput)
+}
+
+func (guard *prototypeTransferGuard) validateSameShardAdmission(
+	acntSnd, acntDst vmcommon.UserAccountHandler,
+	vmInput *vmcommon.ContractCallInput,
+	tokenID []byte,
+) error {
+	if guard.cebEpoch == 0 || len(vmInput.Arguments) != 2 ||
+		vmInput.Function != core.BuiltInFunctionESDTTransfer ||
+		vmInput.NativeCallOrigin != vmcommon.NativeCallOriginOriginalUserTransaction ||
+		vmInput.CallType != vmData.DirectCall || vmInput.CallValue == nil || vmInput.CallValue.Sign() != 0 ||
+		vmInput.GasLocked != 0 || vmInput.ReturnCallAfterError || hasPrototypeAsyncArguments(vmInput.AsyncArguments) ||
+		len(vmInput.ESDTTransfers) != 0 {
+		return fmt.Errorf("%w: execution origin", ErrPrototypeSameShardTransferDenied)
+	}
+	source := acntSnd.AddressBytes()
+	destination := acntDst.AddressBytes()
+	if len(source) != prototypeAddressLength || len(destination) != prototypeAddressLength ||
+		bytes.Equal(source, destination) || core.IsSmartContractAddress(source) || core.IsSmartContractAddress(destination) ||
+		!bytes.Equal(vmInput.CallerAddr, source) || !bytes.Equal(vmInput.RecipientAddr, destination) ||
+		guard.shardCoordinator.ComputeId(source) != guard.shardCoordinator.SelfId() ||
+		guard.shardCoordinator.ComputeId(destination) != guard.shardCoordinator.SelfId() {
+		return fmt.Errorf("%w: holder route", ErrPrototypeSameShardTransferDenied)
+	}
+	if len(vmInput.CurrentTxHash) != prototypeHashLength || len(vmInput.OriginalTxHash) != prototypeHashLength ||
+		len(vmInput.PrevTxHash) != prototypeHashLength ||
+		!bytes.Equal(vmInput.CurrentTxHash, vmInput.OriginalTxHash) ||
+		!bytes.Equal(vmInput.CurrentTxHash, vmInput.PrevTxHash) ||
+		bytes.Equal(vmInput.CurrentTxHash, make([]byte, prototypeHashLength)) {
+		return fmt.Errorf("%w: transaction identity", ErrPrototypeSameShardTransferDenied)
+	}
+	quantity := vmInput.Arguments[1]
+	if !bytes.Equal(vmInput.Arguments[0], tokenID) || !vmcommon.ValidateToken(tokenID) || len(tokenID) > 64 ||
+		len(quantity) == 0 || len(quantity) > 32 || quantity[0] == 0 || new(big.Int).SetBytes(quantity).Sign() <= 0 {
+		return fmt.Errorf("%w: transfer arguments", ErrPrototypeSameShardTransferDenied)
+	}
+
+	return nil
 }
 
 // SetNewGasConfig forwards gas schedule changes to the original transfer built-in.
@@ -176,6 +267,8 @@ type prototypeGuardedBuiltInFunctionFactory struct {
 	prototypeSourceDebit                  *prototypeSourceDebit
 	prototypeDestination                  *prototypeDestination
 	prototypeSourceCompletion             *prototypeSourceCompletion
+	mutBlockchainHook                     sync.RWMutex
+	blockchainHook                        vmcommon.BlockchainDataHook
 }
 
 // PrototypeDRWANetworkDomain returns the immutable value injected into this prototype factory.
@@ -255,6 +348,12 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) SetBlockchainHook(handler
 	if err != nil {
 		return err
 	}
+	if check.IfNil(handler) {
+		return ErrInvalidPrototypeTransferGuardDelegate
+	}
+	factory.mutBlockchainHook.Lock()
+	factory.blockchainHook = handler
+	factory.mutBlockchainHook.Unlock()
 	if factory.prototypeSourceDebit != nil {
 		err = factory.prototypeSourceDebit.setBlockchainHook(handler)
 		if err != nil {
@@ -265,6 +364,17 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) SetBlockchainHook(handler
 		return factory.prototypeDestination.setBlockchainHook(handler)
 	}
 	return nil
+}
+
+func (factory *prototypeGuardedBuiltInFunctionFactory) prototypeCurrentRound() (uint64, error) {
+	factory.mutBlockchainHook.RLock()
+	hook := factory.blockchainHook
+	factory.mutBlockchainHook.RUnlock()
+	if check.IfNil(hook) {
+		return 0, ErrPrototypeSameShardTransferDenied
+	}
+
+	return hook.CurrentRound(), nil
 }
 
 func (factory *prototypeGuardedBuiltInFunctionFactory) CreateBuiltInFunctionContainer() error {
@@ -300,7 +410,15 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) installPrototypeTransferG
 		if err != nil {
 			return err
 		}
-		guard, err := newPrototypeTransferGuard(functionName, delegate, classifier, factory.enableEpochsHandler)
+		guard, err := newPrototypeTransferGuard(
+			functionName,
+			delegate,
+			classifier,
+			factory.enableEpochsHandler,
+			factory.shardCoordinator,
+			factory.prototypeDRWACEBEpoch,
+			factory.prototypeCurrentRound,
+		)
 		if err != nil {
 			return err
 		}
@@ -361,5 +479,20 @@ func (factory *prototypeGuardedBuiltInFunctionFactory) installPrototypeTransferG
 	if err != nil {
 		return err
 	}
-	return container.Add(PrototypeRefundEnvelopeFunction, factory.prototypeSourceCompletion)
+	err = container.Add(PrototypeRefundEnvelopeFunction, factory.prototypeSourceCompletion)
+	if err != nil {
+		return err
+	}
+
+	factory.mutBlockchainHook.RLock()
+	hook := factory.blockchainHook
+	factory.mutBlockchainHook.RUnlock()
+	if check.IfNil(hook) {
+		return nil
+	}
+	err = factory.prototypeSourceDebit.setBlockchainHook(hook)
+	if err != nil {
+		return err
+	}
+	return factory.prototypeDestination.setBlockchainHook(hook)
 }

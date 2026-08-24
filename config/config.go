@@ -631,6 +631,7 @@ type PrototypeDRWAReceiverSeedConfig struct {
 	HolderAddress     string
 	TokenIdentifier   string
 	InitialBalance    string
+	InitialFrozen     bool
 	CEBEpoch          uint32
 	Admitted          bool
 	ValidThroughRound uint64

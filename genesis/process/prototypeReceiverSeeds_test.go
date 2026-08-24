@@ -10,6 +10,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data/esdt"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	vmcommonBuiltInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	"github.com/stretchr/testify/require"
 
 	"github.com/multiversx/mx-chain-go/config"
@@ -79,6 +80,42 @@ func TestValidateAndCanonicalizePrototypeDRWAReceiverSeedsEncodesCanonicalInitia
 	require.NoError(t, arg.Core.InternalMarshalizer().Unmarshal(decoded, canonical[0].encodedBalance))
 	require.Equal(t, configured.InitialBalance, decoded.Value.String())
 	require.Equal(t, uint32(core.Fungible), decoded.Type)
+	require.Empty(t, decoded.Properties)
+}
+
+func TestValidateAndCanonicalizePrototypeDRWAReceiverSeedsEncodesCanonicalFrozenState(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"zero balance frozen state":     "",
+		"positive balance frozen state": "1000",
+	}
+	for name, initialBalance := range tests {
+		initialBalance := initialBalance
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			configured := prototypeReceiverSeedConfig(prototypeReceiverSeedAddress(1), "TOKEN-abcdef")
+			configured.InitialBalance = initialBalance
+			configured.InitialFrozen = true
+			arg := prototypeReceiverSeedArgs([]config.PrototypeDRWAReceiverSeedConfig{configured})
+			arg.Core.(*genesisMock.CoreComponentsMock).IntMarsh = &testscommon.ProtoMarshalizerMock{}
+
+			canonical, err := validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg)
+			require.NoError(t, err)
+			require.Len(t, canonical, 1)
+			require.NotEmpty(t, canonical[0].balanceStorageKey)
+			decoded := &esdt.ESDigitalToken{}
+			require.NoError(t, arg.Core.InternalMarshalizer().Unmarshal(decoded, canonical[0].encodedBalance))
+			expectedBalance := "0"
+			if initialBalance != "" {
+				expectedBalance = initialBalance
+			}
+			require.Equal(t, expectedBalance, decoded.Value.String())
+			require.Equal(t, uint32(core.Fungible), decoded.Type)
+			require.True(t, vmcommonBuiltInFunctions.ESDTUserMetadataFromBytes(decoded.Properties).Frozen)
+		})
+	}
 }
 
 func TestValidateAndCanonicalizePrototypeDRWAReceiverSeedsRejectsEveryInvalidClass(t *testing.T) {

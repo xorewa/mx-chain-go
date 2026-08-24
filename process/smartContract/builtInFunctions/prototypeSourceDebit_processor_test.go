@@ -312,6 +312,183 @@ func TestPrototypeSourceDebitRealWrapperJournalRollbackMatrix(t *testing.T) {
 	}
 }
 
+func TestPrototypeSameShardRegulatedTransferProcessorSuccessAndRollbackMatrix(t *testing.T) {
+	processors := []struct {
+		name   string
+		create func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeBuiltInProcessor, error)
+	}{
+		{name: "legacy", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeBuiltInProcessor, error) {
+			return smartContract.NewSmartContractProcessor(args)
+		}},
+		{name: "v2", create: func(args scrCommon.ArgsNewSmartContractProcessor) (prototypeBuiltInProcessor, error) {
+			return processorV2.NewSmartContractProcessorV2(args)
+		}},
+	}
+	tests := []struct {
+		name                string
+		admitted            bool
+		injectAfterMutation bool
+		wantSuccess         bool
+	}{
+		{name: "no injection success", admitted: true, wantSuccess: true},
+		{name: "receiver denial", admitted: false},
+		{name: "delegate failure after both balance mutations", admitted: true, injectAfterMutation: true},
+	}
+
+	for _, processorCase := range processors {
+		processorCase := processorCase
+		for _, test := range tests {
+			test := test
+			t.Run(processorCase.name+"/"+test.name, func(t *testing.T) {
+				sourceAddress := bytes.Repeat([]byte{0x31}, prototypeAddressLength)
+				destinationAddress := bytes.Repeat([]byte{0x32}, prototypeAddressLength)
+				tokenID := []byte("TOKEN-abcdef")
+				esdtKey := append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier), tokenID...)
+				enableEpochs := enableEpochsHandlerMock.NewEnableEpochsHandlerStub(
+					common.SCDeployFlag,
+					common.BuiltInFunctionsFlag,
+					common.DRWAEnforcementFlag,
+				)
+				accountsDB := &prototypeTrackingAccountsDB{
+					AccountsDB: testIntegration.CreateAccountsDB(testIntegration.CreateMemUnit(), enableEpochs),
+				}
+				sourceAccount := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+				destinationAccount := loadPrototypeJournalAccount(t, accountsDB, destinationAddress)
+				encodedSource, err := testIntegration.TestMarshalizer.Marshal(&esdt.ESDigitalToken{
+					Value: big.NewInt(100),
+					Type:  uint32(core.Fungible),
+				})
+				require.NoError(t, err)
+				require.NoError(t, sourceAccount.AccountDataHandler().SaveKeyValue(esdtKey, encodedSource))
+				receiverBytes, err := drwaprototype.EncodeReceiverGateRecord(drwaprototype.ReceiverGateRecord{
+					Holder:            bytesToPrototypeAddress(destinationAddress),
+					CEBEpoch:          9,
+					Admitted:          test.admitted,
+					ValidThroughRound: 100,
+				})
+				require.NoError(t, err)
+				require.NoError(t, destinationAccount.AccountDataHandler().SaveKeyValue(
+					drwaprototype.ReceiverGateStorageKey(tokenID),
+					receiverBytes,
+				))
+				require.NoError(t, accountsDB.SaveAccount(sourceAccount))
+				require.NoError(t, accountsDB.SaveAccount(destinationAccount))
+				_, err = accountsDB.Commit()
+				require.NoError(t, err)
+				sourceAccount = loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+				destinationAccount = loadPrototypeJournalAccount(t, accountsDB, destinationAddress)
+
+				coordinator := &testscommon.ShardsCoordinatorMock{
+					NoShards:        2,
+					CurrentShard:    0,
+					ComputeIdCalled: func(_ []byte) uint32 { return 0 },
+				}
+				baselineDelegate, err := vmcommonBuiltInFunctions.NewESDTTransferFunc(
+					1,
+					testIntegration.TestMarshalizer,
+					&vmcommonMock.GlobalSettingsHandlerStub{},
+					&vmcommonMock.ShardCoordinatorStub{ComputeIdCalled: coordinator.ComputeId},
+					&vmcommonMock.ESDTRoleHandlerStub{},
+					&vmcommonMock.EnableEpochsHandlerStub{},
+				)
+				require.NoError(t, err)
+				require.NoError(t, baselineDelegate.SetPayableChecker(&vmcommonMock.PayableHandlerStub{}))
+				var delegate vmcommon.BuiltinFunction = baselineDelegate
+				mutationObserved := false
+				if test.injectAfterMutation {
+					delegateStub := &prototypeTransferDelegateStub{}
+					delegateStub.ProcessBuiltinFunctionCalled = func(acntSnd, acntDst vmcommon.UserAccountHandler, input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+						_, delegateErr := baselineDelegate.ProcessBuiltinFunction(acntSnd, acntDst, input)
+						require.NoError(t, delegateErr)
+						mutationObserved = true
+						return nil, errors.New("injected after same-shard balance mutations")
+					}
+					delegate = delegateStub
+				}
+				guard, err := newPrototypeTransferGuard(
+					core.BuiltInFunctionESDTTransfer,
+					delegate,
+					func(_ []byte) (bool, error) { return true, nil },
+					enableEpochs,
+					coordinator,
+					9,
+					func() (uint64, error) { return 7, nil },
+				)
+				require.NoError(t, err)
+
+				var wrapperErr error
+				drwaOutputCount := 0
+				hook := &testscommon.BlockChainHookStub{ProcessBuiltInFunctionCalled: func(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+					output, processErr := guard.ProcessBuiltinFunction(sourceAccount, destinationAccount, input)
+					wrapperErr = processErr
+					if processErr == nil {
+						require.NoError(t, accountsDB.SaveAccount(sourceAccount))
+						require.NoError(t, accountsDB.SaveAccount(destinationAccount))
+					}
+					return output, processErr
+				}}
+				args := newPrototypeProcessorArgs(t, accountsDB, coordinator, enableEpochs, hook, guard, &drwaOutputCount)
+				builtIns := vmcommonBuiltInFunctions.NewBuiltInFunctionContainer()
+				require.NoError(t, builtIns.Add(core.BuiltInFunctionESDTTransfer, guard))
+				args.BuiltInFunctions = builtIns
+				processor, err := processorCase.create(args)
+				require.NoError(t, err)
+
+				tx := &transaction.Transaction{
+					Nonce:    0,
+					SndAddr:  sourceAddress,
+					RcvAddr:  destinationAddress,
+					Value:    big.NewInt(0),
+					GasLimit: 100000,
+					Data: []byte(fmt.Sprintf("%s@%s@02",
+						core.BuiltInFunctionESDTTransfer,
+						hex.EncodeToString(tokenID),
+					)),
+				}
+				returnCode, executionErr := processor.ExecuteBuiltInFunction(tx, sourceAccount, destinationAccount)
+				if test.wantSuccess {
+					require.Equal(t, vmcommon.Ok, returnCode)
+					require.NoError(t, executionErr)
+				} else {
+					require.Equal(t, vmcommon.UserError, returnCode)
+					require.ErrorIs(t, executionErr, process.ErrFailedTransaction)
+					require.Greater(t, accountsDB.revertCount, 0)
+					if test.injectAfterMutation {
+						require.True(t, mutationObserved)
+					} else {
+						require.ErrorIs(t, wrapperErr, ErrPrototypeSameShardTransferDenied)
+					}
+				}
+				require.Zero(t, drwaOutputCount)
+
+				canonicalSource := loadPrototypeJournalAccount(t, accountsDB, sourceAddress)
+				canonicalDestination := loadPrototypeJournalAccount(t, accountsDB, destinationAddress)
+				wantSource := int64(100)
+				wantDestination := int64(0)
+				if test.wantSuccess {
+					wantSource = 98
+					wantDestination = 2
+				}
+				requirePrototypeTokenBalance(t, canonicalSource, esdtKey, wantSource)
+				requirePrototypeTokenBalance(t, canonicalDestination, esdtKey, wantDestination)
+			})
+		}
+	}
+}
+
+func requirePrototypeTokenBalance(t *testing.T, account prototypeJournalAccount, key []byte, expected int64) {
+	t.Helper()
+	encoded, _, err := account.AccountDataHandler().RetrieveValue(key)
+	require.NoError(t, err)
+	if len(encoded) == 0 {
+		require.Zero(t, expected)
+		return
+	}
+	token := &esdt.ESDigitalToken{}
+	require.NoError(t, testIntegration.TestMarshalizer.Unmarshal(token, encoded))
+	require.Zero(t, token.Value.Cmp(big.NewInt(expected)))
+}
+
 func capturePrototypeOpenEffect(
 	t *testing.T,
 	sourceDebit *prototypeSourceDebit,

@@ -1,12 +1,18 @@
 package builtInFunctions
 
 import (
+	"bytes"
 	"errors"
+	"math/big"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
+	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype"
 	"github.com/multiversx/mx-chain-go/testscommon"
+	trieMock "github.com/multiversx/mx-chain-go/testscommon/trie"
+	"github.com/multiversx/mx-chain-go/testscommon/vmcommonMocks"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	vmcommonMock "github.com/multiversx/mx-chain-vm-common-go/mock"
 	"github.com/stretchr/testify/require"
@@ -368,6 +374,9 @@ func TestPrototypeGuardedFactoryInstallsAndReinstallsProtocolHandlers(t *testing
 	factory, err := CreateBuiltInFunctionsFactory(args)
 	require.NoError(t, err)
 	require.IsType(t, &prototypeGuardedBuiltInFunctionFactory{}, factory)
+	guardedFactory := factory.(*prototypeGuardedBuiltInFunctionFactory)
+	_, err = guardedFactory.prototypeCurrentRound()
+	require.ErrorIs(t, err, ErrPrototypeSameShardTransferDenied)
 	require.Len(t, factory.BuiltInFunctionContainer().Keys(), 46)
 	require.Equal(t, 3, countPrototypeTransferGuards(t, factory.BuiltInFunctionContainer()))
 	requirePrototypeTransferGuardNames(t, factory.BuiltInFunctionContainer())
@@ -381,6 +390,8 @@ func TestPrototypeGuardedFactoryInstallsAndReinstallsProtocolHandlers(t *testing
 	require.NoError(t, err)
 	require.IsType(t, &prototypeSourceCompletion{}, function)
 	require.NoError(t, factory.SetPayableHandler(&testscommon.BlockChainHookStub{}))
+	hook := &testscommon.BlockChainHookStub{CurrentRoundCalled: func() uint64 { return 77 }}
+	require.NoError(t, factory.SetBlockchainHook(hook))
 
 	require.NoError(t, factory.CreateBuiltInFunctionContainer())
 	require.Len(t, factory.BuiltInFunctionContainer().Keys(), 46)
@@ -390,6 +401,15 @@ func TestPrototypeGuardedFactoryInstallsAndReinstallsProtocolHandlers(t *testing
 	require.NoError(t, err)
 	require.IsType(t, &prototypeDestination{}, function)
 	require.NoError(t, factory.SetPayableHandler(&testscommon.BlockChainHookStub{}))
+	round, err := guardedFactory.prototypeCurrentRound()
+	require.NoError(t, err)
+	require.Equal(t, uint64(77), round)
+	round, err = guardedFactory.prototypeSourceDebit.currentRound()
+	require.NoError(t, err)
+	require.Equal(t, uint64(77), round)
+	round, err = guardedFactory.prototypeDestination.currentRound()
+	require.NoError(t, err)
+	require.Equal(t, uint64(77), round)
 }
 
 func TestNewPrototypeTransferGuardRejectsDelegateWithoutPayableChecker(t *testing.T) {
@@ -400,9 +420,288 @@ func TestNewPrototypeTransferGuardRejectsDelegateWithoutPayableChecker(t *testin
 		&vmcommonMock.BuiltInFunctionStub{},
 		func(_ []byte) (bool, error) { return false, nil },
 		&vmcommonMock.EnableEpochsHandlerStub{},
+		&testscommon.ShardsCoordinatorMock{},
+		7,
+		func() (uint64, error) { return 1, nil },
 	)
 	require.Nil(t, guard)
 	require.ErrorIs(t, err, ErrInvalidPrototypeTransferGuardDelegate)
+}
+
+func TestPrototypeTransferGuardSameShardRegulatedSuccessDelegatesExactBaselineInput(t *testing.T) {
+	t.Parallel()
+
+	source := bytes.Repeat([]byte{0x11}, prototypeAddressLength)
+	destination := bytes.Repeat([]byte{0x22}, prototypeAddressLength)
+	tokenID := []byte("TOKEN-abcdef")
+	receiverBytes, err := drwaprototype.EncodeReceiverGateRecord(drwaprototype.ReceiverGateRecord{
+		Holder:            [prototypeAddressLength]byte(destination),
+		CEBEpoch:          7,
+		Admitted:          true,
+		ValidThroughRound: 100,
+	})
+	require.NoError(t, err)
+	senderAccount := &vmcommonMocks.UserAccountStub{AddressBytesCalled: func() []byte { return source }}
+	destinationAccount := &vmcommonMocks.UserAccountStub{
+		AddressBytesCalled: func() []byte { return destination },
+		AccountDataHandlerCalled: func() vmcommon.AccountDataHandler {
+			return &trieMock.DataTrieTrackerStub{RetrieveValueCalled: func(key []byte) ([]byte, uint32, error) {
+				require.Equal(t, drwaprototype.ReceiverGateStorageKey(tokenID), key)
+				return receiverBytes, 0, nil
+			}}
+		},
+	}
+	input := validPrototypeSameShardTransferInput(source, destination, tokenID)
+	output := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: 17}
+	delegateCalled := false
+	delegate := &prototypeTransferDelegateStub{}
+	delegate.ProcessBuiltinFunctionCalled = func(actualSender, actualDestination vmcommon.UserAccountHandler, actualInput *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+		delegateCalled = true
+		require.Same(t, senderAccount, actualSender)
+		require.Same(t, destinationAccount, actualDestination)
+		require.Same(t, input, actualInput)
+		return output, nil
+	}
+	guard := createPrototypeTransferGuardForTest(t, core.BuiltInFunctionESDTTransfer, delegate, true, func(_ []byte) (bool, error) {
+		return true, nil
+	})
+
+	actual, err := guard.ProcessBuiltinFunction(senderAccount, destinationAccount, input)
+	require.NoError(t, err)
+	require.Same(t, output, actual)
+	require.True(t, delegateCalled)
+}
+
+func TestPrototypeTransferGuardSameShardRegulatedRejectsEveryAdmissionPredicate(t *testing.T) {
+	t.Parallel()
+
+	type scenario struct {
+		source      []byte
+		destination []byte
+		input       *vmcommon.ContractCallInput
+		guard       *prototypeTransferGuard
+	}
+	tests := []struct {
+		name   string
+		mutate func(*scenario)
+	}{
+		{name: "zero CEB", mutate: func(test *scenario) { test.guard.cebEpoch = 0 }},
+		{name: "wrong function", mutate: func(test *scenario) { test.input.Function = core.BuiltInFunctionESDTNFTTransfer }},
+		{name: "unknown origin", mutate: func(test *scenario) { test.input.NativeCallOrigin = vmcommon.NativeCallOriginUnknown }},
+		{name: "callback", mutate: func(test *scenario) { test.input.CallType = vmData.AsynchronousCallBack }},
+		{name: "nil call value", mutate: func(test *scenario) { test.input.CallValue = nil }},
+		{name: "positive call value", mutate: func(test *scenario) { test.input.CallValue = big.NewInt(1) }},
+		{name: "gas lock", mutate: func(test *scenario) { test.input.GasLocked = 1 }},
+		{name: "return after error", mutate: func(test *scenario) { test.input.ReturnCallAfterError = true }},
+		{name: "async metadata", mutate: func(test *scenario) { test.input.AsyncArguments = &vmcommon.AsyncArguments{CallID: []byte{1}} }},
+		{name: "ESDT transfer metadata", mutate: func(test *scenario) {
+			test.input.ESDTTransfers = []*vmcommon.ESDTTransfer{{ESDTTokenName: []byte("OTHER-abcdef")}}
+		}},
+		{name: "wrong argument count", mutate: func(test *scenario) { test.input.Arguments = test.input.Arguments[:1] }},
+		{name: "short source", mutate: func(test *scenario) {
+			test.source = test.source[:31]
+			test.input.CallerAddr = append([]byte(nil), test.source...)
+		}},
+		{name: "short destination", mutate: func(test *scenario) {
+			test.destination = test.destination[:31]
+			test.input.RecipientAddr = append([]byte(nil), test.destination...)
+		}},
+		{name: "self transfer", mutate: func(test *scenario) {
+			test.destination = append([]byte(nil), test.source...)
+			test.input.RecipientAddr = append([]byte(nil), test.destination...)
+		}},
+		{name: "smart contract source", mutate: func(test *scenario) {
+			test.source = make([]byte, prototypeAddressLength)
+			test.input.CallerAddr = append([]byte(nil), test.source...)
+		}},
+		{name: "smart contract destination", mutate: func(test *scenario) {
+			test.destination = make([]byte, prototypeAddressLength)
+			test.input.RecipientAddr = append([]byte(nil), test.destination...)
+		}},
+		{name: "caller mismatch", mutate: func(test *scenario) { test.input.CallerAddr[0] ^= 0xff }},
+		{name: "recipient mismatch", mutate: func(test *scenario) { test.input.RecipientAddr[0] ^= 0xff }},
+		{name: "short current hash", mutate: func(test *scenario) { test.input.CurrentTxHash = test.input.CurrentTxHash[:31] }},
+		{name: "short original hash", mutate: func(test *scenario) { test.input.OriginalTxHash = test.input.OriginalTxHash[:31] }},
+		{name: "short previous hash", mutate: func(test *scenario) { test.input.PrevTxHash = test.input.PrevTxHash[:31] }},
+		{name: "original hash mismatch", mutate: func(test *scenario) { test.input.OriginalTxHash[0] ^= 0xff }},
+		{name: "previous hash mismatch", mutate: func(test *scenario) { test.input.PrevTxHash[0] ^= 0xff }},
+		{name: "zero transaction identity", mutate: func(test *scenario) {
+			zero := make([]byte, prototypeHashLength)
+			test.input.CurrentTxHash = append([]byte(nil), zero...)
+			test.input.OriginalTxHash = append([]byte(nil), zero...)
+			test.input.PrevTxHash = append([]byte(nil), zero...)
+		}},
+		{name: "empty quantity", mutate: func(test *scenario) { test.input.Arguments[1] = nil }},
+		{name: "oversized quantity", mutate: func(test *scenario) { test.input.Arguments[1] = bytes.Repeat([]byte{1}, 33) }},
+		{name: "non-minimal quantity", mutate: func(test *scenario) { test.input.Arguments[1] = []byte{0, 1} }},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			source := bytes.Repeat([]byte{0x11}, prototypeAddressLength)
+			destination := bytes.Repeat([]byte{0x22}, prototypeAddressLength)
+			receiverHolder := append([]byte(nil), destination...)
+			tokenID := []byte("TOKEN-abcdef")
+			delegateCalled := false
+			delegate := &prototypeTransferDelegateStub{}
+			delegate.ProcessBuiltinFunctionCalled = func(_, _ vmcommon.UserAccountHandler, _ *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+				delegateCalled = true
+				return &vmcommon.VMOutput{}, nil
+			}
+			guard := createPrototypeTransferGuardForTest(t, core.BuiltInFunctionESDTTransfer, delegate, true, func(_ []byte) (bool, error) {
+				return true, nil
+			})
+			current := &scenario{source: source, destination: destination, input: validPrototypeSameShardTransferInput(source, destination, tokenID), guard: guard}
+			test.mutate(current)
+			senderAccount := &vmcommonMocks.UserAccountStub{AddressBytesCalled: func() []byte { return current.source }}
+			destinationAccount := validPrototypeReceiverAccount(t, current.destination, receiverHolder, tokenID, 7, 100)
+
+			output, err := guard.ProcessBuiltinFunction(senderAccount, destinationAccount, current.input)
+			require.Nil(t, output)
+			require.ErrorIs(t, err, ErrPrototypeSameShardTransferDenied)
+			require.False(t, delegateCalled)
+		})
+	}
+}
+
+func TestPrototypeTransferGuardMarkedCrossShardFungibleStillRequiresDRWA(t *testing.T) {
+	t.Parallel()
+
+	source := bytes.Repeat([]byte{0x11}, prototypeAddressLength)
+	destination := bytes.Repeat([]byte{0x22}, prototypeAddressLength)
+	delegateCalled := false
+	delegate := &prototypeTransferDelegateStub{}
+	delegate.ProcessBuiltinFunctionCalled = func(_, _ vmcommon.UserAccountHandler, _ *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+		delegateCalled = true
+		return &vmcommon.VMOutput{}, nil
+	}
+	guard := createPrototypeTransferGuardForTest(t, core.BuiltInFunctionESDTTransfer, delegate, true, func(_ []byte) (bool, error) {
+		return true, nil
+	})
+	guard.shardCoordinator = &testscommon.ShardsCoordinatorMock{NoShards: 2, CurrentShard: 0, ComputeIdCalled: func(address []byte) uint32 {
+		if bytes.Equal(address, destination) {
+			return 1
+		}
+		return 0
+	}}
+
+	output, err := guard.ProcessBuiltinFunction(
+		&vmcommonMocks.UserAccountStub{AddressBytesCalled: func() []byte { return source }},
+		&vmcommonMocks.UserAccountStub{AddressBytesCalled: func() []byte { return destination }},
+		validPrototypeSameShardTransferInput(source, destination, []byte("TOKEN-abcdef")),
+	)
+	require.Nil(t, output)
+	require.ErrorIs(t, err, ErrPrototypeRegulatedTransferRequiresDRWA)
+	require.False(t, delegateCalled)
+}
+
+func TestPrototypeTransferGuardSameShardRegulatedReceiverFailuresNeverDelegate(t *testing.T) {
+	t.Parallel()
+
+	source := bytes.Repeat([]byte{0x11}, prototypeAddressLength)
+	destination := bytes.Repeat([]byte{0x22}, prototypeAddressLength)
+	tokenID := []byte("TOKEN-abcdef")
+	tests := map[string]struct {
+		record       drwaprototype.ReceiverGateRecord
+		encoded      []byte
+		retrieveErr  error
+		currentRound uint64
+		roundErr     error
+		nilHandler   bool
+	}{
+		"missing":   {},
+		"malformed": {encoded: []byte{0xff}},
+		"not admitted": {
+			record: drwaprototype.ReceiverGateRecord{Holder: [prototypeAddressLength]byte(destination), CEBEpoch: 7, ValidThroughRound: 100},
+		},
+		"wrong holder": {
+			record: drwaprototype.ReceiverGateRecord{Holder: [prototypeAddressLength]byte(source), CEBEpoch: 7, Admitted: true, ValidThroughRound: 100},
+		},
+		"wrong CEB": {
+			record: drwaprototype.ReceiverGateRecord{Holder: [prototypeAddressLength]byte(destination), CEBEpoch: 8, Admitted: true, ValidThroughRound: 100},
+		},
+		"expired": {
+			record:       drwaprototype.ReceiverGateRecord{Holder: [prototypeAddressLength]byte(destination), CEBEpoch: 7, Admitted: true, ValidThroughRound: 9},
+			currentRound: 10,
+		},
+		"storage failure":       {retrieveErr: errors.New("injected receiver storage failure")},
+		"current round failure": {roundErr: errors.New("injected current round failure")},
+		"nil data handler":      {nilHandler: true},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			encoded := append([]byte(nil), test.encoded...)
+			if test.record.Holder != ([prototypeAddressLength]byte{}) {
+				var encodeErr error
+				encoded, encodeErr = drwaprototype.EncodeReceiverGateRecord(test.record)
+				require.NoError(t, encodeErr)
+			}
+			senderAccount := &vmcommonMocks.UserAccountStub{AddressBytesCalled: func() []byte { return source }}
+			destinationAccount := &vmcommonMocks.UserAccountStub{
+				AddressBytesCalled: func() []byte { return destination },
+				AccountDataHandlerCalled: func() vmcommon.AccountDataHandler {
+					if test.nilHandler {
+						return nil
+					}
+					return &trieMock.DataTrieTrackerStub{RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) {
+						return encoded, 0, test.retrieveErr
+					}}
+				},
+			}
+			delegateCalled := false
+			delegate := &prototypeTransferDelegateStub{}
+			delegate.ProcessBuiltinFunctionCalled = func(_, _ vmcommon.UserAccountHandler, _ *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+				delegateCalled = true
+				return &vmcommon.VMOutput{}, nil
+			}
+			guard := createPrototypeTransferGuardForTest(t, core.BuiltInFunctionESDTTransfer, delegate, true, func(_ []byte) (bool, error) {
+				return true, nil
+			})
+			guard.currentRoundProvider = func() (uint64, error) { return test.currentRound, test.roundErr }
+
+			output, err := guard.ProcessBuiltinFunction(senderAccount, destinationAccount, validPrototypeSameShardTransferInput(source, destination, tokenID))
+			require.Nil(t, output)
+			require.ErrorIs(t, err, ErrPrototypeSameShardTransferDenied)
+			if test.retrieveErr != nil {
+				require.ErrorIs(t, err, test.retrieveErr)
+			}
+			if test.roundErr != nil {
+				require.ErrorIs(t, err, test.roundErr)
+			}
+			require.False(t, delegateCalled)
+		})
+	}
+}
+
+func validPrototypeReceiverAccount(
+	t *testing.T,
+	accountAddress, receiverHolder, tokenID []byte,
+	ceb uint32,
+	validThrough uint64,
+) *vmcommonMocks.UserAccountStub {
+	t.Helper()
+
+	receiverBytes, err := drwaprototype.EncodeReceiverGateRecord(drwaprototype.ReceiverGateRecord{
+		Holder:            bytesToPrototypeAddress(receiverHolder),
+		CEBEpoch:          ceb,
+		Admitted:          true,
+		ValidThroughRound: validThrough,
+	})
+	require.NoError(t, err)
+	return &vmcommonMocks.UserAccountStub{
+		AddressBytesCalled: func() []byte { return accountAddress },
+		AccountDataHandlerCalled: func() vmcommon.AccountDataHandler {
+			return &trieMock.DataTrieTrackerStub{RetrieveValueCalled: func(key []byte) ([]byte, uint32, error) {
+				require.Equal(t, drwaprototype.ReceiverGateStorageKey(tokenID), key)
+				return receiverBytes, 0, nil
+			}}
+		},
+	}
 }
 
 type prototypeTransferDelegateStub struct {
@@ -446,10 +745,32 @@ func createPrototypeTransferGuardForTest(
 				return active
 			},
 		},
+		&testscommon.ShardsCoordinatorMock{NoShards: 3, CurrentShard: 0, ComputeIdCalled: func(_ []byte) uint32 { return 0 }},
+		7,
+		func() (uint64, error) { return 10, nil },
 	)
 	require.NoError(t, err)
 
 	return guard
+}
+
+func validPrototypeSameShardTransferInput(source, destination, tokenID []byte) *vmcommon.ContractCallInput {
+	txHash := bytes.Repeat([]byte{0x33}, prototypeHashLength)
+	return &vmcommon.ContractCallInput{
+		Function:      core.BuiltInFunctionESDTTransfer,
+		RecipientAddr: append([]byte(nil), destination...),
+		VMInput: vmcommon.VMInput{
+			CallerAddr:       append([]byte(nil), source...),
+			CallValue:        big.NewInt(0),
+			GasProvided:      1_000_000,
+			Arguments:        [][]byte{append([]byte(nil), tokenID...), {1}},
+			CurrentTxHash:    append([]byte(nil), txHash...),
+			OriginalTxHash:   append([]byte(nil), txHash...),
+			PrevTxHash:       append([]byte(nil), txHash...),
+			NativeCallOrigin: vmcommon.NativeCallOriginOriginalUserTransaction,
+			CallType:         vmData.DirectCall,
+		},
+	}
 }
 
 func prototypeSenderMultiArguments(firstToken, secondToken []byte) [][]byte {

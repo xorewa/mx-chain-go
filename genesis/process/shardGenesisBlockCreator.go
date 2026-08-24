@@ -16,6 +16,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data/esdt"
 	logger "github.com/multiversx/mx-chain-logger-go"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	vmcommonBuiltInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 
 	"github.com/multiversx/mx-chain-go/common"
@@ -273,9 +274,14 @@ func validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg ArgsGenesisBlockCreat
 			return nil, fmt.Errorf("%w: seed %d record encoding: %v", ErrInvalidPrototypeDRWAReceiverSeeds, index, err)
 		}
 
-		balanceStorageKey, encodedBalance, err := encodePrototypeDRWAInitialBalance(arg, tokenID, configured.InitialBalance)
+		balanceStorageKey, encodedBalance, err := encodePrototypeDRWAInitialTokenState(
+			arg,
+			tokenID,
+			configured.InitialBalance,
+			configured.InitialFrozen,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("%w: seed %d initial balance: %v", ErrInvalidPrototypeDRWAReceiverSeeds, index, err)
+			return nil, fmt.Errorf("%w: seed %d initial token state: %v", ErrInvalidPrototypeDRWAReceiverSeeds, index, err)
 		}
 
 		canonical = append(canonical, prototypeDRWAReceiverSeed{
@@ -300,31 +306,41 @@ func validateAndCanonicalizePrototypeDRWAReceiverSeeds(arg ArgsGenesisBlockCreat
 	return canonical, nil
 }
 
-func encodePrototypeDRWAInitialBalance(
+func encodePrototypeDRWAInitialTokenState(
 	arg ArgsGenesisBlockCreator,
 	tokenID []byte,
 	configured string,
+	initialFrozen bool,
 ) ([]byte, []byte, error) {
-	if configured == "" {
+	if configured == "" && !initialFrozen {
 		return nil, nil, nil
 	}
-	if configured[0] == '0' {
-		return nil, nil, errors.New("amount is not canonical positive decimal")
-	}
-	for _, character := range []byte(configured) {
-		if character < '0' || character > '9' {
+
+	amount := big.NewInt(0)
+	if configured != "" {
+		if configured[0] == '0' {
 			return nil, nil, errors.New("amount is not canonical positive decimal")
 		}
-	}
-	amount, ok := big.NewInt(0).SetString(configured, 10)
-	if !ok || amount.Sign() <= 0 || len(amount.Bytes()) > 32 {
-		return nil, nil, errors.New("amount is outside the positive 32-byte bound")
+		for _, character := range []byte(configured) {
+			if character < '0' || character > '9' {
+				return nil, nil, errors.New("amount is not canonical positive decimal")
+			}
+		}
+		var ok bool
+		amount, ok = big.NewInt(0).SetString(configured, 10)
+		if !ok || amount.Sign() <= 0 || len(amount.Bytes()) > 32 {
+			return nil, nil, errors.New("amount is outside the positive 32-byte bound")
+		}
 	}
 
-	encoded, err := arg.Core.InternalMarshalizer().Marshal(&esdt.ESDigitalToken{
+	tokenState := &esdt.ESDigitalToken{
 		Value: amount,
 		Type:  uint32(core.Fungible),
-	})
+	}
+	if initialFrozen {
+		tokenState.Properties = (&vmcommonBuiltInFunctions.ESDTUserMetadata{Frozen: true}).ToBytes()
+	}
+	encoded, err := arg.Core.InternalMarshalizer().Marshal(tokenState)
 	if err != nil {
 		return nil, nil, err
 	}
