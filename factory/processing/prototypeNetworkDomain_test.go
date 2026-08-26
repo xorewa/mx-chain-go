@@ -2,19 +2,34 @@ package processing
 
 import (
 	standardSHA256 "crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/hashing"
+	coreBlake2b "github.com/multiversx/mx-chain-core-go/hashing/blake2b"
 	coreSHA256 "github.com/multiversx/mx-chain-core-go/hashing/sha256"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/stretchr/testify/require"
+	standardBlake2b "golang.org/x/crypto/blake2b"
 
+	"github.com/multiversx/mx-chain-go/config"
+	"github.com/multiversx/mx-chain-go/dataRetriever"
+	"github.com/multiversx/mx-chain-go/process/smartContract/drwaprototype/networkidentity"
+	"github.com/multiversx/mx-chain-go/storage"
+	"github.com/multiversx/mx-chain-go/storage/storageunit"
 	"github.com/multiversx/mx-chain-go/testscommon/marshallerMock"
+	storageTests "github.com/multiversx/mx-chain-go/testscommon/storage"
 )
 
 // NON_NORMATIVE_DRWA_PROTOTYPE
@@ -63,11 +78,36 @@ func TestDerivePrototypeNetworkDomainUsesFinalMetachainGenesisHeader(t *testing.
 	require.NotEqual(t, networkDomain, changedDomain)
 }
 
+func TestDerivePrototypeNetworkDomainUsesConfiguredBlake2bForCanonicalHash(t *testing.T) {
+	t.Parallel()
+
+	chainID := "local-testnet"
+	metaHeader := prototypeMetaGenesisHeader(chainID)
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	canonicalHash, networkDomain, err := derivePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: metaHeader},
+		marshalizer,
+		coreBlake2b.NewBlake2b(),
+	)
+	require.NoError(t, err)
+	headerBytes, err := marshalizer.Marshal(metaHeader)
+	require.NoError(t, err)
+	require.Equal(t, standardBlake2b.Sum256(headerBytes), canonicalHash)
+
+	domainPreimage := append([]byte("DRWA/NETWORK/v1"+chainID), canonicalHash[:]...)
+	require.Equal(t, standardSHA256.Sum256(domainPreimage), networkDomain)
+}
+
 func TestDerivePrototypeNetworkDomainRejectsUnavailableOrWrongGenesis(t *testing.T) {
 	t.Parallel()
 
 	chainID := "localnet"
 	valid := prototypeMetaGenesisHeader(chainID)
+	missingStateRoot := prototypeMetaGenesisHeader(chainID)
+	missingStateRoot.RootHash = nil
+	missingValidatorRoot := prototypeMetaGenesisHeader(chainID)
+	missingValidatorRoot.ValidatorStatsRootHash = nil
 	marshalizer := &marshal.GogoProtoMarshalizer{}
 	hasher := coreSHA256.NewSha256()
 	tests := []struct {
@@ -79,7 +119,8 @@ func TestDerivePrototypeNetworkDomainRejectsUnavailableOrWrongGenesis(t *testing
 		{name: "missing metachain", actualChain: chainID, blocks: map[uint32]data.HeaderHandler{}},
 		{name: "wrong metachain type", actualChain: chainID, blocks: map[uint32]data.HeaderHandler{core.MetachainShardId: &block.Header{ShardID: core.MetachainShardId, ChainID: []byte(chainID)}}},
 		{name: "wrong header chain ID", actualChain: "other", blocks: map[uint32]data.HeaderHandler{core.MetachainShardId: valid}},
-		{name: "missing validator root", actualChain: chainID, blocks: map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{ChainID: []byte(chainID)}}},
+		{name: "missing state root", actualChain: chainID, blocks: map[uint32]data.HeaderHandler{core.MetachainShardId: missingStateRoot}},
+		{name: "missing validator root", actualChain: chainID, blocks: map[uint32]data.HeaderHandler{core.MetachainShardId: missingValidatorRoot}},
 	}
 
 	for _, test := range tests {
@@ -135,6 +176,808 @@ func TestDerivePrototypeNetworkDomainRejectsNilHashDependencies(t *testing.T) {
 	}
 }
 
+func TestResolvePrototypeNetworkDomainFreshGenesisPersistsExactSingleMarshal(t *testing.T) {
+	t.Parallel()
+
+	const canonicalEpoch = uint32(7)
+	chainID := "localnet"
+	metaHeader := prototypeMetaGenesisHeader(chainID)
+	metaHeader.Epoch = canonicalEpoch
+	blocks := map[uint32]data.HeaderHandler{core.MetachainShardId: metaHeader}
+	baseMarshalizer := &marshal.GogoProtoMarshalizer{}
+	marshalCalls := 0
+	marshalizer := &marshallerMock.MarshalizerStub{
+		MarshalCalled: func(obj interface{}) ([]byte, error) {
+			marshalCalls++
+			return baseMarshalizer.Marshal(obj)
+		},
+		UnmarshalCalled: baseMarshalizer.Unmarshal,
+	}
+	stored := make(map[string][]byte)
+	putCalls := 0
+	store := newPrototypeIdentityMemoryStore(stored, nil, nil, &putCalls)
+
+	canonicalHash, networkDomain, provenance, err := resolvePrototypeNetworkDomain(
+		chainID,
+		blocks,
+		canonicalEpoch,
+		canonicalEpoch,
+		store,
+		marshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 1, marshalCalls, "fresh genesis must marshal the final metachain header exactly once")
+	require.Equal(t, 1, putCalls)
+	require.Equal(t, prototypeNetworkIdentityProvenanceLocalCanonicalGenesis, provenance)
+
+	envelope := stored[string(prototypeNetworkIdentityKey(canonicalEpoch))]
+	identity, err := decodePrototypeNetworkIdentity(envelope, []byte(chainID))
+	require.NoError(t, err)
+	require.Equal(t, canonicalEpoch, identity.epoch)
+	require.Equal(t, provenance, identity.provenance)
+	require.Equal(t, []byte(chainID), identity.chainID)
+	headerBytes, err := baseMarshalizer.Marshal(metaHeader)
+	require.NoError(t, err)
+	require.Equal(t, headerBytes, identity.headerBytes)
+	require.Equal(t, standardSHA256.Sum256(headerBytes), canonicalHash)
+	require.Equal(t, canonicalHash, identity.canonicalHash)
+	require.NotEqual(t, [32]byte{}, networkDomain)
+	require.Equal(t, networkDomain, identity.networkDomain)
+}
+
+func TestResolvePrototypeNetworkDomainRestartLoadsRetainedIdentityNotPlaceholder(t *testing.T) {
+	t.Parallel()
+
+	const canonicalEpoch = uint32(0)
+	chainID := "localnet"
+	metaHeader := prototypeMetaGenesisHeader(chainID)
+	baseMarshalizer := &marshal.GogoProtoMarshalizer{}
+	headerBytes, err := baseMarshalizer.Marshal(metaHeader)
+	require.NoError(t, err)
+	envelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		canonicalEpoch,
+		prototypeNetworkIdentityProvenanceEmergencyMigration,
+		headerBytes,
+	))
+	require.NoError(t, err)
+	stored := map[string][]byte{string(prototypeNetworkIdentityKey(canonicalEpoch)): envelope}
+	putCalls := 0
+	store := newPrototypeIdentityMemoryStore(stored, nil, nil, &putCalls)
+	placeholder := &block.MetaBlock{Epoch: canonicalEpoch}
+
+	canonicalHash, networkDomain, provenance, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: placeholder},
+		canonicalEpoch,
+		40,
+		store,
+		baseMarshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, standardSHA256.Sum256(headerBytes), canonicalHash)
+	require.NotEqual(t, [32]byte{}, networkDomain)
+	require.Equal(t, prototypeNetworkIdentityProvenanceEmergencyMigration, provenance)
+	require.Zero(t, putCalls, "restart path is load-only")
+
+	secondHash, secondDomain, secondProvenance, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: placeholder},
+		canonicalEpoch,
+		41,
+		store,
+		baseMarshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, canonicalHash, secondHash)
+	require.Equal(t, networkDomain, secondDomain)
+	require.Equal(t, provenance, secondProvenance)
+	require.Zero(t, putCalls, "first and second restart paths must perform no repair or relocation write")
+}
+
+func TestResolvePrototypeNetworkDomainMissingIdentityRejectsPlaceholderWithoutWrite(t *testing.T) {
+	t.Parallel()
+
+	putCalls := 0
+	store := newPrototypeIdentityMemoryStore(make(map[string][]byte), nil, nil, &putCalls)
+	canonicalHash, networkDomain, provenance, err := resolvePrototypeNetworkDomain(
+		"localnet",
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		0,
+		40,
+		store,
+		&marshal.GogoProtoMarshalizer{},
+		coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Equal(t, [32]byte{}, canonicalHash)
+	require.Equal(t, [32]byte{}, networkDomain)
+	require.Zero(t, provenance)
+	require.Zero(t, putCalls)
+}
+
+func TestResolvePrototypeNetworkDomainRejectsReadWriteAndIdentityMismatches(t *testing.T) {
+	t.Parallel()
+
+	chainID := "localnet"
+	metaHeader := prototypeMetaGenesisHeader(chainID)
+	blocks := map[uint32]data.HeaderHandler{core.MetachainShardId: metaHeader}
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	headerBytes, err := marshalizer.Marshal(metaHeader)
+	require.NoError(t, err)
+	validEnvelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		headerBytes,
+	))
+	require.NoError(t, err)
+
+	readFailure := errors.New("read failure")
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 0,
+		newPrototypeIdentityMemoryStore(nil, readFailure, nil, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, readFailure)
+
+	writeFailure := errors.New("write failure")
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 0,
+		newPrototypeIdentityMemoryStore(make(map[string][]byte), nil, writeFailure, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, writeFailure)
+
+	wrongStoredEpochHeader := prototypeMetaGenesisHeader(chainID)
+	wrongStoredEpochHeader.Epoch = 1
+	wrongStoredEpochHeaderBytes, err := marshalizer.Marshal(wrongStoredEpochHeader)
+	require.NoError(t, err)
+	wrongEpochEnvelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		1,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		wrongStoredEpochHeaderBytes,
+	))
+	require.NoError(t, err)
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 4,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): wrongEpochEnvelope}, nil, nil, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "stored epoch 1, expected 0")
+
+	wrongChainEnvelope := append([]byte(nil), validEnvelope...)
+	wrongChainEnvelope[14] ^= 0xff
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 4,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): wrongChainEnvelope}, nil, nil, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "chain ID mismatch")
+
+	wrongCanonicalHashEnvelope := append([]byte(nil), validEnvelope...)
+	wrongCanonicalHashEnvelope[14+len(chainID)] ^= 0xff
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 4,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): wrongCanonicalHashEnvelope}, nil, nil, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "canonical hash mismatch")
+
+	wrongNetworkDomainEnvelope := append([]byte(nil), validEnvelope...)
+	wrongNetworkDomainEnvelope[14+len(chainID)+32] ^= 0xff
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 4,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): wrongNetworkDomainEnvelope}, nil, nil, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "network domain mismatch")
+
+	replacementHeader := prototypeMetaGenesisHeader(chainID)
+	replacementHeader.TimeStamp++
+	replacementHeaderBytes, marshalErr := marshalizer.Marshal(replacementHeader)
+	require.NoError(t, marshalErr)
+	replacementRecord := prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		replacementHeaderBytes,
+	)
+	validRecord, marshalErr := decodePrototypeNetworkIdentity(validEnvelope, []byte(chainID))
+	require.NoError(t, marshalErr)
+	replacementRecord.canonicalHash = validRecord.canonicalHash
+	replacementRecord.networkDomain = validRecord.networkDomain
+	replacementEnvelope, marshalErr := encodePrototypeNetworkIdentity(replacementRecord)
+	require.NoError(t, marshalErr)
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 4,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): replacementEnvelope}, nil, nil, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "canonical hash mismatch", "a same-chain/same-epoch header replacement cannot retain the old tuple identities")
+
+	wrongHeaderEpoch := prototypeMetaGenesisHeader(chainID)
+	wrongHeaderEpoch.Epoch = 1
+	wrongHeaderEpochBytes, marshalErr := marshalizer.Marshal(wrongHeaderEpoch)
+	require.NoError(t, marshalErr)
+	wrongHeaderEpochEnvelope, marshalErr := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		wrongHeaderEpochBytes,
+	))
+	require.NoError(t, marshalErr)
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID, blocks, 0, 4,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): wrongHeaderEpochEnvelope}, nil, nil, nil),
+		marshalizer, coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+
+	changed := prototypeMetaGenesisHeader(chainID)
+	changed.RootHash[0] ^= 0xff
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: changed},
+		0,
+		0,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): validEnvelope}, nil, nil, nil),
+		marshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+}
+
+func TestResolvePrototypeNetworkDomainDocumentsCoherentWholeTupleReplacementResidual(t *testing.T) {
+	t.Parallel()
+
+	chainID := "localnet"
+	oldGeneration := prototypeMetaGenesisHeader(chainID)
+	oldGeneration.TimeStamp--
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	headerBytes, err := marshalizer.Marshal(oldGeneration)
+	require.NoError(t, err)
+	envelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		headerBytes,
+	))
+	require.NoError(t, err)
+
+	hash, domain, provenance, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		0,
+		40,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): envelope}, nil, nil, nil),
+		marshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.NoError(t, err, "coherent whole-store replacement after genesis is the explicitly accepted protocol residual")
+	require.Equal(t, standardSHA256.Sum256(headerBytes), hash)
+	require.NotEqual(t, [32]byte{}, domain)
+	require.Equal(t, prototypeNetworkIdentityProvenanceLocalCanonicalGenesis, provenance)
+}
+
+func TestResolvePrototypeNetworkDomainFreshGenesisRejectsEmergencyMigrationProvenance(t *testing.T) {
+	t.Parallel()
+
+	chainID := "local-testnet"
+	header := prototypeMetaGenesisHeader(chainID)
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	hasher := coreSHA256.NewSha256()
+	canonicalHash, expectedDomain, headerBytes, err := marshalAndDerivePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: header},
+		0,
+		true,
+		marshalizer,
+		hasher,
+	)
+	require.NoError(t, err)
+
+	emergencyEnvelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceEmergencyMigration,
+		headerBytes,
+	))
+	require.NoError(t, err)
+	store := newPrototypeIdentityMemoryStore(
+		map[string][]byte{string(prototypeNetworkIdentityKey(0)): emergencyEnvelope},
+		nil,
+		nil,
+		nil,
+	)
+
+	actualHash, actualDomain, provenance, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: header},
+		0,
+		0,
+		store,
+		marshalizer,
+		hasher,
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "fresh genesis cannot consume EMERGENCY_MIGRATION provenance")
+	require.Equal(t, [32]byte{}, actualHash)
+	require.Equal(t, [32]byte{}, actualDomain)
+	require.Equal(t, prototypeNetworkIdentityProvenance(0), provenance)
+	require.NotEqual(t, [32]byte{}, canonicalHash)
+	require.NotEqual(t, [32]byte{}, expectedDomain)
+}
+
+func TestResolvePrototypeNetworkDomainFreshGenesisRejectsUnavailableCandidateWithRetainedLocalRecord(t *testing.T) {
+	t.Parallel()
+
+	chainID := "local-testnet"
+	header := prototypeMetaGenesisHeader(chainID)
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	hasher := coreSHA256.NewSha256()
+	_, _, headerBytes, err := marshalAndDerivePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: header},
+		0,
+		true,
+		marshalizer,
+		hasher,
+	)
+	require.NoError(t, err)
+	localEnvelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		headerBytes,
+	))
+	require.NoError(t, err)
+	store := newPrototypeIdentityMemoryStore(
+		map[string][]byte{string(prototypeNetworkIdentityKey(0)): localEnvelope},
+		nil,
+		nil,
+		nil,
+	)
+
+	invalidCandidate := prototypeMetaGenesisHeader(chainID)
+	invalidCandidate.ValidatorStatsRootHash = nil
+	actualHash, actualDomain, provenance, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: invalidCandidate},
+		0,
+		0,
+		store,
+		marshalizer,
+		hasher,
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "validate fresh local canonical genesis")
+	require.Equal(t, [32]byte{}, actualHash)
+	require.Equal(t, [32]byte{}, actualDomain)
+	require.Equal(t, prototypeNetworkIdentityProvenance(0), provenance)
+}
+
+func TestResolvePrototypeNetworkDomainOrdinaryAndHardforkRecordsCoexist(t *testing.T) {
+	t.Parallel()
+
+	chainID := "localnet"
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	hasher := coreSHA256.NewSha256()
+	stored := make(map[string][]byte)
+	store := newPrototypeIdentityMemoryStore(stored, nil, nil, nil)
+
+	ordinary := prototypeMetaGenesisHeader(chainID)
+	ordinary.Epoch = 0
+	ordinaryHash, ordinaryDomain, ordinarySource, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: ordinary},
+		0, 0, store, marshalizer, hasher,
+	)
+	require.NoError(t, err)
+	require.Equal(t, prototypeNetworkIdentityProvenanceLocalCanonicalGenesis, ordinarySource)
+
+	hardfork := prototypeMetaGenesisHeader(chainID)
+	hardfork.Epoch = 17
+	hardfork.TimeStamp++
+	hardforkHash, hardforkDomain, hardforkSource, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: hardfork},
+		17, 17, store, marshalizer, hasher,
+	)
+	require.NoError(t, err)
+	require.Equal(t, prototypeNetworkIdentityProvenanceLocalCanonicalGenesis, hardforkSource)
+	require.NotEqual(t, ordinaryHash, hardforkHash)
+	require.NotEqual(t, ordinaryDomain, hardforkDomain)
+	require.Len(t, stored, 2)
+
+	loadedOrdinaryHash, loadedOrdinaryDomain, _, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		0, 22, store, marshalizer, hasher,
+	)
+	require.NoError(t, err)
+	require.Equal(t, ordinaryHash, loadedOrdinaryHash)
+	require.Equal(t, ordinaryDomain, loadedOrdinaryDomain)
+
+	loadedHardforkHash, loadedHardforkDomain, _, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		17, 22, store, marshalizer, hasher,
+	)
+	require.NoError(t, err)
+	require.Equal(t, hardforkHash, loadedHardforkHash)
+	require.Equal(t, hardforkDomain, loadedHardforkDomain)
+}
+
+func TestResolvePrototypeNetworkDomainRejectsNonCanonicalProtobufOrder(t *testing.T) {
+	t.Parallel()
+
+	chainID := "localnet"
+	metaHeader := prototypeMetaGenesisHeader(chainID)
+	metaHeader.Nonce = 1
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	headerBytes, err := marshalizer.Marshal(metaHeader)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(headerBytes), 3)
+	require.Equal(t, byte(0x08), headerBytes[0])
+	require.Equal(t, byte(0x01), headerBytes[1])
+	reordered := append(append([]byte(nil), headerBytes[2:]...), headerBytes[:2]...)
+
+	probe := &block.MetaBlock{}
+	require.NoError(t, marshalizer.Unmarshal(probe, reordered), "mutation must remain parseable")
+	canonical, err := marshalizer.Marshal(probe)
+	require.NoError(t, err)
+	require.NotEqual(t, reordered, canonical)
+
+	envelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceEmergencyMigration,
+		reordered,
+	))
+	require.NoError(t, err)
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		0, 5,
+		newPrototypeIdentityMemoryStore(map[string][]byte{string(prototypeNetworkIdentityKey(0)): envelope}, nil, nil, nil),
+		marshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+}
+
+func TestPrototypeNetworkIdentityEnvelopeRejectsEveryMalformedClass(t *testing.T) {
+	t.Parallel()
+
+	chainID := "localnet"
+	valid, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		9,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		[]byte("header"),
+	))
+	require.NoError(t, err)
+	headerLengthOffset := 14 + len(chainID) + 32 + 32
+
+	tests := []struct {
+		name   string
+		mutate func([]byte) []byte
+	}{
+		{name: "truncated", mutate: func(value []byte) []byte { return value[:13] }},
+		{name: "wrong magic", mutate: func(value []byte) []byte { value[0] ^= 0xff; return value }},
+		{name: "wrong version", mutate: func(value []byte) []byte { value[4]++; return value }},
+		{name: "unknown provenance", mutate: func(value []byte) []byte { value[9] = 0xff; return value }},
+		{name: "zero chain ID length", mutate: func(value []byte) []byte { binary.BigEndian.PutUint32(value[10:14], 0); return value }},
+		{name: "wrong chain ID", mutate: func(value []byte) []byte { value[14] ^= 0xff; return value }},
+		{name: "zero header length", mutate: func(value []byte) []byte {
+			binary.BigEndian.PutUint32(value[headerLengthOffset:headerLengthOffset+4], 0)
+			return value
+		}},
+		{name: "trailing byte", mutate: func(value []byte) []byte { return append(value, 0) }},
+		{name: "declared chain length too large", mutate: func(value []byte) []byte { binary.BigEndian.PutUint32(value[10:14], 999); return value }},
+		{name: "declared header length too large", mutate: func(value []byte) []byte {
+			binary.BigEndian.PutUint32(value[headerLengthOffset:headerLengthOffset+4], 999)
+			return value
+		}},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			mutated := test.mutate(append([]byte(nil), valid...))
+			_, decodeErr := decodePrototypeNetworkIdentity(mutated, []byte(chainID))
+			require.ErrorIs(t, decodeErr, errInvalidPrototypeNetworkIdentity)
+		})
+	}
+
+	invalidProvenance := prototypeIdentityForHeaderBytes(chainID, 9, 99, []byte("header"))
+	_, err = encodePrototypeNetworkIdentity(invalidProvenance)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	missingHeader := prototypeIdentityForHeaderBytes(chainID, 9, prototypeNetworkIdentityProvenanceLocalCanonicalGenesis, []byte("header"))
+	missingHeader.headerBytes = nil
+	_, err = encodePrototypeNetworkIdentity(missingHeader)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+}
+
+func TestResolvePrototypeNetworkDomainUsesOnlySelectedV2KeyAndLeavesExtrasUntouched(t *testing.T) {
+	t.Parallel()
+
+	chainID := "localnet"
+	header := prototypeMetaGenesisHeader(chainID)
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	headerBytes, err := marshalizer.Marshal(header)
+	require.NoError(t, err)
+	selected, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		0,
+		prototypeNetworkIdentityProvenanceEmergencyMigration,
+		headerBytes,
+	))
+	require.NoError(t, err)
+	legacyValue := []byte("retained-v1-evidence")
+	extraKey := []byte("unrelated-extra-key")
+	extraValue := []byte("unrelated-extra-value")
+	stored := map[string][]byte{
+		string(prototypeNetworkIdentityKey(0)): selected,
+		string(networkidentity.LegacyKey(0)):   legacyValue,
+		string(extraKey):                       extraValue,
+	}
+	beforeLegacy := append([]byte(nil), stored[string(networkidentity.LegacyKey(0))]...)
+	beforeExtra := append([]byte(nil), stored[string(extraKey)]...)
+
+	_, _, provenance, err := resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		0,
+		4,
+		newPrototypeIdentityMemoryStore(stored, nil, nil, nil),
+		marshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, prototypeNetworkIdentityProvenanceEmergencyMigration, provenance)
+	require.Equal(t, beforeLegacy, stored[string(networkidentity.LegacyKey(0))])
+	require.Equal(t, beforeExtra, stored[string(extraKey)])
+
+	stored[string(prototypeNetworkIdentityKey(0))] = []byte("malformed-selected-v2")
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		0,
+		4,
+		newPrototypeIdentityMemoryStore(stored, nil, nil, nil),
+		marshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Equal(t, beforeLegacy, stored[string(networkidentity.LegacyKey(0))], "extras cannot rescue or be changed by malformed selected v2")
+	require.Equal(t, beforeExtra, stored[string(extraKey)], "extras cannot rescue or be changed by malformed selected v2")
+
+	delete(stored, string(prototypeNetworkIdentityKey(0)))
+	_, _, _, err = resolvePrototypeNetworkDomain(
+		chainID,
+		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
+		0,
+		4,
+		newPrototypeIdentityMemoryStore(stored, nil, nil, nil),
+		marshalizer,
+		coreSHA256.NewSha256(),
+	)
+	require.ErrorIs(t, err, errInvalidPrototypeNetworkIdentity)
+	require.Contains(t, err.Error(), "retained identity missing")
+}
+
+func TestPrototypeNetworkIdentityDecodeBorrowsExactHeaderRegion(t *testing.T) {
+	t.Parallel()
+
+	chainID := "localnet"
+	envelope, err := encodePrototypeNetworkIdentity(prototypeIdentityForHeaderBytes(
+		chainID,
+		9,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		[]byte("header"),
+	))
+	require.NoError(t, err)
+
+	identity, err := decodePrototypeNetworkIdentity(envelope, []byte(chainID))
+	require.NoError(t, err)
+	headerOffset := 14 + len(chainID) + 32 + 32 + 4
+	require.Same(t, &envelope[headerOffset], &identity.headerBytes[0])
+	require.Same(t, &envelope[14], &identity.chainID[0])
+}
+
+func TestResolvePrototypeNetworkDomainCrashDurableReopen(t *testing.T) {
+	if os.Getenv("DRWA_PROTOTYPE_IDENTITY_CRASH_CHILD") == "1" {
+		dbPath := os.Getenv("DRWA_PROTOTYPE_IDENTITY_CRASH_DB")
+		chainID := "localnet"
+		store := newPrototypeIdentitySerialStore(t, dbPath)
+		_, _, provenance, err := resolvePrototypeNetworkDomain(
+			chainID,
+			map[uint32]data.HeaderHandler{core.MetachainShardId: prototypeMetaGenesisHeader(chainID)},
+			0,
+			0,
+			store,
+			&marshal.GogoProtoMarshalizer{},
+			coreSHA256.NewSha256(),
+		)
+		require.NoError(t, err)
+		require.Equal(t, prototypeNetworkIdentityProvenanceLocalCanonicalGenesis, provenance)
+		// Intentionally bypass every defer and CloseAll after the synchronous Put.
+		os.Exit(0)
+	}
+
+	// Do not run in parallel: the child exits immediately after the production
+	// resolver's synchronous Put, without closing either storage unit or DB.
+	dbPath := filepath.Join(t.TempDir(), "prototype-network-identity")
+	chainID := "localnet"
+	metaHeader := prototypeMetaGenesisHeader(chainID)
+	blocks := map[uint32]data.HeaderHandler{core.MetachainShardId: metaHeader}
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	hasher := coreSHA256.NewSha256()
+	firstHash, firstDomain, _, err := marshalAndDerivePrototypeNetworkDomain(
+		chainID, blocks, 0, true, marshalizer, hasher,
+	)
+	require.NoError(t, err)
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestResolvePrototypeNetworkDomainCrashDurableReopen$")
+	cmd.Env = append(
+		os.Environ(),
+		"DRWA_PROTOTYPE_IDENTITY_CRASH_CHILD=1",
+		"DRWA_PROTOTYPE_IDENTITY_CRASH_DB="+dbPath,
+	)
+	require.NoError(t, cmd.Run())
+
+	secondStore := newPrototypeIdentitySerialStore(t, dbPath)
+	t.Cleanup(func() { require.NoError(t, secondStore.CloseAll()) })
+	placeholder := map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{Epoch: 0}}
+	secondHash, secondDomain, secondProvenance, err := resolvePrototypeNetworkDomain(
+		chainID, placeholder, 0, 1, secondStore, marshalizer, hasher,
+	)
+	require.NoError(t, err)
+	require.Equal(t, firstHash, secondHash)
+	require.Equal(t, firstDomain, secondDomain)
+	require.Equal(t, prototypeNetworkIdentityProvenanceLocalCanonicalGenesis, secondProvenance)
+}
+
+func TestProcessComponentsFactoryPrototypeCanonicalEpoch(t *testing.T) {
+	t.Parallel()
+
+	pcf := &processComponentsFactory{config: config.Config{EpochStartConfig: config.EpochStartConfig{GenesisEpoch: 7}}}
+	require.Equal(t, uint32(7), pcf.prototypeCanonicalEpoch())
+	pcf.config.Hardfork.AfterHardFork = true
+	pcf.config.Hardfork.StartEpoch = 19
+	require.Equal(t, uint32(19), pcf.prototypeCanonicalEpoch())
+}
+
+func TestProcessComponentsFactoryRejectsIdentityBeforeBlockProcessorConstruction(t *testing.T) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	sourcePath := filepath.Join(filepath.Dir(currentFile), "processComponents.go")
+	source, err := os.ReadFile(sourcePath)
+	require.NoError(t, err)
+
+	createStart := strings.Index(string(source), "func (pcf *processComponentsFactory) Create()")
+	createEnd := strings.Index(string(source), "func (pcf *processComponentsFactory) prototypeCanonicalEpoch()")
+	require.GreaterOrEqual(t, createStart, 0)
+	require.Greater(t, createEnd, createStart)
+	createBody := string(source[createStart:createEnd])
+	identityResolve := strings.Index(createBody, "resolvePrototypeNetworkDomain(")
+	identityReturn := strings.Index(createBody[identityResolve:], "if err != nil {\n\t\treturn nil, err\n\t}")
+	blockProcessor := strings.Index(createBody, "pcf.newBlockProcessor(")
+	require.GreaterOrEqual(t, identityResolve, 0)
+	require.GreaterOrEqual(t, identityReturn, 0, "identity failure must return from Create")
+	require.Greater(t, blockProcessor, identityResolve, "identity resolution must precede block-processor construction")
+}
+
+func TestPrototypeNetworkIdentityObservationIsExactAndMachineParseable(t *testing.T) {
+	chainID := []byte("localnet")
+	header := prototypeMetaGenesisHeader(string(chainID))
+	headerBytes, err := (&marshal.GogoProtoMarshalizer{}).Marshal(header)
+	require.NoError(t, err)
+	identity := prototypeIdentityForHeaderBytes(
+		string(chainID),
+		0,
+		prototypeNetworkIdentityProvenanceLocalCanonicalGenesis,
+		headerBytes,
+	)
+	envelope, err := encodePrototypeNetworkIdentity(identity)
+	require.NoError(t, err)
+	envelopeSHA := standardSHA256.Sum256(envelope)
+	observation := formatPrototypeNetworkIdentityObservation(
+		0,
+		0,
+		chainID,
+		prototypeNetworkIdentityKey(0),
+		envelope,
+		identity.canonicalHash,
+		identity.networkDomain,
+		identity.provenance,
+	)
+	require.Equal(t, fmt.Sprintf(
+		"DRWA_PROTOTYPE_NETWORK_IDENTITY_V2 schema=2 canonical_epoch=0 bootstrap_epoch=0 chain_id_hex=%x storage_key_hex=%x envelope_sha256=%x canonical_hash=%x network_domain=%x provenance=LOCAL_CANONICAL_GENESIS DRWA_PROTOTYPE_NETWORK_IDENTITY_V2_END",
+		chainID,
+		prototypeNetworkIdentityKey(0),
+		envelopeSHA,
+		identity.canonicalHash,
+		identity.networkDomain,
+	), observation)
+}
+
+func newPrototypeIdentityMemoryStore(
+	values map[string][]byte,
+	getErr error,
+	putErr error,
+	putCalls *int,
+) dataRetriever.StorageService {
+	if values == nil {
+		values = make(map[string][]byte)
+	}
+
+	return &storageTests.ChainStorerStub{
+		GetCalled: func(unitType dataRetriever.UnitType, key []byte) ([]byte, error) {
+			if unitType != dataRetriever.PrototypeNetworkIdentityUnit {
+				return nil, fmt.Errorf("unexpected unit %s", unitType)
+			}
+			if getErr != nil {
+				return nil, getErr
+			}
+			value, ok := values[string(key)]
+			if !ok {
+				return nil, storage.ErrKeyNotFound
+			}
+			return append([]byte(nil), value...), nil
+		},
+		PutCalled: func(unitType dataRetriever.UnitType, key []byte, value []byte) error {
+			if unitType != dataRetriever.PrototypeNetworkIdentityUnit {
+				return fmt.Errorf("unexpected unit %s", unitType)
+			}
+			if putCalls != nil {
+				(*putCalls)++
+			}
+			if putErr != nil {
+				return putErr
+			}
+			values[string(key)] = append([]byte(nil), value...)
+			return nil
+		},
+	}
+}
+
+func newPrototypeIdentitySerialStore(t *testing.T, dbPath string) *dataRetriever.ChainStorer {
+	t.Helper()
+
+	cache, err := storageunit.NewCache(storageunit.CacheConfig{
+		Name:     "prototype-network-identity-test",
+		Type:     storageunit.LRUCache,
+		Capacity: 4,
+	})
+	require.NoError(t, err)
+	persister, err := storageunit.NewDB(storageunit.ArgDB{
+		DBType:            storageunit.LvlDBSerial,
+		Path:              dbPath,
+		BatchDelaySeconds: 2,
+		MaxBatchSize:      1,
+		MaxOpenFiles:      10,
+	})
+	require.NoError(t, err)
+	unit, err := storageunit.NewStorageUnit(cache, persister)
+	require.NoError(t, err)
+	chainStore := dataRetriever.NewChainStorer()
+	chainStore.AddStorer(dataRetriever.PrototypeNetworkIdentityUnit, unit)
+	return chainStore
+}
+
 func prototypeMetaGenesisHeader(chainID string) *block.MetaBlock {
 	return &block.MetaBlock{
 		Nonce:                  0,
@@ -147,6 +990,27 @@ func prototypeMetaGenesisHeader(chainID string) *block.MetaBlock {
 		PrevHash:               prototypeSequentialBytes(65),
 		RandSeed:               prototypeSequentialBytes(97),
 		PrevRandSeed:           prototypeSequentialBytes(129),
+	}
+}
+
+func prototypeIdentityForHeaderBytes(
+	chainID string,
+	epoch uint32,
+	provenance prototypeNetworkIdentityProvenance,
+	headerBytes []byte,
+) prototypeNetworkIdentity {
+	canonicalHash := standardSHA256.Sum256(headerBytes)
+	domainPreimage := append([]byte("DRWA/NETWORK/v1"), []byte(chainID)...)
+	domainPreimage = append(domainPreimage, canonicalHash[:]...)
+	networkDomain := standardSHA256.Sum256(domainPreimage)
+
+	return prototypeNetworkIdentity{
+		epoch:         epoch,
+		provenance:    provenance,
+		chainID:       []byte(chainID),
+		canonicalHash: canonicalHash,
+		networkDomain: networkDomain,
+		headerBytes:   headerBytes,
 	}
 }
 

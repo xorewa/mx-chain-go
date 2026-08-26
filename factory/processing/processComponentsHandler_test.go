@@ -150,6 +150,7 @@ func TestManagedProcessComponents_Create(t *testing.T) {
 		require.False(t, check.IfNil(managedProcessComponents.EpochSystemSCProcessor()))
 		require.NotEqual(t, [32]byte{}, managedProcessComponents.PrototypeCanonicalGenesisHash())
 		require.NotEqual(t, [32]byte{}, managedProcessComponents.PrototypeDRWANetworkDomain())
+		require.Equal(t, "LOCAL_CANONICAL_GENESIS", managedProcessComponents.PrototypeNetworkIdentitySource())
 
 		require.Equal(t, factory.ProcessComponentsName, managedProcessComponents.String())
 	})
