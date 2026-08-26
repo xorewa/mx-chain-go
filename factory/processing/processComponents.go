@@ -148,6 +148,7 @@ type processComponents struct {
 	transactionProcessor             process.TransactionProcessor
 	prototypeCanonicalGenesisHash    [32]byte
 	prototypeDRWANetworkDomain       [32]byte
+	prototypeNetworkIdentitySource   prototypeNetworkIdentityProvenance
 }
 
 // ProcessComponentsFactoryArgs holds the arguments needed to create a process components factory
@@ -186,33 +187,34 @@ type ProcessComponentsFactoryArgs struct {
 }
 
 type processComponentsFactory struct {
-	miniBlockTracker              process.MiniBlockTracker
-	config                        config.Config
-	roundConfig                   config.RoundConfig
-	epochConfig                   config.EpochConfig
-	prefConfigs                   config.Preferences
-	importDBConfig                config.ImportDbConfig
-	economicsConfig               config.EconomicsConfig
-	accountsParser                genesis.AccountsParser
-	smartContractParser           genesis.InitialSmartContractParser
-	gasSchedule                   core.GasScheduleNotifier
-	nodesCoordinator              nodesCoordinator.NodesCoordinator
-	requestedItemsHandler         dataRetriever.RequestedItemsHandler
-	whiteListHandler              process.WhiteListHandler
-	whiteListerVerifiedTxs        process.WhiteListHandler
-	maxRating                     uint32
-	systemSCConfig                *config.SystemSmartContractsConfig
-	txLogsProcessor               process.TransactionLogProcessor
-	importStartHandler            update.ImportStartHandler
-	historyRepo                   dblookupext.HistoryRepository
-	epochNotifier                 process.EpochNotifier
-	importHandler                 update.ImportHandler
-	flagsConfig                   config.ContextFlagsConfig
-	esdtNftStorage                vmcommon.ESDTNFTStorageHandler
-	stakingDataProviderAPI        peer.StakingDataProviderAPI
-	auctionListSelectorAPI        epochStart.AuctionListSelector
-	prototypeCanonicalGenesisHash [32]byte
-	prototypeDRWANetworkDomain    [32]byte
+	miniBlockTracker               process.MiniBlockTracker
+	config                         config.Config
+	roundConfig                    config.RoundConfig
+	epochConfig                    config.EpochConfig
+	prefConfigs                    config.Preferences
+	importDBConfig                 config.ImportDbConfig
+	economicsConfig                config.EconomicsConfig
+	accountsParser                 genesis.AccountsParser
+	smartContractParser            genesis.InitialSmartContractParser
+	gasSchedule                    core.GasScheduleNotifier
+	nodesCoordinator               nodesCoordinator.NodesCoordinator
+	requestedItemsHandler          dataRetriever.RequestedItemsHandler
+	whiteListHandler               process.WhiteListHandler
+	whiteListerVerifiedTxs         process.WhiteListHandler
+	maxRating                      uint32
+	systemSCConfig                 *config.SystemSmartContractsConfig
+	txLogsProcessor                process.TransactionLogProcessor
+	importStartHandler             update.ImportStartHandler
+	historyRepo                    dblookupext.HistoryRepository
+	epochNotifier                  process.EpochNotifier
+	importHandler                  update.ImportHandler
+	flagsConfig                    config.ContextFlagsConfig
+	esdtNftStorage                 vmcommon.ESDTNFTStorageHandler
+	stakingDataProviderAPI         peer.StakingDataProviderAPI
+	auctionListSelectorAPI         epochStart.AuctionListSelector
+	prototypeCanonicalGenesisHash  [32]byte
+	prototypeDRWANetworkDomain     [32]byte
+	prototypeNetworkIdentitySource prototypeNetworkIdentityProvenance
 
 	data                    factory.DataComponentsHolder
 	coreData                factory.CoreComponentsHolder
@@ -458,9 +460,12 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 	if err != nil {
 		return nil, err
 	}
-	pcf.prototypeCanonicalGenesisHash, pcf.prototypeDRWANetworkDomain, err = derivePrototypeNetworkDomain(
+	pcf.prototypeCanonicalGenesisHash, pcf.prototypeDRWANetworkDomain, pcf.prototypeNetworkIdentitySource, err = resolvePrototypeNetworkDomain(
 		pcf.coreData.ChainID(),
 		genesisBlocks,
+		pcf.prototypeCanonicalEpoch(),
+		pcf.bootstrapComponents.EpochBootstrapParams().Epoch(),
+		pcf.data.StorageService(),
 		pcf.coreData.InternalMarshalizer(),
 		pcf.coreData.Hasher(),
 	)
@@ -471,6 +476,7 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 		"chainID", pcf.coreData.ChainID(),
 		"canonicalMetachainGenesisHash", fmt.Sprintf("%x", pcf.prototypeCanonicalGenesisHash),
 		"networkDomain", fmt.Sprintf("%x", pcf.prototypeDRWANetworkDomain),
+		"identitySource", pcf.prototypeNetworkIdentitySource.String(),
 	)
 
 	epochStartTrigger, err := pcf.newEpochStartTrigger(requestHandler)
@@ -871,7 +877,16 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 		transactionProcessor:             blockProcessorComponents.transactionProcessor,
 		prototypeCanonicalGenesisHash:    pcf.prototypeCanonicalGenesisHash,
 		prototypeDRWANetworkDomain:       pcf.prototypeDRWANetworkDomain,
+		prototypeNetworkIdentitySource:   pcf.prototypeNetworkIdentitySource,
 	}, nil
+}
+
+func (pcf *processComponentsFactory) prototypeCanonicalEpoch() uint32 {
+	if pcf.config.Hardfork.AfterHardFork {
+		return pcf.config.Hardfork.StartEpoch
+	}
+
+	return pcf.config.EpochStartConfig.GenesisEpoch
 }
 
 func (pcf *processComponentsFactory) newValidatorStatisticsProcessor() (process.ValidatorStatisticsProcessor, error) {

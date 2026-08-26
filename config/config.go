@@ -190,6 +190,7 @@ type Config struct {
 	ShardHdrNonceHashStorage        StorageConfig
 	MetaHdrNonceHashStorage         StorageConfig
 	StatusMetricsStorage            StorageConfig
+	PrototypeNetworkIdentityStorage StorageConfig
 	ReceiptsStorage                 StorageConfig
 	ScheduledSCRsStorage            StorageConfig
 	SmartContractsStorage           StorageConfig

@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -23,6 +24,10 @@ import (
 )
 
 var log = logger.GetOrCreate("storage/factory")
+
+// NON_NORMATIVE_DRWA_PROTOTYPE
+// REPLACED_BY_PART_B
+var errInvalidPrototypeNetworkIdentityStorage = errors.New("invalid non-normative DRWA prototype network identity storage")
 
 const (
 	minimumNumberOfActivePersisters = 1
@@ -130,6 +135,18 @@ func checkArgs(args StorageServiceFactoryArgs) error {
 	}
 	if check.IfNil(args.StateStatsHandler) {
 		return statistics.ErrNilStateStatsHandler
+	}
+	if args.Config.PrototypeNetworkIdentityStorage.DB.Type != string(storageunit.LvlDBSerial) {
+		return fmt.Errorf("%w: database type must be %s", errInvalidPrototypeNetworkIdentityStorage, storageunit.LvlDBSerial)
+	}
+	if args.Config.PrototypeNetworkIdentityStorage.DB.MaxBatchSize != 1 {
+		return fmt.Errorf("%w: maximum batch size must be 1", errInvalidPrototypeNetworkIdentityStorage)
+	}
+	if args.Config.PrototypeNetworkIdentityStorage.DB.BatchDelaySeconds < 1 {
+		return fmt.Errorf("%w: batch delay must be positive", errInvalidPrototypeNetworkIdentityStorage)
+	}
+	if args.Config.PrototypeNetworkIdentityStorage.DB.FilePath == "" {
+		return fmt.Errorf("%w: database path must be non-empty", errInvalidPrototypeNetworkIdentityStorage)
 	}
 
 	return nil
@@ -284,6 +301,18 @@ func (psf *StorageServiceFactory) createAndAddBaseStorageUnits(
 	}
 	store.AddStorer(dataRetriever.StatusMetricsUnit, statusMetricsStorageUnit)
 
+	if psf.storageType == ProcessStorageService {
+		prototypeNetworkIdentityUnit, err := psf.createStaticStorageUnit(
+			psf.generalConfig.PrototypeNetworkIdentityStorage,
+			shardId,
+			emptyDBPathSuffix,
+		)
+		if err != nil {
+			return fmt.Errorf("%w for PrototypeNetworkIdentityStorage", err)
+		}
+		store.AddStorer(dataRetriever.PrototypeNetworkIdentityUnit, prototypeNetworkIdentityUnit)
+	}
+
 	trieEpochRootHashStorageUnit, err := psf.createTrieEpochRootHashStorerIfNeeded()
 	if err != nil {
 		return err
@@ -328,9 +357,6 @@ func (psf *StorageServiceFactory) createStaticStorageUnit(
 
 // CreateForShard will return the storage service which contains all storers needed for a shard
 func (psf *StorageServiceFactory) CreateForShard() (dataRetriever.StorageService, error) {
-	// TODO: if there will be a differentiation between the creation or opening of a DB, the DBs could be destroyed on a defer
-	// in case of a failure while creating (not opening).
-
 	disabledCustomDatabaseRemover := disabled.NewDisabledCustomDatabaseRemover()
 	customDatabaseRemover, err := factory.CreateCustomDatabaseRemover(psf.generalConfig.StoragePruning)
 	if err != nil {
@@ -345,6 +371,13 @@ func (psf *StorageServiceFactory) CreateForShard() (dataRetriever.StorageService
 	}
 
 	store := dataRetriever.NewChainStorer()
+	store.AddStorer(dataRetriever.GetHdrNonceHashDataUnit(psf.shardCoordinator.SelfId()), shardHdrHashNonceUnit)
+	creationComplete := false
+	defer func() {
+		if !creationComplete {
+			log.LogIfError(store.CloseAll())
+		}
+	}()
 	err = psf.createAndAddBaseStorageUnits(store, customDatabaseRemover, shardID)
 	if err != nil {
 		return nil, err
@@ -370,9 +403,6 @@ func (psf *StorageServiceFactory) CreateForShard() (dataRetriever.StorageService
 	}
 	store.AddStorer(dataRetriever.PeerChangesUnit, peerBlockUnit)
 
-	hdrNonceHashDataUnit := dataRetriever.GetHdrNonceHashDataUnit(psf.shardCoordinator.SelfId())
-	store.AddStorer(hdrNonceHashDataUnit, shardHdrHashNonceUnit)
-
 	err = psf.setUpDbLookupExtensions(store)
 	if err != nil {
 		return nil, err
@@ -388,30 +418,35 @@ func (psf *StorageServiceFactory) CreateForShard() (dataRetriever.StorageService
 		return nil, err
 	}
 
-	return store, err
+	creationComplete = true
+	return store, nil
 }
 
 // CreateForMeta will return the storage service which contains all storers needed for metachain
 func (psf *StorageServiceFactory) CreateForMeta() (dataRetriever.StorageService, error) {
-	// TODO: if there will be a differentiation between the creation or opening of a DB, the DBs could be destroyed on a defer
-	// in case of a failure while creating (not opening)
-
 	customDatabaseRemover, err := factory.CreateCustomDatabaseRemover(psf.generalConfig.StoragePruning)
 	if err != nil {
 		return nil, err
 	}
 	shardID := core.GetShardIDString(core.MetachainShardId)
 
-	shardHdrHashNonceUnits := make([]*storageunit.Unit, psf.shardCoordinator.NumberOfShards())
+	store := dataRetriever.NewChainStorer()
+	creationComplete := false
+	defer func() {
+		if !creationComplete {
+			log.LogIfError(store.CloseAll())
+		}
+	}()
 	for i := uint32(0); i < psf.shardCoordinator.NumberOfShards(); i++ {
 		shardID = core.GetShardIDString(core.MetachainShardId)
-		shardHdrHashNonceUnits[i], err = psf.createStaticStorageUnit(psf.generalConfig.ShardHdrNonceHashStorage, shardID, fmt.Sprintf("%d", i))
+		shardHdrHashNonceUnit, createErr := psf.createStaticStorageUnit(psf.generalConfig.ShardHdrNonceHashStorage, shardID, fmt.Sprintf("%d", i))
+		err = createErr
 		if err != nil {
 			return nil, fmt.Errorf("%w for ShardHdrNonceHashStorage on shard %d", err, i)
 		}
+		store.AddStorer(dataRetriever.GetHdrNonceHashDataUnit(i), shardHdrHashNonceUnit)
 	}
 
-	store := dataRetriever.NewChainStorer()
 	err = psf.createAndAddBaseStorageUnits(store, customDatabaseRemover, shardID)
 	if err != nil {
 		return nil, err
@@ -423,11 +458,6 @@ func (psf *StorageServiceFactory) CreateForMeta() (dataRetriever.StorageService,
 	}
 	store.AddStorer(dataRetriever.PeerAccountsUnit, peerAccountsUnit)
 
-	for i := uint32(0); i < psf.shardCoordinator.NumberOfShards(); i++ {
-		hdrNonceHashDataUnit := dataRetriever.GetHdrNonceHashDataUnit(i)
-		store.AddStorer(hdrNonceHashDataUnit, shardHdrHashNonceUnits[i])
-	}
-
 	err = psf.setUpDbLookupExtensions(store)
 	if err != nil {
 		return nil, err
@@ -443,7 +473,8 @@ func (psf *StorageServiceFactory) CreateForMeta() (dataRetriever.StorageService,
 		return nil, err
 	}
 
-	return store, err
+	creationComplete = true
+	return store, nil
 }
 
 func (psf *StorageServiceFactory) createTrieStorer(

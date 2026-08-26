@@ -772,6 +772,17 @@ func (m *managedProcessComponents) PrototypeCanonicalGenesisHash() [32]byte {
 	return m.processComponents.prototypeCanonicalGenesisHash
 }
 
+// PrototypeNetworkIdentitySource returns the closed provenance label of the retained S1 identity.
+func (m *managedProcessComponents) PrototypeNetworkIdentitySource() string {
+	m.mutProcessComponents.RLock()
+	defer m.mutProcessComponents.RUnlock()
+
+	if m.processComponents == nil {
+		return ""
+	}
+	return m.processComponents.prototypeNetworkIdentitySource.String()
+}
+
 // IsInterfaceNil returns true if the interface is nil
 func (m *managedProcessComponents) IsInterfaceNil() bool {
 	return m == nil

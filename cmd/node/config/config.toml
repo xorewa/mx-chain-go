@@ -416,6 +416,23 @@
         MaxOpenFiles = 10
         BloomFilterBitsPerKey = 10
 
+# NON_NORMATIVE_DRWA_PROTOTYPE
+# REPLACED_BY_PART_B
+# A dedicated non-pruned store for the exact canonical metachain genesis header.
+# LvlDBSerial and MaxBatchSize=1 make each identity Put a synchronous LevelDB write.
+[PrototypeNetworkIdentityStorage]
+    [PrototypeNetworkIdentityStorage.Cache]
+        Name = "PrototypeNetworkIdentityStorage"
+        Capacity = 4
+        Type = "LRU"
+    [PrototypeNetworkIdentityStorage.DB]
+        FilePath = "PrototypeNetworkIdentityStorageDB"
+        Type = "LvlDBSerial"
+        BatchDelaySeconds = 2
+        MaxBatchSize = 1
+        MaxOpenFiles = 10
+        BloomFilterBitsPerKey = 10
+
 [TrieEpochRootHashStorage]
     [TrieEpochRootHashStorage.Cache]
         Name = "TrieEpochRootHashCache"
