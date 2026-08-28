@@ -416,6 +416,23 @@
         MaxOpenFiles = 10
         BloomFilterBitsPerKey = 10
 
+# NON_NORMATIVE_DRWA_PROTOTYPE
+# REPLACED_BY_PART_B
+# A dedicated non-pruned store for the exact canonical metachain genesis header.
+# LvlDBSerial and MaxBatchSize=1 make each identity Put a synchronous LevelDB write.
+[PrototypeNetworkIdentityStorage]
+    [PrototypeNetworkIdentityStorage.Cache]
+        Name = "PrototypeNetworkIdentityStorage"
+        Capacity = 4
+        Type = "LRU"
+    [PrototypeNetworkIdentityStorage.DB]
+        FilePath = "PrototypeNetworkIdentityStorageDB"
+        Type = "LvlDBSerial"
+        BatchDelaySeconds = 2
+        MaxBatchSize = 1
+        MaxOpenFiles = 10
+        BloomFilterBitsPerKey = 10
+
 [TrieEpochRootHashStorage]
     [TrieEpochRootHashStorage.Cache]
         Name = "TrieEpochRootHashCache"
@@ -987,6 +1004,9 @@
         MetaMaxGasPerVmQuery = 0  #unlimited
 
 [BuiltInFunctions]
+    # NON_NORMATIVE_DRWA_PROTOTYPE: zero keeps the S1 source-debit route disabled.
+    PrototypeDRWACEBEpoch = 0
+    PrototypeDRWASettlementLifetimeRounds = 0
     AutomaticCrawlerAddresses =[
         "erd1he8wwxn4az3j82p7wwqsdk794dm7hcrwny6f8dfegkfla34udx7qrf7xje", #shard 0
         "erd1fpkcgel4gcmh8zqqdt043yfcn5tyx8373kg6q2qmkxzu4dqamc0swts65c", #shard 1

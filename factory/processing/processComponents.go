@@ -146,6 +146,9 @@ type processComponents struct {
 	epochStartTriggerHanlder         epochStart.TriggerHandler
 	aotSelector                      process.AOTTransactionSelector
 	transactionProcessor             process.TransactionProcessor
+	drwaCanonicalGenesisHash         [32]byte
+	drwaNetworkDomain                [32]byte
+	drwaNetworkIdentitySource        drwaNetworkIdentityProvenance
 }
 
 // ProcessComponentsFactoryArgs holds the arguments needed to create a process components factory
@@ -184,31 +187,34 @@ type ProcessComponentsFactoryArgs struct {
 }
 
 type processComponentsFactory struct {
-	miniBlockTracker       process.MiniBlockTracker
-	config                 config.Config
-	roundConfig            config.RoundConfig
-	epochConfig            config.EpochConfig
-	prefConfigs            config.Preferences
-	importDBConfig         config.ImportDbConfig
-	economicsConfig        config.EconomicsConfig
-	accountsParser         genesis.AccountsParser
-	smartContractParser    genesis.InitialSmartContractParser
-	gasSchedule            core.GasScheduleNotifier
-	nodesCoordinator       nodesCoordinator.NodesCoordinator
-	requestedItemsHandler  dataRetriever.RequestedItemsHandler
-	whiteListHandler       process.WhiteListHandler
-	whiteListerVerifiedTxs process.WhiteListHandler
-	maxRating              uint32
-	systemSCConfig         *config.SystemSmartContractsConfig
-	txLogsProcessor        process.TransactionLogProcessor
-	importStartHandler     update.ImportStartHandler
-	historyRepo            dblookupext.HistoryRepository
-	epochNotifier          process.EpochNotifier
-	importHandler          update.ImportHandler
-	flagsConfig            config.ContextFlagsConfig
-	esdtNftStorage         vmcommon.ESDTNFTStorageHandler
-	stakingDataProviderAPI peer.StakingDataProviderAPI
-	auctionListSelectorAPI epochStart.AuctionListSelector
+	miniBlockTracker          process.MiniBlockTracker
+	config                    config.Config
+	roundConfig               config.RoundConfig
+	epochConfig               config.EpochConfig
+	prefConfigs               config.Preferences
+	importDBConfig            config.ImportDbConfig
+	economicsConfig           config.EconomicsConfig
+	accountsParser            genesis.AccountsParser
+	smartContractParser       genesis.InitialSmartContractParser
+	gasSchedule               core.GasScheduleNotifier
+	nodesCoordinator          nodesCoordinator.NodesCoordinator
+	requestedItemsHandler     dataRetriever.RequestedItemsHandler
+	whiteListHandler          process.WhiteListHandler
+	whiteListerVerifiedTxs    process.WhiteListHandler
+	maxRating                 uint32
+	systemSCConfig            *config.SystemSmartContractsConfig
+	txLogsProcessor           process.TransactionLogProcessor
+	importStartHandler        update.ImportStartHandler
+	historyRepo               dblookupext.HistoryRepository
+	epochNotifier             process.EpochNotifier
+	importHandler             update.ImportHandler
+	flagsConfig               config.ContextFlagsConfig
+	esdtNftStorage            vmcommon.ESDTNFTStorageHandler
+	stakingDataProviderAPI    peer.StakingDataProviderAPI
+	auctionListSelectorAPI    epochStart.AuctionListSelector
+	drwaCanonicalGenesisHash  [32]byte
+	drwaNetworkDomain         [32]byte
+	drwaNetworkIdentitySource drwaNetworkIdentityProvenance
 
 	data                    factory.DataComponentsHolder
 	coreData                factory.CoreComponentsHolder
@@ -454,6 +460,24 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 	if err != nil {
 		return nil, err
 	}
+	pcf.drwaCanonicalGenesisHash, pcf.drwaNetworkDomain, pcf.drwaNetworkIdentitySource, err = resolveDRWANetworkDomain(
+		pcf.coreData.ChainID(),
+		genesisBlocks,
+		pcf.drwaCanonicalEpoch(),
+		pcf.bootstrapComponents.EpochBootstrapParams().Epoch(),
+		pcf.data.StorageService(),
+		pcf.coreData.InternalMarshalizer(),
+		pcf.coreData.Hasher(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("NON_NORMATIVE_DRWA_PROTOTYPE network domain derived",
+		"chainID", pcf.coreData.ChainID(),
+		"canonicalMetachainGenesisHash", fmt.Sprintf("%x", pcf.drwaCanonicalGenesisHash),
+		"networkDomain", fmt.Sprintf("%x", pcf.drwaNetworkDomain),
+		"identitySource", pcf.drwaNetworkIdentitySource.String(),
+	)
 
 	epochStartTrigger, err := pcf.newEpochStartTrigger(requestHandler)
 	if err != nil {
@@ -851,7 +875,18 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 		epochStartTriggerHanlder:         epochStartTrigger,
 		aotSelector:                      blockProcessorComponents.aotSelector,
 		transactionProcessor:             blockProcessorComponents.transactionProcessor,
+		drwaCanonicalGenesisHash:         pcf.drwaCanonicalGenesisHash,
+		drwaNetworkDomain:                pcf.drwaNetworkDomain,
+		drwaNetworkIdentitySource:        pcf.drwaNetworkIdentitySource,
 	}, nil
+}
+
+func (pcf *processComponentsFactory) drwaCanonicalEpoch() uint32 {
+	if pcf.config.Hardfork.AfterHardFork {
+		return pcf.config.Hardfork.StartEpoch
+	}
+
+	return pcf.config.EpochStartConfig.GenesisEpoch
 }
 
 func (pcf *processComponentsFactory) newValidatorStatisticsProcessor() (process.ValidatorStatisticsProcessor, error) {
@@ -967,6 +1002,7 @@ func (pcf *processComponentsFactory) newEpochStartTrigger(requestHandler epochSt
 }
 
 func (pcf *processComponentsFactory) generateGenesisHeadersAndApplyInitialBalances() (map[uint32]data.HeaderHandler, map[uint32]*genesis.IndexingData, error) {
+	startEpoch := pcf.bootstrapComponents.EpochBootstrapParams().Epoch()
 	genesisVmConfig := pcf.config.VirtualMachine.Execution
 	conversionBase := 10
 	genesisNodePrice, ok := big.NewInt(0).SetString(pcf.systemSCConfig.StakingSystemSCConfig.GenesisNodePrice, conversionBase)
@@ -976,7 +1012,7 @@ func (pcf *processComponentsFactory) generateGenesisHeadersAndApplyInitialBalanc
 
 	arg := processGenesis.ArgsGenesisBlockCreator{
 		GenesisTime:             uint64(pcf.coreData.GenesisNodesSetup().GetStartTime()),
-		StartEpochNum:           pcf.bootstrapComponents.EpochBootstrapParams().Epoch(),
+		StartEpochNum:           startEpoch,
 		Data:                    pcf.data,
 		Core:                    pcf.coreData,
 		Accounts:                pcf.state.AccountsAdapter(),

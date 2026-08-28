@@ -1,0 +1,99 @@
+package drwa
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+
+	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/core/check"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+)
+
+// NON_NORMATIVE_DRWA_PROTOTYPE
+// DO_NOT_EXPOSE_AS_PUBLIC_WIRE_FORMAT
+// REPLACED_BY_PART_B
+//
+// This protected marker is only an S1-S5 test classifier. Its key and value are not production
+// registry representations and must be removed or disabled when the permanent classifier lands.
+
+const (
+	drwaRegulatedKeySuffix   = "drwa/prototype-regulated/"
+	drwaRegulatedMarkerValue = "DRWA-PROTOTYPE-REGULATED\x01"
+)
+
+var (
+	// ErrInvalidDRWARegulatedTokenID signals a malformed or over-limit DRWA token ID.
+	ErrInvalidDRWARegulatedTokenID = errors.New("invalid non-normative DRWA prototype regulated token ID")
+	// ErrNilDRWAClassificationAccounts signals that the DRWA classifier has no accounts adapter.
+	ErrNilDRWAClassificationAccounts = errors.New("nil non-normative DRWA prototype classification accounts adapter")
+	// ErrInvalidDRWAClassificationAccount signals that the system address did not resolve to a usable user account.
+	ErrInvalidDRWAClassificationAccount = errors.New("invalid non-normative DRWA prototype classification system account")
+	// ErrInvalidDRWAClassificationMarker signals non-empty state other than the exact DRWA marker.
+	ErrInvalidDRWAClassificationMarker = errors.New("invalid non-normative DRWA prototype classification marker")
+)
+
+// DRWARegulatedTokenKey returns a fresh protected key for one bounded DRWA token ID.
+func DRWARegulatedTokenKey(tokenID []byte) ([]byte, error) {
+	if len(tokenID) == 0 || len(tokenID) > drwaTokenIDLimit || !vmcommon.ValidateToken(tokenID) {
+		return nil, ErrInvalidDRWARegulatedTokenID
+	}
+
+	key := make([]byte, 0, len(core.ProtectedKeyPrefix)+len(drwaRegulatedKeySuffix)+len(tokenID))
+	key = append(key, core.ProtectedKeyPrefix...)
+	key = append(key, drwaRegulatedKeySuffix...)
+	key = append(key, tokenID...)
+
+	return key, nil
+}
+
+// IsDRWARegulatedToken classifies one token from protected system-account state.
+// Absence is ordinary; every observation or decoding failure is returned as an error.
+func IsDRWARegulatedToken(accounts vmcommon.AccountsAdapter, tokenID []byte) (bool, error) {
+	key, err := DRWARegulatedTokenKey(tokenID)
+	if err != nil {
+		return false, err
+	}
+
+	_, dataHandler, err := loadDRWAClassificationSystemAccount(accounts)
+	if err != nil {
+		return false, err
+	}
+	stored, _, err := dataHandler.RetrieveValue(key)
+	if err != nil {
+		return false, fmt.Errorf("retrieve prototype classification marker: %w", err)
+	}
+	if len(stored) == 0 {
+		return false, nil
+	}
+	if !bytes.Equal(stored, []byte(drwaRegulatedMarkerValue)) {
+		return false, ErrInvalidDRWAClassificationMarker
+	}
+
+	return true, nil
+}
+
+func loadDRWAClassificationSystemAccount(accounts vmcommon.AccountsAdapter) (vmcommon.UserAccountHandler, vmcommon.AccountDataHandler, error) {
+	if check.IfNil(accounts) {
+		return nil, nil, ErrNilDRWAClassificationAccounts
+	}
+	account, err := accounts.LoadAccount(vmcommon.SystemAccountAddress)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load prototype classification system account: %w", err)
+	}
+
+	return validateDRWAClassificationSystemAccount(account)
+}
+
+func validateDRWAClassificationSystemAccount(account vmcommon.AccountHandler) (vmcommon.UserAccountHandler, vmcommon.AccountDataHandler, error) {
+	userAccount, ok := account.(vmcommon.UserAccountHandler)
+	if !ok || check.IfNil(userAccount) || !bytes.Equal(userAccount.AddressBytes(), vmcommon.SystemAccountAddress) {
+		return nil, nil, ErrInvalidDRWAClassificationAccount
+	}
+	dataHandler := userAccount.AccountDataHandler()
+	if check.IfNil(dataHandler) {
+		return nil, nil, ErrInvalidDRWAClassificationAccount
+	}
+
+	return userAccount, dataHandler, nil
+}

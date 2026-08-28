@@ -7,6 +7,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
 	"github.com/multiversx/mx-chain-core-go/data/vm"
+	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
@@ -115,6 +116,12 @@ func (sc *scProcessor) createVMCallInput(
 	} else {
 		vmCallInput.OriginalTxHash = txHash
 		vmCallInput.PrevTxHash = txHash
+	}
+	if !isSCR && !common.IsRelayedTxV3(tx) {
+		vmCallInput.NativeCallOrigin = vmcommon.NativeCallOriginOriginalUserTransaction
+	}
+	if isSCR && scr.GetProtocolMessageKind() == vm.ProtocolMessageKindDRWA {
+		vmCallInput.NativeCallOrigin = vmcommon.NativeCallOriginDRWAProtocolMessage
 	}
 
 	vmCallInput.ReturnCallAfterError = isSCR && len(scr.ReturnMessage) > 0

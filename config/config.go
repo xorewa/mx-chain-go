@@ -190,6 +190,7 @@ type Config struct {
 	ShardHdrNonceHashStorage        StorageConfig
 	MetaHdrNonceHashStorage         StorageConfig
 	StatusMetricsStorage            StorageConfig
+	DRWANetworkIdentityStorage      StorageConfig `toml:"PrototypeNetworkIdentityStorage"`
 	ReceiptsStorage                 StorageConfig
 	ScheduledSCRsStorage            StorageConfig
 	SmartContractsStorage           StorageConfig
@@ -619,6 +620,8 @@ type BuiltInFunctionsConfig struct {
 	AutomaticCrawlerAddresses     []string
 	MaxNumAddressesInTransferRole uint32
 	DNSV2Addresses                []string
+	DRWACEBEpoch                  uint32 `toml:"PrototypeDRWACEBEpoch"`
+	DRWASettlementLifetimeRounds  uint64 `toml:"PrototypeDRWASettlementLifetimeRounds"`
 }
 
 // HardforkConfig holds the configuration for the hardfork trigger

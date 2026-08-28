@@ -1841,6 +1841,76 @@ func TestScProcessor_CreateVMCallInput(t *testing.T) {
 	input, err := sc.createVMCallInput(tx, []byte{}, false)
 	require.NotNil(t, input)
 	require.Nil(t, err)
+	require.Equal(t, vmcommon.NativeCallOriginOriginalUserTransaction, input.NativeCallOrigin)
+}
+
+func TestScProcessor_CreateVMCallInputDRWANativeOriginFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	arguments := createMockSmartContractProcessorArguments()
+	arguments.VmContainer = &mock.VMContainerMock{}
+	arguments.ArgsParser = &testscommon.ArgumentParserMock{}
+	sc, err := NewSmartContractProcessorV2(arguments)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		tx   data.TransactionHandler
+	}{
+		{
+			name: "smart contract result",
+			tx: &smartContractResult.SmartContractResult{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+			},
+		},
+		{
+			name: "relayed v1 inner smart contract result",
+			tx: &smartContractResult.SmartContractResult{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+				RelayerAddr: []byte("RELAYER"), RelayedValue: big.NewInt(1),
+			},
+		},
+		{
+			name: "relayed v2 inner smart contract result",
+			tx: &smartContractResult.SmartContractResult{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+				RelayerAddr: []byte("RELAYER"), RelayedValue: big.NewInt(0),
+			},
+		},
+		{
+			name: "relayed v3 transaction",
+			tx: &transaction.Transaction{
+				SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+				RelayerAddr: []byte("RELAYER"), RelayerSignature: []byte("signature"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			input, inputErr := sc.createVMCallInput(test.tx, make([]byte, 32), false)
+			require.NoError(t, inputErr)
+			require.Equal(t, vmcommon.NativeCallOriginUnknown, input.NativeCallOrigin)
+		})
+	}
+}
+
+func TestScProcessor_CreateVMCallInputAuthenticatesDRWAProtocolOrigin(t *testing.T) {
+	t.Parallel()
+
+	arguments := createMockSmartContractProcessorArguments()
+	arguments.VmContainer = &mock.VMContainerMock{}
+	arguments.ArgsParser = &testscommon.ArgumentParserMock{}
+	sc, err := NewSmartContractProcessorV2(arguments)
+	require.NoError(t, err)
+
+	scr := &smartContractResult.SmartContractResult{
+		SndAddr: []byte("SRC"), RcvAddr: []byte("DST"), Data: []byte("data"), Value: big.NewInt(0),
+		ProtocolMessageKind: vmData.ProtocolMessageKindDRWA,
+	}
+	input, err := sc.createVMCallInput(scr, make([]byte, 32), true)
+	require.NoError(t, err)
+	require.Equal(t, vmcommon.NativeCallOriginDRWAProtocolMessage, input.NativeCallOrigin)
 }
 
 func TestScProcessor_CreateVMDeployBadCode(t *testing.T) {
@@ -2995,6 +3065,19 @@ func TestScProcessor_ProcessSmartContractResultNilScr(t *testing.T) {
 	require.Equal(t, process.ErrNilSmartContractResult, err)
 }
 
+func TestScProcessor_ProcessSmartContractResultRejectsUnknownProtocolKindBeforeProcessing(t *testing.T) {
+	t.Parallel()
+
+	sc := &scProcessor{}
+	scr := &smartContractResult.SmartContractResult{
+		ProtocolMessageKind: vmData.ProtocolMessageKind(2),
+	}
+
+	returnCode, err := sc.ProcessSmartContractResult(scr)
+	require.Equal(t, vmcommon.UserError, returnCode)
+	require.ErrorIs(t, err, process.ErrUnknownProtocolMessageKind)
+}
+
 func TestScProcessor_ProcessSmartContractResultErrGetAccount(t *testing.T) {
 	t.Parallel()
 
@@ -3699,6 +3782,23 @@ func TestGasLockedInSmartContractProcessor(t *testing.T) {
 	scr = results[0].result.(*smartContractResult.SmartContractResult)
 	gasLocked = sc.getGasLockedFromSCR(scr)
 	require.Equal(t, gasLocked, uint64(0))
+}
+
+func TestSmartContractProcessor_preprocessOutTransferCopiesProtocolMessageKind(t *testing.T) {
+	t.Parallel()
+
+	result := (&scProcessor{}).preprocessOutTransferToSCR(
+		0,
+		vmcommon.OutputTransfer{
+			Value:               big.NewInt(0),
+			ProtocolMessageKind: vmData.ProtocolMessageKindDRWA,
+		},
+		&vmcommon.OutputAccount{Address: []byte("destination")},
+		&transaction.Transaction{RcvAddr: []byte("source")},
+		[]byte("hash"),
+	)
+
+	require.Equal(t, vmData.ProtocolMessageKindDRWA, result.ProtocolMessageKind)
 }
 
 func TestSmartContractProcessor_indexedOutputTransfers(t *testing.T) {

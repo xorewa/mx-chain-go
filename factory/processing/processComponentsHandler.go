@@ -750,6 +750,39 @@ func (m *managedProcessComponents) TransactionProcessor() process.TransactionPro
 	return m.processComponents.transactionProcessor
 }
 
+// DRWANetworkDomain returns the immutable, locally derived DRWA network domain.
+func (m *managedProcessComponents) DRWANetworkDomain() [32]byte {
+	m.mutProcessComponents.RLock()
+	defer m.mutProcessComponents.RUnlock()
+
+	if m.processComponents == nil {
+		return [32]byte{}
+	}
+	return m.processComponents.drwaNetworkDomain
+}
+
+// DRWACanonicalGenesisHash returns the final metachain genesis hash used for the DRWA network identity.
+func (m *managedProcessComponents) DRWACanonicalGenesisHash() [32]byte {
+	m.mutProcessComponents.RLock()
+	defer m.mutProcessComponents.RUnlock()
+
+	if m.processComponents == nil {
+		return [32]byte{}
+	}
+	return m.processComponents.drwaCanonicalGenesisHash
+}
+
+// DRWANetworkIdentitySource returns the closed provenance label of the retained DRWA identity.
+func (m *managedProcessComponents) DRWANetworkIdentitySource() string {
+	m.mutProcessComponents.RLock()
+	defer m.mutProcessComponents.RUnlock()
+
+	if m.processComponents == nil {
+		return ""
+	}
+	return m.processComponents.drwaNetworkIdentitySource.String()
+}
+
 // IsInterfaceNil returns true if the interface is nil
 func (m *managedProcessComponents) IsInterfaceNil() bool {
 	return m == nil

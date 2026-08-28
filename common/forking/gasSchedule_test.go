@@ -70,6 +70,32 @@ func TestNewGasScheduleNotifier(t *testing.T) {
 	assert.NotNil(t, g)
 }
 
+func TestGasScheduleNotifierVersionedGasSchedulesAreSortedAndCopied(t *testing.T) {
+	t.Parallel()
+
+	args := createGasScheduleNotifierArgs()
+	args.GasScheduleConfig.GasScheduleByEpochs[0], args.GasScheduleConfig.GasScheduleByEpochs[1] =
+		args.GasScheduleConfig.GasScheduleByEpochs[1], args.GasScheduleConfig.GasScheduleByEpochs[0]
+	originalFirstEpoch := args.GasScheduleConfig.GasScheduleByEpochs[0].StartEpoch
+	g, err := NewGasScheduleNotifier(args)
+	require.NoError(t, err)
+
+	versions := g.DRWAVersionedGasSchedules()
+	require.Len(t, versions, 2)
+	require.Equal(t, uint32(0), versions[0].StartEpoch)
+	require.Equal(t, uint32(2), versions[1].StartEpoch)
+	require.Equal(t, uint64(50), versions[0].Schedule["BaseOperationCost"]["AoTPreparePerByte"])
+	require.Equal(t, uint64(300), versions[1].Schedule["BaseOperationCost"]["AoTPreparePerByte"])
+	require.Equal(t, originalFirstEpoch, args.GasScheduleConfig.GasScheduleByEpochs[0].StartEpoch)
+
+	versions[0].StartEpoch = 99
+	versions[0].Schedule["BaseOperationCost"]["AoTPreparePerByte"] = 999
+	retained := g.DRWAVersionedGasSchedules()
+	require.Equal(t, uint32(0), retained[0].StartEpoch)
+	require.Equal(t, uint64(50), retained[0].Schedule["BaseOperationCost"]["AoTPreparePerByte"])
+	require.Equal(t, uint64(50), g.LatestGasSchedule()["BaseOperationCost"]["AoTPreparePerByte"])
+}
+
 func TestGasScheduleNotifier_RegisterNotifyHandlerNilHandlerShouldNotAdd(t *testing.T) {
 	t.Parallel()
 

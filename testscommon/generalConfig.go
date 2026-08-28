@@ -359,6 +359,17 @@ func GetGeneralConfig() config.Config {
 				MaxOpenFiles:      10,
 			},
 		},
+		DRWANetworkIdentityStorage: config.StorageConfig{
+			Cache: getLRUCacheConfig(),
+			DB: config.DBConfig{
+				FilePath:          AddTimestampSuffix("PrototypeNetworkIdentityStorageDB"),
+				Type:              string(storageunit.LvlDBSerial),
+				BatchDelaySeconds: 2,
+				MaxBatchSize:      1,
+				MaxOpenFiles:      10,
+				UseTmpAsFilePath:  true,
+			},
+		},
 		SmartContractsStorage: config.StorageConfig{
 			Cache: getLRUCacheConfig(),
 			DB: config.DBConfig{

@@ -176,6 +176,24 @@ func TestSanityCheckNodesConfig(t *testing.T) {
 	t.Parallel()
 
 	numShards := uint32(3)
+	t.Run("DRWA before Supernova should error", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := generateCorrectConfig()
+		cfg.SupernovaEnableEpoch = 2
+		cfg.DRWAEnforcementEnableEpoch = 1
+		err := SanityCheckNodesConfig(&nodesSetupMock.NodesSetupMock{}, cfg)
+		require.ErrorIs(t, err, errDRWAEnforcementBeforeSupernova)
+	})
+	t.Run("DRWA before Dynamic ESDT should error", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := generateCorrectConfig()
+		cfg.DynamicESDTEnableEpoch = 2
+		cfg.DRWAEnforcementEnableEpoch = 1
+		err := SanityCheckNodesConfig(&nodesSetupMock.NodesSetupMock{}, cfg)
+		require.ErrorIs(t, err, errDRWAEnforcementBeforeDynamicESDT)
+	})
 	t.Run("should work", func(t *testing.T) {
 		t.Parallel()
 

@@ -7,37 +7,39 @@ import (
 
 // ChainStorerMock -
 type ChainStorerMock struct {
-	BlockHeaders  *StorerMock
-	Metablocks    *StorerMock
-	Miniblocks    *StorerMock
-	Transactions  *StorerMock
-	Rewards       *StorerMock
-	Unsigned      *StorerMock
-	Logs          *StorerMock
-	MetaHdrNonce  *StorerMock
-	ShardHdrNonce *StorerMock
-	Receipts      *StorerMock
-	ScheduledSCRs *StorerMock
-	Proofs        *StorerMock
-	Others        *StorerMock
+	BlockHeaders    *StorerMock
+	Metablocks      *StorerMock
+	Miniblocks      *StorerMock
+	Transactions    *StorerMock
+	Rewards         *StorerMock
+	Unsigned        *StorerMock
+	Logs            *StorerMock
+	MetaHdrNonce    *StorerMock
+	ShardHdrNonce   *StorerMock
+	Receipts        *StorerMock
+	ScheduledSCRs   *StorerMock
+	Proofs          *StorerMock
+	NetworkIdentity *StorerMock
+	Others          *StorerMock
 }
 
 // NewChainStorerMock -
 func NewChainStorerMock(epoch uint32) *ChainStorerMock {
 	return &ChainStorerMock{
-		BlockHeaders:  NewStorerMockWithEpoch(epoch),
-		Metablocks:    NewStorerMockWithEpoch(epoch),
-		Miniblocks:    NewStorerMockWithEpoch(epoch),
-		Transactions:  NewStorerMockWithEpoch(epoch),
-		Rewards:       NewStorerMockWithEpoch(epoch),
-		Unsigned:      NewStorerMockWithEpoch(epoch),
-		Logs:          NewStorerMockWithEpoch(epoch),
-		MetaHdrNonce:  NewStorerMockWithEpoch(epoch),
-		ShardHdrNonce: NewStorerMockWithEpoch(epoch),
-		Receipts:      NewStorerMockWithEpoch(epoch),
-		ScheduledSCRs: NewStorerMockWithEpoch(epoch),
-		Proofs:        NewStorerMockWithErrKeyNotFound(epoch),
-		Others:        NewStorerMockWithEpoch(epoch),
+		BlockHeaders:    NewStorerMockWithEpoch(epoch),
+		Metablocks:      NewStorerMockWithEpoch(epoch),
+		Miniblocks:      NewStorerMockWithEpoch(epoch),
+		Transactions:    NewStorerMockWithEpoch(epoch),
+		Rewards:         NewStorerMockWithEpoch(epoch),
+		Unsigned:        NewStorerMockWithEpoch(epoch),
+		Logs:            NewStorerMockWithEpoch(epoch),
+		MetaHdrNonce:    NewStorerMockWithEpoch(epoch),
+		ShardHdrNonce:   NewStorerMockWithEpoch(epoch),
+		Receipts:        NewStorerMockWithEpoch(epoch),
+		ScheduledSCRs:   NewStorerMockWithEpoch(epoch),
+		Proofs:          NewStorerMockWithErrKeyNotFound(epoch),
+		NetworkIdentity: NewStorerMockWithErrKeyNotFound(epoch),
+		Others:          NewStorerMockWithEpoch(epoch),
 	}
 }
 
@@ -78,6 +80,11 @@ func (sm *ChainStorerMock) GetStorer(unitType dataRetriever.UnitType) (storage.S
 		return sm.ScheduledSCRs, nil
 	case dataRetriever.ProofsUnit:
 		return sm.Proofs, nil
+	case dataRetriever.DRWANetworkIdentityUnit:
+		if sm.NetworkIdentity == nil {
+			return nil, dataRetriever.ErrStorerNotFound
+		}
+		return sm.NetworkIdentity, nil
 	}
 
 	// According to: dataRetriever/interface.go
@@ -152,6 +159,7 @@ func (sm *ChainStorerMock) GetAllStorers() map[dataRetriever.UnitType]storage.St
 		dataRetriever.ReceiptsUnit:              sm.Receipts,
 		dataRetriever.ScheduledSCRsUnit:         sm.ScheduledSCRs,
 		dataRetriever.ProofsUnit:                sm.Proofs,
+		dataRetriever.DRWANetworkIdentityUnit:   sm.NetworkIdentity,
 	}
 }
 
