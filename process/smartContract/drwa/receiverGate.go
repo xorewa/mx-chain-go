@@ -29,7 +29,7 @@ var (
 	ErrNilReceiverGateDataHandler = errors.New("nil non-normative DRWA prototype receiver gate data handler")
 )
 
-// ReceiverGateRecord is the typed, protected S1-only receiver qualification stand-in.
+// ReceiverGateRecord is the typed, protected non-normative receiver-admission record.
 type ReceiverGateRecord struct {
 	Holder            [drwaAddressLength]byte
 	CEBEpoch          uint32

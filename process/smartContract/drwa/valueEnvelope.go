@@ -78,7 +78,7 @@ type ValueEnvelope struct {
 	Context                 ValueContext
 }
 
-// PrototypeValueEnvelopeMaximumLength returns the replaceable S1 test-only envelope byte limit.
+// DRWAValueEnvelopeMaximumLength returns the replaceable non-normative envelope byte limit.
 func DRWAValueEnvelopeMaximumLength() int {
 	return drwaEnvelopeMaximumLength()
 }

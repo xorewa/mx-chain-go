@@ -349,7 +349,7 @@
     SupernovaEnableEpoch = 2
 
     # DRWAEnforcementEnableEpoch represents the epoch when native DRWA enforcement will be enabled.
-    # It is disabled in the stock fork configuration until a coordinated qualification config selects a future epoch.
+    # It is disabled in the stock fork configuration until a coordinated network configuration selects a future epoch.
     DRWAEnforcementEnableEpoch = 4294967295
 
     # CheckBuiltInCallOnTransferValueAndFailEnableRound represents the ROUND when the check on transfer value fix is activated
