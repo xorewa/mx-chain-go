@@ -2,7 +2,6 @@ package preprocess
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -2565,11 +2564,12 @@ func TestSortTransactionsBySenderAndNonceWithFrontRunningProtection_TestnetBids(
 	numWinsForAddresses := make(map[string]int)
 	numCalls := 10000
 	for i := 0; i < numCalls; i++ {
-		randomness := make([]byte, 32)
-		_, _ = rand.Read(randomness)
+		// A reproducible uniform seed corpus makes a distribution regression
+		// debuggable and removes crypto/rand sampling failures from CI.
+		randomness := txPreproc.hasher.Compute(fmt.Sprintf("front-running-distribution-%d", i))
 		txPreproc.sortTransactionsBySenderAndNonceWithFrontRunningProtection(txs, randomness)
 		encodedWinnerAddr, err := bech32.Encode(txs[0].Tx.GetSndAddr())
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		numWinsForAddresses[encodedWinnerAddr]++
 	}
 
@@ -2586,9 +2586,11 @@ func TestSortTransactionsBySenderAndNonceWithFrontRunningProtection_TestnetBids(
 		"min wins", minWins,
 		"max wins", maxWins)
 
-	for addr, wins := range numWinsForAddresses {
+	for _, addr := range addresses {
+		wins := numWinsForAddresses[addr]
 		log.Info("address wins", "address", addr, "num wins", wins)
-		assert.True(t, minWins <= wins && wins <= maxWins)
+		require.GreaterOrEqual(t, wins, minWins, "address %s is below the deterministic distribution bound", addr)
+		require.LessOrEqual(t, wins, maxWins, "address %s is above the deterministic distribution bound", addr)
 	}
 }
 
