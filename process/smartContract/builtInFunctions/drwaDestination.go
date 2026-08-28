@@ -60,6 +60,7 @@ type drwaDestination struct {
 	networkDomain               [32]byte
 	cebEpoch                    uint32
 	retainedWorkBudgetsProvider drwaRetainedWorkBudgetsProvider
+	qualificationBarrier        *s1QualificationDestinationBarrier
 
 	mutBlockchainHook sync.RWMutex
 	blockchainHook    vmcommon.BlockchainDataHook
@@ -71,6 +72,11 @@ func newDRWADestination(args drwaDestinationArgs) (*drwaDestination, error) {
 		return nil, ErrInvalidDRWADestinationDelegate
 	}
 
+	barrier, err := newS1QualificationDestinationBarrier()
+	if err != nil {
+		return nil, err
+	}
+
 	return &drwaDestination{
 		delegate:                    args.delegate,
 		classifier:                  args.classifier,
@@ -79,6 +85,7 @@ func newDRWADestination(args drwaDestinationArgs) (*drwaDestination, error) {
 		networkDomain:               args.networkDomain,
 		cebEpoch:                    args.cebEpoch,
 		retainedWorkBudgetsProvider: args.retainedWorkBudgetsProvider,
+		qualificationBarrier:        barrier,
 	}, nil
 }
 
@@ -186,6 +193,15 @@ func (destination *drwaDestination) ProcessBuiltinFunction(
 			envelope.Context.DestinationHolder[:],
 			fmt.Errorf("%w: baseline output: %v", ErrDRWADestinationMutation, err),
 		)
+	}
+	if err = destination.qualificationBarrier.reach(
+		vmInput,
+		envelope.Context.EffectID,
+		artifacts.ContextHash,
+		destination.networkDomain,
+		uint32(vmData.ProtocolMessageKindDRWA),
+	); err != nil {
+		return nil, fmt.Errorf("%w: qualification barrier: %v", ErrDRWADestinationMutation, err)
 	}
 
 	return buildDRWADestinationSuccessOutput(vmInput.GasProvided, vmOutput, envelope.Context, receiptBytes)

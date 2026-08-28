@@ -8,6 +8,8 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+
+	"github.com/multiversx/mx-chain-go/state"
 )
 
 // NON_NORMATIVE_DRWA_PROTOTYPE
@@ -31,6 +33,8 @@ var (
 	ErrInvalidDRWAClassificationAccount = errors.New("invalid non-normative DRWA prototype classification system account")
 	// ErrInvalidDRWAClassificationMarker signals non-empty state other than the exact DRWA marker.
 	ErrInvalidDRWAClassificationMarker = errors.New("invalid non-normative DRWA prototype classification marker")
+	// ErrDRWAClassificationAlreadyExists signals that the marker key already has non-empty state.
+	ErrDRWAClassificationAlreadyExists = errors.New("non-normative DRWA prototype classification marker already exists")
 )
 
 // DRWARegulatedTokenKey returns a fresh protected key for one bounded DRWA token ID.
@@ -71,6 +75,55 @@ func IsDRWARegulatedToken(accounts vmcommon.AccountsAdapter, tokenID []byte) (bo
 	}
 
 	return true, nil
+}
+
+// MarkDRWARegulatedToken creates one protected system-account marker for a controlled S1-S5
+// harness. This helper is not registered as a built-in and provides no delete operation.
+func MarkDRWARegulatedToken(accounts vmcommon.AccountsAdapter, tokenID []byte) error {
+	key, err := DRWARegulatedTokenKey(tokenID)
+	if err != nil {
+		return err
+	}
+
+	if check.IfNil(accounts) {
+		return ErrNilDRWAClassificationAccounts
+	}
+
+	account, err := accounts.GetExistingAccount(vmcommon.SystemAccountAddress)
+	isNewAccount := errors.Is(err, state.ErrAccNotFound)
+	if err != nil && !isNewAccount {
+		return fmt.Errorf("get existing prototype classification system account: %w", err)
+	}
+	if isNewAccount {
+		account, err = accounts.LoadAccount(vmcommon.SystemAccountAddress)
+		if err != nil {
+			return fmt.Errorf("load prototype classification system account: %w", err)
+		}
+	}
+
+	systemAccount, dataHandler, err := validateDRWAClassificationSystemAccount(account)
+	if err != nil {
+		return err
+	}
+	if !isNewAccount {
+		existing, _, retrieveErr := dataHandler.RetrieveValue(key)
+		if retrieveErr != nil {
+			return fmt.Errorf("retrieve prototype classification marker: %w", retrieveErr)
+		}
+		if len(existing) != 0 {
+			return ErrDRWAClassificationAlreadyExists
+		}
+	}
+	err = dataHandler.SaveKeyValue(key, []byte(drwaRegulatedMarkerValue))
+	if err != nil {
+		return fmt.Errorf("save prototype classification marker: %w", err)
+	}
+	err = accounts.SaveAccount(systemAccount)
+	if err != nil {
+		return fmt.Errorf("save prototype classification system account: %w", err)
+	}
+
+	return nil
 }
 
 func loadDRWAClassificationSystemAccount(accounts vmcommon.AccountsAdapter) (vmcommon.UserAccountHandler, vmcommon.AccountDataHandler, error) {

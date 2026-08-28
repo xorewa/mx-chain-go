@@ -11,6 +11,7 @@ import (
 	vmcommonMock "github.com/multiversx/mx-chain-vm-common-go/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/multiversx/mx-chain-go/state"
 	trieMock "github.com/multiversx/mx-chain-go/testscommon/trie"
 )
 
@@ -68,17 +69,102 @@ func TestDRWAClassificationAbsentMarkedAndMalformed(t *testing.T) {
 	require.False(t, regulated)
 	require.Equal(t, [][]byte{vmcommon.SystemAccountAddress}, *loadedAddresses)
 
-	key, err := DRWARegulatedTokenKey(tokenID)
-	require.NoError(t, err)
-	stored[string(key)] = []byte(drwaRegulatedMarkerValue)
+	require.NoError(t, MarkDRWARegulatedToken(accounts, tokenID))
 	regulated, err = IsDRWARegulatedToken(accounts, tokenID)
 	require.NoError(t, err)
 	require.True(t, regulated)
 
+	key, err := DRWARegulatedTokenKey(tokenID)
+	require.NoError(t, err)
 	stored[string(key)] = []byte("not-the-marker")
 	regulated, err = IsDRWARegulatedToken(accounts, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrInvalidDRWAClassificationMarker)
+}
+
+func TestMarkDRWARegulatedTokenSavesSystemAccountAndRejectsEveryDuplicate(t *testing.T) {
+	t.Parallel()
+
+	accounts, stored, savedAccounts, _ := newDRWAClassificationMemoryAccounts()
+	tokenID := []byte("TOKEN-abcdef")
+	require.NoError(t, MarkDRWARegulatedToken(accounts, tokenID))
+	require.Len(t, *savedAccounts, 1)
+	require.Equal(t, vmcommon.SystemAccountAddress, (*savedAccounts)[0].AddressBytes())
+
+	key, err := DRWARegulatedTokenKey(tokenID)
+	require.NoError(t, err)
+	require.Equal(t, []byte(drwaRegulatedMarkerValue), stored[string(key)])
+	require.ErrorIs(t, MarkDRWARegulatedToken(accounts, tokenID), ErrDRWAClassificationAlreadyExists)
+	require.Len(t, *savedAccounts, 1)
+
+	otherTokenID := []byte("OTHER-abcdef")
+	otherKey, err := DRWARegulatedTokenKey(otherTokenID)
+	require.NoError(t, err)
+	stored[string(otherKey)] = []byte("malformed-existing-state")
+	require.ErrorIs(t, MarkDRWARegulatedToken(accounts, otherTokenID), ErrDRWAClassificationAlreadyExists)
+	require.Len(t, *savedAccounts, 1)
+}
+
+func TestMarkDRWARegulatedTokenCreatesProvenAbsentSystemAccountWithoutRetrieving(t *testing.T) {
+	t.Parallel()
+
+	retrieveCalled := false
+	loadCalled := false
+	saveCalled := false
+	handler := &trieMock.DataTrieTrackerStub{
+		RetrieveValueCalled: func(_ []byte) ([]byte, uint32, error) {
+			retrieveCalled = true
+			return nil, 0, state.ErrNilTrie
+		},
+	}
+	account := &vmcommonMock.UserAccountStub{
+		Address: vmcommon.SystemAccountAddress,
+		AccountDataHandlerCalled: func() vmcommon.AccountDataHandler {
+			return handler
+		},
+	}
+	accounts := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			require.Equal(t, vmcommon.SystemAccountAddress, address)
+			return nil, state.ErrAccNotFound
+		},
+		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			loadCalled = true
+			require.Equal(t, vmcommon.SystemAccountAddress, address)
+			return account, nil
+		},
+		SaveAccountCalled: func(saved vmcommon.AccountHandler) error {
+			saveCalled = true
+			require.Same(t, account, saved)
+			return nil
+		},
+	}
+
+	require.NoError(t, MarkDRWARegulatedToken(accounts, []byte("TOKEN-abcdef")))
+	require.True(t, loadCalled)
+	require.True(t, saveCalled)
+	require.False(t, retrieveCalled)
+}
+
+func TestMarkDRWARegulatedTokenPropagatesUnexpectedExistingAccountFailure(t *testing.T) {
+	t.Parallel()
+
+	injected := errors.New("injected existing account lookup failure")
+	loadCalled := false
+	accounts := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			require.Equal(t, vmcommon.SystemAccountAddress, address)
+			return nil, injected
+		},
+		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			loadCalled = true
+			return nil, nil
+		},
+	}
+
+	err := MarkDRWARegulatedToken(accounts, []byte("TOKEN-abcdef"))
+	require.ErrorIs(t, err, injected)
+	require.False(t, loadCalled)
 }
 
 func TestDRWAClassificationFailsClosedOnAccountFailures(t *testing.T) {
@@ -89,6 +175,7 @@ func TestDRWAClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	regulated, err := IsDRWARegulatedToken(nilAccounts, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrNilDRWAClassificationAccounts)
+	require.ErrorIs(t, MarkDRWARegulatedToken(nilAccounts, tokenID), ErrNilDRWAClassificationAccounts)
 
 	injectedLoad := errors.New("injected account load failure")
 	loadFailure := &vmcommonMock.AccountsStub{
@@ -112,6 +199,7 @@ func TestDRWAClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	regulated, err = IsDRWARegulatedToken(wrongType, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrInvalidDRWAClassificationAccount)
+	require.ErrorIs(t, MarkDRWARegulatedToken(wrongType, tokenID), ErrInvalidDRWAClassificationAccount)
 
 	wrongAddress := &vmcommonMock.AccountsStub{
 		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
@@ -134,6 +222,7 @@ func TestDRWAClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	regulated, err = IsDRWARegulatedToken(wrongAddress, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrInvalidDRWAClassificationAccount)
+	require.ErrorIs(t, MarkDRWARegulatedToken(wrongAddress, tokenID), ErrInvalidDRWAClassificationAccount)
 
 	nilDataHandler := &vmcommonMock.AccountsStub{
 		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
@@ -146,6 +235,23 @@ func TestDRWAClassificationFailsClosedOnAccountFailures(t *testing.T) {
 	regulated, err = IsDRWARegulatedToken(nilDataHandler, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, ErrInvalidDRWAClassificationAccount)
+	require.ErrorIs(t, MarkDRWARegulatedToken(nilDataHandler, tokenID), ErrInvalidDRWAClassificationAccount)
+}
+
+func TestMarkDRWARegulatedTokenPropagatesAbsentAccountLoadFailure(t *testing.T) {
+	t.Parallel()
+
+	injected := errors.New("injected absent account load failure")
+	accounts := &vmcommonMock.AccountsStub{
+		GetExistingAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return nil, state.ErrAccNotFound
+		},
+		LoadAccountCalled: func(_ []byte) (vmcommon.AccountHandler, error) {
+			return nil, injected
+		},
+	}
+
+	require.ErrorIs(t, MarkDRWARegulatedToken(accounts, []byte("TOKEN-abcdef")), injected)
 }
 
 func TestDRWAClassificationPropagatesStorageFailures(t *testing.T) {
@@ -161,6 +267,26 @@ func TestDRWAClassificationPropagatesStorageFailures(t *testing.T) {
 	regulated, err := IsDRWARegulatedToken(retrieveFailure, tokenID)
 	require.False(t, regulated)
 	require.ErrorIs(t, err, injectedRetrieve)
+	require.ErrorIs(t, MarkDRWARegulatedToken(retrieveFailure, tokenID), injectedRetrieve)
+
+	injectedKeySave := errors.New("injected marker key save failure")
+	accountSaveCalled := false
+	keySaveFailure := newDRWAClassificationAccountsWithHandler(&trieMock.DataTrieTrackerStub{
+		SaveKeyValueCalled: func(_ []byte, _ []byte) error {
+			return injectedKeySave
+		},
+	}, func(_ vmcommon.AccountHandler) error {
+		accountSaveCalled = true
+		return nil
+	})
+	require.ErrorIs(t, MarkDRWARegulatedToken(keySaveFailure, tokenID), injectedKeySave)
+	require.False(t, accountSaveCalled)
+
+	injectedAccountSave := errors.New("injected system account save failure")
+	accountSaveFailure := newDRWAClassificationAccountsWithHandler(&trieMock.DataTrieTrackerStub{}, func(_ vmcommon.AccountHandler) error {
+		return injectedAccountSave
+	})
+	require.ErrorIs(t, MarkDRWARegulatedToken(accountSaveFailure, tokenID), injectedAccountSave)
 }
 
 type drwaNonUserAccount struct{}

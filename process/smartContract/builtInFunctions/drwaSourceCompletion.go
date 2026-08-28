@@ -44,12 +44,17 @@ type drwaSourceCompletion struct {
 	retainedWorkBudgetsProvider drwaRetainedWorkBudgetsProvider
 	loadOpenEffect              func(vmcommon.AccountDataHandler, [32]byte) (*drwa.OpenEffect, error)
 	removeOpenEffect            func(vmcommon.AccountDataHandler, [32]byte) error
+	qualificationMutation       *s1QualificationCompletionMutation
 }
 
 func newDRWASourceCompletion(args drwaSourceCompletionArgs) (*drwaSourceCompletion, error) {
 	if check.IfNil(args.delegate) || check.IfNil(args.enableEpochsHandler) ||
 		check.IfNil(args.shardCoordinator) || args.retainedWorkBudgetsProvider == nil {
 		return nil, ErrInvalidDRWASourceCompletionDelegate
+	}
+	mutation, err := newS1QualificationCompletionMutation()
+	if err != nil {
+		return nil, err
 	}
 	return &drwaSourceCompletion{
 		delegate:                    args.delegate,
@@ -59,6 +64,7 @@ func newDRWASourceCompletion(args drwaSourceCompletionArgs) (*drwaSourceCompleti
 		retainedWorkBudgetsProvider: args.retainedWorkBudgetsProvider,
 		loadOpenEffect:              drwa.LoadOpenEffect,
 		removeOpenEffect:            drwa.RemoveOpenEffect,
+		qualificationMutation:       mutation,
 	}, nil
 }
 
@@ -70,6 +76,10 @@ func (completion *drwaSourceCompletion) ProcessBuiltinFunction(
 	payload, err := completion.validateAdmission(acntSnd, acntDst, vmInput)
 	if err != nil {
 		return nil, err
+	}
+	vmInput, payload, err = completion.qualificationMutation.apply(vmInput, payload)
+	if err != nil {
+		return nil, fmt.Errorf("%w: qualification mutation: %v", ErrDRWASourceCompletionDenied, err)
 	}
 	dataHandler := acntDst.AccountDataHandler()
 	if check.IfNil(dataHandler) {

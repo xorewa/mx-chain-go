@@ -34,17 +34,18 @@ type ArgsExecutionManager struct {
 }
 
 type executionManager struct {
-	mut                     sync.RWMutex
-	headersExecutor         process.HeadersExecutor
-	blocksCache             process.BlocksCache
-	executionResultsTracker process.ExecutionResultsTracker
-	blockChain              data.ChainHandler
-	headers                 dataRetriever.HeadersPool
-	postProcessTransactions storage.Cacher
-	executedMiniBlocks      storage.Cacher
-	storageService          dataRetriever.StorageService
-	marshaller              marshal.Marshalizer
-	shardCoordinator        sharding.Coordinator
+	mut                      sync.RWMutex
+	headersExecutor          process.HeadersExecutor
+	blocksCache              process.BlocksCache
+	executionResultsTracker  process.ExecutionResultsTracker
+	blockChain               data.ChainHandler
+	headers                  dataRetriever.HeadersPool
+	postProcessTransactions  storage.Cacher
+	executedMiniBlocks       storage.Cacher
+	storageService           dataRetriever.StorageService
+	marshaller               marshal.Marshalizer
+	shardCoordinator         sharding.Coordinator
+	qualificationReplacement *s1QualificationReplacement
 }
 
 // NewExecutionManager creates a new instance of executionManager
@@ -89,6 +90,11 @@ func NewExecutionManager(args ArgsExecutionManager) (*executionManager, error) {
 		marshaller:              args.Marshaller,
 		shardCoordinator:        args.ShardCoordinator,
 	}
+	qualificationReplacement, err := newS1QualificationReplacement(instance)
+	if err != nil {
+		return nil, err
+	}
+	instance.qualificationReplacement = qualificationReplacement
 
 	return instance, nil
 }
@@ -122,6 +128,25 @@ func (em *executionManager) AddPairForExecution(pair cache.HeaderBodyPair) error
 	em.mut.Lock()
 	defer em.mut.Unlock()
 
+	pairs, replay, err := em.qualificationReplacement.prepare(pair)
+	if err != nil {
+		return err
+	}
+	for _, currentPair := range pairs {
+		err = em.addPairForExecutionLocked(currentPair)
+		if err != nil {
+			break
+		}
+	}
+	if replay {
+		return em.qualificationReplacement.complete(err)
+	}
+	return err
+}
+
+// addPairForExecutionLocked is the unchanged baseline replacement/AddOrReplace path.
+// The caller must hold em.mut.
+func (em *executionManager) addPairForExecutionLocked(pair cache.HeaderBodyPair) error {
 	lastExecutedBlock := em.blockChain.GetLastExecutedBlockHeader()
 	if !check.IfNil(lastExecutedBlock) &&
 		lastExecutedBlock.GetNonce() >= pair.Header.GetNonce() {

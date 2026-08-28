@@ -1,16 +1,22 @@
 package process
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 	"sync"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-core-go/data"
 	dataBlock "github.com/multiversx/mx-chain-core-go/data/block"
+	"github.com/multiversx/mx-chain-core-go/data/esdt"
 	logger "github.com/multiversx/mx-chain-logger-go"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	vmcommonBuiltInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 
 	"github.com/multiversx/mx-chain-go/common"
@@ -35,6 +41,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/rewardTransaction"
 	"github.com/multiversx/mx-chain-go/process/smartContract"
 	"github.com/multiversx/mx-chain-go/process/smartContract/builtInFunctions"
+	"github.com/multiversx/mx-chain-go/process/smartContract/drwa"
 	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
 	"github.com/multiversx/mx-chain-go/process/smartContract/hooks/counters"
 	"github.com/multiversx/mx-chain-go/process/smartContract/processProxy"
@@ -56,6 +63,16 @@ var zero = big.NewInt(0)
 type deployedScMetrics struct {
 	numDelegation int
 	numOtherTypes int
+}
+
+type drwaReceiverSeed struct {
+	holderAddress         []byte
+	tokenID               []byte
+	receiverStorageKey    []byte
+	encodedReceiverRecord []byte
+	balanceStorageKey     []byte
+	encodedBalance        []byte
+	shardID               uint32
 }
 
 func createGenesisConfig(providedEnableEpochs config.EnableEpochs) config.EnableEpochs {
@@ -88,6 +105,14 @@ func CreateShardGenesisBlock(
 	nodesListSplitter genesis.NodesListSplitter,
 	hardForkBlockProcessor update.HardForkBlockProcessor,
 ) (data.HeaderHandler, [][]byte, *genesis.IndexingData, error) {
+	if len(arg.DRWAReceiverSeeds) > 0 && mustDoHardForkImportProcess(arg) {
+		return nil, nil, nil, fmt.Errorf("%w: non-empty list cannot be combined with hard-fork import", ErrInvalidDRWAReceiverSeeds)
+	}
+	drwaReceiverSeeds, err := validateAndCanonicalizeDRWAReceiverSeeds(arg)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	if mustDoHardForkImportProcess(arg) {
 		return createShardGenesisBlockAfterHardFork(arg, body, hardForkBlockProcessor)
 	}
@@ -120,6 +145,18 @@ func CreateShardGenesisBlock(
 	numSetBalances, err := setBalancesToTrie(arg)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("%w encountered when creating genesis block for shard %d while setting the balances to trie",
+			err, arg.ShardCoordinator.SelfId())
+	}
+
+	numRegulatedTokens, err := applyDRWARegulatedTokenMarkers(arg, drwaReceiverSeeds)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("%w encountered when creating genesis block for shard %d while applying prototype regulated-token markers",
+			err, arg.ShardCoordinator.SelfId())
+	}
+
+	numReceiverSeeds, err := applyDRWAReceiverSeeds(arg, drwaReceiverSeeds)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("%w encountered when creating genesis block for shard %d while applying prototype receiver seeds",
 			err, arg.ShardCoordinator.SelfId())
 	}
 
@@ -156,6 +193,8 @@ func CreateShardGenesisBlock(
 		"num delegation SC deployed", deployMetrics.numDelegation,
 		"num other SC deployed", deployMetrics.numOtherTypes,
 		"num set balances", numSetBalances,
+		"num prototype regulated tokens", numRegulatedTokens,
+		"num prototype receiver seeds", numReceiverSeeds,
 		"num staked directly", numStaked,
 		"total staked on a delegation SC", delegationResult.NumTotalStaked,
 		"total delegation nodes", delegationResult.NumTotalDelegated,
@@ -181,6 +220,208 @@ func CreateShardGenesisBlock(
 	}
 
 	return headerHandler, scAddresses, indexingData, nil
+}
+
+func validateAndCanonicalizeDRWAReceiverSeeds(arg ArgsGenesisBlockCreator) ([]drwaReceiverSeed, error) {
+	if len(arg.DRWAReceiverSeeds) == 0 {
+		return nil, nil
+	}
+
+	canonical := make([]drwaReceiverSeed, 0, len(arg.DRWAReceiverSeeds))
+	seen := make(map[string]struct{}, len(arg.DRWAReceiverSeeds))
+	for index, configured := range arg.DRWAReceiverSeeds {
+		holderAddress, err := arg.Core.AddressPubKeyConverter().Decode(configured.HolderAddress)
+		if err != nil {
+			return nil, fmt.Errorf("%w: seed %d holder decode: %v", ErrInvalidDRWAReceiverSeeds, index, err)
+		}
+		var holder [32]byte
+		if len(holderAddress) != len(holder) {
+			return nil, fmt.Errorf("%w: seed %d holder length", ErrInvalidDRWAReceiverSeeds, index)
+		}
+		copy(holder[:], holderAddress)
+		if holder == ([32]byte{}) || core.IsSystemAccountAddress(holderAddress) || core.IsSmartContractAddress(holderAddress) {
+			return nil, fmt.Errorf("%w: seed %d holder is not a non-zero EOA", ErrInvalidDRWAReceiverSeeds, index)
+		}
+
+		tokenID := []byte(configured.TokenIdentifier)
+		if !vmcommon.ValidateToken(tokenID) {
+			return nil, fmt.Errorf("%w: seed %d token identifier", ErrInvalidDRWAReceiverSeeds, index)
+		}
+		if configured.CEBEpoch == 0 || configured.CEBEpoch != arg.DRWACEBEpoch {
+			return nil, fmt.Errorf("%w: seed %d CEB", ErrInvalidDRWAReceiverSeeds, index)
+		}
+		if configured.ValidThroughRound == 0 {
+			return nil, fmt.Errorf("%w: seed %d valid-through round", ErrInvalidDRWAReceiverSeeds, index)
+		}
+
+		shardID := arg.ShardCoordinator.ComputeId(holderAddress)
+		if shardID >= arg.ShardCoordinator.NumberOfShards() {
+			return nil, fmt.Errorf("%w: seed %d holder is not in an ordinary shard", ErrInvalidDRWAReceiverSeeds, index)
+		}
+		uniqueKey := string(holderAddress) + "\x00" + configured.TokenIdentifier
+		if _, exists := seen[uniqueKey]; exists {
+			return nil, fmt.Errorf("%w: seed %d duplicate holder/token", ErrInvalidDRWAReceiverSeeds, index)
+		}
+		seen[uniqueKey] = struct{}{}
+
+		encodedRecord, err := drwa.EncodeReceiverGateRecord(drwa.ReceiverGateRecord{
+			Holder:            holder,
+			CEBEpoch:          configured.CEBEpoch,
+			Admitted:          configured.Admitted,
+			ValidThroughRound: configured.ValidThroughRound,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%w: seed %d record encoding: %v", ErrInvalidDRWAReceiverSeeds, index, err)
+		}
+
+		balanceStorageKey, encodedBalance, err := encodeDRWAInitialTokenState(
+			arg,
+			tokenID,
+			configured.InitialBalance,
+			configured.InitialFrozen,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%w: seed %d initial token state: %v", ErrInvalidDRWAReceiverSeeds, index, err)
+		}
+
+		canonical = append(canonical, drwaReceiverSeed{
+			holderAddress:         append([]byte(nil), holderAddress...),
+			tokenID:               append([]byte(nil), tokenID...),
+			receiverStorageKey:    drwa.ReceiverGateStorageKey(tokenID),
+			encodedReceiverRecord: encodedRecord,
+			balanceStorageKey:     balanceStorageKey,
+			encodedBalance:        encodedBalance,
+			shardID:               shardID,
+		})
+	}
+
+	sort.Slice(canonical, func(first, second int) bool {
+		holderComparison := bytes.Compare(canonical[first].holderAddress, canonical[second].holderAddress)
+		if holderComparison != 0 {
+			return holderComparison < 0
+		}
+		return bytes.Compare(canonical[first].tokenID, canonical[second].tokenID) < 0
+	})
+
+	return canonical, nil
+}
+
+func encodeDRWAInitialTokenState(
+	arg ArgsGenesisBlockCreator,
+	tokenID []byte,
+	configured string,
+	initialFrozen bool,
+) ([]byte, []byte, error) {
+	if configured == "" && !initialFrozen {
+		return nil, nil, nil
+	}
+
+	amount := big.NewInt(0)
+	if configured != "" {
+		if configured[0] == '0' {
+			return nil, nil, errors.New("amount is not canonical positive decimal")
+		}
+		for _, character := range []byte(configured) {
+			if character < '0' || character > '9' {
+				return nil, nil, errors.New("amount is not canonical positive decimal")
+			}
+		}
+		var ok bool
+		amount, ok = big.NewInt(0).SetString(configured, 10)
+		if !ok || amount.Sign() <= 0 || len(amount.Bytes()) > 32 {
+			return nil, nil, errors.New("amount is outside the positive 32-byte bound")
+		}
+	}
+
+	tokenState := &esdt.ESDigitalToken{
+		Value: amount,
+		Type:  uint32(core.Fungible),
+	}
+	if initialFrozen {
+		tokenState.Properties = (&vmcommonBuiltInFunctions.ESDTUserMetadata{Frozen: true}).ToBytes()
+	}
+	encoded, err := arg.Core.InternalMarshalizer().Marshal(tokenState)
+	if err != nil {
+		return nil, nil, err
+	}
+	key := make([]byte, 0, len(core.ProtectedKeyPrefix)+len(core.ESDTKeyIdentifier)+len(tokenID))
+	key = append(key, core.ProtectedKeyPrefix...)
+	key = append(key, core.ESDTKeyIdentifier...)
+	key = append(key, tokenID...)
+
+	return key, encoded, nil
+}
+
+func applyDRWARegulatedTokenMarkers(
+	arg ArgsGenesisBlockCreator,
+	seeds []drwaReceiverSeed,
+) (int, error) {
+	uniqueTokens := make([][]byte, 0, len(seeds))
+	seen := make(map[string]struct{}, len(seeds))
+	for _, seed := range seeds {
+		if _, exists := seen[string(seed.tokenID)]; exists {
+			continue
+		}
+		seen[string(seed.tokenID)] = struct{}{}
+		uniqueTokens = append(uniqueTokens, append([]byte(nil), seed.tokenID...))
+	}
+	sort.Slice(uniqueTokens, func(first, second int) bool {
+		return bytes.Compare(uniqueTokens[first], uniqueTokens[second]) < 0
+	})
+
+	for index, tokenID := range uniqueTokens {
+		err := drwa.MarkDRWARegulatedToken(arg.Accounts, tokenID)
+		if err != nil {
+			return index, err
+		}
+	}
+
+	return len(uniqueTokens), nil
+}
+
+func applyDRWAReceiverSeeds(arg ArgsGenesisBlockCreator, seeds []drwaReceiverSeed) (int, error) {
+	numApplied := 0
+	for _, seed := range seeds {
+		if seed.shardID != arg.ShardCoordinator.SelfId() {
+			continue
+		}
+
+		accountHandler, err := arg.Accounts.LoadAccount(seed.holderAddress)
+		if err != nil {
+			return numApplied, err
+		}
+		account, ok := accountHandler.(state.UserAccountHandler)
+		if !ok {
+			return numApplied, process.ErrWrongTypeAssertion
+		}
+		if len(seed.encodedBalance) > 0 {
+			existing, _, retrieveErr := account.RetrieveValue(seed.balanceStorageKey)
+			if retrieveErr != nil {
+				isProvenEmptyDataRoot := errors.Is(retrieveErr, state.ErrNilTrie) && len(account.GetRootHash()) == 0
+				if !isProvenEmptyDataRoot {
+					return numApplied, retrieveErr
+				}
+			}
+			if len(existing) != 0 {
+				return numApplied, fmt.Errorf("%w: pre-existing initial balance", ErrInvalidDRWAReceiverSeeds)
+			}
+			err = account.SaveKeyValue(seed.balanceStorageKey, seed.encodedBalance)
+			if err != nil {
+				return numApplied, err
+			}
+		}
+		err = account.SaveKeyValue(seed.receiverStorageKey, seed.encodedReceiverRecord)
+		if err != nil {
+			return numApplied, err
+		}
+		err = arg.Accounts.SaveAccount(account)
+		if err != nil {
+			return numApplied, err
+		}
+		numApplied++
+	}
+
+	return numApplied, nil
 }
 
 func setInitialDataInHeader(

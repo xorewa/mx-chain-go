@@ -62,7 +62,7 @@ type baseInterceptorsContainerFactory struct {
 	nodeOperationMode               common.NodeOperation
 	interceptedDataVerifierFactory  process.InterceptedDataVerifierFactory
 	enableEpochsHandler             common.EnableEpochsHandler
-	config                         config.Config
+	config                          config.Config
 }
 
 func checkBaseParams(
@@ -215,6 +215,11 @@ func createTopicAndAssignHandlerOnMessenger(
 ) error {
 
 	err := messenger.CreateTopic(topic, createChannel)
+	if err != nil {
+		return err
+	}
+
+	interceptor, err = s1QualificationTransportSeam(topic, interceptor)
 	if err != nil {
 		return err
 	}

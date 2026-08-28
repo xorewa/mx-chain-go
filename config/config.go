@@ -622,6 +622,20 @@ type BuiltInFunctionsConfig struct {
 	DNSV2Addresses                []string
 	DRWACEBEpoch                  uint32 `toml:"PrototypeDRWACEBEpoch"`
 	DRWASettlementLifetimeRounds  uint64 `toml:"PrototypeDRWASettlementLifetimeRounds"`
+	DRWAReceiverSeeds             []DRWAReceiverSeedConfig `toml:"PrototypeDRWAReceiverSeeds"`
+}
+
+// PrototypeDRWAReceiverSeedConfig holds one fresh-genesis-only S1 receiver qualification seed.
+// NON_NORMATIVE_DRWA_PROTOTYPE
+// REPLACED_BY_PART_B
+type DRWAReceiverSeedConfig struct {
+	HolderAddress     string
+	TokenIdentifier   string
+	InitialBalance    string
+	InitialFrozen     bool
+	CEBEpoch          uint32
+	Admitted          bool
+	ValidThroughRound uint64
 }
 
 // HardforkConfig holds the configuration for the hardfork trigger
