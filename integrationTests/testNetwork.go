@@ -424,6 +424,7 @@ func (net *TestNetwork) createNodes() {
 		MiniBlockPartialExecutionEnableEpoch: UnreachableEpoch,
 		AndromedaEnableEpoch:                 UnreachableEpoch,
 		SupernovaEnableEpoch:                 UnreachableEpoch,
+		DRWAEnforcementEnableEpoch:           UnreachableEpoch,
 	}
 
 	net.Nodes = CreateNodesWithEnableEpochsAndEnableRounds(

@@ -34,6 +34,7 @@ func TestBridgeSetupAndBurn(t *testing.T) {
 		FixAsyncCallBackArgsListEnableEpoch: integrationTests.UnreachableEpoch,
 		AndromedaEnableEpoch:                integrationTests.UnreachableEpoch,
 		SupernovaEnableEpoch:                integrationTests.UnreachableEpoch,
+		DRWAEnforcementEnableEpoch:          integrationTests.UnreachableEpoch,
 	}
 	arwenVersion := config.WasmVMVersionByEpoch{Version: "v1.4"}
 	vmConfig := &config.VirtualMachineConfig{
