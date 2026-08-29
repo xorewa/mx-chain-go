@@ -3,6 +3,7 @@ package f1t
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,22 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/p2pmocks"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRecorderRejectsMixedCampaignCatalogAndEmitsBoundContext(t *testing.T) {
+	contextDigest := strings.Repeat("b1", 32)
+	callback := CallbackKey{Role: "target", Path: "pubsub"}
+	events := make(chan RecorderEvent, 1)
+	recorder := NewRecorderWithConfig(nil, RecorderConfig{Callback: callback, CampaignContextSHA256: contextDigest,
+		DurableEmit: func(event RecorderEvent) error { events <- event; return nil }})
+	entry := SendCatalogEntry{MessageID: "message", Kind: "CALIBRATION", Index: 1, Expected: []CallbackKey{callback},
+		CampaignContextSHA256: contextDigest}
+	require.NoError(t, recorder.RegisterExpected(entry))
+
+	wrong := entry
+	wrong.MessageID = "wrong"
+	wrong.CampaignContextSHA256 = strings.Repeat("b2", 32)
+	require.ErrorIs(t, recorder.RegisterExpected(wrong), ErrReconciliation)
+}
 
 var targetPubsub = CallbackKey{Role: "target", Path: "pubsub"}
 

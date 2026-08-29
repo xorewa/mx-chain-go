@@ -100,6 +100,16 @@ type SemanticProfileFlags struct {
 	DRWAEnforcementFlag bool `json:"drwa_enforcement_flag"`
 }
 
+// SemanticProfileBinding is the externally supplied, hash-bound description
+// of the runtime profile against which one observation is evaluated. The
+// selector does not infer these values from a profile label.
+type SemanticProfileBinding struct {
+	ID              Profile                 `json:"id"`
+	EvaluationEpoch uint32                  `json:"evaluation_epoch"`
+	EffectiveEpochs SemanticEffectiveEpochs `json:"effective_epochs"`
+	ExpectedFlags   SemanticProfileFlags    `json:"expected_flags"`
+}
+
 type SemanticProfileFields struct {
 	ID              Profile                 `json:"id"`
 	EvaluationEpoch uint32                  `json:"evaluation_epoch"`
@@ -173,9 +183,49 @@ type DestinationConversionObservation struct {
 // None is an expected semantic arm or an expected predicate result.
 type ObservationContext struct {
 	NetworkDomain       [32]byte
+	ProfileBinding      SemanticProfileBinding
+	ProfileBindingHash  [32]byte
 	EnableEpochsHandler common.EnableEpochsHandler
 	Coordinator         sharding.Coordinator
 	Conversion          *DestinationConversionObservation
+}
+
+func NewObservationContext(profile VerifiedProfile, constructor CanonicalSourceConstructor) (ObservationContext, error) {
+	if profile.EnableEpochsHandler == nil || profile.EnableEpochsHandler.IsInterfaceNil() ||
+		profile.Entry.ID != profile.Binding.ID || profile.Binding.ID == "" {
+		return ObservationContext{}, ErrSelectorMismatch
+	}
+	bindingHash, err := SemanticProfileBindingHash(profile.Binding)
+	if err != nil || hex.EncodeToString(bindingHash[:]) != profile.SelectorDigest {
+		return ObservationContext{}, ErrSelectorMismatch
+	}
+	coordinator, err := sharding.NewMultiShardCoordinator(3, constructor.ReceiverShard)
+	if err != nil || coordinator.ComputeId(constructor.Destination[:]) != constructor.ReceiverShard ||
+		coordinator.ComputeId(constructor.SourceHolder[:]) != constructor.SenderShard {
+		return ObservationContext{}, ErrSelectorMismatch
+	}
+	return ObservationContext{NetworkDomain: constructor.NetworkDomain, ProfileBinding: profile.Binding,
+		ProfileBindingHash: bindingHash, EnableEpochsHandler: profile.EnableEpochsHandler, Coordinator: coordinator}, nil
+}
+
+const semanticProfileBindingDomain = "DRWA/F1T/SEMANTIC-PROFILE/v1"
+
+// SemanticProfileBindingHash deterministically binds the complete profile
+// artifact. Only closed, scalar structs are serialized, so callers cannot
+// retain mutable aliases inside the binding.
+func SemanticProfileBindingHash(binding SemanticProfileBinding) ([32]byte, error) {
+	if binding.ID != ProfileLegacy && binding.ID != ProfileV2 {
+		return [32]byte{}, fmt.Errorf("%w: unknown profile binding", ErrSelectorMismatch)
+	}
+	encoded, err := json.Marshal(binding)
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("%w: profile binding encoding", ErrSelectorMismatch)
+	}
+	preimage := make([]byte, 0, len(semanticProfileBindingDomain)+1+len(encoded))
+	preimage = append(preimage, semanticProfileBindingDomain...)
+	preimage = append(preimage, 0)
+	preimage = append(preimage, encoded...)
+	return sha256.Sum256(preimage), nil
 }
 
 type parsedFixture struct {
@@ -236,7 +286,10 @@ func ClassifyObservedFixture(
 	arms [][]byte,
 	context ObservationContext,
 ) (Selection, error) {
-	if isZero32(context.NetworkDomain) || context.EnableEpochsHandler == nil || context.EnableEpochsHandler.IsInterfaceNil() ||
+	profileBindingHash, bindingErr := SemanticProfileBindingHash(context.ProfileBinding)
+	if isZero32(context.NetworkDomain) || isZero32(context.ProfileBindingHash) || bindingErr != nil ||
+		profileBindingHash != context.ProfileBindingHash || context.ProfileBinding.ID != expectedProfile ||
+		context.EnableEpochsHandler == nil || context.EnableEpochsHandler.IsInterfaceNil() ||
 		context.Coordinator == nil || context.Coordinator.IsInterfaceNil() {
 		return Selection{}, fmt.Errorf("%w: unbound observation context", ErrSelectorMismatch)
 	}
@@ -244,7 +297,7 @@ func ClassifyObservedFixture(
 	if err != nil || len(arms) < 2 {
 		return Selection{}, ErrSelectorMismatch
 	}
-	semanticCandidate, decoded, err := projectSemanticCandidate(candidate, context.NetworkDomain)
+	semanticCandidate, decoded, err := projectSemanticCandidate(candidate, context.NetworkDomain, context.ProfileBinding)
 	if err != nil {
 		return Selection{}, err
 	}
@@ -256,7 +309,7 @@ func ClassifyObservedFixture(
 		if armErr != nil {
 			return Selection{}, armErr
 		}
-		armSemantic, _, armErr := projectSemanticCandidate(arm, context.NetworkDomain)
+		armSemantic, _, armErr := projectSemanticCandidate(arm, context.NetworkDomain, context.ProfileBinding)
 		if armErr != nil {
 			return Selection{}, armErr
 		}
@@ -295,7 +348,11 @@ type decodedProjection struct {
 	envelopeBytes []byte
 }
 
-func projectSemanticCandidate(parsed parsedFixture, networkDomain [32]byte) (*SemanticCandidate, decodedProjection, error) {
+func projectSemanticCandidate(
+	parsed parsedFixture,
+	networkDomain [32]byte,
+	profileBinding SemanticProfileBinding,
+) (*SemanticCandidate, decodedProjection, error) {
 	marshaller := &marshal.GogoProtoMarshalizer{}
 	decoded := decodedProjection{}
 	if err := canonicalUnmarshal(marshaller, parsed.artifacts.BatchCanonical, &decoded.batch); err != nil {
@@ -322,14 +379,32 @@ func projectSemanticCandidate(parsed parsedFixture, networkDomain [32]byte) (*Se
 	}
 	decoded.envelope = *envelope
 
-	profileFields, err := semanticProfile(parsed.fixture.Profile, decoded.scr)
+	candidate, err := semanticCandidateFromDecoded(parsed.fixture.Profile, networkDomain, profileBinding, decoded)
 	if err != nil {
 		return nil, decodedProjection{}, err
+	}
+	return candidate, decoded, nil
+}
+
+func semanticCandidateFromDecoded(
+	profile Profile,
+	networkDomain [32]byte,
+	profileBinding SemanticProfileBinding,
+	decoded decodedProjection,
+) (*SemanticCandidate, error) {
+	parts := bytes.Split(decoded.scr.Data, []byte{'@'})
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("%w: calldata projection", ErrSelectorMismatch)
+	}
+	profileFields, err := semanticProfile(profileBinding, profile, decoded.scr)
+	if err != nil {
+		return nil, err
 	}
 	relayedValue := OptionalDecimal{State: "ABSENT"}
 	if decoded.scr.RelayedValue != nil {
 		relayedValue = OptionalDecimal{State: "PRESENT", ValueDecimal: decoded.scr.RelayedValue.String()}
 	}
+	envelope := decoded.envelope
 	intent := semanticIntent(envelope.Context)
 	candidate := &SemanticCandidate{
 		ProtocolKind: uint32(decoded.scr.ProtocolMessageKind), CallType: uint32(decoded.scr.CallType), Value: decoded.scr.Value.String(),
@@ -344,7 +419,7 @@ func projectSemanticCandidate(parsed parsedFixture, networkDomain [32]byte) (*Se
 		TxHash: hex.EncodeToString(decoded.scr.PrevTxHash), NetworkDomain: hex.EncodeToString(networkDomain[:]), Intent: intent,
 		ESDTPayload: hex.EncodeToString(envelope.OriginalTransferPayload),
 	}
-	return candidate, decoded, nil
+	return candidate, nil
 }
 
 func mustDecodeCanonicalHex(encoded []byte) []byte {
@@ -355,25 +430,21 @@ func mustDecodeCanonicalHex(encoded []byte) []byte {
 	return decoded
 }
 
-func semanticProfile(profile Profile, scr smartContractResult.SmartContractResult) (SemanticProfileFields, error) {
+func semanticProfile(
+	binding SemanticProfileBinding,
+	profile Profile,
+	scr smartContractResult.SmartContractResult,
+) (SemanticProfileFields, error) {
 	if scr.Value == nil {
 		return SemanticProfileFields{}, fmt.Errorf("%w: nil value", ErrSelectorMismatch)
 	}
-	fields := SemanticProfileFields{ID: profile, EvaluationEpoch: 2,
-		EffectiveEpochs: SemanticEffectiveEpochs{SCDeployEnableEpoch: 0, SupernovaEnableEpoch: 2,
-			DynamicESDTEnableEpoch: 1, DRWAEnforcementEnableEpoch: 2},
-		ExpectedFlags: SemanticProfileFlags{SCDeployFlag: true, DRWAEnforcementFlag: true}, Nonce: scr.Nonce,
+	if binding.ID != profile {
+		return SemanticProfileFields{}, fmt.Errorf("%w: profile binding", ErrSelectorMismatch)
+	}
+	fields := SemanticProfileFields{ID: binding.ID, EvaluationEpoch: binding.EvaluationEpoch,
+		EffectiveEpochs: binding.EffectiveEpochs, ExpectedFlags: binding.ExpectedFlags, Nonce: scr.Nonce,
 		GasPrice: scr.GasPrice, CodeHex: hex.EncodeToString(scr.Code), CodeMetadataHex: hex.EncodeToString(scr.CodeMetadata),
 		ReturnMessage: string(scr.ReturnMessage), OriginalSender: hex.EncodeToString(scr.OriginalSender)}
-	switch profile {
-	case ProfileLegacy:
-		fields.EffectiveEpochs.SCProcessorV2EnableEpoch = 3
-	case ProfileV2:
-		fields.EffectiveEpochs.SCProcessorV2EnableEpoch = 1
-		fields.ExpectedFlags.SCProcessorV2Flag = true
-	default:
-		return SemanticProfileFields{}, ErrSelectorMismatch
-	}
 	return fields, nil
 }
 
@@ -392,19 +463,21 @@ func checkedBudgetTotal(context drwa.ValueContext) (uint64, error) {
 	}).Total()
 }
 
-func profileFieldsMatch(profile Profile, scr smartContractResult.SmartContractResult, fields SemanticProfileFields) bool {
-	if fields.ID != profile || fields.EvaluationEpoch != 2 || fields.EffectiveEpochs.SCDeployEnableEpoch != 0 ||
-		fields.EffectiveEpochs.SupernovaEnableEpoch != 2 || fields.EffectiveEpochs.DynamicESDTEnableEpoch != 1 ||
-		fields.EffectiveEpochs.DRWAEnforcementEnableEpoch != 2 || !fields.ExpectedFlags.SCDeployFlag ||
-		!fields.ExpectedFlags.DRWAEnforcementFlag || scr.Nonce != 0 || scr.GasPrice == 0 || len(scr.Code) != 0 ||
+func profileFieldsMatch(
+	profile Profile,
+	scr smartContractResult.SmartContractResult,
+	fields SemanticProfileFields,
+	binding SemanticProfileBinding,
+) bool {
+	expected, err := semanticProfile(binding, profile, scr)
+	if err != nil || !reflect.DeepEqual(fields, expected) || scr.Nonce != 0 || scr.GasPrice == 0 || len(scr.Code) != 0 ||
 		len(scr.CodeMetadata) != 0 || len(scr.ReturnMessage) != 0 {
 		return false
 	}
-	if profile == ProfileLegacy {
-		return fields.EffectiveEpochs.SCProcessorV2EnableEpoch == 3 && !fields.ExpectedFlags.SCProcessorV2Flag && len(scr.OriginalSender) == 0
+	if !binding.ExpectedFlags.SCProcessorV2Flag {
+		return len(scr.OriginalSender) == 0
 	}
-	return profile == ProfileV2 && fields.EffectiveEpochs.SCProcessorV2EnableEpoch == 1 && fields.ExpectedFlags.SCProcessorV2Flag &&
-		bytes.Equal(scr.OriginalSender, scr.SndAddr)
+	return bytes.Equal(scr.OriginalSender, scr.SndAddr)
 }
 
 func canonicalCallData(data []byte) bool {
@@ -718,7 +791,7 @@ func evaluateObservedPredicates(
 	set("PR017_RESERVED_GAS", budgetErr == nil && decoded.scr.GasLimit == budgetTotal)
 	set("PR018_RELAYER_ADDR_ABSENT", len(decoded.scr.RelayerAddr) == 0)
 	set("PR019_RELAYED_VALUE_ABSENT", decoded.scr.RelayedValue == nil && candidate.RelayedValue.State == "ABSENT")
-	set("PR020_REMAINING_PROFILE_FIELDS", profileFieldsMatch(parsed.fixture.Profile, decoded.scr, candidate.ProfileFields))
+	set("PR020_REMAINING_PROFILE_FIELDS", profileFieldsMatch(parsed.fixture.Profile, decoded.scr, candidate.ProfileFields, context.ProfileBinding))
 	set("PR021_FUNCTION", candidate.Function == vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)
 	set("PR022_CALLDATA_GRAMMAR", canonicalCallData(decoded.scr.Data))
 	set("PR023_ENVELOPE_DECODABLE", true)

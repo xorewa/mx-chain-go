@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,66 @@ func validTestFrame(t *testing.T) Frame {
 	return Frame{SchemaVersion: SchemaVersion, SessionID: "session", RunID: "run", Role: "target",
 		PIDStartID: "1:2", ExecutableHash: hex.EncodeToString(sum[:]), SourceSequence: 1,
 		ReleaseEpoch: 1, Kind: KindEvent, PayloadHash: payloadHash, AdmissionState: "READY", Payload: payload}
+}
+
+func validPhaseIIFrame(t *testing.T, context string) Frame {
+	t.Helper()
+	frame := validTestFrame(t)
+	payload, payloadHash, err := NewPayload(RoleReadyPayload{Type: PayloadRoleReady, Phase: "INTERCEPTED_REHEARSAL",
+		Role: "target", CampaignContextSHA256: context})
+	require.NoError(t, err)
+	frame.SchemaVersion = PhaseIISchemaVersion
+	frame.CampaignContextSHA256 = context
+	frame.Payload = payload
+	frame.PayloadHash = payloadHash
+	return frame
+}
+
+func TestMeasurementEnvelopeBindsActionIdentityAndExactFixture(t *testing.T) {
+	fixture := []byte("same-fixture-across-cells")
+	fixtureHash := sha256.Sum256(fixture)
+	action := CampaignActionPayload{Type: PayloadAction, Kind: ObservationCalibration, Profile: ProfileV2,
+		Path: PathRemoteTarget, Load: LoadBaseline, Index: 1, ActionIndex: 1,
+		FixtureSHA256: hex.EncodeToString(fixtureHash[:]), CampaignContextSHA256: strings.Repeat("ab", 32)}
+	first, firstID, err := EncodeMeasurementEnvelope(action, fixture)
+	require.NoError(t, err)
+	decoded, decodedID, err := DecodeMeasurementEnvelope(first)
+	require.NoError(t, err)
+	require.Equal(t, firstID, decodedID)
+	require.Equal(t, fixture, decoded.Fixture)
+
+	action.Load = LoadCPU
+	action.ActionIndex = 2
+	second, secondID, err := EncodeMeasurementEnvelope(action, fixture)
+	require.NoError(t, err)
+	require.NotEqual(t, firstID, secondID, "repeated raw fixtures need unique transport identities")
+	require.NotEqual(t, first, second)
+
+	var mutated MeasurementEnvelope
+	require.NoError(t, json.Unmarshal(first, &mutated))
+	mutated.Fixture[0] ^= 1
+	mutatedRaw, err := json.Marshal(mutated)
+	require.NoError(t, err)
+	_, _, err = DecodeMeasurementEnvelope(mutatedRaw)
+	require.ErrorIs(t, err, ErrInvalidFrame)
+}
+
+func TestPhaseIIFrameRequiresMatchingContextAtOuterAndPayloadLayers(t *testing.T) {
+	context := strings.Repeat("91", 32)
+	frame := validPhaseIIFrame(t, context)
+	packet, err := EncodeFrame(frame)
+	require.NoError(t, err)
+	_, err = DecodeFrame(packet)
+	require.NoError(t, err)
+
+	frame.CampaignContextSHA256 = strings.Repeat("92", 32)
+	_, err = EncodeFrame(frame)
+	require.ErrorIs(t, err, ErrInvalidFrame)
+
+	frame = validTestFrame(t)
+	frame.CampaignContextSHA256 = context
+	_, err = EncodeFrame(frame)
+	require.ErrorIs(t, err, ErrInvalidFrame)
 }
 
 func TestFrameRoundTripAndHostileShapes(t *testing.T) {

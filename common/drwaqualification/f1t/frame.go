@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	SchemaVersion = "DRWA_S1_F1T_FRAME_V1"
-	MaxFrameSize  = 1 << 20
+	SchemaVersion        = "DRWA_S1_F1T_FRAME_V1"
+	PhaseIISchemaVersion = "DRWA_S1_F1T_FRAME_V2"
+	MaxFrameSize         = 1 << 20
 )
 
 var ErrInvalidFrame = errors.New("invalid F1-T frame")
@@ -29,18 +30,19 @@ const (
 )
 
 type Frame struct {
-	SchemaVersion  string          `json:"schema_version"`
-	SessionID      string          `json:"session_id"`
-	RunID          string          `json:"run_id"`
-	Role           string          `json:"role"`
-	PIDStartID     string          `json:"pid_start_id"`
-	ExecutableHash string          `json:"executable_sha256"`
-	SourceSequence uint64          `json:"source_sequence"`
-	ReleaseEpoch   uint64          `json:"release_epoch"`
-	Kind           Kind            `json:"kind"`
-	PayloadHash    string          `json:"payload_sha256"`
-	AdmissionState string          `json:"callback_admission_state"`
-	Payload        json.RawMessage `json:"payload"`
+	SchemaVersion         string          `json:"schema_version"`
+	CampaignContextSHA256 string          `json:"campaign_context_sha256,omitempty"`
+	SessionID             string          `json:"session_id"`
+	RunID                 string          `json:"run_id"`
+	Role                  string          `json:"role"`
+	PIDStartID            string          `json:"pid_start_id"`
+	ExecutableHash        string          `json:"executable_sha256"`
+	SourceSequence        uint64          `json:"source_sequence"`
+	ReleaseEpoch          uint64          `json:"release_epoch"`
+	Kind                  Kind            `json:"kind"`
+	PayloadHash           string          `json:"payload_sha256"`
+	AdmissionState        string          `json:"callback_admission_state"`
+	Payload               json.RawMessage `json:"payload"`
 }
 
 type PayloadType string
@@ -58,9 +60,10 @@ const (
 )
 
 type RoleReadyPayload struct {
-	Type  PayloadType `json:"type"`
-	Phase string      `json:"phase"`
-	Role  string      `json:"role"`
+	Type                  PayloadType `json:"type"`
+	Phase                 string      `json:"phase"`
+	Role                  string      `json:"role"`
+	CampaignContextSHA256 string      `json:"campaign_context_sha256,omitempty"`
 }
 
 type DurableAckPayload struct {
@@ -69,57 +72,140 @@ type DurableAckPayload struct {
 	GlobalIngressSequence uint64      `json:"global_ingress_sequence"`
 	DurableTimestampRawNS uint64      `json:"durable_timestamp_monotonic_raw_ns"`
 	FrameSHA256           string      `json:"frame_sha256"`
+	CampaignContextSHA256 string      `json:"campaign_context_sha256,omitempty"`
 }
 
 type SendCatalogPayload struct {
-	Type  PayloadType      `json:"type"`
-	Entry SendCatalogEntry `json:"entry"`
+	Type                  PayloadType      `json:"type"`
+	Entry                 SendCatalogEntry `json:"entry"`
+	CampaignContextSHA256 string           `json:"campaign_context_sha256,omitempty"`
 }
 
 type CallbackEventPayload struct {
-	Type  PayloadType   `json:"type"`
-	Event RecorderEvent `json:"event"`
+	Type                  PayloadType   `json:"type"`
+	Event                 RecorderEvent `json:"event"`
+	CampaignContextSHA256 string        `json:"campaign_context_sha256,omitempty"`
 }
 
 type CommandIntentPayload struct {
-	Type    PayloadType `json:"type"`
-	Command string      `json:"command"`
+	Type                  PayloadType `json:"type"`
+	Command               string      `json:"command"`
+	CampaignContextSHA256 string      `json:"campaign_context_sha256,omitempty"`
 }
 
 type RoleCommandAckPayload struct {
 	Type                  PayloadType `json:"type"`
 	Command               string      `json:"command"`
 	CommandSourceSequence uint64      `json:"command_source_sequence"`
+	CampaignContextSHA256 string      `json:"campaign_context_sha256,omitempty"`
 }
 
 type DrainReportPayload struct {
-	Type         PayloadType `json:"type"`
-	LastAdmitted uint64      `json:"last_admitted"`
-	LastEmitted  uint64      `json:"last_emitted"`
-	InFlight     uint64      `json:"in_flight"`
-	QueueEmpty   bool        `json:"queue_empty"`
+	Type                  PayloadType `json:"type"`
+	LastAdmitted          uint64      `json:"last_admitted"`
+	LastEmitted           uint64      `json:"last_emitted"`
+	InFlight              uint64      `json:"in_flight"`
+	QueueEmpty            bool        `json:"queue_empty"`
+	CampaignContextSHA256 string      `json:"campaign_context_sha256,omitempty"`
 }
 
 type FailurePayload struct {
-	Type         PayloadType `json:"type"`
-	FailureClass string      `json:"failure_class"`
-	DetailSHA256 string      `json:"detail_sha256"`
+	Type                  PayloadType `json:"type"`
+	FailureClass          string      `json:"failure_class"`
+	DetailSHA256          string      `json:"detail_sha256"`
+	CampaignContextSHA256 string      `json:"campaign_context_sha256,omitempty"`
 }
 
 type CampaignActionPayload struct {
-	Type          PayloadType     `json:"type"`
-	Kind          ObservationKind `json:"observation_kind"`
-	Profile       Profile         `json:"profile"`
-	Path          Path            `json:"path"`
-	Load          LoadCell        `json:"load"`
-	Index         uint64          `json:"index"`
-	FixtureSHA256 string          `json:"fixture_sha256"`
+	Type                  PayloadType     `json:"type"`
+	Kind                  ObservationKind `json:"observation_kind"`
+	Profile               Profile         `json:"profile"`
+	Path                  Path            `json:"path"`
+	Load                  LoadCell        `json:"load"`
+	Index                 uint64          `json:"index"`
+	ActionIndex           uint64          `json:"action_index"`
+	FixtureSHA256         string          `json:"fixture_sha256"`
+	MessageID             string          `json:"message_id"`
+	CampaignContextSHA256 string          `json:"campaign_context_sha256,omitempty"`
+}
+
+type CampaignActionAckPayload struct {
+	Type                  PayloadType     `json:"type"`
+	Kind                  ObservationKind `json:"observation_kind"`
+	Profile               Profile         `json:"profile"`
+	Path                  Path            `json:"path"`
+	Load                  LoadCell        `json:"load"`
+	Index                 uint64          `json:"index"`
+	ActionIndex           uint64          `json:"action_index"`
+	FixtureSHA256         string          `json:"fixture_sha256"`
+	MessageID             string          `json:"message_id"`
+	CommandSourceSequence uint64          `json:"command_source_sequence"`
+	CampaignContextSHA256 string          `json:"campaign_context_sha256,omitempty"`
+}
+
+// MeasurementEnvelope is the canonical transport payload. Its action identity
+// makes otherwise identical fixtures unique across profile/load/sample cells,
+// preventing pubsub deduplication from silently shrinking the population.
+type MeasurementEnvelope struct {
+	Schema                string          `json:"schema"`
+	Kind                  ObservationKind `json:"observation_kind"`
+	Profile               Profile         `json:"profile"`
+	Load                  LoadCell        `json:"load"`
+	Index                 uint64          `json:"index"`
+	ActionIndex           uint64          `json:"action_index"`
+	FixtureSHA256         string          `json:"fixture_sha256"`
+	CampaignContextSHA256 string          `json:"campaign_context_sha256"`
+	Fixture               []byte          `json:"fixture"`
+}
+
+func EncodeMeasurementEnvelope(action CampaignActionPayload, fixture []byte) ([]byte, string, error) {
+	envelope := MeasurementEnvelope{Schema: "DRWA_S1_F1T_MEASUREMENT_ENVELOPE_V1", Kind: action.Kind,
+		Profile: action.Profile, Load: action.Load, Index: action.Index, ActionIndex: action.ActionIndex,
+		FixtureSHA256: action.FixtureSHA256, CampaignContextSHA256: action.CampaignContextSHA256,
+		Fixture: append([]byte(nil), fixture...)}
+	if err := validateMeasurementEnvelope(envelope); err != nil {
+		return nil, "", err
+	}
+	raw, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, "", err
+	}
+	sum := sha256.Sum256(raw)
+	return raw, hex.EncodeToString(sum[:]), nil
+}
+
+func DecodeMeasurementEnvelope(raw []byte) (MeasurementEnvelope, string, error) {
+	var envelope MeasurementEnvelope
+	if err := decodeExactPayload(raw, &envelope); err != nil {
+		return MeasurementEnvelope{}, "", err
+	}
+	if err := validateMeasurementEnvelope(envelope); err != nil {
+		return MeasurementEnvelope{}, "", err
+	}
+	sum := sha256.Sum256(raw)
+	return envelope, hex.EncodeToString(sum[:]), nil
+}
+
+func validateMeasurementEnvelope(envelope MeasurementEnvelope) error {
+	fixtureSum := sha256.Sum256(envelope.Fixture)
+	if envelope.Schema != "DRWA_S1_F1T_MEASUREMENT_ENVELOPE_V1" || !knownObservationKind(envelope.Kind) ||
+		!knownProfile(envelope.Profile) || !knownLoad(envelope.Load) || envelope.Index == 0 ||
+		!validPayloadActionIndex(envelope.Kind, envelope.ActionIndex) || !isHexDigest(envelope.FixtureSHA256) ||
+		!isHexDigest(envelope.CampaignContextSHA256) || len(envelope.Fixture) == 0 ||
+		envelope.FixtureSHA256 != hex.EncodeToString(fixtureSum[:]) {
+		return ErrInvalidFrame
+	}
+	return nil
 }
 
 func (frame Frame) Validate() error {
-	if frame.SchemaVersion != SchemaVersion || frame.SessionID == "" || frame.RunID == "" || frame.Role == "" ||
+	if (frame.SchemaVersion != SchemaVersion && frame.SchemaVersion != PhaseIISchemaVersion) || frame.SessionID == "" || frame.RunID == "" || frame.Role == "" ||
 		frame.PIDStartID == "" || frame.SourceSequence == 0 || frame.AdmissionState == "" {
 		return fmt.Errorf("%w: required identity", ErrInvalidFrame)
+	}
+	if (frame.SchemaVersion == SchemaVersion && frame.CampaignContextSHA256 != "") ||
+		(frame.SchemaVersion == PhaseIISchemaVersion && !isHexDigest(frame.CampaignContextSHA256)) {
+		return fmt.Errorf("%w: campaign context", ErrInvalidFrame)
 	}
 	if frame.Kind != KindCommand && frame.Kind != KindEvent && frame.Kind != KindAck && frame.Kind != KindDrain && frame.Kind != KindFailure {
 		return fmt.Errorf("%w: kind", ErrInvalidFrame)
@@ -130,7 +216,7 @@ func (frame Frame) Validate() error {
 	if err := validateCanonicalJSON(frame.Payload); err != nil {
 		return fmt.Errorf("%w: payload: %v", ErrInvalidFrame, err)
 	}
-	if err := validateClosedPayload(frame.Kind, frame.AdmissionState, frame.Payload); err != nil {
+	if err := validateClosedPayload(frame.SchemaVersion, frame.CampaignContextSHA256, frame.Kind, frame.AdmissionState, frame.Payload); err != nil {
 		return fmt.Errorf("%w: payload schema: %v", ErrInvalidFrame, err)
 	}
 	payloadSum := sha256.Sum256(frame.Payload)
@@ -140,7 +226,7 @@ func (frame Frame) Validate() error {
 	return nil
 }
 
-func validateClosedPayload(kind Kind, admissionState string, raw []byte) error {
+func validateClosedPayload(schemaVersion, campaignContext string, kind Kind, admissionState string, raw []byte) error {
 	var header struct {
 		Type PayloadType `json:"type"`
 	}
@@ -151,62 +237,94 @@ func validateClosedPayload(kind Kind, admissionState string, raw []byte) error {
 	case PayloadRoleReady:
 		var payload RoleReadyPayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindEvent || admissionState != "READY" ||
-			(payload.Phase != "INTERCEPTED_REHEARSAL" && payload.Phase != "CAMPAIGN") || !validRole(payload.Role) {
+			(payload.Phase != "INTERCEPTED_REHEARSAL" && payload.Phase != "CAMPAIGN") || !validRole(payload.Role) ||
+			!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid role-ready payload")
 		}
 	case PayloadDurableAck:
 		var payload DurableAckPayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindAck || admissionState != "DURABLE" ||
-			payload.AckedSourceSequence == 0 || payload.GlobalIngressSequence == 0 || payload.DurableTimestampRawNS == 0 || !isHexDigest(payload.FrameSHA256) {
+			payload.AckedSourceSequence == 0 || payload.GlobalIngressSequence == 0 || payload.DurableTimestampRawNS == 0 || !isHexDigest(payload.FrameSHA256) ||
+			!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid durable-ack payload")
 		}
 	case PayloadSendCatalog:
 		var payload SendCatalogPayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindEvent || admissionState != "JOURNALED" ||
-			ValidateSendCatalogEntry(payload.Entry) != nil {
+			ValidateSendCatalogEntry(payload.Entry) != nil || !payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid send-catalog payload")
 		}
 	case PayloadCallbackEvent:
 		var payload CallbackEventPayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindEvent || admissionState != "ADMITTED" ||
-			payload.Event.SourceSequence == 0 || payload.Event.MessageID == "" || payload.Event.Callback.Role == "" || payload.Event.Callback.Path == "" || payload.Event.State != "ADMITTED" {
+			payload.Event.SourceSequence == 0 || payload.Event.MessageID == "" || payload.Event.Callback.Role == "" || payload.Event.Callback.Path == "" || payload.Event.State != "ADMITTED" ||
+			!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid callback-event payload")
 		}
 	case PayloadCommand:
 		var payload CommandIntentPayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindCommand || admissionState != "INTENT" ||
-			(payload.Command != "RELEASE" && payload.Command != "QUIESCE" && payload.Command != "STOP") {
+			(payload.Command != "RELEASE" && payload.Command != "QUIESCE" && payload.Command != "STOP") ||
+			!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid command payload")
 		}
 	case PayloadRoleAck:
 		var payload RoleCommandAckPayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindEvent || admissionState != "APPLIED" ||
-			(payload.Command != "RELEASE" && payload.Command != "STOP") || payload.CommandSourceSequence == 0 {
+			(payload.Command != "RELEASE" && payload.Command != "STOP") || payload.CommandSourceSequence == 0 ||
+			!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid role-command-ack payload")
 		}
 	case PayloadDrain:
 		var payload DrainReportPayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindDrain || admissionState != "QUIESCED" ||
-			payload.LastAdmitted != payload.LastEmitted || payload.InFlight != 0 || !payload.QueueEmpty {
+			payload.LastAdmitted != payload.LastEmitted || payload.InFlight != 0 || !payload.QueueEmpty ||
+			!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid drain payload")
 		}
 	case PayloadFailure:
 		var payload FailurePayload
 		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindFailure || admissionState != "TERMINAL_FAILURE" ||
-			payload.FailureClass == "" || !isHexDigest(payload.DetailSHA256) {
+			payload.FailureClass == "" || !isHexDigest(payload.DetailSHA256) ||
+			!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
 			return errors.New("invalid failure payload")
 		}
 	case PayloadAction:
-		var payload CampaignActionPayload
-		if err := decodeExactPayload(raw, &payload); err != nil || kind != KindCommand || admissionState != "INTENT" ||
-			!knownObservationKind(payload.Kind) || !knownProfile(payload.Profile) || !knownPath(payload.Path) || !knownLoad(payload.Load) ||
-			payload.Index == 0 || !isHexDigest(payload.FixtureSHA256) {
-			return errors.New("invalid campaign-action payload")
+		if kind == KindCommand {
+			var payload CampaignActionPayload
+			if err := decodeExactPayload(raw, &payload); err != nil || admissionState != "INTENT" ||
+				!knownObservationKind(payload.Kind) || !knownProfile(payload.Profile) || !knownPath(payload.Path) || !knownLoad(payload.Load) ||
+				payload.Index == 0 || !validPayloadActionIndex(payload.Kind, payload.ActionIndex) || !isHexDigest(payload.FixtureSHA256) || !isHexDigest(payload.MessageID) ||
+				!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
+				return errors.New("invalid campaign-action payload")
+			}
+		} else {
+			var payload CampaignActionAckPayload
+			if err := decodeExactPayload(raw, &payload); err != nil || kind != KindEvent || admissionState != "OBSERVED" ||
+				!knownObservationKind(payload.Kind) || !knownProfile(payload.Profile) || !knownPath(payload.Path) || !knownLoad(payload.Load) ||
+				payload.Index == 0 || !validPayloadActionIndex(payload.Kind, payload.ActionIndex) || payload.CommandSourceSequence == 0 || !isHexDigest(payload.FixtureSHA256) || !isHexDigest(payload.MessageID) ||
+				!payloadContextValid(schemaVersion, campaignContext, payload.CampaignContextSHA256) {
+				return errors.New("invalid campaign-action acknowledgement")
+			}
 		}
 	default:
 		return errors.New("unknown payload type")
 	}
 	return nil
+}
+
+func validPayloadActionIndex(kind ObservationKind, action uint64) bool {
+	if kind == ObservationCalibration {
+		return action > 0
+	}
+	return action == 0
+}
+
+func payloadContextValid(schemaVersion, frameContext, payloadContext string) bool {
+	if schemaVersion == SchemaVersion {
+		return frameContext == "" && payloadContext == ""
+	}
+	return schemaVersion == PhaseIISchemaVersion && isHexDigest(frameContext) && payloadContext == frameContext
 }
 
 // DecodeClosedPayload decodes one already canonical frame payload with unknown

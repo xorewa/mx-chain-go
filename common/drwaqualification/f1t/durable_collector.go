@@ -18,24 +18,27 @@ import (
 var ErrCollectorClosed = errors.New("F1-T collector closed")
 
 type CollectorRecord struct {
-	Schema               string `json:"schema"`
-	GlobalSequence       uint64 `json:"global_sequence"`
-	SourceIdentity       string `json:"source_identity"`
-	TimestampRawNS       uint64 `json:"timestamp_monotonic_raw_ns"`
-	PreviousRecordSHA256 string `json:"previous_record_sha256"`
-	FrameSHA256          string `json:"frame_sha256"`
-	Frame                Frame  `json:"frame"`
-	RuntimeCredit        int    `json:"authoritative_runtime_credit"`
+	Schema                string `json:"schema"`
+	GlobalSequence        uint64 `json:"global_sequence"`
+	SourceIdentity        string `json:"source_identity"`
+	TimestampRawNS        uint64 `json:"timestamp_monotonic_raw_ns"`
+	PreviousRecordSHA256  string `json:"previous_record_sha256"`
+	FrameSHA256           string `json:"frame_sha256"`
+	Frame                 Frame  `json:"frame"`
+	RuntimeCredit         int    `json:"authoritative_runtime_credit"`
+	CampaignContextSHA256 string `json:"campaign_context_sha256,omitempty"`
 }
 
 type CollectorClosure struct {
-	Schema              string `json:"schema"`
-	FinalGlobalSequence uint64 `json:"final_global_sequence"`
-	FinalRecordSHA256   string `json:"final_record_sha256"`
-	AuthoritativeCredit int    `json:"authoritative_runtime_credit"`
-	PhaseIOnly          bool   `json:"phase_i_only"`
-	PhaseIISubmission   bool   `json:"phase_ii_submission"`
-	NumericRatification bool   `json:"numeric_ratification"`
+	Schema                string `json:"schema"`
+	FinalGlobalSequence   uint64 `json:"final_global_sequence"`
+	FinalRecordSHA256     string `json:"final_record_sha256"`
+	AuthoritativeCredit   int    `json:"authoritative_runtime_credit"`
+	PhaseIOnly            bool   `json:"phase_i_only"`
+	PhaseIISubmission     bool   `json:"phase_ii_submission"`
+	NumericRatification   bool   `json:"numeric_ratification"`
+	CampaignContextSHA256 string `json:"campaign_context_sha256,omitempty"`
+	InterceptedRehearsal  bool   `json:"intercepted_rehearsal,omitempty"`
 }
 
 type CollectorHooks struct {
@@ -45,29 +48,37 @@ type CollectorHooks struct {
 }
 
 type DurableCollector struct {
-	mu         sync.Mutex
-	file       *os.File
-	sequence   uint64
-	sealed     bool
-	closed     bool
-	failed     error
-	lastHash   string
-	lastByRole map[string]uint64
-	catalog    map[string]SendCatalogEntry
-	callbacks  map[string]map[CallbackKey]struct{}
-	terminal   bool
-	hooks      CollectorHooks
+	mu                    sync.Mutex
+	file                  *os.File
+	sequence              uint64
+	sealed                bool
+	closed                bool
+	failed                error
+	lastHash              string
+	lastByRole            map[string]uint64
+	catalog               map[string]SendCatalogEntry
+	callbacks             map[string]map[CallbackKey]struct{}
+	terminal              bool
+	hooks                 CollectorHooks
+	campaignContextSHA256 string
 }
 
 func CreateDurableCollector(path string) (*DurableCollector, error) {
-	return createDurableCollector(path, CollectorHooks{})
+	return createDurableCollector(path, "", CollectorHooks{})
 }
 
 func CreateDurableCollectorWithHooks(path string, hooks CollectorHooks) (*DurableCollector, error) {
-	return createDurableCollector(path, hooks)
+	return createDurableCollector(path, "", hooks)
 }
 
-func createDurableCollector(path string, hooks CollectorHooks) (*DurableCollector, error) {
+func CreateDurableCollectorForCampaign(path, campaignContextSHA256 string, hooks CollectorHooks) (*DurableCollector, error) {
+	if !isHexDigest(campaignContextSHA256) {
+		return nil, ErrCampaignIdentity
+	}
+	return createDurableCollector(path, campaignContextSHA256, hooks)
+}
+
+func createDurableCollector(path, campaignContextSHA256 string, hooks CollectorHooks) (*DurableCollector, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return nil, errors.New("collector path must be clean absolute")
 	}
@@ -89,7 +100,7 @@ func createDurableCollector(path string, hooks CollectorHooks) (*DurableCollecto
 	if hooks.Clock == nil {
 		hooks.Clock = RawMonotonicNanoseconds
 	}
-	return &DurableCollector{file: file, hooks: hooks, lastByRole: make(map[string]uint64),
+	return &DurableCollector{file: file, hooks: hooks, lastByRole: make(map[string]uint64), campaignContextSHA256: campaignContextSHA256,
 		catalog: make(map[string]SendCatalogEntry), callbacks: make(map[string]map[CallbackKey]struct{})}, nil
 }
 
@@ -102,6 +113,13 @@ func (collector *DurableCollector) AppendFrom(sourceIdentity string, frame Frame
 	defer collector.mu.Unlock()
 	if collector.sealed || collector.closed || collector.file == nil || collector.failed != nil {
 		return CollectorRecord{}, ErrCollectorClosed
+	}
+	if collector.campaignContextSHA256 == "" {
+		if frame.SchemaVersion != SchemaVersion || frame.CampaignContextSHA256 != "" {
+			return CollectorRecord{}, collector.failLocked(ErrCampaignIdentity)
+		}
+	} else if frame.SchemaVersion != PhaseIISchemaVersion || RequireCampaignContext(frame.CampaignContextSHA256, collector.campaignContextSHA256) != nil {
+		return CollectorRecord{}, collector.failLocked(ErrCampaignIdentity)
 	}
 	if !sourceIdentityMatchesFrame(sourceIdentity, frame.Role) || frame.SourceSequence != collector.lastByRole[sourceIdentity]+1 {
 		return CollectorRecord{}, collector.failLocked(fmt.Errorf("%w: source sequence", ErrInvalidFrame))
@@ -123,11 +141,15 @@ func (collector *DurableCollector) AppendFrom(sourceIdentity string, frame Frame
 	}
 	nextSequence := collector.sequence + 1
 	sum := sha256.Sum256(packet)
+	recordSchema := "DRWA_S1_F1T_COLLECTOR_RECORD_V1"
+	if collector.campaignContextSHA256 != "" {
+		recordSchema = "DRWA_S1_F1T_COLLECTOR_RECORD_V2"
+	}
 	record := CollectorRecord{
-		Schema: "DRWA_S1_F1T_COLLECTOR_RECORD_V1", GlobalSequence: nextSequence, SourceIdentity: sourceIdentity,
+		Schema: recordSchema, GlobalSequence: nextSequence, SourceIdentity: sourceIdentity,
 		TimestampRawNS: timestamp, PreviousRecordSHA256: collector.lastHash,
 		FrameSHA256: hex.EncodeToString(sum[:]), Frame: frame,
-		RuntimeCredit: 0,
+		RuntimeCredit: 0, CampaignContextSHA256: collector.campaignContextSHA256,
 	}
 	encoded, err := json.Marshal(record)
 	if err != nil {
@@ -173,6 +195,12 @@ func (collector *DurableCollector) Seal() (CollectorClosure, error) {
 	}
 	closure := CollectorClosure{Schema: "DRWA_S1_F1T_COLLECTOR_CLOSURE_V1", FinalGlobalSequence: collector.sequence,
 		FinalRecordSHA256: collector.lastHash, PhaseIOnly: true}
+	if collector.campaignContextSHA256 != "" {
+		closure.Schema = "DRWA_S1_F1T_COLLECTOR_CLOSURE_V2"
+		closure.PhaseIOnly = false
+		closure.InterceptedRehearsal = true
+		closure.CampaignContextSHA256 = collector.campaignContextSHA256
+	}
 	encoded, err := json.Marshal(closure)
 	if err != nil {
 		return CollectorClosure{}, collector.failLocked(err)
@@ -213,7 +241,7 @@ func (collector *DurableCollector) prepareSemanticUpdate(sourceIdentity string, 
 	case PayloadSendCatalog:
 		var payload SendCatalogPayload
 		if err := DecodeClosedPayload(frame.Payload, &payload); err != nil || frame.Role != "publisher" || sourceIdentity != "publisher" ||
-			validateGlobalSendCatalogEntry(payload.Entry) != nil {
+			validateGlobalSendCatalogEntry(payload.Entry) != nil || payload.Entry.CampaignContextSHA256 != collector.campaignContextSHA256 {
 			return nil, ErrReconciliation
 		}
 		if _, duplicate := collector.catalog[payload.Entry.MessageID]; duplicate {
@@ -225,7 +253,7 @@ func (collector *DurableCollector) prepareSemanticUpdate(sourceIdentity string, 
 	case PayloadCallbackEvent:
 		var payload CallbackEventPayload
 		if err := DecodeClosedPayload(frame.Payload, &payload); err != nil || sourceIdentity != frame.Role ||
-			payload.Event.Callback.Role != frame.Role {
+			payload.Event.Callback.Role != frame.Role || payload.Event.CampaignContextSHA256 != collector.campaignContextSHA256 {
 			return nil, ErrReconciliation
 		}
 		entry, exists := collector.catalog[payload.Event.MessageID]
@@ -266,6 +294,9 @@ func validateGlobalSendCatalogEntry(entry SendCatalogEntry) error {
 	want := map[CallbackKey]struct{}{
 		{Role: "target", Path: "pubsub"}:  {},
 		{Role: "passive", Path: "pubsub"}: {},
+	}
+	if entry.CampaignContextSHA256 != "" {
+		want[CallbackKey{Role: "target", Path: "self-direct"}] = struct{}{}
 	}
 	if entry.Kind == "SELF_DIRECT" {
 		want = map[CallbackKey]struct{}{{Role: "target", Path: "self-direct"}: {}}
@@ -341,11 +372,13 @@ func MakeAck(source Frame, sourcePacket []byte, record CollectorRecord, role, st
 	}
 	payload, payloadHash, err := NewPayload(DurableAckPayload{Type: PayloadDurableAck,
 		AckedSourceSequence: source.SourceSequence, GlobalIngressSequence: record.GlobalSequence,
-		DurableTimestampRawNS: record.TimestampRawNS, FrameSHA256: record.FrameSHA256})
+		DurableTimestampRawNS: record.TimestampRawNS, FrameSHA256: record.FrameSHA256,
+		CampaignContextSHA256: source.CampaignContextSHA256})
 	if err != nil {
 		return Frame{}, err
 	}
-	ack := Frame{SchemaVersion: SchemaVersion, SessionID: source.SessionID, RunID: source.RunID,
+	ack := Frame{SchemaVersion: source.SchemaVersion, CampaignContextSHA256: source.CampaignContextSHA256,
+		SessionID: source.SessionID, RunID: source.RunID,
 		Role: role, PIDStartID: startID, ExecutableHash: executableHash,
 		SourceSequence: outboundSequence, ReleaseEpoch: source.ReleaseEpoch,
 		Kind: KindAck, PayloadHash: payloadHash, AdmissionState: "DURABLE", Payload: payload}
@@ -357,7 +390,8 @@ func MakeAck(source Frame, sourcePacket []byte, record CollectorRecord, role, st
 
 func ValidateAck(source Frame, sourcePacket []byte, ack Frame, expectedOutboundSequence uint64) error {
 	if ack.Kind != KindAck || ack.AdmissionState != "DURABLE" || ack.SessionID != source.SessionID || ack.RunID != source.RunID ||
-		ack.SourceSequence != expectedOutboundSequence || ack.ReleaseEpoch != source.ReleaseEpoch {
+		ack.SourceSequence != expectedOutboundSequence || ack.ReleaseEpoch != source.ReleaseEpoch || ack.SchemaVersion != source.SchemaVersion ||
+		ack.CampaignContextSHA256 != source.CampaignContextSHA256 {
 		return ErrInvalidFrame
 	}
 	var payload DurableAckPayload
@@ -368,6 +402,9 @@ func ValidateAck(source Frame, sourcePacket []byte, ack Frame, expectedOutboundS
 	if payload.Type != PayloadDurableAck || payload.AckedSourceSequence != source.SourceSequence ||
 		payload.FrameSHA256 != hex.EncodeToString(hash[:]) || payload.GlobalIngressSequence == 0 || payload.DurableTimestampRawNS == 0 {
 		return ErrInvalidFrame
+	}
+	if payload.CampaignContextSHA256 != source.CampaignContextSHA256 {
+		return ErrCampaignIdentity
 	}
 	return nil
 }

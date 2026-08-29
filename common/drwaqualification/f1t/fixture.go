@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/multiversx/mx-chain-core-go/data/batch"
@@ -14,6 +15,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-core-go/marshal"
+	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process/smartContract/drwa"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"golang.org/x/crypto/blake2b"
@@ -22,6 +24,8 @@ import (
 var ErrSourceConstructorUnavailable = errors.New("F1-T source constructor unavailable")
 
 const sourceConstructorDomain = "DRWA/S1/F1T/SOURCE_CONSTRUCTOR/v1"
+
+const FixtureCatalogSchema = "DRWA_S1_F1T_FIXTURE_CATALOG_V1"
 
 type SourceArtifacts struct {
 	SCRCanonical       []byte
@@ -54,10 +58,200 @@ type CanonicalSourceConstructor struct {
 	Budgets       drwa.WorkBudgets
 }
 
+type GasProfileBinding struct {
+	ID               string           `json:"id"`
+	Path             string           `json:"path"`
+	SHA256           string           `json:"sha256"`
+	ScheduleIdentity string           `json:"schedule_identity"`
+	Budgets          drwa.WorkBudgets `json:"budgets"`
+}
+
+type FixtureCatalog struct {
+	Schema                   string                     `json:"schema"`
+	TrustedRoot              string                     `json:"trusted_workspace_realpath"`
+	ControlMatrixPath        string                     `json:"control_matrix_path"`
+	ControlMatrixSHA256      string                     `json:"control_matrix_sha256"`
+	ActivationManifestPath   string                     `json:"activation_manifest_path"`
+	ActivationManifestSHA256 string                     `json:"activation_manifest_sha256"`
+	ConstructorSourceCommit  string                     `json:"constructor_source_commit"`
+	Constructor              CanonicalSourceConstructor `json:"constructor"`
+	GasProfiles              []GasProfileBinding        `json:"gas_profiles"`
+	CanonicalFixtureSHA256   map[Profile]string         `json:"canonical_fixture_sha256"`
+	RuntimeCredit            int                        `json:"authoritative_runtime_credit"`
+	NumericRatification      bool                       `json:"numeric_ratification"`
+}
+
+func LoadAndVerifyFixtureCatalog(trustedRoot, catalogPath, catalogSHA256, expectedSourceCommit string) (CanonicalSourceConstructor, error) {
+	bound, err := ReadBoundRegularFile(trustedRoot, catalogPath, catalogSHA256)
+	if err != nil {
+		return CanonicalSourceConstructor{}, err
+	}
+	var catalog FixtureCatalog
+	if err = decodeExactPayload(bound.Bytes, &catalog); err != nil || catalog.Schema != FixtureCatalogSchema ||
+		catalog.TrustedRoot != trustedRoot || catalog.ConstructorSourceCommit != expectedSourceCommit ||
+		!isSourceCommit(expectedSourceCommit) ||
+		catalog.RuntimeCredit != 0 || catalog.NumericRatification || len(catalog.GasProfiles) != 2 || len(catalog.CanonicalFixtureSHA256) != 2 {
+		return CanonicalSourceConstructor{}, ErrPreflight
+	}
+	matrixBound, err := ReadBoundRegularFile(trustedRoot, catalog.ControlMatrixPath, catalog.ControlMatrixSHA256)
+	if err != nil {
+		return CanonicalSourceConstructor{}, err
+	}
+	manifestBound, err := ReadBoundRegularFile(trustedRoot, catalog.ActivationManifestPath, catalog.ActivationManifestSHA256)
+	if err != nil {
+		return CanonicalSourceConstructor{}, err
+	}
+	var matrix map[string]any
+	var manifest map[string]any
+	if json.Unmarshal(matrixBound.Bytes, &matrix) != nil || json.Unmarshal(manifestBound.Bytes, &manifest) != nil {
+		return CanonicalSourceConstructor{}, ErrPreflight
+	}
+	if err = verifyConstructorAgainstControlMatrix(catalog.Constructor, matrix); err != nil {
+		return CanonicalSourceConstructor{}, err
+	}
+	maximum := drwa.WorkBudgets{}
+	for index, profile := range catalog.GasProfiles {
+		expectedID := "A"
+		if index == 1 {
+			expectedID = "B"
+		}
+		if profile.ID != expectedID || !isHexDigest(profile.SHA256) || !isHexDigest(profile.ScheduleIdentity) {
+			return CanonicalSourceConstructor{}, ErrPreflight
+		}
+		err = withBoundRegularFile(trustedRoot, profile.Path, profile.SHA256, func(fd int, _ string, _ []byte, _ string) error {
+			loaded, loadErr := common.LoadGasScheduleConfig("/proc/self/fd/" + strconv.Itoa(fd))
+			if loadErr != nil {
+				return loadErr
+			}
+			costs, ok := loaded["DRWAPrototypeCost"]
+			if !ok || len(costs) != 4 || costs["DestinationGate"] != profile.Budgets.DestinationGate ||
+				costs["SuccessReceipt"] != profile.Budgets.SuccessReceipt || costs["RefundGeneration"] != profile.Budgets.RefundGeneration ||
+				costs["SourceCompletion"] != profile.Budgets.SourceCompletion {
+				return ErrPreflight
+			}
+			return nil
+		})
+		if err != nil {
+			return CanonicalSourceConstructor{}, err
+		}
+		maximum.DestinationGate = max(maximum.DestinationGate, profile.Budgets.DestinationGate)
+		maximum.SuccessReceipt = max(maximum.SuccessReceipt, profile.Budgets.SuccessReceipt)
+		maximum.RefundGeneration = max(maximum.RefundGeneration, profile.Budgets.RefundGeneration)
+		maximum.SourceCompletion = max(maximum.SourceCompletion, profile.Budgets.SourceCompletion)
+	}
+	if maximum != catalog.Constructor.Budgets || !manifestGasBindingsMatch(manifest, catalog.GasProfiles, maximum) {
+		return CanonicalSourceConstructor{}, ErrPreflight
+	}
+	for _, profile := range []Profile{ProfileLegacy, ProfileV2} {
+		raw, _, buildErr := BuildCalibrationFixture(catalog.Constructor, profile, "SELECTED", 1, "fixture", "/drwa/f1t", "peer-remote", true)
+		if buildErr != nil || catalog.CanonicalFixtureSHA256[profile] != digestHex(raw) {
+			return CanonicalSourceConstructor{}, ErrPreflight
+		}
+	}
+	return catalog.Constructor, nil
+}
+
+func isSourceCommit(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+func verifyConstructorAgainstControlMatrix(constructor CanonicalSourceConstructor, document map[string]any) error {
+	rawCatalog, ok := document["raw_identity_preimage_catalog"].(map[string]any)
+	if !ok {
+		return ErrPreflight
+	}
+	selected, ok := rawCatalog["SELECTED::V2_CURRENT_RUNTIME_CLASS"].(map[string]any)
+	if !ok {
+		return ErrPreflight
+	}
+	inputs, ok := selected["construction_inputs"].(map[string]any)
+	if !ok {
+		return ErrPreflight
+	}
+	semantic, ok := inputs["semantic_fields"].(map[string]any)
+	if !ok {
+		return ErrPreflight
+	}
+	value := func(name string) any {
+		field, _ := semantic[name].(map[string]any)
+		return field["value"]
+	}
+	fixtureValues, ok := document["fixture_value_catalog"].(map[string]any)
+	if !ok {
+		return ErrPreflight
+	}
+	budgetRecord, _ := fixtureValues["POSITIVE_CURRENT_WORK_BUDGET_PROVIDER_RESULT"].(map[string]any)
+	budgetValue, _ := budgetRecord["value"].(map[string]any)
+	gasPriceRecord, _ := fixtureValues["ARM_POSITIVE_GAS_PRICE"].(map[string]any)
+	dependencies, ok := document["constructor_dependency_catalog"].(map[string]any)
+	if !ok {
+		return ErrPreflight
+	}
+	caseBound, _ := dependencies["CASE_BOUND_VALID_TEST_DOUBLES"].(map[string]any)
+	rows, _ := caseBound["dependencies"].([]any)
+	constructorValue := func(field string) any {
+		for _, row := range rows {
+			object, _ := row.(map[string]any)
+			if object["field"] == field {
+				if valueHex, exists := object["value_hex"]; exists {
+					return valueHex
+				}
+				return object["value"]
+			}
+		}
+		return nil
+	}
+	if value("network_domain") != hex.EncodeToString(constructor.NetworkDomain[:]) ||
+		value("source_holder") != strings.Repeat("11", 32) || value("destination_holder") != strings.Repeat("22", 32) ||
+		uint64FromJSON(value("sender_shard")) != uint64(constructor.SenderShard) ||
+		uint64FromJSON(value("receiver_shard")) != uint64(constructor.ReceiverShard) ||
+		value("tx_hash") != strings.Repeat("33", 32) || value("function") != vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope ||
+		constructorValue("networkDomain") != hex.EncodeToString(constructor.NetworkDomain[:]) || uint64FromJSON(constructorValue("cebEpoch")) != uint64(constructor.CEBEpoch) ||
+		uint64FromJSON(constructorValue("settlementLifetimeRounds")) != constructor.Expiry ||
+		uint64FromJSON(gasPriceRecord["value"]) != constructor.GasPrice || budgetValue["gas_schedule_identity_hex"] != hex.EncodeToString(constructor.GasIdentity[:]) ||
+		uint64FromJSON(budgetValue["DestinationGate"]) != constructor.Budgets.DestinationGate ||
+		uint64FromJSON(budgetValue["SuccessReceipt"]) != constructor.Budgets.SuccessReceipt ||
+		uint64FromJSON(budgetValue["RefundGeneration"]) != constructor.Budgets.RefundGeneration ||
+		uint64FromJSON(budgetValue["SourceCompletion"]) != constructor.Budgets.SourceCompletion {
+		return ErrPreflight
+	}
+	intentField, ok := semantic["intent"].(map[string]any)
+	if !ok {
+		return ErrPreflight
+	}
+	intent, ok := intentField["value"].(map[string]any)
+	if !ok || intent["TokenID"] != "DRWAQUAL-abcdef" || intent["Quantity"] != "0a" ||
+		intent["SourceSubject"] != strings.Repeat("11", 32) || intent["DestinationSubject"] != strings.Repeat("22", 32) {
+		return ErrPreflight
+	}
+	return nil
+}
+
+func manifestGasBindingsMatch(manifest map[string]any, profiles []GasProfileBinding, maximum drwa.WorkBudgets) bool {
+	gas, ok := manifest["gas_catalog"].(map[string]any)
+	if !ok || gas["profile_a_identity"] != profiles[0].ScheduleIdentity || gas["profile_b_identity"] != profiles[1].ScheduleIdentity {
+		return false
+	}
+	total, err := maximum.Total()
+	return err == nil && uint64FromJSON(gas["maximum_reserved_total"]) == total
+}
+
+func uint64FromJSON(value any) uint64 {
+	number, ok := value.(float64)
+	if !ok || number < 0 || number > float64(^uint64(0)) || number != float64(uint64(number)) {
+		return 0
+	}
+	return uint64(number)
+}
+
 func DefaultCanonicalSourceConstructor() CanonicalSourceConstructor {
 	return CanonicalSourceConstructor{
 		NetworkDomain: repeatedDigest(0x44), SourceHolder: repeatedDigest(0x55), Destination: repeatedDigest(0x66),
-		GasIdentity: repeatedDigest(0x88), SenderShard: 0, ReceiverShard: 1, CEBEpoch: 2, Expiry: 4000,
+		GasIdentity: repeatedDigest(0x88), SenderShard: 1, ReceiverShard: 2, CEBEpoch: 2, Expiry: 4000,
 		GasPrice: 1_000_000_000,
 		Budgets: drwa.WorkBudgets{DestinationGate: 1_200_000, SuccessReceipt: 1_200_000,
 			RefundGeneration: 1_200_000, SourceCompletion: 1_200_000},

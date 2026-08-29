@@ -56,9 +56,18 @@ func TestF1TQualificationReachesV2ProductionConversionOnce(t *testing.T) {
 	_, _ = processor.ExecuteBuiltInFunction(scr, nil, createAccount(scr.RcvAddr))
 	require.Equal(t, uint64(1), invocations)
 	require.NotNil(t, captured)
+	profileBinding := f1t.SemanticProfileBinding{
+		ID: f1t.ProfileV2, EvaluationEpoch: 2,
+		EffectiveEpochs: f1t.SemanticEffectiveEpochs{SCDeployEnableEpoch: 0, SCProcessorV2EnableEpoch: 1,
+			SupernovaEnableEpoch: 2, DynamicESDTEnableEpoch: 1, DRWAEnforcementEnableEpoch: 2},
+		ExpectedFlags: f1t.SemanticProfileFlags{SCDeployFlag: true, SCProcessorV2Flag: true, DRWAEnforcementFlag: true},
+	}
+	profileBindingHash, err := f1t.SemanticProfileBindingHash(profileBinding)
+	require.NoError(t, err)
 
 	selection, err := f1t.ClassifyObservedFixture(selected, f1t.ProfileV2, "topic", "peer", [][]byte{selected, sentinel}, f1t.ObservationContext{
-		NetworkDomain: constructor.NetworkDomain, EnableEpochsHandler: enableEpochs, Coordinator: coordinator,
+		NetworkDomain: constructor.NetworkDomain, ProfileBinding: profileBinding, ProfileBindingHash: profileBindingHash,
+		EnableEpochsHandler: enableEpochs, Coordinator: coordinator,
 		Conversion: &f1t.DestinationConversionObservation{InvocationCount: invocations, VMInput: captured},
 	})
 	require.NoError(t, err)

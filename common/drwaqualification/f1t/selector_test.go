@@ -21,7 +21,7 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 )
 
-func TestCanonicalSourceConstructorReproducesV17ProfileIdentities(t *testing.T) {
+func TestCanonicalSourceConstructorReproducesV18ShardCorrectedProfileIdentities(t *testing.T) {
 	constructor := DefaultCanonicalSourceConstructor()
 	tests := []struct {
 		profile Profile
@@ -30,10 +30,10 @@ func TestCanonicalSourceConstructorReproducesV17ProfileIdentities(t *testing.T) 
 		mini    string
 		batch   string
 	}{
-		{ProfileLegacy, "SELECTED", "aeafa062494b64ac448af4668321ad33aef1b9f2e97bdba88f54d6634c611c53", "1d3e41a51d75ac68bbb2700c43d459f8abab3d2a5120c3bc11767794031f8a23", "5a8572f6afebc12464a27af400a3883153ba79c91e98e33ee2ccf029907a25c9"},
-		{ProfileV2, "SELECTED", "282008087574fa2fbb58c5c9c056a875f972132d20ab9f33dd06b1d62d7dd5e3", "5258aa94c2b42728edee3b5ecd28daff89c3910be31aaf78eaa1a85124b049cf", "1312b939514c3d6ce9f0f374b156ced45f59d464be95496d8865bfe5b10e4b3c"},
-		{ProfileLegacy, "SENTINEL_1", "9d195155ae9995ac7360aabb3f46873ad47acbaab577d749c8263b02910f996a", "d7c82c8cca4b685ebc3d40287e88dc9681d753737e650f39d095f700d44cdf75", "31104fcaf5cad66b358affebece21da291460796e1f753533549a4be2011a2ac"},
-		{ProfileV2, "SENTINEL_1", "57b26fc5f96a4e1d57ed099d5b56957281487e2ea1afbec6ad1185029491a7ea", "28ed2e7978eb36217decceb1eb3e88262da982da513bedcc1156fb4a055ba632", "8e05e9bc703bfbc5fad4bc2888c7f1170ddee269e2543af6e49e44e6507be694"},
+		{ProfileLegacy, "SELECTED", "aeafa062494b64ac448af4668321ad33aef1b9f2e97bdba88f54d6634c611c53", "af0aaba1a80d3abbd6093c5bf9cd9d69a86261c1191c7d7da70b41ecfe0bf834", "39d003c8558965ee69d02f9b73d9cddb4100e5da789933db65a38364f848c20e"},
+		{ProfileV2, "SELECTED", "282008087574fa2fbb58c5c9c056a875f972132d20ab9f33dd06b1d62d7dd5e3", "7d578e1a85d83cb12497949ba28302c4103f4269b3266fd03a22c5c8bd8b15a4", "9963ff4901e00368c5e145ab721043ef1783939d2b5130581f0d0b78a22b7485"},
+		{ProfileLegacy, "SENTINEL_1", "9d195155ae9995ac7360aabb3f46873ad47acbaab577d749c8263b02910f996a", "61834ca31ac671ca632efb97dac4d90a8899c5448b3e111860255a5e962740b2", "368b556520d3349188c466a1657b00ab8e2750ceb044991515c339263353067b"},
+		{ProfileV2, "SENTINEL_1", "57b26fc5f96a4e1d57ed099d5b56957281487e2ea1afbec6ad1185029491a7ea", "f6f85cb0dc622d736306471e93afad91b96c80c08c7fa565196404a3b6e458f1", "a314c29dbde6707c605591ff57f088259e951f31a169a1bb86d06945bed5a857"},
 	}
 	for _, test := range tests {
 		t.Run(string(test.profile)+"/"+test.arm, func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestObservedFixtureProjectsAllFieldsAndEvaluatesStructuredResults(t *testin
 	sentinel, _, err := BuildCalibrationFixture(constructor, ProfileV2, "SENTINEL_1", 1, "fixture", "topic", "peer", false)
 	require.NoError(t, err)
 
-	context := observedFixtureContext(constructor.NetworkDomain)
+	context := observedFixtureContext(t, constructor.NetworkDomain, ProfileV2)
 	selection, err := ClassifyObservedFixture(selected, ProfileV2, "topic", "peer", [][]byte{selected, sentinel}, context)
 	require.NoError(t, err)
 	require.Equal(t, "OBSERVED_STRUCTURED_SUCCESSOR", selection.PredicateEvidenceStatus)
@@ -168,6 +168,55 @@ func TestObservedFixtureProjectsAllFieldsAndEvaluatesStructuredResults(t *testin
 	require.Equal(t, PredicateResult{State: "TRUE"}, reselection.ObservedPredicates["PR001_BATCH_DECODABLE"])
 }
 
+func TestSemanticCandidatePreservesPresentZeroRelayedValue(t *testing.T) {
+	constructor := DefaultCanonicalSourceConstructor()
+	raw, _, err := BuildCalibrationFixture(constructor, ProfileV2, "SELECTED", 1, "fixture", "topic", "peer", true)
+	require.NoError(t, err)
+	parsed, err := parseFixture(raw, ProfileV2, "topic", "peer")
+	require.NoError(t, err)
+	binding, _ := semanticProfileBindingForTest(t, ProfileV2)
+	_, decoded, err := projectSemanticCandidate(parsed, constructor.NetworkDomain, binding)
+	require.NoError(t, err)
+
+	decoded.scr.RelayedValue = big.NewInt(0)
+	candidate, err := semanticCandidateFromDecoded(ProfileV2, constructor.NetworkDomain, binding, decoded)
+	require.NoError(t, err)
+	require.Equal(t, OptionalDecimal{State: "PRESENT", ValueDecimal: "0"}, candidate.RelayedValue)
+}
+
+func TestSemanticCandidateDoesNotAliasCallerOwnedBuffers(t *testing.T) {
+	constructor := DefaultCanonicalSourceConstructor()
+	raw, _, err := BuildCalibrationFixture(constructor, ProfileV2, "SELECTED", 1, "fixture", "topic", "peer", true)
+	require.NoError(t, err)
+	parsed, err := parseFixture(raw, ProfileV2, "topic", "peer")
+	require.NoError(t, err)
+	binding, _ := semanticProfileBindingForTest(t, ProfileV2)
+	networkDomain := constructor.NetworkDomain
+	candidate, decoded, err := projectSemanticCandidate(parsed, networkDomain, binding)
+	require.NoError(t, err)
+	before := append([]byte(nil), mustJSON(t, candidate)...)
+
+	for index := range raw {
+		raw[index] ^= 0xff
+	}
+	for index := range decoded.scr.SndAddr {
+		decoded.scr.SndAddr[index] ^= 0xff
+	}
+	for index := range decoded.scr.RcvAddr {
+		decoded.scr.RcvAddr[index] ^= 0xff
+	}
+	for index := range decoded.envelopeBytes {
+		decoded.envelopeBytes[index] ^= 0xff
+	}
+	for index := range decoded.envelope.Context.RegulatedTokenID {
+		decoded.envelope.Context.RegulatedTokenID[index] ^= 0xff
+	}
+	networkDomain[0] ^= 0xff
+	binding.EvaluationEpoch++
+
+	require.Equal(t, before, mustJSON(t, candidate))
+}
+
 func TestObservedFixtureValidatesCapturedProductionInputWithoutReconstruction(t *testing.T) {
 	constructor := DefaultCanonicalSourceConstructor()
 	for _, profile := range []Profile{ProfileLegacy, ProfileV2} {
@@ -179,10 +228,11 @@ func TestObservedFixtureValidatesCapturedProductionInputWithoutReconstruction(t 
 
 			parsed, err := parseFixture(selected, profile, "topic", "peer")
 			require.NoError(t, err)
-			_, decoded, err := projectSemanticCandidate(parsed, constructor.NetworkDomain)
+			binding, _ := semanticProfileBindingForTest(t, profile)
+			_, decoded, err := projectSemanticCandidate(parsed, constructor.NetworkDomain, binding)
 			require.NoError(t, err)
 			input := expectedCapturedInput(profile, decoded.scr, decoded.envelopeBytes, parsed.artifacts.SCRHash)
-			context := observedFixtureContext(constructor.NetworkDomain)
+			context := observedFixtureContext(t, constructor.NetworkDomain, profile)
 			context.Conversion = &DestinationConversionObservation{InvocationCount: 1, VMInput: input}
 
 			selection, err := ClassifyObservedFixture(selected, profile, "topic", "peer", [][]byte{selected, sentinel}, context)
@@ -204,6 +254,20 @@ func TestObservedFixtureRejectsUnboundContextAndPredicateGraphDefects(t *testing
 	sentinel, _, err := BuildCalibrationFixture(constructor, ProfileV2, "SENTINEL_1", 1, "fixture", "topic", "peer", false)
 	require.NoError(t, err)
 	_, err = ClassifyObservedFixture(selected, ProfileV2, "topic", "peer", [][]byte{selected, sentinel}, ObservationContext{})
+	require.ErrorIs(t, err, ErrSelectorMismatch)
+
+	context := observedFixtureContext(t, constructor.NetworkDomain, ProfileV2)
+	context.ProfileBindingHash = [32]byte{}
+	_, err = ClassifyObservedFixture(selected, ProfileV2, "topic", "peer", [][]byte{selected, sentinel}, context)
+	require.ErrorIs(t, err, ErrSelectorMismatch)
+
+	context = observedFixtureContext(t, constructor.NetworkDomain, ProfileV2)
+	context.ProfileBinding.EvaluationEpoch++
+	_, err = ClassifyObservedFixture(selected, ProfileV2, "topic", "peer", [][]byte{selected, sentinel}, context)
+	require.ErrorIs(t, err, ErrSelectorMismatch)
+
+	context = observedFixtureContext(t, constructor.NetworkDomain, ProfileLegacy)
+	_, err = ClassifyObservedFixture(selected, ProfileV2, "topic", "peer", [][]byte{selected, sentinel}, context)
 	require.ErrorIs(t, err, ErrSelectorMismatch)
 
 	complete := make(map[string]PredicateResult, len(v17PredicateIDs))
@@ -229,11 +293,12 @@ func TestObservedValidatorProjectionInvokesRealAdmissionAcrossOrderedRows(t *tes
 	require.NoError(t, err)
 	parsed, err := parseFixture(raw, ProfileV2, "topic", "peer")
 	require.NoError(t, err)
-	_, decoded, err := projectSemanticCandidate(parsed, constructor.NetworkDomain)
+	binding, _ := semanticProfileBindingForTest(t, ProfileV2)
+	_, decoded, err := projectSemanticCandidate(parsed, constructor.NetworkDomain, binding)
 	require.NoError(t, err)
 	active := enableEpochsHandlerMock.NewEnableEpochsHandlerStub(common.DRWAEnforcementFlag)
 	inactive := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
-	localDestination := observedFixtureContext(constructor.NetworkDomain).Coordinator
+	localDestination := observedFixtureContext(t, constructor.NetworkDomain, ProfileV2).Coordinator
 	remoteDestination := &processMock.ShardCoordinatorStub{SelfIdCalled: func() uint32 { return 2 }, ComputeIdCalled: localDestination.ComputeId}
 	localSource := &processMock.ShardCoordinatorStub{SelfIdCalled: func() uint32 { return 0 }, ComputeIdCalled: func([]byte) uint32 { return 0 }}
 
@@ -278,9 +343,13 @@ func TestObservedValidatorProjectionInvokesRealAdmissionAcrossOrderedRows(t *tes
 	}
 }
 
-func observedFixtureContext(networkDomain [32]byte) ObservationContext {
+func observedFixtureContext(t *testing.T, networkDomain [32]byte, profile Profile) ObservationContext {
+	t.Helper()
+	binding, bindingHash := semanticProfileBindingForTest(t, profile)
 	return ObservationContext{
 		NetworkDomain:       networkDomain,
+		ProfileBinding:      binding,
+		ProfileBindingHash:  bindingHash,
 		EnableEpochsHandler: enableEpochsHandlerMock.NewEnableEpochsHandlerStub(common.DRWAEnforcementFlag),
 		Coordinator: &processMock.ShardCoordinatorStub{
 			NumberOfShardsCalled: func() uint32 { return 3 },
@@ -295,6 +364,30 @@ func observedFixtureContext(networkDomain [32]byte) ObservationContext {
 			CommunicationIdentifierCalled: func(destShardID uint32) string { return string(rune(destShardID)) },
 		},
 	}
+}
+
+func semanticProfileBindingForTest(t *testing.T, profile Profile) (SemanticProfileBinding, [32]byte) {
+	t.Helper()
+	binding := SemanticProfileBinding{
+		ID:              profile,
+		EvaluationEpoch: 2,
+		EffectiveEpochs: SemanticEffectiveEpochs{
+			SCDeployEnableEpoch:        0,
+			SupernovaEnableEpoch:       2,
+			DynamicESDTEnableEpoch:     1,
+			DRWAEnforcementEnableEpoch: 2,
+		},
+		ExpectedFlags: SemanticProfileFlags{SCDeployFlag: true, DRWAEnforcementFlag: true},
+	}
+	if profile == ProfileLegacy {
+		binding.EffectiveEpochs.SCProcessorV2EnableEpoch = 3
+	} else {
+		binding.EffectiveEpochs.SCProcessorV2EnableEpoch = 1
+		binding.ExpectedFlags.SCProcessorV2Flag = true
+	}
+	bindingHash, err := SemanticProfileBindingHash(binding)
+	require.NoError(t, err)
+	return binding, bindingHash
 }
 
 func expectedCapturedInput(profile Profile, scr smartContractResult.SmartContractResult, envelope []byte, currentHash [32]byte) *vmcommon.ContractCallInput {

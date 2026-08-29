@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,34 @@ func TestDurableCollectorOrdersAndRefusesAfterClose(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(data), `"authoritative_runtime_credit":0`)
 	require.Contains(t, string(data), `"phase_i_only":true`)
+}
+
+func TestPhaseIICollectorBindsContextIntoRecordAckAndClosure(t *testing.T) {
+	context := strings.Repeat("a1", 32)
+	collector, err := CreateDurableCollectorForCampaign(filepath.Join(t.TempDir(), "record.jsonl"), context, CollectorHooks{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = collector.Close() })
+	frame := validPhaseIIFrame(t, context)
+	packet, err := EncodeFrame(frame)
+	require.NoError(t, err)
+	record, err := collector.Append(frame)
+	require.NoError(t, err)
+	require.Equal(t, context, record.CampaignContextSHA256)
+	ack, err := MakeAck(frame, packet, record, "collector", "1:2", frame.ExecutableHash, 1)
+	require.NoError(t, err)
+	require.Equal(t, context, ack.CampaignContextSHA256)
+	require.NoError(t, ValidateAck(frame, packet, ack, 1))
+	closure, err := collector.Seal()
+	require.NoError(t, err)
+	require.Equal(t, "DRWA_S1_F1T_COLLECTOR_CLOSURE_V2", closure.Schema)
+	require.Equal(t, context, closure.CampaignContextSHA256)
+	require.True(t, closure.InterceptedRehearsal)
+
+	wrong, err := CreateDurableCollectorForCampaign(filepath.Join(t.TempDir(), "wrong.jsonl"), strings.Repeat("a2", 32), CollectorHooks{})
+	require.NoError(t, err)
+	defer wrong.Close()
+	_, err = wrong.Append(frame)
+	require.ErrorIs(t, err, ErrCampaignIdentity)
 }
 
 func TestDurableCollectorFailsPermanentlyOnDurabilityFailure(t *testing.T) {
@@ -179,6 +208,42 @@ func TestDurableCollectorReconcilesCatalogAgainstExactCallbacks(t *testing.T) {
 	require.Equal(t, uint64(3), closure.FinalGlobalSequence)
 }
 
+func TestPhaseIICollectorRequiresExactThreePathTopology(t *testing.T) {
+	contextDigest := strings.Repeat("ab", 32)
+	expected := []CallbackKey{{Role: "target", Path: "pubsub"}, {Role: "passive", Path: "pubsub"}, {Role: "target", Path: "self-direct"}}
+	t.Run("exact topology", func(t *testing.T) {
+		collector, err := CreateDurableCollectorForCampaign(filepath.Join(t.TempDir(), "record.jsonl"), contextDigest, CollectorHooks{})
+		require.NoError(t, err)
+		defer collector.Close()
+		entry := SendCatalogEntry{MessageID: strings.Repeat("cd", 32), Kind: "CALIBRATION", Index: 1,
+			Expected: expected, CampaignContextSHA256: contextDigest}
+		_, err = collector.AppendFrom("publisher", phaseIIFrameWithPayload(t, contextDigest, "publisher", 1, KindEvent, "JOURNALED",
+			SendCatalogPayload{Type: PayloadSendCatalog, Entry: entry, CampaignContextSHA256: contextDigest}))
+		require.NoError(t, err)
+		roleSequence := map[string]uint64{}
+		for _, callback := range expected {
+			roleSequence[callback.Role]++
+			event := RecorderEvent{SourceSequence: roleSequence[callback.Role], ReleaseEpoch: 1, MessageID: entry.MessageID,
+				Callback: callback, State: "ADMITTED", CampaignContextSHA256: contextDigest}
+			_, err = collector.AppendFrom(callback.Role, phaseIIFrameWithPayload(t, contextDigest, callback.Role, roleSequence[callback.Role], KindEvent, "ADMITTED",
+				CallbackEventPayload{Type: PayloadCallbackEvent, Event: event, CampaignContextSHA256: contextDigest}))
+			require.NoError(t, err)
+		}
+		_, err = collector.Seal()
+		require.NoError(t, err)
+	})
+	t.Run("path collapse", func(t *testing.T) {
+		collector, err := CreateDurableCollectorForCampaign(filepath.Join(t.TempDir(), "record.jsonl"), contextDigest, CollectorHooks{})
+		require.NoError(t, err)
+		defer collector.Close()
+		entry := SendCatalogEntry{MessageID: strings.Repeat("ef", 32), Kind: "CALIBRATION", Index: 1,
+			Expected: expected[:2], CampaignContextSHA256: contextDigest}
+		_, err = collector.AppendFrom("publisher", phaseIIFrameWithPayload(t, contextDigest, "publisher", 1, KindEvent, "JOURNALED",
+			SendCatalogPayload{Type: PayloadSendCatalog, Entry: entry, CampaignContextSHA256: contextDigest}))
+		require.ErrorIs(t, err, ErrReconciliation)
+	})
+}
+
 func TestDurableCollectorRefusesIncompleteOrDuplicateReconciliation(t *testing.T) {
 	t.Run("incomplete", func(t *testing.T) {
 		collector, err := CreateDurableCollector(filepath.Join(t.TempDir(), "record.jsonl"))
@@ -269,6 +334,21 @@ func frameWithPayload(t *testing.T, role string, sequence uint64, kind Kind, sta
 	payload, payloadHash, err := NewPayload(value)
 	require.NoError(t, err)
 	frame := validTestFrame(t)
+	frame.Role = role
+	frame.SourceSequence = sequence
+	frame.Kind = kind
+	frame.AdmissionState = state
+	frame.Payload = payload
+	frame.PayloadHash = payloadHash
+	require.NoError(t, frame.Validate())
+	return frame
+}
+
+func phaseIIFrameWithPayload(t *testing.T, contextDigest, role string, sequence uint64, kind Kind, state string, value any) Frame {
+	t.Helper()
+	payload, payloadHash, err := NewPayload(value)
+	require.NoError(t, err)
+	frame := validPhaseIIFrame(t, contextDigest)
 	frame.Role = role
 	frame.SourceSequence = sequence
 	frame.Kind = kind

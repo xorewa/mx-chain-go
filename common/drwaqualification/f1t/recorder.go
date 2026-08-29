@@ -28,10 +28,11 @@ type CallbackKey struct {
 }
 
 type SendCatalogEntry struct {
-	MessageID string        `json:"message_id"`
-	Kind      string        `json:"kind"`
-	Index     uint64        `json:"index"`
-	Expected  []CallbackKey `json:"expected"`
+	MessageID             string        `json:"message_id"`
+	Kind                  string        `json:"kind"`
+	Index                 uint64        `json:"index"`
+	Expected              []CallbackKey `json:"expected"`
+	CampaignContextSHA256 string        `json:"campaign_context_sha256,omitempty"`
 }
 
 type admissionToken struct {
@@ -40,18 +41,20 @@ type admissionToken struct {
 }
 
 type RecorderEvent struct {
-	SourceSequence uint64      `json:"source_sequence"`
-	ReleaseEpoch   uint64      `json:"release_epoch"`
-	MessageID      string      `json:"message_id"`
-	Callback       CallbackKey `json:"callback"`
-	State          string      `json:"state"`
+	SourceSequence        uint64      `json:"source_sequence"`
+	ReleaseEpoch          uint64      `json:"release_epoch"`
+	MessageID             string      `json:"message_id"`
+	Callback              CallbackKey `json:"callback"`
+	State                 string      `json:"state"`
+	CampaignContextSHA256 string      `json:"campaign_context_sha256,omitempty"`
 }
 
 type RecorderConfig struct {
-	Callback        CallbackKey
-	QueueCapacity   int
-	MessageIdentity func(p2p.MessageP2P) (string, error)
-	DurableEmit     func(RecorderEvent) error
+	Callback              CallbackKey
+	QueueCapacity         int
+	MessageIdentity       func(p2p.MessageP2P) (string, error)
+	DurableEmit           func(RecorderEvent) error
+	CampaignContextSHA256 string
 }
 
 type recorderWork struct {
@@ -97,6 +100,9 @@ func NewRecorder(processor func(p2p.MessageP2P, core.PeerID, p2p.MessageHandler)
 }
 
 func NewRecorderWithConfig(processor func(p2p.MessageP2P, core.PeerID, p2p.MessageHandler) ([]byte, error), config RecorderConfig) *Recorder {
+	if config.CampaignContextSHA256 != "" && !isHexDigest(config.CampaignContextSHA256) {
+		panic("F1-T recorder campaign context must be a digest")
+	}
 	if config.MessageIdentity == nil {
 		config.MessageIdentity = func(message p2p.MessageP2P) (string, error) {
 			if message == nil || message.IsInterfaceNil() {
@@ -186,7 +192,8 @@ func (recorder *Recorder) SetReleaseEpoch(epoch uint64) error {
 func (recorder *Recorder) addSend(entry SendCatalogEntry) error {
 	recorder.mu.Lock()
 	defer recorder.mu.Unlock()
-	if recorder.sendsSealed || recorder.quiescing || recorder.closed || recorder.failed != nil || ValidateSendCatalogEntry(entry) != nil {
+	if recorder.sendsSealed || recorder.quiescing || recorder.closed || recorder.failed != nil || ValidateSendCatalogEntry(entry) != nil ||
+		entry.CampaignContextSHA256 != recorder.config.CampaignContextSHA256 {
 		return recorder.failLocked(ErrReconciliation)
 	}
 	if _, exists := recorder.catalog[entry.MessageID]; exists {
@@ -195,7 +202,9 @@ func (recorder *Recorder) addSend(entry SendCatalogEntry) error {
 	entry.Expected = append([]CallbackKey(nil), entry.Expected...)
 	recorder.catalog[entry.MessageID] = entry
 	if callbackExpected(entry, recorder.config.Callback) {
-		recorder.expected[entry.MessageID] = entry
+		receiverEntry := entry
+		receiverEntry.Expected = []CallbackKey{recorder.config.Callback}
+		recorder.expected[entry.MessageID] = receiverEntry
 	}
 	recorder.signalLocked()
 	return nil
@@ -205,6 +214,9 @@ func (recorder *Recorder) addSend(entry SendCatalogEntry) error {
 // guarded sender, receiver-side frame protocol and collector reconciliation.
 func ValidateSendCatalogEntry(entry SendCatalogEntry) error {
 	if entry.MessageID == "" || !validSendKind(entry.Kind) || entry.Index == 0 || len(entry.Expected) == 0 {
+		return ErrReconciliation
+	}
+	if entry.CampaignContextSHA256 != "" && !isHexDigest(entry.CampaignContextSHA256) {
 		return ErrReconciliation
 	}
 	seen := make(map[CallbackKey]struct{}, len(entry.Expected))
@@ -375,7 +387,8 @@ func (recorder *Recorder) processOne(request recorderWork) ([]byte, error) {
 	}
 	if recorder.config.DurableEmit != nil {
 		err = recorder.config.DurableEmit(RecorderEvent{SourceSequence: request.token.sequence, ReleaseEpoch: request.token.epoch,
-			MessageID: request.id, Callback: recorder.config.Callback, State: "ADMITTED"})
+			MessageID: request.id, Callback: recorder.config.Callback, State: "ADMITTED",
+			CampaignContextSHA256: recorder.config.CampaignContextSHA256})
 		if err != nil {
 			cause := recorder.fail(err)
 			recorder.finishFailed(request.token)
@@ -450,7 +463,7 @@ func (recorder *Recorder) emitTerminalFailure(messageID string, key CallbackKey,
 		return cause
 	}
 	emitErr := recorder.config.DurableEmit(RecorderEvent{SourceSequence: token.sequence, ReleaseEpoch: token.epoch,
-		MessageID: messageID, Callback: key, State: "TERMINAL_FAILURE"})
+		MessageID: messageID, Callback: key, State: "TERMINAL_FAILURE", CampaignContextSHA256: recorder.config.CampaignContextSHA256})
 	return errors.Join(cause, emitErr)
 }
 
