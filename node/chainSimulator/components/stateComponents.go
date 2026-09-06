@@ -11,7 +11,6 @@ import (
 	"github.com/multiversx/mx-chain-go/factory"
 	factoryState "github.com/multiversx/mx-chain-go/factory/state"
 	"github.com/multiversx/mx-chain-go/state"
-	"github.com/multiversx/mx-chain-go/state/disabled"
 )
 
 // ArgsStateComponents will hold the components needed for state components
@@ -33,6 +32,7 @@ type stateComponentsHolder struct {
 	triesStorageManager      map[string]common.StorageManager
 	missingTrieNodesNotifier common.MissingTrieNodesNotifier
 	trieLeavesRetriever      common.TrieLeavesRetriever
+	stateAccessesCollector   state.StateAccessesCollector
 	stateComponentsCloser    io.Closer
 }
 
@@ -76,6 +76,7 @@ func CreateStateComponents(args ArgsStateComponents) (*stateComponentsHolder, er
 		triesStorageManager:      stateComp.TrieStorageManagers(),
 		missingTrieNodesNotifier: stateComp.MissingTrieNodesNotifier(),
 		trieLeavesRetriever:      stateComp.TrieLeavesRetriever(),
+		stateAccessesCollector:   stateComp.StateAccessesCollector(),
 		stateComponentsCloser:    stateComp,
 	}, nil
 }
@@ -126,7 +127,7 @@ func (s *stateComponentsHolder) TrieLeavesRetriever() common.TrieLeavesRetriever
 }
 
 func (s *stateComponentsHolder) StateAccessesCollector() state.StateAccessesCollector {
-	return disabled.NewDisabledStateAccessesCollector()
+	return s.stateAccessesCollector
 }
 
 // Close will close the state components

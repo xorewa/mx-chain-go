@@ -2,15 +2,17 @@ package chainSimulator
 
 // Full-node qualification of the state-access collector changes on this
 // baseline: real multi-shard chain simulator nodes (3 shards + metachain)
-// produce blocks through the Supernova activation and multiple epoch changes
-// with state-access collection ENABLED, so the collector code sits live on
-// the block-processing hot path (collection, merge, commit, reset and revert
-// flows) of every node. Block production must be completely unaffected.
+// receive the configured collector through the same state-component holder
+// used by block processing, then produce blocks through Supernova activation
+// and multiple epoch changes. The explicit lifecycle probe below proves that
+// the simulator did not substitute a disabled collector; focused outport tests
+// separately prove delivery of retained header-scoped accesses.
 
 import (
 	"testing"
 	"time"
 
+	data "github.com/multiversx/mx-chain-core-go/data/stateChange"
 	"github.com/stretchr/testify/require"
 
 	"github.com/multiversx/mx-chain-go/config"
@@ -38,6 +40,22 @@ func TestChainSimulatorSupernovaWithStateAccessCollectionEnabled(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.NotNil(t, chainSimulator)
+	t.Cleanup(chainSimulator.Close)
+
+	collector := chainSimulator.GetNodeHandler(0).GetStateComponents().StateAccessesCollector()
+	require.NotNil(t, collector)
+	headerHash := []byte("chain-simulator-header")
+	rootHash := []byte("chain-simulator-root")
+	collector.BeginExecution(headerHash)
+	collector.AddStateAccess(&data.StateAccess{
+		Type:   data.Write,
+		TxHash: []byte("chain-simulator-tx"),
+	})
+	require.NoError(t, collector.CommitCollectedAccesses(rootHash))
+	collector.EndExecution(headerHash)
+	retained, err := collector.TakeStateAccessesForHeader(headerHash, rootHash)
+	require.NoError(t, err)
+	require.Contains(t, retained, "chain-simulator-tx")
 
 	err = chainSimulator.GenerateBlocksUntilEpochIsReached(2)
 	require.Nil(t, err)
@@ -52,6 +70,4 @@ func TestChainSimulatorSupernovaWithStateAccessCollectionEnabled(t *testing.T) {
 	require.Nil(t, err)
 
 	time.Sleep(time.Second)
-
-	chainSimulator.Close()
 }

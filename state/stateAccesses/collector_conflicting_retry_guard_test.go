@@ -18,10 +18,24 @@ import (
 	"github.com/multiversx/mx-chain-go/state/disabled"
 )
 
+type countingStateAccessesStorer struct {
+	stores int
+}
+
+func (s *countingStateAccessesStorer) Store(_ map[string]*data.StateAccesses) error {
+	s.stores++
+	return nil
+}
+
+func (s *countingStateAccessesStorer) IsInterfaceNil() bool {
+	return s == nil
+}
+
 func TestCollector_IdenticalRetryIsIdempotent(t *testing.T) {
 	t.Parallel()
 
-	c, err := NewCollector(disabled.NewDisabledStateAccessesStorer(), WithCollectWrite())
+	storer := &countingStateAccessesStorer{}
+	c, err := NewCollector(storer, WithCollectWrite())
 	require.NoError(t, err)
 
 	headerHash := []byte("execution-header-hash")
@@ -37,6 +51,8 @@ func TestCollector_IdenticalRetryIsIdempotent(t *testing.T) {
 	require.NoError(t, c.CommitCollectedAccesses(rootHash),
 		"an identical retry must succeed idempotently")
 	c.EndExecution(headerHash)
+	require.Equal(t, 1, storer.stores,
+		"an identical retry must not write the retained payload again")
 
 	retained, err := c.TakeStateAccessesForHeader(headerHash, rootHash)
 	require.NoError(t, err)
@@ -70,4 +86,17 @@ func TestCollector_ConflictingRetryMustBeRejected(t *testing.T) {
 	require.NoError(t, takeErr)
 	require.Contains(t, retained, "tx-1")
 	require.NotContains(t, retained, "tx-2")
+
+	// A conflict must not destroy the rejected working payload. Prove it can
+	// still be committed under a new execution identity after the caller
+	// handles the conflict.
+	retryHeaderHash := []byte("retry-header-hash")
+	retryRootHash := []byte("retry-root-hash")
+	c.BeginExecution(retryHeaderHash)
+	require.NoError(t, c.CommitCollectedAccesses(retryRootHash))
+	c.EndExecution(retryHeaderHash)
+
+	restored, restoreErr := c.TakeStateAccessesForHeader(retryHeaderHash, retryRootHash)
+	require.NoError(t, restoreErr)
+	require.Contains(t, restored, "tx-2")
 }
