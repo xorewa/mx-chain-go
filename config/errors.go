@@ -11,3 +11,7 @@ var errMismatchNodesToShuffle = errors.New("previous MaxNodesChangeEnableEpoch.N
 var errNoMaxNodesConfigChangeForStakingV4 = errors.New("no MaxNodesChangeEnableEpoch config found for EpochEnable = StakingV4Step3EnableEpoch")
 
 var errInvalidMaxMinNodes = errors.New("number of min nodes with hysteresis > number of max nodes")
+
+var errDRWAEnforcementBeforeSupernova = errors.New("DRWA enforcement enable epoch is before Supernova enable epoch")
+
+var errDRWAEnforcementBeforeDynamicESDT = errors.New("DRWA enforcement enable epoch is before Dynamic ESDT enable epoch")

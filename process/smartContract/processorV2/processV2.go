@@ -934,8 +934,31 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 	}
 
 	_, txTypeOnDst, _ := sc.txTypeHandler.ComputeTransactionType(tx)
-	builtInFuncGasUsed, err := sc.computeBuiltInFuncGasUsed(txTypeOnDst, vmInput.Function, vmInput.GasProvided, vmOutput.GasRemaining, check.IfNil(acntSnd))
-	log.LogIfError(err, "function", "ExecuteBuiltInFunction.computeBuiltInFuncGasUsed")
+	builtInFuncGasUsed, matchedDRWAGas, drwaRefund, drwaGasRefundRecipient, drwaGasErr := scrCommon.DRWAExecutionGasAccounting(
+		txTypeOnDst,
+		check.IfNil(acntSnd),
+		vmInput,
+		vmOutput,
+	)
+	if drwaGasErr != nil {
+		revertErr := sc.accounts.RevertToSnapshot(failureContext.snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		return vmcommon.ExecutionFailed, drwaGasErr
+	}
+	if drwaRefund {
+		revertErr := sc.accounts.RevertToSnapshot(failureContext.snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		vmOutput.ReturnCode = vmcommon.Ok
+		vmOutput.ReturnMessage = ""
+	}
+	if !matchedDRWAGas {
+		builtInFuncGasUsed, err = sc.computeBuiltInFuncGasUsed(txTypeOnDst, vmInput.Function, vmInput.GasProvided, vmOutput.GasRemaining, check.IfNil(acntSnd))
+		log.LogIfError(err, "function", "ExecuteBuiltInFunction.computeBuiltInFuncGasUsed")
+	}
 
 	if txTypeOnDst != process.SCInvoking {
 		vmOutput.GasRemaining += vmInput.GasLocked
@@ -1029,14 +1052,15 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 	if !isSCCallCrossShard /* isSCCallSelfShard || txTypeOnDst != process.SCInvoking */ {
 		scrResults, errReturnCode, err = sc.completeOutputProcessingAndCreateCallback(
 			&outputDataFromCall{
-				vmInput:              &vmInput.VMInput,
-				vmOutput:             newVMOutput,
-				txHash:               txHash,
-				tx:                   tx,
-				scrTxs:               scrResults,
-				acntSnd:              acntSnd,
-				createdAsyncCallback: createdAsyncCallback,
-				failureContext:       failureContext,
+				vmInput:                &vmInput.VMInput,
+				vmOutput:               newVMOutput,
+				txHash:                 txHash,
+				tx:                     tx,
+				scrTxs:                 scrResults,
+				acntSnd:                acntSnd,
+				createdAsyncCallback:   createdAsyncCallback,
+				failureContext:         failureContext,
+				drwaGasRefundRecipient: drwaGasRefundRecipient,
 			})
 		if errReturnCode != vmcommon.Ok || err != nil {
 			return errReturnCode, nil
@@ -1049,7 +1073,15 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 		return vmcommon.UserError, nil
 	}
 
-	return sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	returnCode, finishErr := sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	if finishErr != nil && len(drwaGasRefundRecipient) != 0 {
+		revertErr := sc.accounts.RevertToSnapshot(failureContext.snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		return vmcommon.ExecutionFailed, finishErr
+	}
+	return returnCode, finishErr
 }
 
 func mergeOutputResultsWithBuiltinResults(results *outputResultsToBeMerged) (bool, []data.TransactionHandler) {
@@ -2051,14 +2083,15 @@ func (sc *scProcessor) processVMOutput(
 }
 
 type outputDataFromCall struct {
-	vmInput              *vmcommon.VMInput
-	vmOutput             *vmcommon.VMOutput
-	txHash               []byte
-	tx                   data.TransactionHandler
-	scrTxs               []data.TransactionHandler
-	acntSnd              state.UserAccountHandler
-	createdAsyncCallback bool
-	failureContext       *failureContext
+	vmInput                *vmcommon.VMInput
+	vmOutput               *vmcommon.VMOutput
+	txHash                 []byte
+	tx                     data.TransactionHandler
+	scrTxs                 []data.TransactionHandler
+	acntSnd                state.UserAccountHandler
+	createdAsyncCallback   bool
+	failureContext         *failureContext
+	drwaGasRefundRecipient []byte
 }
 
 func (sc *scProcessor) completeOutputProcessingAndCreateCallback(
@@ -2103,6 +2136,9 @@ func (sc *scProcessor) createSCRForSenderAndRelayerAndRefundGas(outData *outputD
 		outData.txHash,
 		outData.vmInput.CallType,
 	)
+	if len(outData.drwaGasRefundRecipient) != 0 {
+		scrForSender.RcvAddr = append([]byte(nil), outData.drwaGasRefundRecipient...)
+	}
 
 	var err error
 	if !check.IfNil(scrForRelayer) {
@@ -2441,6 +2477,7 @@ func (sc *scProcessor) preprocessOutTransferToSCR(
 
 	result.GasLimit = outputTransfer.GasLimit
 	result.CallType = outputTransfer.CallType
+	result.ProtocolMessageKind = outputTransfer.ProtocolMessageKind
 	setOriginalTxHash(result, txHash, tx)
 	result.OriginalSender = GetOriginalSenderForTx(tx)
 	return result
@@ -2800,10 +2837,13 @@ func (sc *scProcessor) ProcessSmartContractResult(scr *smartContractResult.Smart
 	if check.IfNil(scr) {
 		return 0, process.ErrNilSmartContractResult
 	}
+	err := scrCommon.ValidateProtocolMessageAdmission(scr, sc.enableEpochsHandler, sc.shardCoordinator)
+	if err != nil {
+		return vmcommon.UserError, err
+	}
 
 	log.Trace("scProcessor.ProcessSmartContractResult()", "sender", scr.GetSndAddr(), "receiver", scr.GetRcvAddr(), "data", string(scr.GetData()))
 
-	var err error
 	returnCode := vmcommon.UserError
 	txHash, err := core.CalculateHash(sc.marshalizer, sc.hasher, scr)
 	if err != nil {

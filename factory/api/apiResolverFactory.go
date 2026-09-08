@@ -163,6 +163,9 @@ func CreateApiResolver(args *ApiResolverArgs) (facade.ApiResolver, error) {
 		convertedAddresses,
 		args.Configs.GeneralConfig.BuiltInFunctions.MaxNumAddressesInTransferRole,
 		convertedDNSV2Addresses,
+		drwaNetworkDomain(args.ProcessComponents),
+		args.Configs.GeneralConfig.BuiltInFunctions.DRWACEBEpoch,
+		args.Configs.GeneralConfig.BuiltInFunctions.DRWASettlementLifetimeRounds,
 	)
 	if err != nil {
 		return nil, err
@@ -384,6 +387,9 @@ func createScQueryElement(
 		convertedAddresses,
 		args.generalConfig.BuiltInFunctions.MaxNumAddressesInTransferRole,
 		convertedDNSV2Addresses,
+		drwaNetworkDomain(args.processComponents),
+		args.generalConfig.BuiltInFunctions.DRWACEBEpoch,
+		args.generalConfig.BuiltInFunctions.DRWASettlementLifetimeRounds,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -660,6 +666,9 @@ func createBuiltinFuncs(
 	automaticCrawlerAddresses [][]byte,
 	maxNumAddressesInTransferRole uint32,
 	dnsV2Addresses [][]byte,
+	drwaNetworkDomain [32]byte,
+	drwaCEBEpoch uint32,
+	drwaSettlementLifetimeRounds uint64,
 ) (vmcommon.BuiltInFunctionFactory, error) {
 	mapDNSV2Addresses := make(map[string]struct{})
 	for _, address := range dnsV2Addresses {
@@ -667,19 +676,37 @@ func createBuiltinFuncs(
 	}
 
 	argsBuiltIn := builtInFunctions.ArgsCreateBuiltInFunctionContainer{
-		GasSchedule:               gasScheduleNotifier,
-		MapDNSAddresses:           make(map[string]struct{}),
-		MapDNSV2Addresses:         mapDNSV2Addresses,
-		Marshalizer:               marshalizer,
-		Accounts:                  accnts,
-		ShardCoordinator:          shardCoordinator,
-		EpochNotifier:             epochNotifier,
-		EnableEpochsHandler:       enableEpochsHandler,
-		GuardedAccountHandler:     guardedAccountHandler,
-		AutomaticCrawlerAddresses: automaticCrawlerAddresses,
-		MaxNumNodesInTransferRole: maxNumAddressesInTransferRole,
+		GasSchedule:                  gasScheduleNotifier,
+		MapDNSAddresses:              make(map[string]struct{}),
+		MapDNSV2Addresses:            mapDNSV2Addresses,
+		Marshalizer:                  marshalizer,
+		Accounts:                     accnts,
+		ShardCoordinator:             shardCoordinator,
+		EpochNotifier:                epochNotifier,
+		EnableEpochsHandler:          enableEpochsHandler,
+		GuardedAccountHandler:        guardedAccountHandler,
+		AutomaticCrawlerAddresses:    automaticCrawlerAddresses,
+		MaxNumNodesInTransferRole:    maxNumAddressesInTransferRole,
+		DRWANetworkDomain:            drwaNetworkDomain,
+		DRWACEBEpoch:                 drwaCEBEpoch,
+		DRWASettlementLifetimeRounds: drwaSettlementLifetimeRounds,
 	}
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)
+}
+
+type drwaNetworkDomainProvider interface {
+	DRWANetworkDomain() [32]byte
+}
+
+func drwaNetworkDomain(processComponents factory.ProcessComponentsHolder) [32]byte {
+	if processComponents == nil || processComponents.IsInterfaceNil() {
+		return [32]byte{}
+	}
+	provider, ok := processComponents.(drwaNetworkDomainProvider)
+	if !ok {
+		return [32]byte{}
+	}
+	return provider.DRWANetworkDomain()
 }
 
 func createAPIBlockProcessor(args *ApiResolverArgs, apiTransactionHandler external.APITransactionHandler) (blockAPI.APIBlockHandler, error) {

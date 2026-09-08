@@ -17,6 +17,7 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/epochNotifier"
 	"github.com/multiversx/mx-chain-go/testscommon/guardianMocks"
 	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,6 +41,7 @@ func createMockArguments() ArgsCreateBuiltInFunctionContainer {
 		},
 		MaxNumNodesInTransferRole: 100,
 		GuardedAccountHandler:     &guardianMocks.GuardedAccountHandlerStub{},
+		DRWANetworkDomain:         [32]byte{1, 2, 3},
 	}
 
 	return args
@@ -173,7 +175,35 @@ func TestCreateBuiltInFunctionContainer(t *testing.T) {
 		args := createMockArguments()
 		builtInFuncFactory, err := CreateBuiltInFunctionsFactory(args)
 		assert.Nil(t, err)
-		assert.Equal(t, 42, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
+		drwaFactory, ok := builtInFuncFactory.(*drwaGuardedBuiltInFunctionFactory)
+		assert.True(t, ok)
+		assert.Equal(t, args.DRWANetworkDomain, drwaFactory.DRWANetworkDomain())
+		_, err = drwaFactory.DRWAGasScheduleCatalogIdentity()
+		assert.ErrorIs(t, err, ErrDRWAGasScheduleUnavailable)
+		_, err = drwaFactory.DRWACurrentGasScheduleIdentity()
+		assert.ErrorIs(t, err, ErrDRWAGasScheduleUnavailable)
+		assert.Equal(t, 46, len(builtInFuncFactory.BuiltInFunctionContainer().Keys()))
+		function, err := builtInFuncFactory.BuiltInFunctionContainer().Get(DRWASourceDebitFunction)
+		assert.NoError(t, err)
+		sourceDebit, ok := function.(*drwaSourceDebit)
+		assert.True(t, ok)
+		assert.False(t, sourceDebit.IsActive())
+		function, err = builtInFuncFactory.BuiltInFunctionContainer().Get(vmcommon.BuiltInFunctionDRWARegulatedValueEnvelope)
+		assert.NoError(t, err)
+		destination, ok := function.(*drwaDestination)
+		assert.True(t, ok)
+		assert.False(t, destination.IsActive())
+
+		err = builtInFuncFactory.SetBlockchainHook(&testscommon.BlockChainHookStub{
+			CurrentRoundCalled: func() uint64 { return 17 },
+		})
+		assert.NoError(t, err)
+		currentRound, err := sourceDebit.currentRound()
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(17), currentRound)
+		currentRound, err = destination.currentRound()
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(17), currentRound)
 
 		err = builtInFuncFactory.SetPayableHandler(&testscommon.BlockChainHookStub{})
 		assert.Nil(t, err)

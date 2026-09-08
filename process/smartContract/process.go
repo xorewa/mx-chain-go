@@ -956,8 +956,31 @@ func (sc *scProcessor) doExecuteBuiltInFunction(
 	}
 
 	_, txTypeOnDst, _ := sc.txTypeHandler.ComputeTransactionType(tx)
-	builtInFuncGasUsed, err := sc.computeBuiltInFuncGasUsed(txTypeOnDst, vmInput.Function, vmInput.GasProvided, vmOutput.GasRemaining, check.IfNil(acntSnd))
-	log.LogIfError(err, "function", "ExecuteBuiltInFunction.computeBuiltInFuncGasUsed")
+	builtInFuncGasUsed, matchedDRWAGas, drwaRefund, drwaGasRefundRecipient, drwaGasErr := scrCommon.DRWAExecutionGasAccounting(
+		txTypeOnDst,
+		check.IfNil(acntSnd),
+		vmInput,
+		vmOutput,
+	)
+	if drwaGasErr != nil {
+		revertErr := sc.accounts.RevertToSnapshot(snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		return vmcommon.ExecutionFailed, drwaGasErr
+	}
+	if drwaRefund {
+		revertErr := sc.accounts.RevertToSnapshot(snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		vmOutput.ReturnCode = vmcommon.Ok
+		vmOutput.ReturnMessage = ""
+	}
+	if !matchedDRWAGas {
+		builtInFuncGasUsed, err = sc.computeBuiltInFuncGasUsed(txTypeOnDst, vmInput.Function, vmInput.GasProvided, vmOutput.GasRemaining, check.IfNil(acntSnd))
+		log.LogIfError(err, "function", "ExecuteBuiltInFunction.computeBuiltInFuncGasUsed")
+	}
 
 	if txTypeOnDst != process.SCInvoking {
 		vmOutput.GasRemaining += vmInput.GasLocked
@@ -1041,7 +1064,13 @@ func (sc *scProcessor) doExecuteBuiltInFunction(
 			sc.penalizeUserIfNeeded(tx, txHash, newVMInput.CallType, newVMInput.GasProvided, newVMOutput)
 		}
 
-		scrForSender, scrForRelayer, errCreateSCR := sc.processSCRForSenderAfterBuiltIn(tx, txHash, vmInput, newVMOutput)
+		scrForSender, scrForRelayer, errCreateSCR := sc.processSCRForSenderAfterBuiltIn(
+			tx,
+			txHash,
+			vmInput,
+			newVMOutput,
+			drwaGasRefundRecipient,
+		)
 		if errCreateSCR != nil {
 			return 0, errCreateSCR
 		}
@@ -1067,7 +1096,15 @@ func (sc *scProcessor) doExecuteBuiltInFunction(
 		}
 	}
 
-	return sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	returnCode, finishErr := sc.finishSCExecution(scrResults, txHash, tx, newVMOutput, builtInFuncGasUsed)
+	if finishErr != nil && len(drwaGasRefundRecipient) != 0 {
+		revertErr := sc.accounts.RevertToSnapshot(snapshot)
+		if revertErr != nil {
+			return vmcommon.ExecutionFailed, revertErr
+		}
+		return vmcommon.ExecutionFailed, finishErr
+	}
+	return returnCode, finishErr
 }
 
 func mergeVMOutputLogs(newVMOutput *vmcommon.VMOutput, vmOutput *vmcommon.VMOutput) {
@@ -1087,6 +1124,7 @@ func (sc *scProcessor) processSCRForSenderAfterBuiltIn(
 	txHash []byte,
 	vmInput *vmcommon.ContractCallInput,
 	vmOutput *vmcommon.VMOutput,
+	drwaGasRefundRecipient []byte,
 ) (*smartContractResult.SmartContractResult, *smartContractResult.SmartContractResult, error) {
 	sc.penalizeUserIfNeeded(tx, txHash, vmInput.CallType, vmInput.GasProvided, vmOutput)
 	scrForSender, scrForRelayer := sc.createSCRForSenderAndRelayer(
@@ -1095,6 +1133,9 @@ func (sc *scProcessor) processSCRForSenderAfterBuiltIn(
 		txHash,
 		vmInput.CallType,
 	)
+	if len(drwaGasRefundRecipient) != 0 {
+		scrForSender.RcvAddr = append([]byte(nil), drwaGasRefundRecipient...)
+	}
 
 	err := sc.addGasRefundIfInShard(scrForSender.RcvAddr, scrForSender.Value)
 	if err != nil {
@@ -2296,6 +2337,7 @@ func (sc *scProcessor) preprocessOutTransferToSCR(
 	result.Data = outputTransfer.Data
 	result.GasLimit = outputTransfer.GasLimit
 	result.CallType = outputTransfer.CallType
+	result.ProtocolMessageKind = outputTransfer.ProtocolMessageKind
 	setOriginalTxHash(result, txHash, tx)
 	if result.Value.Cmp(zero) > 0 {
 		result.OriginalSender = tx.GetSndAddr()
@@ -2772,10 +2814,13 @@ func (sc *scProcessor) ProcessSmartContractResult(scr *smartContractResult.Smart
 	if check.IfNil(scr) {
 		return 0, process.ErrNilSmartContractResult
 	}
+	err := scrCommon.ValidateProtocolMessageAdmission(scr, sc.enableEpochsHandler, sc.shardCoordinator)
+	if err != nil {
+		return vmcommon.UserError, err
+	}
 
 	log.Trace("scProcessor.ProcessSmartContractResult()", "sender", scr.GetSndAddr(), "receiver", scr.GetRcvAddr(), "data", string(scr.GetData()))
 
-	var err error
 	returnCode := vmcommon.UserError
 	txHash, err := core.CalculateHash(sc.marshalizer, sc.hasher, scr)
 	if err != nil {

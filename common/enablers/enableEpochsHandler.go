@@ -945,6 +945,13 @@ func (handler *enableEpochsHandler) createAllFlagsMap() {
 			activationEpoch:     handler.enableEpochsConfig.SupernovaEnableEpoch,
 			activationEpochName: "SupernovaEnableEpoch",
 		},
+		common.DRWAEnforcementFlag: {
+			isActiveInEpoch: func(epoch uint32) bool {
+				return epoch >= handler.enableEpochsConfig.DRWAEnforcementEnableEpoch
+			},
+			activationEpoch:     handler.enableEpochsConfig.DRWAEnforcementEnableEpoch,
+			activationEpochName: "DRWAEnforcementEnableEpoch",
+		},
 		// TODO: move it to activation round
 		common.CheckBuiltInCallOnTransferValueAndFailExecutionFlag: {
 			isActiveInEpoch: func(epoch uint32) bool {

@@ -36,6 +36,7 @@ import (
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/sharding/nodesCoordinator"
 	"github.com/multiversx/mx-chain-go/state"
+	stateAccounts "github.com/multiversx/mx-chain-go/state/accounts"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	"github.com/multiversx/mx-chain-go/testscommon/bootstrapMocks"
 	"github.com/multiversx/mx-chain-go/testscommon/chainParameters"
@@ -896,10 +897,15 @@ func TestProcessComponentsFactory_Create(t *testing.T) {
 		args.State = stateCompMock
 
 		coreCompStub := factoryMocks.NewCoreComponentsHolderStubFromRealComponent(args.CoreData)
+		realMarshalizer := args.CoreData.InternalMarshalizer()
 		cnt := 0
 		coreCompStub.InternalMarshalizerCalled = func() marshal.Marshalizer {
 			return &marshallerMock.MarshalizerStub{
+				MarshalCalled: realMarshalizer.Marshal,
 				UnmarshalCalled: func(obj interface{}, buff []byte) error {
+					if _, isUserAccount := obj.(*stateAccounts.UserAccountData); !isUserAccount {
+						return realMarshalizer.Unmarshal(obj, buff)
+					}
 					cnt++
 					if cnt == 1 {
 						return nil // coverage, key_ok
@@ -995,9 +1001,14 @@ func TestProcessComponentsFactory_Create(t *testing.T) {
 			ChangesCollector:     realStateComp.StateAccessesCollector(),
 		}
 		coreCompStub := factoryMocks.NewCoreComponentsHolderStubFromRealComponent(args.CoreData)
+		realMarshalizer := args.CoreData.InternalMarshalizer()
 		coreCompStub.InternalMarshalizerCalled = func() marshal.Marshalizer {
 			return &marshallerMock.MarshalizerStub{
+				MarshalCalled: realMarshalizer.Marshal,
 				UnmarshalCalled: func(obj interface{}, buff []byte) error {
+					if _, isUserAccount := obj.(*stateAccounts.UserAccountData); !isUserAccount {
+						return realMarshalizer.Unmarshal(obj, buff)
+					}
 					return nil
 				},
 			}

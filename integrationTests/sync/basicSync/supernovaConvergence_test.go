@@ -88,6 +88,21 @@ func TestSupernovaSync_NodesSplitOnSiblings_ConvergeOnLowerRound(t *testing.T) {
 		require.Nil(t, err)
 		injectBlock(target, header, hash, proof)
 	}
+	requireNodesAtBlock := func(nodes []*integrationTests.TestProcessorNode, expectedNonce uint64, expectedHash []byte, message string) {
+		require.Eventually(t, func() bool {
+			for _, node := range nodes {
+				header := node.BlockChain.GetCurrentBlockHeader()
+				if header == nil || header.GetNonce() != expectedNonce {
+					return false
+				}
+				if string(node.BlockChain.GetCurrentBlockHeaderHash()) != string(expectedHash) {
+					return false
+				}
+			}
+
+			return true
+		}, 5*time.Second, 25*time.Millisecond, message)
+	}
 
 	round := uint64(0)
 	nonce := uint64(0)
@@ -111,6 +126,14 @@ func TestSupernovaSync_NodesSplitOnSiblings_ConvergeOnLowerRound(t *testing.T) {
 		integrationTests.UpdateRound(allNodes, round)
 		nonce++
 	}
+	// The final round update triggers the asynchronous sync loop. Observe the
+	// committed state instead of assuming SyncDelay was sufficient on every host.
+	requireNodesAtBlock(
+		shardNodes,
+		uint64(numPrefixBlocks),
+		pA.BlockChain.GetCurrentBlockHeaderHash(),
+		"not all shard nodes committed the same common-prefix block",
+	)
 
 	for _, n := range shardNodes {
 		require.NotNil(t, n.BlockChain.GetCurrentBlockHeader())
