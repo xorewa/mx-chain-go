@@ -1,6 +1,6 @@
 package process
 
-// Guard for the core #7961 defect on the #7962 base: two distinct execution
+// Two distinct execution
 // results sharing one state root must each keep their own state-access batch
 // all the way through the outport provider.
 

@@ -1,12 +1,11 @@
 package stateAccesses
 
-// Guard for retry semantics on the #7962 base. A commit that reuses an
+// Guard for the retained-state-access retry contract. A commit that reuses an
 // execution identity must be:
 //   - idempotent when the root and the payload are identical;
 //   - rejected with a typed conflict error when the payload differs, because
 //     silently keeping the first payload hides non-deterministic re-execution
-//     or corruption from every downstream consumer (storage, outport, DRWA
-//     audit evidence).
+//     or corruption from every downstream consumer (storage and outport).
 
 import (
 	"testing"

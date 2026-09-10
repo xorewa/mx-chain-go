@@ -19,7 +19,7 @@ import (
 	"github.com/multiversx/mx-chain-go/node/chainSimulator/components/api"
 )
 
-func TestChainSimulatorSupernovaWithStateAccessCollectionEnabled(t *testing.T) {
+func TestQualChainSimulatorSupernovaWithStateAccessCollectionEnabled(t *testing.T) {
 	chainSimulator, err := NewChainSimulator(ArgsChainSimulator{
 		BypassTxSignatureCheck:         true,
 		BypassCreateBlockTimeCheck:     true,
