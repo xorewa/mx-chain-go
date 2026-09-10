@@ -13,6 +13,7 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
 	"github.com/multiversx/mx-chain-go/testscommon/trie"
+	"github.com/multiversx/mx-chain-go/testscommon/vmcommonMocks"
 	"github.com/multiversx/mx-chain-go/vm"
 	"github.com/multiversx/mx-chain-go/vm/mock"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
@@ -151,6 +152,139 @@ func TestVmContext_GetBalance(t *testing.T) {
 
 	res := vmCtx.GetBalance(addr)
 	assert.Equal(t, res.Uint64(), balance.Uint64())
+}
+
+func TestVmContext_AddTxValueToSmartContractPreservesPersistedBalance(t *testing.T) {
+	t.Parallel()
+
+	addr := []byte("system smart contract")
+	persistedBalance := big.NewInt(100)
+	callValue := big.NewInt(7)
+	account, _ := accounts.NewUserAccount(
+		[]byte("account"), &trie.DataTrieTrackerStub{}, &trie.TrieLeafParserStub{})
+	_ = account.AddToBalance(persistedBalance)
+
+	args := createDefaultEeiArgs()
+	args.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(address []byte) (vmcommon.UserAccountHandler, error) {
+			if bytes.Equal(address, addr) {
+				return account, nil
+			}
+			return nil, errors.New("account not found")
+		},
+	}
+	vmCtx, _ := NewVMContext(args)
+
+	vmCtx.AddTxValueToSmartContract(callValue, addr)
+
+	assert.Equal(t, uint64(107), vmCtx.GetBalance(addr).Uint64())
+	output := vmCtx.CreateVMOutput()
+	assert.Contains(t, output.OutputAccounts, string(addr))
+	assert.Equal(t, callValue, output.OutputAccounts[string(addr)].BalanceDelta)
+}
+
+func TestVmContext_AddTxValueToSmartContractMissingPersistedAccountUsesZeroBalance(t *testing.T) {
+	t.Parallel()
+
+	addr := []byte("missing system smart contract")
+	args := createDefaultEeiArgs()
+	args.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(_ []byte) (vmcommon.UserAccountHandler, error) {
+			return nil, nil
+		},
+	}
+	vmCtx, err := NewVMContext(args)
+	assert.NoError(t, err)
+
+	vmCtx.AddTxValueToSmartContract(big.NewInt(7), addr)
+
+	assert.Equal(t, uint64(7), vmCtx.GetBalance(addr).Uint64())
+}
+
+func TestVmContext_AddTxValueToSmartContractAccountLookupErrorUsesZeroBalance(t *testing.T) {
+	t.Parallel()
+
+	addr := []byte("unavailable system smart contract")
+	args := createDefaultEeiArgs()
+	args.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(_ []byte) (vmcommon.UserAccountHandler, error) {
+			return nil, errors.New("account unavailable")
+		},
+	}
+	vmCtx, err := NewVMContext(args)
+	assert.NoError(t, err)
+
+	vmCtx.AddTxValueToSmartContract(big.NewInt(7), addr)
+
+	assert.Equal(t, uint64(7), vmCtx.GetBalance(addr).Uint64())
+}
+
+func TestVmContext_AddTxValueToSmartContractNilPersistedBalanceUsesZeroBalance(t *testing.T) {
+	t.Parallel()
+
+	addr := []byte("empty system smart contract")
+	args := createDefaultEeiArgs()
+	args.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(_ []byte) (vmcommon.UserAccountHandler, error) {
+			return &vmcommonMocks.UserAccountStub{}, nil
+		},
+	}
+	vmCtx, err := NewVMContext(args)
+	assert.NoError(t, err)
+
+	vmCtx.AddTxValueToSmartContract(big.NewInt(7), addr)
+
+	assert.Equal(t, uint64(7), vmCtx.GetBalance(addr).Uint64())
+}
+
+func TestVmContext_AddTxValueToSmartContractCopiesPersistedBalance(t *testing.T) {
+	t.Parallel()
+
+	addr := []byte("system smart contract")
+	persistedBalance := big.NewInt(100)
+	args := createDefaultEeiArgs()
+	args.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(_ []byte) (vmcommon.UserAccountHandler, error) {
+			return &vmcommonMocks.UserAccountStub{
+				GetBalanceCalled: func() *big.Int {
+					return persistedBalance
+				},
+			}, nil
+		},
+	}
+	vmCtx, err := NewVMContext(args)
+	assert.NoError(t, err)
+
+	vmCtx.AddTxValueToSmartContract(big.NewInt(7), addr)
+	persistedBalance.SetInt64(200)
+
+	assert.Equal(t, uint64(107), vmCtx.GetBalance(addr).Uint64())
+}
+
+func TestVmContext_AddTxValueToSmartContractSeedsPersistedBalanceOnce(t *testing.T) {
+	t.Parallel()
+
+	addr := []byte("system smart contract")
+	lookupCount := 0
+	args := createDefaultEeiArgs()
+	args.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(_ []byte) (vmcommon.UserAccountHandler, error) {
+			lookupCount++
+			return &vmcommonMocks.UserAccountStub{
+				GetBalanceCalled: func() *big.Int {
+					return big.NewInt(100)
+				},
+			}, nil
+		},
+	}
+	vmCtx, err := NewVMContext(args)
+	assert.NoError(t, err)
+
+	vmCtx.AddTxValueToSmartContract(big.NewInt(7), addr)
+	vmCtx.AddTxValueToSmartContract(big.NewInt(3), addr)
+
+	assert.Equal(t, 1, lookupCount)
+	assert.Equal(t, uint64(110), vmCtx.GetBalance(addr).Uint64())
 }
 
 func TestVmContext_CreateVMOutput_Empty(t *testing.T) {
