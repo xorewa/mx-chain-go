@@ -276,7 +276,7 @@ func fileSHA256(t *testing.T, path string) string {
 	return hex.EncodeToString(digest.Sum(nil))
 }
 
-func TestS0R3RealLoaderNonRunningPackage(t *testing.T) {
+func TestS0RealLoaderNonRunningPackage(t *testing.T) {
 	packageRoot := os.Getenv("S0_R3_PACKAGE_ROOT")
 	if packageRoot == "" {
 		t.Skip("S0_R3_PACKAGE_ROOT is required for retained package verification")
@@ -637,16 +637,16 @@ func TestS0R3StartupInputHostiles(t *testing.T) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, exe, "-test.run=^TestS0R3RealLoaderNonRunningPackage$", "-test.v")
+		cmd := exec.CommandContext(ctx, exe, "-test.run=^TestS0RealLoaderNonRunningPackage$", "-test.v")
 		cmd.Env = append(os.Environ(), "S0_R3_PACKAGE_ROOT="+root)
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, ctx.Err(), "timeout is not rejection evidence")
 		if wantPass {
 			require.NoError(t, err, "%s", output)
-			require.Contains(t, string(output), "--- PASS: TestS0R3RealLoaderNonRunningPackage")
+			require.Contains(t, string(output), "--- PASS: TestS0RealLoaderNonRunningPackage")
 		} else {
 			require.Error(t, err, "hostile package accepted")
-			require.Contains(t, string(output), "--- FAIL: TestS0R3RealLoaderNonRunningPackage", "must fail an assertion, not crash")
+			require.Contains(t, string(output), "--- FAIL: TestS0RealLoaderNonRunningPackage", "must fail an assertion, not crash")
 			require.NotContains(t, string(output), "panic:")
 		}
 	}
