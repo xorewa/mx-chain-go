@@ -47,7 +47,7 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/epochNotifier"
 )
 
-type s0R3SimulatorSnapshot struct {
+type s0V208SimulatorSnapshot struct {
 	ValidatorPublicKeys []string          `json:"validatorPublicKeys"`
 	WalletPublicKeys    []string          `json:"walletPublicKeys"`
 	TerminalNonces      map[uint32]uint64 `json:"terminalNonces"`
@@ -55,22 +55,22 @@ type s0R3SimulatorSnapshot struct {
 	StateRoots          map[uint32]string `json:"stateRoots"`
 }
 
-type s0R3ProcessInventory struct {
-	SchemaVersion        string               `json:"schemaVersion"`
-	PackageClass         string               `json:"packageClass"`
-	SourceCommit         string               `json:"sourceCommit"`
-	SourceTree           string               `json:"sourceTree"`
-	NodeBinarySHA256     string               `json:"nodeBinarySha256"`
-	SeedBinarySHA256     string               `json:"seednodeBinarySha256"`
-	ConfigurationRoot    string               `json:"configurationRoot"`
-	WorkingDirConvention string               `json:"workingDirectoryConvention"`
-	ChainID              string               `json:"chainID"`
-	GenesisStartTime     int64                `json:"genesisStartTime"`
-	Processes            []s0R3ProcessBinding `json:"processes"`
-	SupportProcesses     []s0R3ProcessBinding `json:"supportProcesses"`
+type s0V208ProcessInventory struct {
+	SchemaVersion        string                 `json:"schemaVersion"`
+	PackageClass         string                 `json:"packageClass"`
+	SourceCommit         string                 `json:"sourceCommit"`
+	SourceTree           string                 `json:"sourceTree"`
+	NodeBinarySHA256     string                 `json:"nodeBinarySha256"`
+	SeedBinarySHA256     string                 `json:"seednodeBinarySha256"`
+	ConfigurationRoot    string                 `json:"configurationRoot"`
+	WorkingDirConvention string                 `json:"workingDirectoryConvention"`
+	ChainID              string                 `json:"chainID"`
+	GenesisStartTime     int64                  `json:"genesisStartTime"`
+	Processes            []s0V208ProcessBinding `json:"processes"`
+	SupportProcesses     []s0V208ProcessBinding `json:"supportProcesses"`
 }
 
-type s0R3ProcessBinding struct {
+type s0V208ProcessBinding struct {
 	ID               string   `json:"id"`
 	Role             string   `json:"role"`
 	Shard            string   `json:"shard"`
@@ -83,21 +83,21 @@ type s0R3ProcessBinding struct {
 	Argv             []string `json:"argv"`
 }
 
-func TestS0R3InternalSimulatorDeterminism(t *testing.T) {
+func TestS0V208InternalSimulatorDeterminism(t *testing.T) {
 	t.Skip("deterministic simulator key overlay is historical; current S0 uses repository-native simulator tests")
-	first := runS0R3Simulator(t)
-	second := runS0R3Simulator(t)
+	first := runS0V208Simulator(t)
+	second := runS0V208Simulator(t)
 	require.Equal(t, first, second)
 
 	encoded, err := json.Marshal(first)
 	require.NoError(t, err)
-	t.Logf("S0_R3_SIMULATOR_SNAPSHOT=%s", encoded)
+	t.Logf("S0_V208_SIMULATOR_SNAPSHOT=%s", encoded)
 }
 
-func TestS0R3MaterializeNonRunningPackage(t *testing.T) {
-	packageRoot := os.Getenv("S0_R3_PACKAGE_ROOT")
+func TestS0V208MaterializeNonRunningPackage(t *testing.T) {
+	packageRoot := os.Getenv("S0_V208_PACKAGE_ROOT")
 	if packageRoot == "" {
-		t.Skip("S0_R3_PACKAGE_ROOT is required for retained package materialization")
+		t.Skip("S0_V208_PACKAGE_ROOT is required for retained package materialization")
 	}
 	entries, err := os.ReadDir(packageRoot)
 	require.NoError(t, err)
@@ -123,9 +123,9 @@ func TestS0R3MaterializeNonRunningPackage(t *testing.T) {
 	require.Len(t, materialized.ValidatorsPrivateKeys, 16)
 	require.Len(t, materialized.Configs.NodesConfig.InitialNodes, 16)
 	writeS0BalanceWalletKeys(t, packageRoot, materialized.InitialWallets.BalanceWallets)
-	transformS0R3LocalnetConfig(t, packageRoot)
-	materializeS0R3RuntimeInputs(t, packageRoot)
-	t.Logf("S0_R3_NON_RUNNING_PACKAGE_ROOT=%s", packageRoot)
+	transformS0V208LocalnetConfig(t, packageRoot)
+	materializeS0V208RuntimeInputs(t, packageRoot)
+	t.Logf("S0_V208_NON_RUNNING_PACKAGE_ROOT=%s", packageRoot)
 }
 
 func writeS0BalanceWalletKeys(t *testing.T, packageRoot string, wallets map[uint32]*dtos.WalletKey) {
@@ -143,7 +143,7 @@ func writeS0BalanceWalletKeys(t *testing.T, packageRoot string, wallets map[uint
 	require.NoError(t, file.Close())
 }
 
-func transformS0R3LocalnetConfig(t *testing.T, packageRoot string) {
+func transformS0V208LocalnetConfig(t *testing.T, packageRoot string) {
 	configPath := filepath.Join(packageRoot, "config", "config.toml")
 	contents, err := os.ReadFile(configPath)
 	require.NoError(t, err)
@@ -163,8 +163,8 @@ func transformS0R3LocalnetConfig(t *testing.T, packageRoot string) {
 	nodesPath := filepath.Join(packageRoot, "config", "nodesSetup.json")
 	var nodesConfig config.NodesConfig
 	require.NoError(t, core.LoadJsonFile(&nodesConfig, nodesPath))
-	nodesConfig.StartTime = s0R3GenesisStart(t)
-	if os.Getenv("S0_R3_GENESIS_START") != "" {
+	nodesConfig.StartTime = s0V208GenesisStart(t)
+	if os.Getenv("S0_V208_GENESIS_START") != "" {
 		require.GreaterOrEqual(t, nodesConfig.StartTime-time.Now().Unix(), int64(600), "fresh genesis operational buffer")
 	}
 	encoded, err := json.Marshal(nodesConfig)
@@ -172,9 +172,9 @@ func transformS0R3LocalnetConfig(t *testing.T, packageRoot string) {
 	require.NoError(t, os.WriteFile(nodesPath, encoded, 0o600))
 }
 
-func materializeS0R3RuntimeInputs(t *testing.T, packageRoot string) {
-	nodeBinary := os.Getenv("S0_R3_NODE_BINARY")
-	seedBinary := os.Getenv("S0_R3_SEED_BINARY")
+func materializeS0V208RuntimeInputs(t *testing.T, packageRoot string) {
+	nodeBinary := os.Getenv("S0_V208_NODE_BINARY")
+	seedBinary := os.Getenv("S0_V208_SEED_BINARY")
 	require.NotEmpty(t, nodeBinary)
 	require.NotEmpty(t, seedBinary)
 	require.NoError(t, os.Mkdir(filepath.Join(packageRoot, "bin"), 0o700))
@@ -199,8 +199,8 @@ func materializeS0R3RuntimeInputs(t *testing.T, packageRoot string) {
 	p2pText = strings.Replace(p2pText, oldInitialPeer, initialPeer, 1)
 	require.NoError(t, os.WriteFile(p2pPath, []byte(p2pText), 0o600))
 
-	processes := make([]s0R3ProcessBinding, 0, 20)
-	setup := loadS0R3NodesSetup(t, packageRoot)
+	processes := make([]s0V208ProcessBinding, 0, 20)
+	setup := loadS0V208NodesSetup(t, packageRoot)
 	var initial config.NodesConfig
 	require.NoError(t, core.LoadJsonFile(&initial, filepath.Join(packageRoot, "config/nodesSetup.json")))
 	validatorShards := make([]string, 0, len(initial.InitialNodes))
@@ -219,7 +219,7 @@ func materializeS0R3RuntimeInputs(t *testing.T, packageRoot string) {
 		id := "validator-" + strconv.Itoa(index)
 		p2pKey := filepath.Join("p2p-keys", id+".pem")
 		writeDeterministicP2PKey(t, filepath.Join(packageRoot, p2pKey), id)
-		processes = append(processes, s0R3ProcessBinding{
+		processes = append(processes, s0V208ProcessBinding{
 			ID: id, Role: "validator", Shard: shard, KeyFile: "allValidatorsKeys.pem", KeyIndex: index,
 			P2PKeyFile: p2pKey, APIPort: 9500 + index, P2PPort: 21500 + index,
 			WorkingDirectory: ".",
@@ -235,20 +235,20 @@ func materializeS0R3RuntimeInputs(t *testing.T, packageRoot string) {
 		}
 		p2pKey := filepath.Join("p2p-keys", id+".pem")
 		writeDeterministicP2PKey(t, filepath.Join(packageRoot, p2pKey), id)
-		processes = append(processes, s0R3ProcessBinding{
+		processes = append(processes, s0V208ProcessBinding{
 			ID: id, Role: "observer", Shard: shard, KeyFile: "config/testKeys/extraValidatorsKeys.pem", KeyIndex: index,
 			P2PKeyFile: p2pKey, APIPort: 10000 + index, P2PPort: 21100 + index,
 			WorkingDirectory: ".",
 			Argv:             []string{"bin/node", "-port", strconv.Itoa(21100 + index), "-rest-api-interface", "localhost:" + strconv.Itoa(10000+index), "-destination-shard-as-observer", destination, "-validator-key-pem-file", "config/testKeys/extraValidatorsKeys.pem", "-sk-index", strconv.Itoa(index), "-p2p-key-pem-file", p2pKey, "-working-directory", "runtime/" + id, "-config", "config/config.toml", "-operation-mode", "db-lookup-extension"},
 		})
 	}
-	inventory := s0R3ProcessInventory{
+	inventory := s0V208ProcessInventory{
 		SchemaVersion: "1.1.0", PackageClass: "NON_RUNNING_LOCALNET_INPUTS",
-		SourceCommit: s0R3RequiredIdentity(t, "S0_R3_SOURCE_COMMIT"), SourceTree: s0R3RequiredIdentity(t, "S0_R3_SOURCE_TREE"),
+		SourceCommit: s0V208RequiredIdentity(t, "S0_V208_SOURCE_COMMIT"), SourceTree: s0V208RequiredIdentity(t, "S0_V208_SOURCE_TREE"),
 		NodeBinarySHA256: fileSHA256(t, nodeBinary), SeedBinarySHA256: fileSHA256(t, seedBinary),
 		ConfigurationRoot: "config", WorkingDirConvention: "package-root-relative per-process workingDirectory",
-		ChainID: "local-testnet", GenesisStartTime: s0R3GenesisStart(t), Processes: processes,
-		SupportProcesses: []s0R3ProcessBinding{{ID: "seednode", Role: "seednode", Shard: "none", P2PKeyFile: "p2p-keys/seednode.pem", APIPort: 9998, P2PPort: 9999, WorkingDirectory: "seednode-runtime", Argv: []string{"../bin/seednode", "-port", "9999", "-rest-api-interface", "localhost:9998", "-config", "config/config.toml", "-p2p-key-pem-file", "../p2p-keys/seednode.pem"}}},
+		ChainID: "local-testnet", GenesisStartTime: s0V208GenesisStart(t), Processes: processes,
+		SupportProcesses: []s0V208ProcessBinding{{ID: "seednode", Role: "seednode", Shard: "none", P2PKeyFile: "p2p-keys/seednode.pem", APIPort: 9998, P2PPort: 9999, WorkingDirectory: "seednode-runtime", Argv: []string{"../bin/seednode", "-port", "9999", "-rest-api-interface", "localhost:9998", "-config", "config/config.toml", "-p2p-key-pem-file", "../p2p-keys/seednode.pem"}}},
 	}
 	encoded, err := json.MarshalIndent(inventory, "", "  ")
 	require.NoError(t, err)
@@ -294,9 +294,9 @@ func fileSHA256(t *testing.T, path string) string {
 }
 
 func TestS0RealLoaderNonRunningPackage(t *testing.T) {
-	packageRoot := os.Getenv("S0_R3_PACKAGE_ROOT")
+	packageRoot := os.Getenv("S0_V208_PACKAGE_ROOT")
 	if packageRoot == "" {
-		t.Skip("S0_R3_PACKAGE_ROOT is required for retained package verification")
+		t.Skip("S0_V208_PACKAGE_ROOT is required for retained package verification")
 	}
 	configRoot := filepath.Join(packageRoot, "config")
 
@@ -351,7 +351,7 @@ func TestS0RealLoaderNonRunningPackage(t *testing.T) {
 
 	var nodesConfig config.NodesConfig
 	require.NoError(t, core.LoadJsonFile(&nodesConfig, filepath.Join(configRoot, "nodesSetup.json")))
-	require.Equal(t, s0R3GenesisStart(t), nodesConfig.StartTime)
+	require.Equal(t, s0V208GenesisStart(t), nodesConfig.StartTime)
 	require.Len(t, nodesConfig.InitialNodes, 16)
 	genesisBytes, err := os.ReadFile(filepath.Join(configRoot, "genesis.json"))
 	require.NoError(t, err)
@@ -397,12 +397,12 @@ func TestS0RealLoaderNonRunningPackage(t *testing.T) {
 
 	inventoryBytes, err := os.ReadFile(filepath.Join(packageRoot, "process-inventory.json"))
 	require.NoError(t, err)
-	var inventory s0R3ProcessInventory
+	var inventory s0V208ProcessInventory
 	require.NoError(t, json.Unmarshal(inventoryBytes, &inventory))
 	require.Equal(t, "1.1.0", inventory.SchemaVersion)
 	require.Equal(t, "NON_RUNNING_LOCALNET_INPUTS", inventory.PackageClass)
-	require.Equal(t, s0R3RequiredIdentity(t, "S0_R3_SOURCE_COMMIT"), inventory.SourceCommit)
-	require.Equal(t, s0R3RequiredIdentity(t, "S0_R3_SOURCE_TREE"), inventory.SourceTree)
+	require.Equal(t, s0V208RequiredIdentity(t, "S0_V208_SOURCE_COMMIT"), inventory.SourceCommit)
+	require.Equal(t, s0V208RequiredIdentity(t, "S0_V208_SOURCE_TREE"), inventory.SourceTree)
 	require.Equal(t, fileSHA256(t, filepath.Join(packageRoot, "bin", "node")), inventory.NodeBinarySHA256)
 	require.Equal(t, fileSHA256(t, filepath.Join(packageRoot, "bin", "seednode")), inventory.SeedBinarySHA256)
 	require.Equal(t, "config", inventory.ConfigurationRoot)
@@ -418,7 +418,7 @@ func TestS0RealLoaderNonRunningPackage(t *testing.T) {
 	keyIdentities := make(map[string]struct{})
 	p2pIdentities := make(map[string]struct{})
 	for _, process := range inventory.Processes {
-		validateS0R3ArgumentShape(t, process)
+		validateS0V208ArgumentShape(t, process)
 		require.NotEmpty(t, process.Argv)
 		require.GreaterOrEqual(t, process.KeyIndex, 0)
 		require.NotEmpty(t, process.ID)
@@ -467,7 +467,7 @@ func TestS0RealLoaderNonRunningPackage(t *testing.T) {
 	}
 	require.Len(t, inventory.SupportProcesses, 1)
 	seed := inventory.SupportProcesses[0]
-	validateS0R3ArgumentShape(t, seed)
+	validateS0V208ArgumentShape(t, seed)
 	require.NotEmpty(t, seed.Argv)
 	require.Equal(t, "seednode", seed.Role)
 	require.Equal(t, 9998, seed.APIPort)
@@ -491,13 +491,13 @@ func TestS0RealLoaderNonRunningPackage(t *testing.T) {
 	require.NoError(t, err)
 	seedPeerID := strings.TrimPrefix(seedP2PTypes[0], "PRIVATE KEY for ")
 	require.Contains(t, string(p2pBytes), "/ip4/127.0.0.1/tcp/9999/p2p/"+seedPeerID)
-	validateS0R3StartupInputs(t, packageRoot, mainConfig, nodesConfig, inventory)
+	validateS0V208StartupInputs(t, packageRoot, mainConfig, nodesConfig, inventory)
 }
 
 // This NON_RUNNING package supports only the declared flags below. Reject
 // additional real CLI overrides as well as unknown flags: otherwise validation
 // of default config/genesis paths says nothing about the effective startup input.
-func validateS0R3ArgumentShape(t *testing.T, process s0R3ProcessBinding) {
+func validateS0V208ArgumentShape(t *testing.T, process s0V208ProcessBinding) {
 	t.Helper()
 	allowed := []string{"-port", "-rest-api-interface", "-config", "-p2p-key-pem-file"}
 	if process.Role == "validator" || process.Role == "observer" {
@@ -537,7 +537,7 @@ func argumentValue(t *testing.T, arguments []string, name string) string {
 
 // Validate with the same parsers and key decoders used by startup, not PEM labels
 // or generated expectations alone. This is input validation, not a node launch.
-func validateS0R3StartupInputs(t *testing.T, root string, cfg *config.Config, nodes config.NodesConfig, inv s0R3ProcessInventory) {
+func validateS0V208StartupInputs(t *testing.T, root string, cfg *config.Config, nodes config.NodesConfig, inv s0V208ProcessInventory) {
 	t.Helper()
 	economics, err := commonConfig.LoadEconomicsConfig(filepath.Join(root, "config/economics.toml"))
 	require.NoError(t, err)
@@ -568,7 +568,7 @@ func validateS0R3StartupInputs(t *testing.T, root string, cfg *config.Config, no
 	for _, node := range nodes.InitialNodes {
 		validators[node.PubKey] = true
 	}
-	for _, process := range append(append([]s0R3ProcessBinding{}, inv.Processes...), inv.SupportProcesses...) {
+	for _, process := range append(append([]s0V208ProcessBinding{}, inv.Processes...), inv.SupportProcesses...) {
 		cwd := filepath.Join(root, process.WorkingDirectory)
 		require.Equal(t, strconv.Itoa(process.P2PPort), argumentValue(t, process.Argv, "-port"))
 		require.Equal(t, "localhost:"+strconv.Itoa(process.APIPort), argumentValue(t, process.Argv, "-rest-api-interface"))
@@ -645,10 +645,10 @@ func pemBlockTypes(t *testing.T, path string) []string {
 	return types
 }
 
-func TestS0R3StartupInputHostiles(t *testing.T) {
-	source := os.Getenv("S0_R3_PACKAGE_ROOT")
+func TestS0V208StartupInputHostiles(t *testing.T) {
+	source := os.Getenv("S0_V208_PACKAGE_ROOT")
 	if source == "" {
-		t.Skip("S0_R3_PACKAGE_ROOT required")
+		t.Skip("S0_V208_PACKAGE_ROOT required")
 	}
 	root := filepath.Join(t.TempDir(), "package")
 	require.NoError(t, filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
@@ -675,7 +675,7 @@ func TestS0R3StartupInputHostiles(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, exe, "-test.run=^TestS0RealLoaderNonRunningPackage$", "-test.v")
-		cmd.Env = append(os.Environ(), "S0_R3_PACKAGE_ROOT="+root)
+		cmd.Env = append(os.Environ(), "S0_V208_PACKAGE_ROOT="+root)
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, ctx.Err(), "timeout is not rejection evidence")
 		if wantPass {
@@ -772,7 +772,7 @@ func TestS0R3StartupInputHostiles(t *testing.T) {
 			for _, form := range []string{"append", "replace"} {
 				t.Run("undeclared/"+target+"/"+flag+"/"+form, func(t *testing.T) {
 					mutateFile(t, "process-inventory.json", func(before []byte) []byte {
-						var inv s0R3ProcessInventory
+						var inv s0V208ProcessInventory
 						require.NoError(t, json.Unmarshal(before, &inv))
 						p := &inv.Processes[0]
 						if target == "waiting-validator" {
@@ -799,7 +799,7 @@ func TestS0R3StartupInputHostiles(t *testing.T) {
 		for _, mutation := range []string{"wrong_port", "wrong_api", "swapped_flags", "duplicate_flag", "missing_value", "wrong_p2p_path", "wrong_config"} {
 			t.Run("argv/"+target+"/"+mutation, func(t *testing.T) {
 				mutateFile(t, "process-inventory.json", func(before []byte) []byte {
-					var inv s0R3ProcessInventory
+					var inv s0V208ProcessInventory
 					require.NoError(t, json.Unmarshal(before, &inv))
 					p := &inv.Processes[0]
 					if target == "waiting-validator" {
@@ -847,7 +847,7 @@ func TestS0R3StartupInputHostiles(t *testing.T) {
 	for _, mutation := range []string{"key_index", "negative_index", "key_path", "database", "observer_shard", "port_collision", "seed_cwd"} {
 		t.Run("inventory/"+mutation, func(t *testing.T) {
 			mutateFile(t, "process-inventory.json", func(before []byte) []byte {
-				var inv s0R3ProcessInventory
+				var inv s0V208ProcessInventory
 				require.NoError(t, json.Unmarshal(before, &inv))
 				p := &inv.Processes[0]
 				for i := range p.Argv {
@@ -887,7 +887,7 @@ func TestS0R3StartupInputHostiles(t *testing.T) {
 	runLoader(t, true)
 }
 
-func runS0R3Simulator(t *testing.T) s0R3SimulatorSnapshot {
+func runS0V208Simulator(t *testing.T) s0V208SimulatorSnapshot {
 	// Deterministic-key overlay is intentionally not part of current source.
 
 	simulator, err := NewChainSimulator(ArgsChainSimulator{
@@ -910,7 +910,7 @@ func runS0R3Simulator(t *testing.T) s0R3SimulatorSnapshot {
 
 	require.NoError(t, simulator.GenerateBlocks(12))
 
-	snapshot := s0R3SimulatorSnapshot{
+	snapshot := s0V208SimulatorSnapshot{
 		TerminalNonces: make(map[uint32]uint64),
 		TerminalRounds: make(map[uint32]uint64),
 		StateRoots:     make(map[uint32]string),
@@ -943,7 +943,7 @@ func runS0R3Simulator(t *testing.T) s0R3SimulatorSnapshot {
 	return snapshot
 }
 
-func s0R3RequiredIdentity(t *testing.T, name string) string {
+func s0V208RequiredIdentity(t *testing.T, name string) string {
 	t.Helper()
 	value := os.Getenv(name)
 	require.Len(t, value, 40, "%s must be an exact Git object identity", name)
@@ -952,9 +952,9 @@ func s0R3RequiredIdentity(t *testing.T, name string) string {
 	return value
 }
 
-func s0R3GenesisStart(t *testing.T) int64 {
+func s0V208GenesisStart(t *testing.T) int64 {
 	t.Helper()
-	value := os.Getenv("S0_R3_GENESIS_START")
+	value := os.Getenv("S0_V208_GENESIS_START")
 	if value == "" {
 		return 1900000000
 	}
@@ -964,7 +964,7 @@ func s0R3GenesisStart(t *testing.T) int64 {
 	return stamp
 }
 
-func loadS0R3NodesSetup(t *testing.T, root string) *sharding.NodesSetup {
+func loadS0V208NodesSetup(t *testing.T, root string) *sharding.NodesSetup {
 	t.Helper()
 	cfg, err := commonConfig.LoadMainConfig(filepath.Join(root, "config/config.toml"))
 	require.NoError(t, err)
@@ -983,12 +983,12 @@ func loadS0R3NodesSetup(t *testing.T, root string) *sharding.NodesSetup {
 	return setup
 }
 
-func TestS0R3WaitingPoolReassignment(t *testing.T) {
-	root := os.Getenv("S0_R3_PACKAGE_ROOT")
+func TestS0V208WaitingPoolReassignment(t *testing.T) {
+	root := os.Getenv("S0_V208_PACKAGE_ROOT")
 	if root == "" {
-		t.Skip("S0_R3_PACKAGE_ROOT is required for reassignment qualification")
+		t.Skip("S0_V208_PACKAGE_ROOT is required for reassignment qualification")
 	}
-	setup := loadS0R3NodesSetup(t, root)
+	setup := loadS0V208NodesSetup(t, root)
 	initialEligible, initialWaiting := setup.InitialNodesInfo()
 	convert := func(input map[uint32][]nodesCoordinator.GenesisNodeInfoHandler) map[uint32][]nodesCoordinator.Validator {
 		result := make(map[uint32][]nodesCoordinator.Validator)
@@ -1080,7 +1080,7 @@ func TestS0R3WaitingPoolReassignment(t *testing.T) {
 // The canonical epoch producer and block API use this same V1/V3 root selection.
 // This checks byte/anchor consistency only; the caller must separately establish
 // provenance from the running generation and agreement of metachain witnesses.
-func verifyS0R3EpochHeaderAnchors(metaRaw []byte, shardRaw map[uint32][]byte, epoch uint32, chainID string) error {
+func verifyS0V208EpochHeaderAnchors(metaRaw []byte, shardRaw map[uint32][]byte, epoch uint32, chainID string) error {
 	marshalizer, err := marshalFactory.NewMarshalizer("gogo protobuf")
 	if err != nil {
 		return err
@@ -1136,7 +1136,7 @@ func verifyS0R3EpochHeaderAnchors(metaRaw []byte, shardRaw map[uint32][]byte, ep
 	return nil
 }
 
-func TestS0R3EpochHeaderAnchorContracts(t *testing.T) {
+func TestS0V208EpochHeaderAnchorContracts(t *testing.T) {
 	// Fixtures are native upstream DTOs encoded by the pinned upstream marshaler.
 	// Negative controls alter the independent raw-header/epoch-anchor boundary.
 	marshalizer, err := marshalFactory.NewMarshalizer("gogo protobuf")
@@ -1172,8 +1172,8 @@ func TestS0R3EpochHeaderAnchorContracts(t *testing.T) {
 				return raw
 			}
 			raw := makeMeta(anchors, epoch, "local-testnet")
-			require.NoError(t, verifyS0R3EpochHeaderAnchors(raw, shards, epoch, "local-testnet"))
-			if destination := os.Getenv("S0_R3_HEADER_FIXTURE_ROOT"); destination != "" {
+			require.NoError(t, verifyS0V208EpochHeaderAnchors(raw, shards, epoch, "local-testnet"))
+			if destination := os.Getenv("S0_V208_HEADER_FIXTURE_ROOT"); destination != "" {
 				meta, e := process.UnmarshalMetaHeader(marshalizer, raw)
 				require.NoError(t, e)
 				payload, e := json.Marshal(struct {
@@ -1227,16 +1227,16 @@ func TestS0R3EpochHeaderAnchorContracts(t *testing.T) {
 					if kind == "malformed-meta" {
 						changed = []byte{0xff}
 					}
-					require.Error(t, verifyS0R3EpochHeaderAnchors(changed, bodies, epoch, "local-testnet"))
+					require.Error(t, verifyS0V208EpochHeaderAnchors(changed, bodies, epoch, "local-testnet"))
 				})
 			}
 		})
 	}
 }
 
-func TestS0R3RetainedEpochHeaderAnchors(t *testing.T) {
+func TestS0V208RetainedEpochHeaderAnchors(t *testing.T) {
 	// Executed only read-only against a qx-capture-derived bundle, never a sender.
-	path := os.Getenv("S0_R3_EPOCH_HEADER_BUNDLE")
+	path := os.Getenv("S0_V208_EPOCH_HEADER_BUNDLE")
 	if path == "" {
 		t.Skip("read-only runtime bundle not supplied")
 	}
@@ -1255,7 +1255,7 @@ func TestS0R3RetainedEpochHeaderAnchors(t *testing.T) {
 	for _, witness := range bundle.MetaWitnesses {
 		require.Equal(t, bundle.MetaWitnesses[0], witness, "independent metachain responses disagree")
 	}
-	require.NoError(t, verifyS0R3EpochHeaderAnchors(bundle.MetaWitnesses[0], bundle.ShardHeaders, bundle.Epoch, bundle.ChainID))
+	require.NoError(t, verifyS0V208EpochHeaderAnchors(bundle.MetaWitnesses[0], bundle.ShardHeaders, bundle.Epoch, bundle.ChainID))
 	marshalizer, err := marshalFactory.NewMarshalizer("gogo protobuf")
 	require.NoError(t, err)
 	header, err := process.UnmarshalMetaHeader(marshalizer, bundle.MetaWitnesses[0])
@@ -1264,5 +1264,5 @@ func TestS0R3RetainedEpochHeaderAnchors(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, string(encoded), string(bundle.MetaJSON), "raw and structured epoch header differ")
 
-	t.Logf("S0_R3_EPOCH_HEADER_CONSISTENCY epoch=%d meta_witnesses=3 shard_anchors=3 bundle_sha256=%s", bundle.Epoch, fileSHA256(t, path))
+	t.Logf("S0_V208_EPOCH_HEADER_CONSISTENCY epoch=%d meta_witnesses=3 shard_anchors=3 bundle_sha256=%s", bundle.Epoch, fileSHA256(t, path))
 }
