@@ -14,9 +14,11 @@ import (
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/config"
+	"github.com/multiversx/mx-chain-go/state/accounts"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	"github.com/multiversx/mx-chain-go/testscommon/hashingMocks"
+	"github.com/multiversx/mx-chain-go/testscommon/trie"
 	"github.com/multiversx/mx-chain-go/vm"
 	"github.com/multiversx/mx-chain-go/vm/mock"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
@@ -2758,6 +2760,47 @@ func TestEsdt_ExecuteClaim(t *testing.T) {
 
 	receiver := eei.outputAccounts[string(vmInput.CallerAddr)]
 	assert.True(t, receiver.BalanceDelta.Cmp(big.NewInt(100)) == 0)
+}
+
+func TestEsdt_ExecuteClaimUsesPersistedBalanceSeededByCallEntry(t *testing.T) {
+	t.Parallel()
+
+	vmInput := getDefaultVmInputForFunc("claim", nil)
+	persistedBalance := big.NewInt(100)
+	account, err := accounts.NewUserAccount(
+		vmInput.RecipientAddr,
+		&trie.DataTrieTrackerStub{},
+		&trie.TrieLeafParserStub{},
+	)
+	require.NoError(t, err)
+	require.NoError(t, account.AddToBalance(persistedBalance))
+
+	eeiArgs := createDefaultEeiArgs()
+	eeiArgs.BlockChainHook = &mock.BlockChainHookStub{
+		GetUserAccountCalled: func(address []byte) (vmcommon.UserAccountHandler, error) {
+			if bytes.Equal(address, vmInput.RecipientAddr) {
+				return account, nil
+			}
+			return nil, errors.New("account not found")
+		},
+	}
+	eei, err := NewVMContext(eeiArgs)
+	require.NoError(t, err)
+	eei.AddTxValueToSmartContract(vmInput.CallValue, vmInput.RecipientAddr)
+
+	args := createMockArgumentsForESDT()
+	args.Eei = eei
+	e, err := NewESDTSmartContract(args)
+	require.NoError(t, err)
+	vmInput.CallerAddr = e.ownerAddress
+
+	output := e.Execute(vmInput)
+	require.Equal(t, vmcommon.Ok, output)
+
+	scOutAcc := eei.outputAccounts[string(vmInput.RecipientAddr)]
+	require.Zero(t, scOutAcc.BalanceDelta.Cmp(new(big.Int).Neg(persistedBalance)))
+	receiver := eei.outputAccounts[string(vmInput.CallerAddr)]
+	require.Zero(t, receiver.BalanceDelta.Cmp(persistedBalance))
 }
 
 func getAddress() []byte {
