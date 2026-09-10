@@ -38,6 +38,7 @@ import (
 	"github.com/multiversx/mx-chain-go/genesis/parsing"
 	"github.com/multiversx/mx-chain-go/node/chainSimulator/components/api"
 	"github.com/multiversx/mx-chain-go/node/chainSimulator/configs"
+	"github.com/multiversx/mx-chain-go/node/chainSimulator/dtos"
 	p2pFactory "github.com/multiversx/mx-chain-go/p2p/factory"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/sharding"
@@ -121,9 +122,25 @@ func TestS0R3MaterializeNonRunningPackage(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, materialized.ValidatorsPrivateKeys, 16)
 	require.Len(t, materialized.Configs.NodesConfig.InitialNodes, 16)
+	writeS0BalanceWalletKeys(t, packageRoot, materialized.InitialWallets.BalanceWallets)
 	transformS0R3LocalnetConfig(t, packageRoot)
 	materializeS0R3RuntimeInputs(t, packageRoot)
 	t.Logf("S0_R3_NON_RUNNING_PACKAGE_ROOT=%s", packageRoot)
+}
+
+func writeS0BalanceWalletKeys(t *testing.T, packageRoot string, wallets map[uint32]*dtos.WalletKey) {
+	shardIDs := make([]int, 0, len(wallets))
+	for shardID := range wallets {
+		shardIDs = append(shardIDs, int(shardID))
+	}
+	sort.Ints(shardIDs)
+	file, err := os.OpenFile(filepath.Join(packageRoot, "balanceWalletKeys.pem"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	require.NoError(t, err)
+	for _, shardID := range shardIDs {
+		wallet := wallets[uint32(shardID)]
+		require.NoError(t, pem.Encode(file, &pem.Block{Type: "PRIVATE KEY for " + wallet.Address.Bech32, Bytes: []byte(wallet.PrivateKeyHex)}))
+	}
+	require.NoError(t, file.Close())
 }
 
 func transformS0R3LocalnetConfig(t *testing.T, packageRoot string) {
@@ -336,6 +353,26 @@ func TestS0RealLoaderNonRunningPackage(t *testing.T) {
 	require.NoError(t, core.LoadJsonFile(&nodesConfig, filepath.Join(configRoot, "nodesSetup.json")))
 	require.Equal(t, s0R3GenesisStart(t), nodesConfig.StartTime)
 	require.Len(t, nodesConfig.InitialNodes, 16)
+	genesisBytes, err := os.ReadFile(filepath.Join(configRoot, "genesis.json"))
+	require.NoError(t, err)
+	var genesisAccounts []struct {
+		Address string `json:"address"`
+		Balance string `json:"balance"`
+	}
+	require.NoError(t, json.Unmarshal(genesisBytes, &genesisAccounts))
+	fundedAddresses := make([]string, 0, 3)
+	for _, account := range genesisAccounts {
+		if account.Balance != "0" {
+			fundedAddresses = append(fundedAddresses, account.Address)
+		}
+	}
+	sort.Strings(fundedAddresses)
+	walletKeyAddresses := pemBlockTypes(t, filepath.Join(packageRoot, "balanceWalletKeys.pem"))
+	for index := range walletKeyAddresses {
+		walletKeyAddresses[index] = strings.TrimPrefix(walletKeyAddresses[index], "PRIVATE KEY for ")
+	}
+	sort.Strings(walletKeyAddresses)
+	require.Equal(t, fundedAddresses, walletKeyAddresses)
 	addressConverter, err := commonFactory.NewPubkeyConverter(mainConfig.AddressPubkeyConverter)
 	require.NoError(t, err)
 	validatorConverter, err := commonFactory.NewPubkeyConverter(mainConfig.ValidatorPubkeyConverter)
