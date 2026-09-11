@@ -384,6 +384,48 @@ func TestDRWATransferGuardBuildsCompleteOrderedMixedBatchFromSharedParser(t *tes
 	require.NoError(t, drwa.ValidateMixedBatchBinding(*binding))
 }
 
+func TestDRWATransferGuardRejectsNativeEGLDWithNonZeroNonce(t *testing.T) {
+	t.Parallel()
+
+	sender := bytes.Repeat([]byte{0x11}, drwaAddressLength)
+	destination := bytes.Repeat([]byte{0x22}, drwaAddressLength)
+	regulatedToken := []byte("RWA-123456")
+	delegateCalled := false
+	delegate := &drwaTransferDelegateStub{}
+	delegate.ProcessBuiltinFunctionCalled = func(_, _ vmcommon.UserAccountHandler, _ *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+		delegateCalled = true
+		return &vmcommon.VMOutput{}, nil
+	}
+	input := &vmcommon.ContractCallInput{
+		RecipientAddr: sender,
+		VMInput: vmcommon.VMInput{
+			CallerAddr: sender,
+			Arguments: [][]byte{
+				destination, {2},
+				regulatedToken, {0}, {2},
+				[]byte(vmcommon.EGLDIdentifier), {1}, {3},
+			},
+		},
+	}
+	guard := createDRWATransferGuardForTest(
+		t,
+		core.BuiltInFunctionMultiESDTNFTTransfer,
+		delegate,
+		true,
+		func(tokenID []byte) (bool, error) { return bytes.Equal(tokenID, regulatedToken), nil },
+	)
+
+	binding, hasRegulatedLeg, err := guard.buildMixedBatchBinding(input)
+	require.ErrorIs(t, err, drwa.ErrInvalidMixedBatch)
+	require.True(t, hasRegulatedLeg)
+	require.Nil(t, binding)
+
+	output, err := guard.ProcessBuiltinFunction(nil, nil, input)
+	require.ErrorIs(t, err, drwa.ErrInvalidMixedBatch)
+	require.Nil(t, output)
+	require.False(t, delegateCalled)
+}
+
 func TestDRWATransferGuardMixedBatchDigestChangesWhenSourceOrderChanges(t *testing.T) {
 	t.Parallel()
 

@@ -263,6 +263,10 @@ func (guard *drwaTransferGuard) buildMixedBatchBinding(
 				hasMalformedLeg = true
 				continue
 			}
+			if transfer.ESDTTokenNonce != 0 {
+				hasMalformedLeg = true
+				continue
+			}
 			legs[index] = drwa.MixedBatchLeg{
 				Kind:     drwa.MixedBatchLegKindNativeEGLD,
 				Quantity: transfer.ESDTValue.Bytes(),
