@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data"
@@ -339,32 +338,9 @@ func loadAndValidateDRWANetworkIdentity(
 	}
 
 	if _, globalExists := candidates["global"]; !globalExists {
-		putErr := storageService.Put(dataRetriever.DRWANetworkIdentityUnit, key, selectedEnvelope)
-		if putErr != nil {
-			return nil, drwaNetworkIdentity{}, [32]byte{}, [32]byte{}, false, fmt.Errorf(
-				"%w: migrate legacy retained identity: %w",
-				errInvalidDRWANetworkIdentity,
-				putErr,
-			)
-		}
-		readBack, getErr := storageService.Get(dataRetriever.DRWANetworkIdentityUnit, key)
-		if getErr != nil {
-			return nil, drwaNetworkIdentity{}, [32]byte{}, [32]byte{}, false, fmt.Errorf(
-				"%w: read back migrated retained identity: %w",
-				errInvalidDRWANetworkIdentity,
-				getErr,
-			)
-		}
-		if !bytes.Equal(readBack, selectedEnvelope) {
-			return nil, drwaNetworkIdentity{}, [32]byte{}, [32]byte{}, false, fmt.Errorf(
-				"%w: migrated retained identity readback mismatch",
-				errInvalidDRWANetworkIdentity,
-			)
-		}
-		log.Info(
-			"DRWA network identity migrated to node-global storage",
-			"legacy candidates", strings.Join(names, ","),
-			"envelope sha256", fmt.Sprintf("%x", sha256.Sum256(selectedEnvelope)),
+		return nil, drwaNetworkIdentity{}, [32]byte{}, [32]byte{}, false, fmt.Errorf(
+			"%w: legacy retained identity requires separately authorized migration",
+			errInvalidDRWANetworkIdentity,
 		)
 	}
 

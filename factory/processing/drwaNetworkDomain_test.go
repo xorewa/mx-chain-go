@@ -1013,7 +1013,7 @@ func newDRWAIdentityCandidateStore(
 	return chainStore
 }
 
-func TestResolveDRWANetworkDomainMigratesExactLegacyEnvelopeOnce(t *testing.T) {
+func TestResolveDRWANetworkDomainRejectsLegacyOnlyWithoutAutomaticMigration(t *testing.T) {
 	const canonicalEpoch = uint32(0)
 	chainID := "localnet"
 	marshalizer := &marshal.GogoProtoMarshalizer{}
@@ -1028,30 +1028,59 @@ func TestResolveDRWANetworkDomainMigratesExactLegacyEnvelopeOnce(t *testing.T) {
 	))
 	require.NoError(t, err)
 
-	global := make(map[string][]byte)
+	for _, bootstrapEpoch := range []uint32{canonicalEpoch, 10} {
+		t.Run(fmt.Sprintf("bootstrap epoch %d", bootstrapEpoch), func(t *testing.T) {
+			global := make(map[string][]byte)
+			putCalls := 0
+			store := newDRWAIdentityCandidateStore(global, map[string][]byte{
+				"legacy/Shard_0": append([]byte(nil), envelope...),
+				"legacy/Shard_2": append([]byte(nil), envelope...),
+			}, &putCalls, false)
+
+			canonicalHash, networkDomain, provenance, resolveErr := resolveDRWANetworkDomain(
+				chainID,
+				map[uint32]data.HeaderHandler{core.MetachainShardId: header},
+				canonicalEpoch,
+				bootstrapEpoch,
+				store,
+				marshalizer,
+				coreSHA256.NewSha256(),
+			)
+			require.ErrorIs(t, resolveErr, errInvalidDRWANetworkIdentity)
+			require.ErrorContains(t, resolveErr, "legacy retained identity requires separately authorized migration")
+			require.Equal(t, [32]byte{}, canonicalHash)
+			require.Equal(t, [32]byte{}, networkDomain)
+			require.Equal(t, drwaNetworkIdentityProvenance(0), provenance)
+			require.Zero(t, putCalls)
+			require.Empty(t, global)
+		})
+	}
+}
+
+func TestResolveDRWANetworkDomainAcceptsGlobalWithIdenticalLegacyCandidateWithoutWrite(t *testing.T) {
+	const canonicalEpoch = uint32(0)
+	chainID := "localnet"
+	marshalizer := &marshal.GogoProtoMarshalizer{}
+	header := drwaMetaGenesisHeader(chainID)
+	headerBytes, err := marshalizer.Marshal(header)
+	require.NoError(t, err)
+	envelope, err := encodeDRWANetworkIdentity(drwaIdentityForHeaderBytes(
+		chainID,
+		canonicalEpoch,
+		drwaNetworkIdentityProvenanceLocalCanonicalGenesis,
+		headerBytes,
+	))
+	require.NoError(t, err)
+
+	global := map[string][]byte{
+		string(drwaNetworkIdentityKey(canonicalEpoch)): append([]byte(nil), envelope...),
+	}
 	putCalls := 0
 	store := newDRWAIdentityCandidateStore(global, map[string][]byte{
 		"legacy/Shard_0": append([]byte(nil), envelope...),
-		"legacy/Shard_2": append([]byte(nil), envelope...),
 	}, &putCalls, false)
 
 	canonicalHash, networkDomain, provenance, err := resolveDRWANetworkDomain(
-		chainID,
-		map[uint32]data.HeaderHandler{core.MetachainShardId: header},
-		canonicalEpoch,
-		0,
-		store,
-		marshalizer,
-		coreSHA256.NewSha256(),
-	)
-	require.NoError(t, err)
-	require.Equal(t, 1, putCalls)
-	require.Equal(t, envelope, global[string(drwaNetworkIdentityKey(canonicalEpoch))])
-	require.Equal(t, standardSHA256.Sum256(headerBytes), canonicalHash)
-	require.NotEqual(t, [32]byte{}, networkDomain)
-	require.Equal(t, drwaNetworkIdentityProvenanceLocalCanonicalGenesis, provenance)
-
-	_, _, _, err = resolveDRWANetworkDomain(
 		chainID,
 		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{Epoch: canonicalEpoch}},
 		canonicalEpoch,
@@ -1061,7 +1090,10 @@ func TestResolveDRWANetworkDomainMigratesExactLegacyEnvelopeOnce(t *testing.T) {
 		coreSHA256.NewSha256(),
 	)
 	require.NoError(t, err)
-	require.Equal(t, 1, putCalls, "an identical migrated identity must not be rewritten")
+	require.Equal(t, standardSHA256.Sum256(headerBytes), canonicalHash)
+	require.NotEqual(t, [32]byte{}, networkDomain)
+	require.Equal(t, drwaNetworkIdentityProvenanceLocalCanonicalGenesis, provenance)
+	require.Zero(t, putCalls)
 }
 
 func TestResolveDRWANetworkDomainRejectsCandidateEnumerationFailure(t *testing.T) {
@@ -1137,32 +1169,6 @@ func TestResolveDRWANetworkDomainRejectsAnyInvalidOrConflictingCandidate(t *test
 			require.ErrorIs(t, resolveErr, errInvalidDRWANetworkIdentity)
 		})
 	}
-}
-
-func TestResolveDRWANetworkDomainRejectsMigrationReadbackMismatch(t *testing.T) {
-	chainID := "localnet"
-	marshalizer := &marshal.GogoProtoMarshalizer{}
-	headerBytes, err := marshalizer.Marshal(drwaMetaGenesisHeader(chainID))
-	require.NoError(t, err)
-	envelope, err := encodeDRWANetworkIdentity(drwaIdentityForHeaderBytes(
-		chainID, 0, drwaNetworkIdentityProvenanceLocalCanonicalGenesis, headerBytes,
-	))
-	require.NoError(t, err)
-	store := newDRWAIdentityCandidateStore(make(map[string][]byte), map[string][]byte{
-		"legacy/Shard_metachain": envelope,
-	}, nil, true)
-
-	_, _, _, err = resolveDRWANetworkDomain(
-		chainID,
-		map[uint32]data.HeaderHandler{core.MetachainShardId: &block.MetaBlock{}},
-		0,
-		5,
-		store,
-		marshalizer,
-		coreSHA256.NewSha256(),
-	)
-	require.ErrorIs(t, err, errInvalidDRWANetworkIdentity)
-	require.ErrorContains(t, err, "readback mismatch")
 }
 
 func TestResolveDRWANetworkDomainRejectsFreshGenesisReadbackMismatch(t *testing.T) {

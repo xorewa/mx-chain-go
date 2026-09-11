@@ -162,7 +162,7 @@ func TestDRWANetworkIdentityStorerRejectsConcurrentWriterAndAllowsReopen(t *test
 	require.NoError(t, second.Close())
 }
 
-func TestStorageServiceFactoryReturnsMigrationCapableIdentityStorerOnlyForProcessService(t *testing.T) {
+func TestStorageServiceFactoryReturnsLegacyCandidateAwareIdentityStorerOnlyForProcessService(t *testing.T) {
 	chainModes := []struct {
 		name   string
 		selfID uint32
@@ -206,7 +206,7 @@ func TestStorageServiceFactoryReturnsMigrationCapableIdentityStorerOnlyForProces
 				_, ok := storer.(interface {
 					DRWANetworkIdentityCandidates([]byte) (map[string][]byte, error)
 				})
-				require.True(t, ok, "the process factory must not silently bypass legacy migration")
+				require.True(t, ok, "the process service must retain read-only predecessor discovery")
 				require.NoError(t, service.CloseAll())
 			})
 		}
