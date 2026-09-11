@@ -413,6 +413,7 @@ func TestDRWASameShardRegulatedTransferProcessorSuccessAndRollbackMatrix(t *test
 					coordinator,
 					9,
 					func() (uint64, error) { return 7, nil },
+					nil,
 				)
 				require.NoError(t, err)
 

@@ -12,6 +12,7 @@ import (
 	logger "github.com/multiversx/mx-chain-logger-go"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	vmcommonBuiltInFunctions "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
+	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 )
 
 var log = logger.GetOrCreate("process/smartcontract/builtInFunctions")
@@ -101,6 +102,10 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	if err != nil {
 		return nil, err
 	}
+	esdtTransferParser, err := parsers.NewESDTTransferParser(args.Marshalizer)
+	if err != nil {
+		return nil, err
+	}
 
 	guardedFactory := &drwaGuardedBuiltInFunctionFactory{
 		delegate:                     bContainerFactory,
@@ -112,6 +117,7 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 		drwaCEBEpoch:                 args.DRWACEBEpoch,
 		drwaSettlementLifetimeRounds: args.DRWASettlementLifetimeRounds,
 		shardCoordinator:             args.ShardCoordinator,
+		esdtTransferParser:           esdtTransferParser,
 	}
 	if drwaGasScheduleCatalog != nil {
 		currentIdentity, identityErr := guardedFactory.DRWACurrentGasScheduleIdentity()

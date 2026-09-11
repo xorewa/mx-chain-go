@@ -20,6 +20,7 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	testIntegration "github.com/multiversx/mx-chain-go/testscommon/integrationtests"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -207,6 +208,8 @@ func runDRWAOrdinaryProcessorVector(
 			}},
 		}, nil
 	}
+	esdtTransferParser, err := parsers.NewESDTTransferParser(testIntegration.TestMarshalizer)
+	require.NoError(t, err)
 	guard, err := newDRWATransferGuard(
 		vector.functionName,
 		delegate,
@@ -219,6 +222,7 @@ func runDRWAOrdinaryProcessorVector(
 		coordinator,
 		9,
 		func() (uint64, error) { return 7, nil },
+		esdtTransferParser,
 	)
 	require.NoError(t, err)
 

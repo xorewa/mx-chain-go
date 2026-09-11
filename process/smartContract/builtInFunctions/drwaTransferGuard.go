@@ -23,8 +23,6 @@ import (
 // These guards exist only to keep S1-S5 prototype-marked tokens out of ordinary transfer entry
 // points. They are not the permanent classifier or the positive DRWA value path.
 
-const drwaArgumentsPerMultiTransfer = 3
-
 var (
 	// ErrDRWARegulatedTransferRequiresDRWA denies an ordinary transfer for a DRWA-marked token.
 	ErrDRWARegulatedTransferRequiresDRWA = errors.New("non-normative DRWA prototype regulated token requires the DRWA transfer path")
@@ -45,6 +43,7 @@ type drwaTransferGuard struct {
 	shardCoordinator     sharding.Coordinator
 	cebEpoch             uint32
 	currentRoundProvider drwaCurrentRoundProvider
+	esdtTransferParser   vmcommon.ESDTTransferParser
 }
 
 func newDRWATransferGuard(
@@ -55,9 +54,11 @@ func newDRWATransferGuard(
 	shardCoordinator sharding.Coordinator,
 	cebEpoch uint32,
 	currentRoundProvider drwaCurrentRoundProvider,
+	esdtTransferParser vmcommon.ESDTTransferParser,
 ) (*drwaTransferGuard, error) {
 	if check.IfNil(delegate) || classifier == nil || check.IfNil(enableEpochsHandler) ||
-		check.IfNil(shardCoordinator) || currentRoundProvider == nil {
+		check.IfNil(shardCoordinator) || currentRoundProvider == nil ||
+		(functionName == core.BuiltInFunctionMultiESDTNFTTransfer && check.IfNil(esdtTransferParser)) {
 		return nil, ErrInvalidDRWATransferGuardDelegate
 	}
 	_, ok := delegate.(vmcommon.AcceptPayableChecker)
@@ -73,6 +74,7 @@ func newDRWATransferGuard(
 		shardCoordinator:     shardCoordinator,
 		cebEpoch:             cebEpoch,
 		currentRoundProvider: currentRoundProvider,
+		esdtTransferParser:   esdtTransferParser,
 	}, nil
 }
 
@@ -82,6 +84,16 @@ func (guard *drwaTransferGuard) ProcessBuiltinFunction(
 	vmInput *vmcommon.ContractCallInput,
 ) (*vmcommon.VMOutput, error) {
 	if !guard.enableEpochsHandler.IsFlagEnabled(common.DRWAEnforcementFlag) {
+		return guard.delegate.ProcessBuiltinFunction(acntSnd, acntDst, vmInput)
+	}
+	if guard.functionName == core.BuiltInFunctionMultiESDTNFTTransfer {
+		_, hasRegulatedLeg, err := guard.buildMixedBatchBinding(vmInput)
+		if err != nil {
+			return nil, fmt.Errorf("build non-normative DRWA prototype mixed-batch binding: %w", err)
+		}
+		if hasRegulatedLeg {
+			return nil, ErrDRWARegulatedTransferRequiresDRWA
+		}
 		return guard.delegate.ProcessBuiltinFunction(acntSnd, acntDst, vmInput)
 	}
 
@@ -217,41 +229,78 @@ func drwaTransferTokenIDs(functionName string, vmInput *vmcommon.ContractCallInp
 			return nil, false
 		}
 		return [][]byte{vmInput.Arguments[0]}, true
-	case core.BuiltInFunctionMultiESDTNFTTransfer:
-		return drwaMultiTransferTokenIDs(vmInput)
 	default:
 		return nil, false
 	}
 }
 
-func drwaMultiTransferTokenIDs(vmInput *vmcommon.ContractCallInput) ([][]byte, bool) {
-	countIndex := 0
-	firstTokenIndex := 1
-	if bytes.Equal(vmInput.CallerAddr, vmInput.RecipientAddr) {
-		countIndex = 1
-		firstTokenIndex = 2
+func (guard *drwaTransferGuard) buildMixedBatchBinding(
+	vmInput *vmcommon.ContractCallInput,
+) (*drwa.MixedBatchBinding, bool, error) {
+	if vmInput == nil {
+		return nil, false, nil
 	}
-	if len(vmInput.Arguments) <= firstTokenIndex || countIndex >= len(vmInput.Arguments) {
-		return nil, false
-	}
-
-	countValue := new(big.Int).SetBytes(vmInput.Arguments[countIndex])
-	if !countValue.IsUint64() {
-		return nil, false
-	}
-	declaredCount := countValue.Uint64()
-	maximumCountFromArguments := uint64((len(vmInput.Arguments) - firstTokenIndex) / drwaArgumentsPerMultiTransfer)
-	if declaredCount == 0 || declaredCount > maximumCountFromArguments {
-		return nil, false
+	parsed, err := guard.esdtTransferParser.ParseESDTTransfers(
+		vmInput.CallerAddr,
+		vmInput.RecipientAddr,
+		core.BuiltInFunctionMultiESDTNFTTransfer,
+		vmInput.Arguments,
+	)
+	if err != nil || parsed == nil {
+		return nil, false, nil
 	}
 
-	tokenIDs := make([][]byte, 0, int(declaredCount))
-	for index := uint64(0); index < declaredCount; index++ {
-		tokenIndex := firstTokenIndex + int(index)*drwaArgumentsPerMultiTransfer
-		tokenIDs = append(tokenIDs, vmInput.Arguments[tokenIndex])
-	}
+	legs := make([]drwa.MixedBatchLeg, len(parsed.ESDTTransfers))
+	hasRegulatedLeg := false
+	hasMalformedLeg := false
+	for index, transfer := range parsed.ESDTTransfers {
+		if transfer == nil || transfer.ESDTValue == nil {
+			hasMalformedLeg = true
+			continue
+		}
+		if bytes.Equal(transfer.ESDTTokenName, []byte(vmcommon.EGLDIdentifier)) {
+			if !guard.enableEpochsHandler.IsFlagEnabled(common.EGLDInESDTMultiTransferFlag) {
+				hasMalformedLeg = true
+				continue
+			}
+			legs[index] = drwa.MixedBatchLeg{
+				Kind:     drwa.MixedBatchLegKindNativeEGLD,
+				Quantity: transfer.ESDTValue.Bytes(),
+			}
+			continue
+		}
 
-	return tokenIDs, true
+		leg := drwa.MixedBatchLeg{
+			Kind:     drwa.MixedBatchLegKindESDT,
+			TokenID:  append([]byte(nil), transfer.ESDTTokenName...),
+			Nonce:    transfer.ESDTTokenNonce,
+			Quantity: transfer.ESDTValue.Bytes(),
+		}
+		if !vmcommon.ValidateToken(transfer.ESDTTokenName) {
+			hasMalformedLeg = true
+			legs[index] = leg
+			continue
+		}
+		leg.Regulated, err = guard.classifier(transfer.ESDTTokenName)
+		if err != nil {
+			return nil, false, fmt.Errorf("classify mixed-batch token: %w", err)
+		}
+		if leg.Regulated {
+			hasRegulatedLeg = true
+		}
+		legs[index] = leg
+	}
+	if !hasRegulatedLeg {
+		return nil, false, nil
+	}
+	if hasMalformedLeg {
+		return nil, true, drwa.ErrInvalidMixedBatch
+	}
+	binding, err := drwa.BuildMixedBatchBinding(legs)
+	if err != nil {
+		return nil, true, err
+	}
+	return binding, true, nil
 }
 
 type drwaGuardedBuiltInFunctionFactory struct {
@@ -264,6 +313,7 @@ type drwaGuardedBuiltInFunctionFactory struct {
 	drwaCEBEpoch                 uint32
 	drwaSettlementLifetimeRounds uint64
 	shardCoordinator             sharding.Coordinator
+	esdtTransferParser           vmcommon.ESDTTransferParser
 	drwaSourceDebit              *drwaSourceDebit
 	drwaDestination              *drwaDestination
 	drwaSourceCompletion         *drwaSourceCompletion
@@ -418,6 +468,7 @@ func (factory *drwaGuardedBuiltInFunctionFactory) installDRWATransferGuards() er
 			factory.shardCoordinator,
 			factory.drwaCEBEpoch,
 			factory.drwaCurrentRound,
+			factory.esdtTransferParser,
 		)
 		if err != nil {
 			return err

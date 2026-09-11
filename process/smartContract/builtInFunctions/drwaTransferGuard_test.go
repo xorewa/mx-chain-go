@@ -15,6 +15,7 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/vmcommonMocks"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	vmcommonMock "github.com/multiversx/mx-chain-vm-common-go/mock"
+	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -106,6 +107,7 @@ func TestDRWATransferGuardOrdinaryMultiFormsDelegateUnchanged(t *testing.T) {
 
 	firstToken := []byte("FIRST-abcdef")
 	secondToken := []byte("SECOND-abcdef")
+	senderAddress := bytes.Repeat([]byte{0x11}, drwaAddressLength)
 	tests := []struct {
 		name  string
 		input *vmcommon.ContractCallInput
@@ -113,9 +115,9 @@ func TestDRWATransferGuardOrdinaryMultiFormsDelegateUnchanged(t *testing.T) {
 		{
 			name: "sender-local",
 			input: &vmcommon.ContractCallInput{
-				RecipientAddr: []byte("same"),
+				RecipientAddr: senderAddress,
 				VMInput: vmcommon.VMInput{
-					CallerAddr: []byte("same"),
+					CallerAddr: senderAddress,
 					Arguments:  drwaSenderMultiArguments(firstToken, secondToken),
 				},
 			},
@@ -163,6 +165,7 @@ func TestDRWATransferGuardBlocksMarkedTokenInEveryTransferForm(t *testing.T) {
 
 	firstToken := []byte("FIRST-abcdef")
 	markedToken := []byte("SECOND-abcdef")
+	senderAddress := bytes.Repeat([]byte{0x11}, drwaAddressLength)
 	tests := []struct {
 		name         string
 		functionName string
@@ -182,9 +185,9 @@ func TestDRWATransferGuardBlocksMarkedTokenInEveryTransferForm(t *testing.T) {
 			name:         "sender-local multi second token",
 			functionName: core.BuiltInFunctionMultiESDTNFTTransfer,
 			input: &vmcommon.ContractCallInput{
-				RecipientAddr: []byte("same"),
+				RecipientAddr: senderAddress,
 				VMInput: vmcommon.VMInput{
-					CallerAddr: []byte("same"),
+					CallerAddr: senderAddress,
 					Arguments:  drwaSenderMultiArguments(firstToken, markedToken),
 				},
 			},
@@ -308,7 +311,7 @@ func TestDRWATransferGuardMalformedCallsDelegateToBaseline(t *testing.T) {
 	}
 }
 
-func TestDRWATransferGuardSkipsInvalidTokenButStillChecksLaterValidToken(t *testing.T) {
+func TestDRWATransferGuardRejectsInvalidOrdinaryLegWhenLaterLegIsRegulated(t *testing.T) {
 	t.Parallel()
 
 	markedToken := []byte("SECOND-abcdef")
@@ -329,9 +332,167 @@ func TestDRWATransferGuardSkipsInvalidTokenButStillChecksLaterValidToken(t *test
 	})
 
 	_, err := guard.ProcessBuiltinFunction(nil, nil, input)
-	require.ErrorIs(t, err, ErrDRWARegulatedTransferRequiresDRWA)
+	require.ErrorIs(t, err, drwa.ErrInvalidMixedBatch)
 	require.False(t, delegateCalled)
 	require.Equal(t, []string{"SECOND-abcdef"}, classified)
+}
+
+func TestDRWATransferGuardBuildsCompleteOrderedMixedBatchFromSharedParser(t *testing.T) {
+	t.Parallel()
+
+	sender := bytes.Repeat([]byte{0x11}, drwaAddressLength)
+	destination := bytes.Repeat([]byte{0x22}, drwaAddressLength)
+	regulatedToken := []byte("RWA-123456")
+	input := &vmcommon.ContractCallInput{
+		RecipientAddr: sender,
+		VMInput: vmcommon.VMInput{
+			CallerAddr: sender,
+			Arguments: [][]byte{
+				destination, {4},
+				[]byte("ORD-abcdef"), {0}, {10},
+				regulatedToken, {1}, {2},
+				[]byte(vmcommon.EGLDIdentifier), {0}, {3},
+				regulatedToken, {9}, {4},
+				[]byte("destinationFunction"), []byte("argument"),
+			},
+		},
+	}
+	classified := make([]string, 0)
+	guard := createDRWATransferGuardForTest(
+		t,
+		core.BuiltInFunctionMultiESDTNFTTransfer,
+		&drwaTransferDelegateStub{},
+		true,
+		func(tokenID []byte) (bool, error) {
+			classified = append(classified, string(tokenID))
+			return bytes.Equal(tokenID, regulatedToken), nil
+		},
+	)
+
+	binding, hasRegulatedLeg, err := guard.buildMixedBatchBinding(input)
+	require.NoError(t, err)
+	require.True(t, hasRegulatedLeg)
+	require.NotNil(t, binding)
+	require.Equal(t, []string{"ORD-abcdef", "RWA-123456", "RWA-123456"}, classified)
+	require.Equal(t, regulatedToken, binding.RegulatedTokenID)
+	require.Equal(t, []drwa.MixedBatchLeg{
+		{Kind: drwa.MixedBatchLegKindESDT, TokenID: []byte("ORD-abcdef"), Quantity: []byte{10}},
+		{Kind: drwa.MixedBatchLegKindESDT, TokenID: regulatedToken, Nonce: 1, Quantity: []byte{2}, Regulated: true},
+		{Kind: drwa.MixedBatchLegKindNativeEGLD, Quantity: []byte{3}},
+		{Kind: drwa.MixedBatchLegKindESDT, TokenID: regulatedToken, Nonce: 9, Quantity: []byte{4}, Regulated: true},
+	}, binding.Legs)
+	require.NoError(t, drwa.ValidateMixedBatchBinding(*binding))
+}
+
+func TestDRWATransferGuardMixedBatchDigestChangesWhenSourceOrderChanges(t *testing.T) {
+	t.Parallel()
+
+	sender := bytes.Repeat([]byte{0x11}, drwaAddressLength)
+	destination := bytes.Repeat([]byte{0x22}, drwaAddressLength)
+	regulatedToken := []byte("RWA-123456")
+	guard := createDRWATransferGuardForTest(
+		t,
+		core.BuiltInFunctionMultiESDTNFTTransfer,
+		&drwaTransferDelegateStub{},
+		true,
+		func(tokenID []byte) (bool, error) { return bytes.Equal(tokenID, regulatedToken), nil },
+	)
+	buildInput := func(firstToken, secondToken []byte) *vmcommon.ContractCallInput {
+		return &vmcommon.ContractCallInput{
+			RecipientAddr: sender,
+			VMInput: vmcommon.VMInput{
+				CallerAddr: sender,
+				Arguments: [][]byte{
+					destination, {2},
+					firstToken, {0}, {1},
+					secondToken, {0}, {2},
+				},
+			},
+		}
+	}
+	first, regulated, err := guard.buildMixedBatchBinding(buildInput([]byte("ORD-abcdef"), regulatedToken))
+	require.NoError(t, err)
+	require.True(t, regulated)
+	second, regulated, err := guard.buildMixedBatchBinding(buildInput(regulatedToken, []byte("ORD-abcdef")))
+	require.NoError(t, err)
+	require.True(t, regulated)
+	require.NotEqual(t, first.FullBatchLegsDigest, second.FullBatchLegsDigest)
+}
+
+func TestDRWATransferGuardRejectsTwoRegulatedIdentifiersBeforeDelegate(t *testing.T) {
+	t.Parallel()
+
+	firstRegulated := []byte("RWA-123456")
+	secondRegulated := []byte("RWA-654321")
+	delegateCalled := false
+	delegate := &drwaTransferDelegateStub{}
+	delegate.ProcessBuiltinFunctionCalled = func(_, _ vmcommon.UserAccountHandler, _ *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+		delegateCalled = true
+		return &vmcommon.VMOutput{}, nil
+	}
+	guard := createDRWATransferGuardForTest(
+		t,
+		core.BuiltInFunctionMultiESDTNFTTransfer,
+		delegate,
+		true,
+		func(tokenID []byte) (bool, error) {
+			return bytes.Equal(tokenID, firstRegulated) || bytes.Equal(tokenID, secondRegulated), nil
+		},
+	)
+	input := &vmcommon.ContractCallInput{
+		RecipientAddr: []byte("destination"),
+		VMInput: vmcommon.VMInput{
+			CallerAddr: []byte("source"),
+			Arguments:  drwaDestinationMultiArguments(firstRegulated, secondRegulated),
+		},
+	}
+
+	output, err := guard.ProcessBuiltinFunction(nil, nil, input)
+	require.Nil(t, output)
+	require.ErrorIs(t, err, drwa.ErrMultipleRegulatedTokenIdentifiers)
+	require.False(t, delegateCalled)
+}
+
+func TestDRWATransferGuardRejectsNativeEGLDInRegulatedBatchWhenFeatureIsDisabled(t *testing.T) {
+	t.Parallel()
+
+	parser, err := parsers.NewESDTTransferParser(&vmcommonMock.MarshalizerMock{})
+	require.NoError(t, err)
+	delegateCalled := false
+	delegate := &drwaTransferDelegateStub{}
+	delegate.ProcessBuiltinFunctionCalled = func(_, _ vmcommon.UserAccountHandler, _ *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+		delegateCalled = true
+		return &vmcommon.VMOutput{}, nil
+	}
+	guard, err := newDRWATransferGuard(
+		core.BuiltInFunctionMultiESDTNFTTransfer,
+		delegate,
+		func(tokenID []byte) (bool, error) { return bytes.Equal(tokenID, []byte("RWA-123456")), nil },
+		&vmcommonMock.EnableEpochsHandlerStub{IsFlagEnabledCalled: func(flag core.EnableEpochFlag) bool {
+			return flag == common.DRWAEnforcementFlag
+		}},
+		&testscommon.ShardsCoordinatorMock{},
+		7,
+		func() (uint64, error) { return 10, nil },
+		parser,
+	)
+	require.NoError(t, err)
+	input := &vmcommon.ContractCallInput{
+		RecipientAddr: []byte("destination"),
+		VMInput: vmcommon.VMInput{
+			CallerAddr: []byte("source"),
+			Arguments: [][]byte{
+				{2},
+				[]byte("RWA-123456"), {0}, {1},
+				[]byte(vmcommon.EGLDIdentifier), {0}, {2},
+			},
+		},
+	}
+
+	output, err := guard.ProcessBuiltinFunction(nil, nil, input)
+	require.Nil(t, output)
+	require.ErrorIs(t, err, drwa.ErrInvalidMixedBatch)
+	require.False(t, delegateCalled)
 }
 
 func TestDRWATransferGuardForwardsLifecycleMethods(t *testing.T) {
@@ -423,6 +584,7 @@ func TestNewDRWATransferGuardRejectsDelegateWithoutPayableChecker(t *testing.T) 
 		&testscommon.ShardsCoordinatorMock{},
 		7,
 		func() (uint64, error) { return 1, nil },
+		nil,
 	)
 	require.Nil(t, guard)
 	require.ErrorIs(t, err, ErrInvalidDRWATransferGuardDelegate)
@@ -734,6 +896,8 @@ func createDRWATransferGuardForTest(
 	classifier drwaTokenClassifier,
 ) *drwaTransferGuard {
 	t.Helper()
+	esdtTransferParser, err := parsers.NewESDTTransferParser(&vmcommonMock.MarshalizerMock{})
+	require.NoError(t, err)
 
 	guard, err := newDRWATransferGuard(
 		functionName,
@@ -741,13 +905,20 @@ func createDRWATransferGuardForTest(
 		classifier,
 		&vmcommonMock.EnableEpochsHandlerStub{
 			IsFlagEnabledCalled: func(flag core.EnableEpochFlag) bool {
-				require.Equal(t, common.DRWAEnforcementFlag, flag)
-				return active
+				switch flag {
+				case common.DRWAEnforcementFlag:
+					return active
+				case common.EGLDInESDTMultiTransferFlag:
+					return true
+				default:
+					return false
+				}
 			},
 		},
 		&testscommon.ShardsCoordinatorMock{NoShards: 3, CurrentShard: 0, ComputeIdCalled: func(_ []byte) uint32 { return 0 }},
 		7,
 		func() (uint64, error) { return 10, nil },
+		esdtTransferParser,
 	)
 	require.NoError(t, err)
 
@@ -775,7 +946,7 @@ func validDRWASameShardTransferInput(source, destination, tokenID []byte) *vmcom
 
 func drwaSenderMultiArguments(firstToken, secondToken []byte) [][]byte {
 	return [][]byte{
-		make([]byte, 32), {2},
+		bytes.Repeat([]byte{0x22}, drwaAddressLength), {2},
 		firstToken, {0}, {1},
 		secondToken, {0}, {2},
 	}
