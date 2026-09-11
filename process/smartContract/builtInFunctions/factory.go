@@ -1,6 +1,7 @@
 package builtInFunctions
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -15,25 +16,32 @@ import (
 	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 )
 
-var log = logger.GetOrCreate("process/smartcontract/builtInFunctions")
+var (
+	log = logger.GetOrCreate("process/smartcontract/builtInFunctions")
+
+	// ErrInvalidDRWASettlementLifetimeProfile signals a partially configured or out-of-range prototype lifetime profile.
+	ErrInvalidDRWASettlementLifetimeProfile = errors.New("invalid non-normative DRWA prototype settlement lifetime profile")
+)
 
 // ArgsCreateBuiltInFunctionContainer defines the argument structure to create new built in function container
 type ArgsCreateBuiltInFunctionContainer struct {
-	GasSchedule                  core.GasScheduleNotifier
-	MapDNSAddresses              map[string]struct{}
-	MapDNSV2Addresses            map[string]struct{}
-	EnableUserNameChange         bool
-	Marshalizer                  marshal.Marshalizer
-	Accounts                     state.AccountsAdapter
-	ShardCoordinator             sharding.Coordinator
-	EpochNotifier                vmcommon.EpochNotifier
-	EnableEpochsHandler          vmcommon.EnableEpochsHandler
-	GuardedAccountHandler        vmcommon.GuardedAccountHandler
-	AutomaticCrawlerAddresses    [][]byte
-	MaxNumNodesInTransferRole    uint32
-	DRWANetworkDomain            [32]byte
-	DRWACEBEpoch                 uint32
-	DRWASettlementLifetimeRounds uint64
+	GasSchedule                     core.GasScheduleNotifier
+	MapDNSAddresses                 map[string]struct{}
+	MapDNSV2Addresses               map[string]struct{}
+	EnableUserNameChange            bool
+	Marshalizer                     marshal.Marshalizer
+	Accounts                        state.AccountsAdapter
+	ShardCoordinator                sharding.Coordinator
+	EpochNotifier                   vmcommon.EpochNotifier
+	EnableEpochsHandler             vmcommon.EnableEpochsHandler
+	GuardedAccountHandler           vmcommon.GuardedAccountHandler
+	AutomaticCrawlerAddresses       [][]byte
+	MaxNumNodesInTransferRole       uint32
+	DRWANetworkDomain               [32]byte
+	DRWACEBEpoch                    uint32
+	DRWAMinSettlementLifetimeRounds uint64
+	DRWASettlementLifetimeRounds    uint64
+	DRWAMaxSettlementLifetimeRounds uint64
 }
 
 // CreateBuiltInFunctionsFactory creates a container that will hold all the available built in functions
@@ -61,6 +69,14 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	}
 	if check.IfNil(args.GuardedAccountHandler) {
 		return nil, process.ErrNilGuardedAccountHandler
+	}
+	err := validateDRWASettlementLifetimeProfile(
+		args.DRWAMinSettlementLifetimeRounds,
+		args.DRWASettlementLifetimeRounds,
+		args.DRWAMaxSettlementLifetimeRounds,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	vmcommonAccounts, ok := args.Accounts.(vmcommon.AccountsAdapter)
@@ -142,6 +158,23 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	args.GasSchedule.RegisterNotifyHandler(bContainerFactory)
 
 	return guardedFactory, nil
+}
+
+func validateDRWASettlementLifetimeProfile(minimum, selected, maximum uint64) error {
+	if minimum == 0 && selected == 0 && maximum == 0 {
+		return nil
+	}
+	if minimum == 0 || selected == 0 || maximum == 0 || minimum > maximum || selected < minimum || selected > maximum {
+		return fmt.Errorf(
+			"%w: require 0 < minimum <= selected <= maximum, got %d <= %d <= %d",
+			ErrInvalidDRWASettlementLifetimeProfile,
+			minimum,
+			selected,
+			maximum,
+		)
+	}
+
+	return nil
 }
 
 // GetAllowedAddress returns the allowed crawler address on the current shard

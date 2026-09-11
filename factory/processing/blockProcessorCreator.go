@@ -1579,20 +1579,22 @@ func (pcf *processComponentsFactory) createBuiltInFunctionContainer(
 	}
 
 	argsBuiltIn := builtInFunctions.ArgsCreateBuiltInFunctionContainer{
-		GasSchedule:                  pcf.gasSchedule,
-		MapDNSAddresses:              mapDNSAddresses,
-		MapDNSV2Addresses:            mapDNSV2Addresses,
-		Marshalizer:                  pcf.coreData.InternalMarshalizer(),
-		Accounts:                     accounts,
-		ShardCoordinator:             pcf.bootstrapComponents.ShardCoordinator(),
-		EpochNotifier:                pcf.coreData.EpochNotifier(),
-		EnableEpochsHandler:          pcf.coreData.EnableEpochsHandler(),
-		GuardedAccountHandler:        pcf.bootstrapComponents.GuardedAccountHandler(),
-		AutomaticCrawlerAddresses:    convertedAddresses,
-		MaxNumNodesInTransferRole:    pcf.config.BuiltInFunctions.MaxNumAddressesInTransferRole,
-		DRWANetworkDomain:            pcf.drwaNetworkDomain,
-		DRWACEBEpoch:                 pcf.config.BuiltInFunctions.DRWACEBEpoch,
-		DRWASettlementLifetimeRounds: pcf.config.BuiltInFunctions.DRWASettlementLifetimeRounds,
+		GasSchedule:                     pcf.gasSchedule,
+		MapDNSAddresses:                 mapDNSAddresses,
+		MapDNSV2Addresses:               mapDNSV2Addresses,
+		Marshalizer:                     pcf.coreData.InternalMarshalizer(),
+		Accounts:                        accounts,
+		ShardCoordinator:                pcf.bootstrapComponents.ShardCoordinator(),
+		EpochNotifier:                   pcf.coreData.EpochNotifier(),
+		EnableEpochsHandler:             pcf.coreData.EnableEpochsHandler(),
+		GuardedAccountHandler:           pcf.bootstrapComponents.GuardedAccountHandler(),
+		AutomaticCrawlerAddresses:       convertedAddresses,
+		MaxNumNodesInTransferRole:       pcf.config.BuiltInFunctions.MaxNumAddressesInTransferRole,
+		DRWANetworkDomain:               pcf.drwaNetworkDomain,
+		DRWACEBEpoch:                    pcf.config.BuiltInFunctions.DRWACEBEpoch,
+		DRWAMinSettlementLifetimeRounds: pcf.config.BuiltInFunctions.DRWAMinSettlementLifetimeRounds,
+		DRWASettlementLifetimeRounds:    pcf.config.BuiltInFunctions.DRWASettlementLifetimeRounds,
+		DRWAMaxSettlementLifetimeRounds: pcf.config.BuiltInFunctions.DRWAMaxSettlementLifetimeRounds,
 	}
 
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)

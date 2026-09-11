@@ -78,8 +78,17 @@ func TestDRWASourceCompletionProcessorAtomicMatrix(t *testing.T) {
 				_, effectErr := drwa.LoadOpenEffect(account.AccountDataHandler(), effectID)
 				if test.wantEffect {
 					require.NoError(t, effectErr)
+					_, terminalErr := drwa.LoadTerminalValueEvidence(account.AccountDataHandler(), effectID)
+					require.ErrorIs(t, terminalErr, drwa.ErrTerminalValueEvidenceNotFound)
 				} else {
 					require.ErrorIs(t, effectErr, drwa.ErrOpenEffectNotFound)
+					terminal, terminalErr := drwa.LoadTerminalValueEvidence(account.AccountDataHandler(), effectID)
+					require.NoError(t, terminalErr)
+					if test.refund {
+						require.Equal(t, drwa.TerminalValueOutcomeRefunded, terminal.Outcome)
+					} else {
+						require.Equal(t, drwa.TerminalValueOutcomeSettled, terminal.Outcome)
+					}
 				}
 				if test.wantReturnCode == vmcommon.Ok {
 					require.Equal(t, []uint64{test.wantRemaining}, observations.refunded)
@@ -124,6 +133,9 @@ func TestDRWASourceCompletionDuplicateCannotMutateAfterEffectRemoval(t *testing.
 	require.Equal(t, 1, creditedRefunds)
 	_, effectErr := drwa.LoadOpenEffect(account.AccountDataHandler(), effectID)
 	require.ErrorIs(t, effectErr, drwa.ErrOpenEffectNotFound)
+	terminal, terminalErr := drwa.LoadTerminalValueEvidence(account.AccountDataHandler(), effectID)
+	require.NoError(t, terminalErr)
+	require.Equal(t, drwa.TerminalValueOutcomeRefunded, terminal.Outcome)
 }
 
 func TestDRWASourceCompletionProcessorRejectsInvalidGasRefundRecipient(t *testing.T) {
@@ -328,8 +340,8 @@ func newDRWACompletionProcessorFixture(
 	})
 	require.NoError(t, err)
 	if failAfterTerminalIO {
-		completion.removeOpenEffect = func(handler vmcommon.AccountDataHandler, effectID [32]byte) error {
-			require.NoError(t, drwa.RemoveOpenEffect(handler, effectID))
+		completion.finalizeOpenEffect = func(handler vmcommon.AccountDataHandler, effect drwa.OpenEffect, evidence drwa.TerminalValueEvidence) error {
+			require.NoError(t, drwa.FinalizeOpenEffect(handler, effect, evidence))
 			return errors.New("injected after terminal mutation")
 		}
 	}

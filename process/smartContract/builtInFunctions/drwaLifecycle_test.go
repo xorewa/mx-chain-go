@@ -145,6 +145,9 @@ func TestDRWALifecycleSourceDestinationReceiptCompletion(t *testing.T) {
 	require.Equal(t, sourceAddress, completionOutput.ProtocolExecution.GasRefundRecipient)
 	_, err = drwa.LoadOpenEffect(sourceHandler, envelope.Context.EffectID)
 	require.ErrorIs(t, err, drwa.ErrOpenEffectNotFound)
+	terminal, err := drwa.LoadTerminalValueEvidence(sourceHandler, envelope.Context.EffectID)
+	require.NoError(t, err)
+	require.Equal(t, drwa.TerminalValueOutcomeSettled, terminal.Outcome)
 }
 
 func TestDRWALifecycleDestinationDenialRefundCompletion(t *testing.T) {
@@ -212,6 +215,9 @@ func TestDRWALifecycleDestinationDenialRefundCompletion(t *testing.T) {
 	require.Equal(t, sourceAddress, completionOutput.ProtocolExecution.GasRefundRecipient)
 	_, err = drwa.LoadOpenEffect(sourceHandler, artifacts.OpenEffect.EffectID)
 	require.ErrorIs(t, err, drwa.ErrOpenEffectNotFound)
+	terminal, err := drwa.LoadTerminalValueEvidence(sourceHandler, artifacts.OpenEffect.EffectID)
+	require.NoError(t, err)
+	require.Equal(t, drwa.TerminalValueOutcomeRefunded, terminal.Outcome)
 }
 
 func decodeDRWACarrierPayload(t *testing.T, data []byte, function string) []byte {

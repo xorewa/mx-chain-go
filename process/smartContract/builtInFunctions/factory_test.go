@@ -214,6 +214,52 @@ func TestCreateBuiltInFunctionContainer(t *testing.T) {
 	})
 }
 
+func TestValidateDRWASettlementLifetimeProfile(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		minimum  uint64
+		selected uint64
+		maximum  uint64
+		valid    bool
+	}{
+		{name: "disabled", valid: true},
+		{name: "minimum", minimum: 1, selected: 1, maximum: 3, valid: true},
+		{name: "between bounds", minimum: 1, selected: 2, maximum: 3, valid: true},
+		{name: "maximum", minimum: 1, selected: 3, maximum: 3, valid: true},
+		{name: "zero minimum", selected: 1, maximum: 1},
+		{name: "zero selected", minimum: 1, maximum: 1},
+		{name: "zero maximum", minimum: 1, selected: 1},
+		{name: "minimum above maximum", minimum: 2, selected: 2, maximum: 1},
+		{name: "selected below minimum", minimum: 2, selected: 1, maximum: 3},
+		{name: "selected above maximum", minimum: 1, selected: 4, maximum: 3},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateDRWASettlementLifetimeProfile(test.minimum, test.selected, test.maximum)
+			if test.valid {
+				assert.NoError(t, err)
+				return
+			}
+			assert.ErrorIs(t, err, ErrInvalidDRWASettlementLifetimeProfile)
+		})
+	}
+}
+
+func TestCreateBuiltInFunctionsFactoryRejectsInvalidDRWASettlementLifetimeProfile(t *testing.T) {
+	t.Parallel()
+
+	args := createMockArguments()
+	args.DRWAMinSettlementLifetimeRounds = 2
+	args.DRWASettlementLifetimeRounds = 1
+	args.DRWAMaxSettlementLifetimeRounds = 3
+
+	_, err := CreateBuiltInFunctionsFactory(args)
+	assert.ErrorIs(t, err, ErrInvalidDRWASettlementLifetimeProfile)
+}
+
 func TestCreateBuiltInFunctionContainerGetAllowedAddress_Errors(t *testing.T) {
 	t.Parallel()
 

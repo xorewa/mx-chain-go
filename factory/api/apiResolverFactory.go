@@ -165,7 +165,9 @@ func CreateApiResolver(args *ApiResolverArgs) (facade.ApiResolver, error) {
 		convertedDNSV2Addresses,
 		drwaNetworkDomain(args.ProcessComponents),
 		args.Configs.GeneralConfig.BuiltInFunctions.DRWACEBEpoch,
+		args.Configs.GeneralConfig.BuiltInFunctions.DRWAMinSettlementLifetimeRounds,
 		args.Configs.GeneralConfig.BuiltInFunctions.DRWASettlementLifetimeRounds,
+		args.Configs.GeneralConfig.BuiltInFunctions.DRWAMaxSettlementLifetimeRounds,
 	)
 	if err != nil {
 		return nil, err
@@ -389,7 +391,9 @@ func createScQueryElement(
 		convertedDNSV2Addresses,
 		drwaNetworkDomain(args.processComponents),
 		args.generalConfig.BuiltInFunctions.DRWACEBEpoch,
+		args.generalConfig.BuiltInFunctions.DRWAMinSettlementLifetimeRounds,
 		args.generalConfig.BuiltInFunctions.DRWASettlementLifetimeRounds,
+		args.generalConfig.BuiltInFunctions.DRWAMaxSettlementLifetimeRounds,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -668,7 +672,9 @@ func createBuiltinFuncs(
 	dnsV2Addresses [][]byte,
 	drwaNetworkDomain [32]byte,
 	drwaCEBEpoch uint32,
+	drwaMinSettlementLifetimeRounds uint64,
 	drwaSettlementLifetimeRounds uint64,
+	drwaMaxSettlementLifetimeRounds uint64,
 ) (vmcommon.BuiltInFunctionFactory, error) {
 	mapDNSV2Addresses := make(map[string]struct{})
 	for _, address := range dnsV2Addresses {
@@ -676,20 +682,22 @@ func createBuiltinFuncs(
 	}
 
 	argsBuiltIn := builtInFunctions.ArgsCreateBuiltInFunctionContainer{
-		GasSchedule:                  gasScheduleNotifier,
-		MapDNSAddresses:              make(map[string]struct{}),
-		MapDNSV2Addresses:            mapDNSV2Addresses,
-		Marshalizer:                  marshalizer,
-		Accounts:                     accnts,
-		ShardCoordinator:             shardCoordinator,
-		EpochNotifier:                epochNotifier,
-		EnableEpochsHandler:          enableEpochsHandler,
-		GuardedAccountHandler:        guardedAccountHandler,
-		AutomaticCrawlerAddresses:    automaticCrawlerAddresses,
-		MaxNumNodesInTransferRole:    maxNumAddressesInTransferRole,
-		DRWANetworkDomain:            drwaNetworkDomain,
-		DRWACEBEpoch:                 drwaCEBEpoch,
-		DRWASettlementLifetimeRounds: drwaSettlementLifetimeRounds,
+		GasSchedule:                     gasScheduleNotifier,
+		MapDNSAddresses:                 make(map[string]struct{}),
+		MapDNSV2Addresses:               mapDNSV2Addresses,
+		Marshalizer:                     marshalizer,
+		Accounts:                        accnts,
+		ShardCoordinator:                shardCoordinator,
+		EpochNotifier:                   epochNotifier,
+		EnableEpochsHandler:             enableEpochsHandler,
+		GuardedAccountHandler:           guardedAccountHandler,
+		AutomaticCrawlerAddresses:       automaticCrawlerAddresses,
+		MaxNumNodesInTransferRole:       maxNumAddressesInTransferRole,
+		DRWANetworkDomain:               drwaNetworkDomain,
+		DRWACEBEpoch:                    drwaCEBEpoch,
+		DRWAMinSettlementLifetimeRounds: drwaMinSettlementLifetimeRounds,
+		DRWASettlementLifetimeRounds:    drwaSettlementLifetimeRounds,
+		DRWAMaxSettlementLifetimeRounds: drwaMaxSettlementLifetimeRounds,
 	}
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)
 }

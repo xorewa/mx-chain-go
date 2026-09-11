@@ -187,6 +187,13 @@ func CreateOpenEffect(dataHandler vmcommon.AccountDataHandler, effect OpenEffect
 	if err != nil {
 		return err
 	}
+	terminal, _, err := dataHandler.RetrieveValue(TerminalValueEvidenceStorageKey(effect.EffectID))
+	if err != nil {
+		return fmt.Errorf("retrieve prototype terminal value evidence: %w", err)
+	}
+	if len(terminal) != 0 {
+		return ErrTerminalValueEvidenceAlreadyExists
+	}
 	key := OpenEffectStorageKey(effect.EffectID)
 	existing, _, err := dataHandler.RetrieveValue(key)
 	if err != nil {
@@ -224,20 +231,6 @@ func LoadOpenEffect(dataHandler vmcommon.AccountDataHandler, effectID [drwaDiges
 	}
 
 	return effect, nil
-}
-
-// RemoveOpenEffect removes one exact protected prototype record. The caller must validate the
-// loaded effect and perform any terminal value mutation in the same enclosing account journal.
-func RemoveOpenEffect(dataHandler vmcommon.AccountDataHandler, effectID [drwaDigestLength]byte) error {
-	_, err := LoadOpenEffect(dataHandler, effectID)
-	if err != nil {
-		return err
-	}
-	err = dataHandler.SaveKeyValue(OpenEffectStorageKey(effectID), nil)
-	if err != nil {
-		return fmt.Errorf("remove prototype OpenEffect: %w", err)
-	}
-	return nil
 }
 
 func validateOpenEffect(effect OpenEffect) error {

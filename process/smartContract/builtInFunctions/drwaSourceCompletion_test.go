@@ -28,6 +28,9 @@ func TestDRWASourceCompletionReceiptRemovesExactEffect(t *testing.T) {
 	require.Equal(t, uint64(30), output.GasRemaining)
 	require.Equal(t, input.RecipientAddr, output.ProtocolExecution.GasRefundRecipient)
 	require.Empty(t, stored[string(drwa.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
+	terminal, err := drwa.LoadTerminalValueEvidence(account.AccountDataHandler(), artifacts.OpenEffect.EffectID)
+	require.NoError(t, err)
+	require.Equal(t, drwa.TerminalValueOutcomeSettled, terminal.Outcome)
 }
 
 func TestDRWASourceCompletionReceiptReturnsBoundedUnusedDestinationGas(t *testing.T) {
@@ -84,6 +87,51 @@ func TestDRWASourceCompletionRefundUsesBaselineReturnThenRemovesEffect(t *testin
 	require.Len(t, output.Logs, 1)
 	require.Equal(t, []byte("ESDTTransfer"), output.Logs[0].Identifier)
 	require.Empty(t, stored[string(drwa.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
+	terminal, err := drwa.LoadTerminalValueEvidence(account.AccountDataHandler(), artifacts.OpenEffect.EffectID)
+	require.NoError(t, err)
+	require.Equal(t, drwa.TerminalValueOutcomeRefunded, terminal.Outcome)
+}
+
+func TestDRWASourceCompletionTerminalBarrierRejectsDuplicateBeforeRefundMutation(t *testing.T) {
+	completion, input, account, _, artifacts := newDRWASourceCompletionFixture(t, true)
+	delegateCalls := 0
+	completion.delegate = &processMock.BuiltInFunctionStub{ProcessBuiltinFunctionCalled: func(
+		_, _ vmcommon.UserAccountHandler,
+		_ *vmcommon.ContractCallInput,
+	) (*vmcommon.VMOutput, error) {
+		delegateCalls++
+		return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok}, nil
+	}}
+
+	firstOutput, err := completion.ProcessBuiltinFunction(nil, account, input)
+	require.NoError(t, err)
+	require.NotNil(t, firstOutput)
+	secondOutput, err := completion.ProcessBuiltinFunction(nil, account, input)
+	require.Nil(t, secondOutput)
+	require.ErrorIs(t, err, ErrDRWASourceCompletionDenied)
+	require.Equal(t, 1, delegateCalls)
+	terminal, err := drwa.LoadTerminalValueEvidence(account.AccountDataHandler(), artifacts.OpenEffect.EffectID)
+	require.NoError(t, err)
+	require.Equal(t, drwa.TerminalValueOutcomeRefunded, terminal.Outcome)
+}
+
+func TestDRWASourceCompletionMalformedTerminalBarrierDeniesBeforeRefundMutation(t *testing.T) {
+	completion, input, account, stored, artifacts := newDRWASourceCompletionFixture(t, true)
+	stored[string(drwa.TerminalValueEvidenceStorageKey(artifacts.OpenEffect.EffectID))] = []byte{0xff}
+	delegateCalled := false
+	completion.delegate = &processMock.BuiltInFunctionStub{ProcessBuiltinFunctionCalled: func(
+		_, _ vmcommon.UserAccountHandler,
+		_ *vmcommon.ContractCallInput,
+	) (*vmcommon.VMOutput, error) {
+		delegateCalled = true
+		return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok}, nil
+	}}
+
+	output, err := completion.ProcessBuiltinFunction(nil, account, input)
+	require.Nil(t, output)
+	require.ErrorIs(t, err, ErrDRWASourceCompletionDenied)
+	require.False(t, delegateCalled)
+	require.NotEmpty(t, stored[string(drwa.OpenEffectStorageKey(artifacts.OpenEffect.EffectID))])
 }
 
 func TestBuildDRWACompletionOutputRefundRecipientContract(t *testing.T) {

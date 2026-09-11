@@ -43,7 +43,8 @@ type drwaSourceCompletion struct {
 	networkDomain               [32]byte
 	retainedWorkBudgetsProvider drwaRetainedWorkBudgetsProvider
 	loadOpenEffect              func(vmcommon.AccountDataHandler, [32]byte) (*drwa.OpenEffect, error)
-	removeOpenEffect            func(vmcommon.AccountDataHandler, [32]byte) error
+	loadTerminalValueEvidence   func(vmcommon.AccountDataHandler, [32]byte) (*drwa.TerminalValueEvidence, error)
+	finalizeOpenEffect          func(vmcommon.AccountDataHandler, drwa.OpenEffect, drwa.TerminalValueEvidence) error
 }
 
 func newDRWASourceCompletion(args drwaSourceCompletionArgs) (*drwaSourceCompletion, error) {
@@ -58,7 +59,8 @@ func newDRWASourceCompletion(args drwaSourceCompletionArgs) (*drwaSourceCompleti
 		networkDomain:               args.networkDomain,
 		retainedWorkBudgetsProvider: args.retainedWorkBudgetsProvider,
 		loadOpenEffect:              drwa.LoadOpenEffect,
-		removeOpenEffect:            drwa.RemoveOpenEffect,
+		loadTerminalValueEvidence:   drwa.LoadTerminalValueEvidence,
+		finalizeOpenEffect:          drwa.FinalizeOpenEffect,
 	}, nil
 }
 
@@ -128,6 +130,16 @@ func (completion *drwaSourceCompletion) applySettlementReceipt(
 	if err != nil {
 		return nil, fmt.Errorf("%w: receipt: %w", ErrDRWASourceCompletionDenied, err)
 	}
+	err = completion.rejectTerminalValueReplay(
+		dataHandler,
+		receipt.EffectID,
+		receipt.ContextHash,
+		drwa.TerminalValueOutcomeSettled,
+		payload,
+	)
+	if err != nil {
+		return nil, err
+	}
 	effect, err := completion.loadOpenEffect(dataHandler, receipt.EffectID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: OpenEffect: %w", ErrDRWASourceCompletionDenied, err)
@@ -164,9 +176,13 @@ func (completion *drwaSourceCompletion) applySettlementReceipt(
 		return nil, fmt.Errorf("%w: receipt gas partition", ErrDRWASourceCompletionDenied)
 	}
 
-	err = completion.removeOpenEffect(dataHandler, effect.EffectID)
+	terminalEvidence, err := drwa.BuildTerminalValueEvidence(*effect, drwa.TerminalValueOutcomeSettled, payload)
 	if err != nil {
-		return nil, fmt.Errorf("%w: remove OpenEffect: %w", ErrDRWASourceCompletionMutation, err)
+		return nil, fmt.Errorf("%w: terminal evidence: %w", ErrDRWASourceCompletionDenied, err)
+	}
+	err = completion.finalizeOpenEffect(dataHandler, *effect, terminalEvidence)
+	if err != nil {
+		return nil, fmt.Errorf("%w: finalize OpenEffect: %w", ErrDRWASourceCompletionMutation, err)
 	}
 	return buildDRWACompletionOutput(
 		vmcommon.ProtocolExecutionOutcomeSourceSettled,
@@ -185,6 +201,16 @@ func (completion *drwaSourceCompletion) applyRefund(
 	refund, err := drwa.DecodeRefundEnvelope(payload)
 	if err != nil {
 		return nil, fmt.Errorf("%w: refund: %w", ErrDRWASourceCompletionDenied, err)
+	}
+	err = completion.rejectTerminalValueReplay(
+		dataHandler,
+		refund.EffectID,
+		refund.ContextHash,
+		drwa.TerminalValueOutcomeRefunded,
+		payload,
+	)
+	if err != nil {
+		return nil, err
 	}
 	effect, err := completion.loadOpenEffect(dataHandler, refund.EffectID)
 	if err != nil {
@@ -209,6 +235,10 @@ func (completion *drwaSourceCompletion) applyRefund(
 	if err != nil || vmInput.GasProvided != expectedGas {
 		return nil, fmt.Errorf("%w: refund gas", ErrDRWASourceCompletionDenied)
 	}
+	terminalEvidence, err := drwa.BuildTerminalValueEvidence(*effect, drwa.TerminalValueOutcomeRefunded, payload)
+	if err != nil {
+		return nil, fmt.Errorf("%w: terminal evidence: %w", ErrDRWASourceCompletionDenied, err)
+	}
 
 	delegateInput := *vmInput
 	delegateInput.Function = core.BuiltInFunctionESDTTransfer
@@ -228,9 +258,9 @@ func (completion *drwaSourceCompletion) applyRefund(
 	if !isValidDRWARefundDelegateOutput(delegateOutput, expectedDelegateGasRemaining) {
 		return nil, fmt.Errorf("%w: baseline refund output", ErrDRWASourceCompletionMutation)
 	}
-	err = completion.removeOpenEffect(dataHandler, effect.EffectID)
+	err = completion.finalizeOpenEffect(dataHandler, *effect, terminalEvidence)
 	if err != nil {
-		return nil, fmt.Errorf("%w: remove OpenEffect: %w", ErrDRWASourceCompletionMutation, err)
+		return nil, fmt.Errorf("%w: finalize OpenEffect: %w", ErrDRWASourceCompletionMutation, err)
 	}
 	output := buildDRWACompletionOutput(
 		vmcommon.ProtocolExecutionOutcomeSourceRefunded,
@@ -240,6 +270,28 @@ func (completion *drwaSourceCompletion) applyRefund(
 	)
 	output.Logs = delegateOutput.Logs
 	return output, nil
+}
+
+func (completion *drwaSourceCompletion) rejectTerminalValueReplay(
+	dataHandler vmcommon.AccountDataHandler,
+	effectID [32]byte,
+	contextHash [32]byte,
+	outcome drwa.TerminalValueOutcome,
+	payload []byte,
+) error {
+	evidence, err := completion.loadTerminalValueEvidence(dataHandler, effectID)
+	if errors.Is(err, drwa.ErrTerminalValueEvidenceNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("%w: terminal evidence: %w", ErrDRWASourceCompletionDenied, err)
+	}
+	err = drwa.ValidateTerminalValueEvidenceResult(*evidence, effectID, contextHash, outcome, payload)
+	if err != nil {
+		return fmt.Errorf("%w: terminal evidence mismatch: %w", ErrDRWASourceCompletionDenied, err)
+	}
+
+	return fmt.Errorf("%w: terminal result replay", ErrDRWASourceCompletionDenied)
 }
 
 func isValidDRWARefundDelegateOutput(output *vmcommon.VMOutput, expectedGasRemaining uint64) bool {
