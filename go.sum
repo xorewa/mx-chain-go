@@ -435,8 +435,6 @@ github.com/multiversx/concurrent-map v0.1.4 h1:hdnbM8VE4b0KYJaGY5yJS2aNIW9TFFsUY
 github.com/multiversx/concurrent-map v0.1.4/go.mod h1:8cWFRJDOrWHOTNSqgYCUvwT7c7eFQ4U2vKMOp4A/9+o=
 github.com/multiversx/mx-chain-communication-go v1.4.1 h1:rM0pTHFJYOCtO7x6O9LUIPkFgVrUNbVGwJvzp/apfbE=
 github.com/multiversx/mx-chain-communication-go v1.4.1/go.mod h1:MouVOCFBj6h0MS5MLGL+Ez46B3lkWd+Liqx8xpt63Gc=
-github.com/multiversx/mx-chain-core-go v1.5.1 h1:VG6axsPG6KbeEUGZCxVtgb0qexb35b3zW/Vq/Ykgwrg=
-github.com/multiversx/mx-chain-core-go v1.5.1/go.mod h1:xEQ823/jcHNqHsMUoxStOCczO09/EDEbZl35A3esT6Q=
 github.com/multiversx/mx-chain-crypto-go v1.3.3 h1:TcVIFKefHH07uQ/bolsqsYbhTqkMIDS2+LhMj5BqRRg=
 github.com/multiversx/mx-chain-crypto-go v1.3.3/go.mod h1:jkWqUAin8x31oC5/eocnxEVFm8nDli8OfMGBkC64mWA=
 github.com/multiversx/mx-chain-es-indexer-go v1.10.3 h1:SOJVu+bOW5cKNM7WLEVF7JbF+VVEvraAWWBbvMTQpOA=
@@ -447,8 +445,6 @@ github.com/multiversx/mx-chain-scenario-go v1.8.0 h1:1gKP5z5K3faHHwjUuImkovGgjBF
 github.com/multiversx/mx-chain-scenario-go v1.8.0/go.mod h1:w3pCtJYeey67WPQB0m3YgJDI8lJKR58ckRAtNQMAaSU=
 github.com/multiversx/mx-chain-storage-go v1.2.0 h1:c+T7NJdsnbZza5k7ez/pUEHeAT9BoytLvTphRaO7ZiA=
 github.com/multiversx/mx-chain-storage-go v1.2.0/go.mod h1:jzaisAV6n/TdrQpYiMX/+A35yl9Cd8LAG+4Afqi6J5s=
-github.com/multiversx/mx-chain-vm-common-go v1.7.1 h1:uYRxUGz5n2m2a0t1fkLmFOtqgGnHqoCWaY4mYeOom14=
-github.com/multiversx/mx-chain-vm-common-go v1.7.1/go.mod h1:Lk2ZNxVCThYFbFhjXxy1S8PwqjcEnF7uvTQ0QvA4BbQ=
 github.com/multiversx/mx-chain-vm-go v1.5.49 h1:BQA1qC6qVmPF1dygDxPL4Gg9kykw9ux8OidzSgH6LlQ=
 github.com/multiversx/mx-chain-vm-go v1.5.49/go.mod h1:OgE4RhDo5tWChM6/6Y0Mbn8dTFv2yIJHCkA0yQwK52s=
 github.com/multiversx/mx-chain-vm-v1_2-go v1.2.70 h1:qwEqmynUoxzErFgpw6MPnkCTiZhzTYTXnIu29MjfHG0=
@@ -630,6 +626,10 @@ github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee h1:lYbXeSv
 github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee/go.mod h1:m2aV4LZI4Aez7dP5PMyVKEHhUyEJ/RjmPEDOpDvudHg=
 github.com/wlynxg/anet v0.0.5 h1:J3VJGi1gvo0JwZ/P1/Yc/8p63SoW98B5dHkYDmpgvvU=
 github.com/wlynxg/anet v0.0.5/go.mod h1:eay5PRQr7fIVAMbTbchTnO9gG65Hg/uYGdc7mguHxoA=
+github.com/xorewa/mx-chain-core-go v0.0.0-20260911093806-810fa6af7310 h1:Y3uQrPUI103Yc2eEhui0vbLF5a4mh2KnXDrN6LCnQCc=
+github.com/xorewa/mx-chain-core-go v0.0.0-20260911093806-810fa6af7310/go.mod h1:xEQ823/jcHNqHsMUoxStOCczO09/EDEbZl35A3esT6Q=
+github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260911094724-2b7e7ecfcfcb h1:PLL2D3zvFM9qYTn0b+J/xh2aqC5W3+mPIRWPVmLI9Ww=
+github.com/xorewa/mx-chain-vm-common-go v0.0.0-20260911094724-2b7e7ecfcfcb/go.mod h1:y5L47VeHtoDH9merYMW3VkAlbBwm1PbPQObRDD7mR+o=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

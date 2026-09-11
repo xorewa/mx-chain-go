@@ -3871,6 +3871,7 @@ func CreateEnableEpochsConfig() config.EnableEpochs {
 		SCProcessorV2EnableEpoch:                          UnreachableEpoch,
 		FixRelayedBaseCostEnableEpoch:                     UnreachableEpoch,
 		FixRelayedMoveBalanceToNonPayableSCEnableEpoch:    UnreachableEpoch,
+		DRWAEnforcementEnableEpoch:                        UnreachableEpoch,
 	}
 }
 
@@ -4215,6 +4216,7 @@ func GetDefaultEnableEpochsConfig() *config.EnableEpochs {
 		StakingV4Step3EnableEpoch:                       UnreachableEpoch,
 		AndromedaEnableEpoch:                            UnreachableEpoch,
 		SupernovaEnableEpoch:                            UnreachableEpoch,
+		DRWAEnforcementEnableEpoch:                      UnreachableEpoch,
 	}
 }
 

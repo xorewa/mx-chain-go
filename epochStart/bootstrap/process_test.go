@@ -169,6 +169,7 @@ func createMockEpochStartBootstrapArgs(
 			HeartbeatV2:                     generalCfg.HeartbeatV2,
 			Hardfork:                        generalCfg.Hardfork,
 			ProofsStorage:                   generalCfg.ProofsStorage,
+			DRWANetworkIdentityStorage:      generalCfg.DRWANetworkIdentityStorage,
 			ExecutionResultsStorage:         generalCfg.ExecutionResultsStorage,
 			EvictionWaitingList: config.EvictionWaitingListConfig{
 				HashesSize:     100,

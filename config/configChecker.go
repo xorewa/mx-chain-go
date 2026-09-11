@@ -13,6 +13,13 @@ func SanityCheckNodesConfig(
 	nodesSetup NodesSetupHandler,
 	cfg EnableEpochs,
 ) error {
+	if cfg.DRWAEnforcementEnableEpoch < cfg.SupernovaEnableEpoch {
+		return errDRWAEnforcementBeforeSupernova
+	}
+	if cfg.DRWAEnforcementEnableEpoch < cfg.DynamicESDTEnableEpoch {
+		return errDRWAEnforcementBeforeDynamicESDT
+	}
+
 	maxNodesChange := cfg.MaxNodesChangeEnableEpoch
 	for _, maxNodesConfig := range maxNodesChange {
 		err := checkMaxNodesConfig(nodesSetup, maxNodesConfig)

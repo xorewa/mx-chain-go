@@ -18,18 +18,21 @@ var log = logger.GetOrCreate("process/smartcontract/builtInFunctions")
 
 // ArgsCreateBuiltInFunctionContainer defines the argument structure to create new built in function container
 type ArgsCreateBuiltInFunctionContainer struct {
-	GasSchedule               core.GasScheduleNotifier
-	MapDNSAddresses           map[string]struct{}
-	MapDNSV2Addresses         map[string]struct{}
-	EnableUserNameChange      bool
-	Marshalizer               marshal.Marshalizer
-	Accounts                  state.AccountsAdapter
-	ShardCoordinator          sharding.Coordinator
-	EpochNotifier             vmcommon.EpochNotifier
-	EnableEpochsHandler       vmcommon.EnableEpochsHandler
-	GuardedAccountHandler     vmcommon.GuardedAccountHandler
-	AutomaticCrawlerAddresses [][]byte
-	MaxNumNodesInTransferRole uint32
+	GasSchedule                  core.GasScheduleNotifier
+	MapDNSAddresses              map[string]struct{}
+	MapDNSV2Addresses            map[string]struct{}
+	EnableUserNameChange         bool
+	Marshalizer                  marshal.Marshalizer
+	Accounts                     state.AccountsAdapter
+	ShardCoordinator             sharding.Coordinator
+	EpochNotifier                vmcommon.EpochNotifier
+	EnableEpochsHandler          vmcommon.EnableEpochsHandler
+	GuardedAccountHandler        vmcommon.GuardedAccountHandler
+	AutomaticCrawlerAddresses    [][]byte
+	MaxNumNodesInTransferRole    uint32
+	DRWANetworkDomain            [32]byte
+	DRWACEBEpoch                 uint32
+	DRWASettlementLifetimeRounds uint64
 }
 
 // CreateBuiltInFunctionsFactory creates a container that will hold all the available built in functions
@@ -70,6 +73,10 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 	if err != nil {
 		return nil, err
 	}
+	drwaGasScheduleCatalog, err := sealDRWAConfiguredGasScheduleCatalog(args.GasSchedule)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Debug("createBuiltInFunctionsFactory",
 		"shardId", args.ShardCoordinator.SelfId(),
@@ -95,14 +102,40 @@ func CreateBuiltInFunctionsFactory(args ArgsCreateBuiltInFunctionContainer) (vmc
 		return nil, err
 	}
 
-	err = bContainerFactory.CreateBuiltInFunctionContainer()
+	guardedFactory := &drwaGuardedBuiltInFunctionFactory{
+		delegate:                     bContainerFactory,
+		accounts:                     vmcommonAccounts,
+		enableEpochsHandler:          args.EnableEpochsHandler,
+		drwaNetworkDomain:            args.DRWANetworkDomain,
+		drwaGasScheduleCatalog:       drwaGasScheduleCatalog,
+		gasScheduleNotifier:          args.GasSchedule,
+		drwaCEBEpoch:                 args.DRWACEBEpoch,
+		drwaSettlementLifetimeRounds: args.DRWASettlementLifetimeRounds,
+		shardCoordinator:             args.ShardCoordinator,
+	}
+	if drwaGasScheduleCatalog != nil {
+		currentIdentity, identityErr := guardedFactory.DRWACurrentGasScheduleIdentity()
+		if identityErr != nil {
+			return nil, identityErr
+		}
+		catalogIdentity, identityErr := drwaGasScheduleCatalog.Identity()
+		if identityErr != nil {
+			return nil, identityErr
+		}
+		log.Info("NON_NORMATIVE_DRWA_PROTOTYPE gas schedule catalog sealed",
+			"shardId", args.ShardCoordinator.SelfId(),
+			"catalogIdentity", fmt.Sprintf("%x", catalogIdentity),
+			"currentIdentity", fmt.Sprintf("%x", currentIdentity),
+		)
+	}
+	err = guardedFactory.CreateBuiltInFunctionContainer()
 	if err != nil {
 		return nil, err
 	}
 
 	args.GasSchedule.RegisterNotifyHandler(bContainerFactory)
 
-	return bContainerFactory, nil
+	return guardedFactory, nil
 }
 
 // GetAllowedAddress returns the allowed crawler address on the current shard

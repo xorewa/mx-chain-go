@@ -2,6 +2,8 @@ package factory
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -12,6 +14,7 @@ import (
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	"github.com/multiversx/mx-chain-go/storage"
 	"github.com/multiversx/mx-chain-go/storage/mock"
+	"github.com/multiversx/mx-chain-go/storage/storageunit"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	"github.com/multiversx/mx-chain-go/testscommon/nodeTypeProviderMock"
 	"github.com/stretchr/testify/assert"
@@ -45,10 +48,15 @@ func createMockArgument(t *testing.T) StorageServiceFactoryArgs {
 			AccountsTrieStorage:        createMockStorageConfig("AccountsTrieStorage"),
 			PeerAccountsTrieStorage:    createMockStorageConfig("PeerAccountsTrieStorage"),
 			StatusMetricsStorage:       createMockStorageConfig("StatusMetricsStorage"),
-			PeerBlockBodyStorage:       createMockStorageConfig("PeerBlockBodyStorage"),
-			TrieEpochRootHashStorage:   createMockStorageConfig("TrieEpochRootHashStorage"),
-			ProofsStorage:              createMockStorageConfig("ProofsStorage"),
-			ExecutionResultsStorage:    createMockStorageConfig("ExecutionResultsStorage"),
+			DRWANetworkIdentityStorage: func() config.StorageConfig {
+				storageConfig := createMockStorageConfig("PrototypeNetworkIdentityStorage")
+				storageConfig.DB.MaxBatchSize = 1
+				return storageConfig
+			}(),
+			PeerBlockBodyStorage:     createMockStorageConfig("PeerBlockBodyStorage"),
+			TrieEpochRootHashStorage: createMockStorageConfig("TrieEpochRootHashStorage"),
+			ProofsStorage:            createMockStorageConfig("ProofsStorage"),
+			ExecutionResultsStorage:  createMockStorageConfig("ExecutionResultsStorage"),
 			DbLookupExtensions: config.DbLookupExtensionsConfig{
 				Enabled:                            true,
 				DbLookupMaxActivePersisters:        10,
@@ -111,6 +119,60 @@ func TestNewStorageServiceFactory(t *testing.T) {
 		assert.Equal(t, storage.ErrInvalidNumberOfActivePersisters, err)
 		assert.Nil(t, storageServiceFactory)
 	})
+	t.Run("wrong prototype network identity storage type should error", func(t *testing.T) {
+		t.Parallel()
+
+		args := createMockArgument(t)
+		args.Config.DRWANetworkIdentityStorage.DB.Type = string(storageunit.MemoryDB)
+		storageServiceFactory, err := NewStorageServiceFactory(args)
+		require.ErrorIs(t, err, errInvalidDRWANetworkIdentityStorage)
+		require.Nil(t, storageServiceFactory)
+	})
+	t.Run("absent prototype network identity storage should error", func(t *testing.T) {
+		t.Parallel()
+
+		args := createMockArgument(t)
+		args.Config.DRWANetworkIdentityStorage = config.StorageConfig{}
+		storageServiceFactory, err := NewStorageServiceFactory(args)
+		require.ErrorIs(t, err, errInvalidDRWANetworkIdentityStorage)
+		require.Nil(t, storageServiceFactory)
+	})
+	t.Run("wrong prototype network identity storage batch size should error", func(t *testing.T) {
+		t.Parallel()
+
+		args := createMockArgument(t)
+		args.Config.DRWANetworkIdentityStorage.DB.MaxBatchSize = 2
+		storageServiceFactory, err := NewStorageServiceFactory(args)
+		require.ErrorIs(t, err, errInvalidDRWANetworkIdentityStorage)
+		require.Nil(t, storageServiceFactory)
+	})
+	t.Run("zero prototype network identity storage batch delay should error", func(t *testing.T) {
+		t.Parallel()
+
+		args := createMockArgument(t)
+		args.Config.DRWANetworkIdentityStorage.DB.BatchDelaySeconds = 0
+		storageServiceFactory, err := NewStorageServiceFactory(args)
+		require.ErrorIs(t, err, errInvalidDRWANetworkIdentityStorage)
+		require.Nil(t, storageServiceFactory)
+	})
+	t.Run("negative prototype network identity storage batch delay should error", func(t *testing.T) {
+		t.Parallel()
+
+		args := createMockArgument(t)
+		args.Config.DRWANetworkIdentityStorage.DB.BatchDelaySeconds = -1
+		storageServiceFactory, err := NewStorageServiceFactory(args)
+		require.ErrorIs(t, err, errInvalidDRWANetworkIdentityStorage)
+		require.Nil(t, storageServiceFactory)
+	})
+	t.Run("empty prototype network identity database path should error", func(t *testing.T) {
+		t.Parallel()
+
+		args := createMockArgument(t)
+		args.Config.DRWANetworkIdentityStorage.DB.FilePath = ""
+		storageServiceFactory, err := NewStorageServiceFactory(args)
+		require.ErrorIs(t, err, errInvalidDRWANetworkIdentityStorage)
+		require.Nil(t, storageServiceFactory)
+	})
 	t.Run("nil shard coordinator should error", func(t *testing.T) {
 		t.Parallel()
 
@@ -170,6 +232,17 @@ func TestStorageServiceFactory_CreateForShard(t *testing.T) {
 	t.Parallel()
 
 	expectedErrForCacheString := "not supported cache type"
+	t.Run("wrong prototype network identity cache should error without fallback", func(t *testing.T) {
+		t.Parallel()
+
+		args := createMockArgument(t)
+		args.Config.DRWANetworkIdentityStorage.Cache.Type = ""
+		storageServiceFactory, err := NewStorageServiceFactory(args)
+		require.NoError(t, err)
+		storageService, err := storageServiceFactory.CreateForShard()
+		require.ErrorContains(t, err, expectedErrForCacheString+" for PrototypeNetworkIdentityStorage")
+		require.Nil(t, storageService)
+	})
 
 	t.Run("wrong config for ShardHdrNonceHashStorage should error", func(t *testing.T) {
 		t.Parallel()
@@ -410,7 +483,7 @@ func TestStorageServiceFactory_CreateForShard(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, check.IfNil(storageService))
 		allStorers := storageService.GetAllStorers()
-		expectedStorers := 25
+		expectedStorers := 26
 		assert.Equal(t, expectedStorers, len(allStorers))
 
 		storer, _ := storageService.GetStorer(dataRetriever.UserAccountsUnit)
@@ -418,6 +491,10 @@ func TestStorageServiceFactory_CreateForShard(t *testing.T) {
 
 		storer, _ = storageService.GetStorer(dataRetriever.PeerAccountsUnit)
 		assert.NotEqual(t, "*disabled.storer", fmt.Sprintf("%T", storer))
+
+		storer, err = storageService.GetStorer(dataRetriever.DRWANetworkIdentityUnit)
+		assert.NoError(t, err)
+		assert.NotNil(t, storer)
 
 		_ = storageService.CloseAll()
 	})
@@ -432,7 +509,7 @@ func TestStorageServiceFactory_CreateForShard(t *testing.T) {
 		assert.False(t, check.IfNil(storageService))
 		allStorers := storageService.GetAllStorers()
 		numDBLookupExtensionUnits := 6
-		expectedStorers := 25 - numDBLookupExtensionUnits
+		expectedStorers := 26 - numDBLookupExtensionUnits
 		assert.Equal(t, expectedStorers, len(allStorers))
 		_ = storageService.CloseAll()
 	})
@@ -446,7 +523,7 @@ func TestStorageServiceFactory_CreateForShard(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, check.IfNil(storageService))
 		allStorers := storageService.GetAllStorers()
-		expectedStorers := 25 // we still have a storer for trie epoch root hash
+		expectedStorers := 26 // we still have a storer for trie epoch root hash
 		assert.Equal(t, expectedStorers, len(allStorers))
 		_ = storageService.CloseAll()
 	})
@@ -468,6 +545,9 @@ func TestStorageServiceFactory_CreateForShard(t *testing.T) {
 
 		storer, _ = storageService.GetStorer(dataRetriever.PeerAccountsUnit)
 		assert.Equal(t, "*disabled.storer", fmt.Sprintf("%T", storer))
+
+		_, err = storageService.GetStorer(dataRetriever.DRWANetworkIdentityUnit)
+		assert.Error(t, err)
 
 		_ = storageService.CloseAll()
 	})
@@ -529,7 +609,7 @@ func TestStorageServiceFactory_CreateForMeta(t *testing.T) {
 		allStorers := storageService.GetAllStorers()
 		missingStorers := 2 // PeerChangesUnit and ShardHdrNonceHashDataUnit
 		numShardHdrStorage := 3
-		expectedStorers := 25 - missingStorers + numShardHdrStorage
+		expectedStorers := 26 - missingStorers + numShardHdrStorage
 		assert.Equal(t, expectedStorers, len(allStorers))
 
 		storer, _ := storageService.GetStorer(dataRetriever.UserAccountsUnit)
@@ -537,6 +617,10 @@ func TestStorageServiceFactory_CreateForMeta(t *testing.T) {
 
 		storer, _ = storageService.GetStorer(dataRetriever.PeerAccountsUnit)
 		assert.NotEqual(t, "*disabled.storer", fmt.Sprintf("%T", storer))
+
+		storer, err = storageService.GetStorer(dataRetriever.DRWANetworkIdentityUnit)
+		assert.NoError(t, err)
+		assert.NotNil(t, storer)
 
 		_ = storageService.CloseAll()
 	})
@@ -561,6 +645,156 @@ func TestStorageServiceFactory_CreateForMeta(t *testing.T) {
 		storer, _ = storageService.GetStorer(dataRetriever.PeerAccountsUnit)
 		assert.Equal(t, "*disabled.storer", fmt.Sprintf("%T", storer))
 
+		_, err = storageService.GetStorer(dataRetriever.DRWANetworkIdentityUnit)
+		assert.Error(t, err)
+
 		_ = storageService.CloseAll()
 	})
+}
+
+func TestStorageServiceFactory_PartialFailureClosesIdentityStoreAndAllowsSameRootRetry(t *testing.T) {
+	tests := map[string]func(*StorageServiceFactory) (dataRetriever.StorageService, error){
+		"shard": (*StorageServiceFactory).CreateForShard,
+		"meta":  (*StorageServiceFactory).CreateForMeta,
+	}
+	for name, create := range tests {
+		name, create := name, create
+		t.Run(name, func(t *testing.T) {
+			args := createMockArgument(t)
+			args.Config.TrieEpochRootHashStorage.Cache.Type = ""
+			firstFactory, err := NewStorageServiceFactory(args)
+			require.NoError(t, err)
+			service, err := create(firstFactory)
+			require.Error(t, err)
+			require.Nil(t, service)
+
+			args.Config.TrieEpochRootHashStorage = createMockStorageConfig("TrieEpochRootHashStorage")
+			secondFactory, err := NewStorageServiceFactory(args)
+			require.NoError(t, err)
+			service, err = create(secondFactory)
+			require.NoError(t, err, "a partial first attempt must not retain a LevelDB lock")
+			require.NoError(t, service.CloseAll())
+		})
+	}
+}
+
+func TestStorageServiceFactory_IdentityCloseReopenDestroyAndArchivedSiblingPreservation(t *testing.T) {
+	args := createMockArgument(t)
+	archiveRoot := t.TempDir()
+	archiveSentinel := filepath.Join(archiveRoot, "preserved-generation.txt")
+	require.NoError(t, os.WriteFile(archiveSentinel, []byte("preserve"), 0o600))
+	key := []byte("identity-key")
+	value := []byte("identity-value")
+
+	firstFactory, err := NewStorageServiceFactory(args)
+	require.NoError(t, err)
+	first, err := firstFactory.CreateForShard()
+	require.NoError(t, err)
+	require.NoError(t, first.Put(dataRetriever.DRWANetworkIdentityUnit, key, value))
+	require.NoError(t, first.CloseAll())
+
+	secondFactory, err := NewStorageServiceFactory(args)
+	require.NoError(t, err)
+	second, err := secondFactory.CreateForShard()
+	require.NoError(t, err)
+	loaded, err := second.Get(dataRetriever.DRWANetworkIdentityUnit, key)
+	require.NoError(t, err)
+	require.Equal(t, value, loaded)
+	require.NoError(t, second.Destroy())
+
+	thirdFactory, err := NewStorageServiceFactory(args)
+	require.NoError(t, err)
+	third, err := thirdFactory.CreateForShard()
+	require.NoError(t, err)
+	_, err = third.Get(dataRetriever.DRWANetworkIdentityUnit, key)
+	require.Error(t, err, "fresh-generation recreation must not silently restore destroyed active state")
+	require.NoError(t, third.CloseAll())
+
+	preserved, err := os.ReadFile(archiveSentinel)
+	require.NoError(t, err)
+	require.Equal(t, []byte("preserve"), preserved, "active-root lifecycle operations must not touch an archived sibling")
+}
+
+func TestStorageServiceFactory_DRWAIdentityStorageTypeMatrix(t *testing.T) {
+	createMethods := map[string]func(*StorageServiceFactory) (dataRetriever.StorageService, error){
+		"shard": (*StorageServiceFactory).CreateForShard,
+		"meta":  (*StorageServiceFactory).CreateForMeta,
+	}
+	storageTypes := []StorageServiceType{
+		ProcessStorageService,
+		BootstrapStorageService,
+		ImportDBStorageService,
+	}
+
+	for createName, create := range createMethods {
+		createName, create := createName, create
+		for _, storageType := range storageTypes {
+			storageType := storageType
+			t.Run(createName+"/"+string(storageType)+"/valid", func(t *testing.T) {
+				args := createMockArgument(t)
+				args.StorageType = storageType
+				storageServiceFactory, err := NewStorageServiceFactory(args)
+				require.NoError(t, err)
+				storageService, err := create(storageServiceFactory)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, storageService.CloseAll()) })
+
+				_, identityErr := storageService.GetStorer(dataRetriever.DRWANetworkIdentityUnit)
+				if storageType == ProcessStorageService {
+					require.NoError(t, identityErr, "process storage must contain the retained identity unit")
+				} else {
+					require.Error(t, identityErr, "%s storage must not construct the retained identity unit", storageType)
+				}
+			})
+
+			t.Run(createName+"/"+string(storageType)+"/invalid-cache", func(t *testing.T) {
+				args := createMockArgument(t)
+				args.StorageType = storageType
+				args.Config.DRWANetworkIdentityStorage.Cache.Type = ""
+				storageServiceFactory, err := NewStorageServiceFactory(args)
+				require.NoError(t, err)
+				storageService, err := create(storageServiceFactory)
+				if storageType == ProcessStorageService {
+					require.ErrorContains(t, err, "not supported cache type for PrototypeNetworkIdentityStorage")
+					require.Nil(t, storageService)
+				} else {
+					require.NoError(t, err, "%s must not consume the process-only identity cache configuration", storageType)
+					require.NoError(t, storageService.CloseAll())
+				}
+			})
+		}
+	}
+
+	invalidPersistenceConfigurations := map[string]func(*config.StorageConfig){
+		"absent": func(storageConfig *config.StorageConfig) {
+			*storageConfig = config.StorageConfig{}
+		},
+		"database-type": func(storageConfig *config.StorageConfig) {
+			storageConfig.DB.Type = string(storageunit.MemoryDB)
+		},
+		"batch-size": func(storageConfig *config.StorageConfig) {
+			storageConfig.DB.MaxBatchSize = 2
+		},
+		"batch-delay": func(storageConfig *config.StorageConfig) {
+			storageConfig.DB.BatchDelaySeconds = 0
+		},
+		"database-path": func(storageConfig *config.StorageConfig) {
+			storageConfig.DB.FilePath = ""
+		},
+	}
+	for _, storageType := range storageTypes {
+		storageType := storageType
+		for mutationName, mutate := range invalidPersistenceConfigurations {
+			mutationName, mutate := mutationName, mutate
+			t.Run(string(storageType)+"/invalid-"+mutationName, func(t *testing.T) {
+				args := createMockArgument(t)
+				args.StorageType = storageType
+				mutate(&args.Config.DRWANetworkIdentityStorage)
+				storageServiceFactory, err := NewStorageServiceFactory(args)
+				require.ErrorIs(t, err, errInvalidDRWANetworkIdentityStorage,
+					"the retained-identity persistence contract is validated uniformly before service-type selection")
+				require.Nil(t, storageServiceFactory)
+			})
+		}
+	}
 }

@@ -55,6 +55,10 @@ const (
 	StateAccessesUnit UnitType = 24
 	// ExecutionResultsUnit is the execution results unit identifier
 	ExecutionResultsUnit UnitType = 25
+	// DRWANetworkIdentityUnit is the non-pruned, crash-durable DRWA network identity unit.
+	// NON_NORMATIVE_DRWA_PROTOTYPE
+	// REPLACED_BY_PART_B
+	DRWANetworkIdentityUnit UnitType = 26
 
 	// ShardHdrNonceHashDataUnit is the header nonce-hash pair data unit identifier
 	//TODO: Add only unit types lower than 100
@@ -122,6 +126,8 @@ func (ut UnitType) String() string {
 		return "StateAccessesUnit"
 	case ExecutionResultsUnit:
 		return "ExecutionResultsUnit"
+	case DRWANetworkIdentityUnit:
+		return "PrototypeNetworkIdentityUnit"
 	}
 
 	if ut < ShardHdrNonceHashDataUnit {
