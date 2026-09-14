@@ -128,13 +128,7 @@ func (destination *drwaDestination) ProcessBuiltinFunction(
 		return nil, err
 	}
 	if currentRound > envelope.Context.SettlementExpiry {
-		return buildDRWADestinationRefundOutput(
-			vmInput.GasProvided,
-			refund,
-			refundGas,
-			envelope.Context.DestinationHolder[:],
-			fmt.Errorf("%w: settlement expired", ErrDRWADestinationDenied),
-		)
+		return nil, fmt.Errorf("%w: settlement expired", ErrDRWADestinationDenied)
 	}
 
 	regulatoryErr := destination.validateDestinationProgram(acntDst, envelope, currentRound, vmInput.GasProvided)

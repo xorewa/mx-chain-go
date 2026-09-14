@@ -45,27 +45,28 @@ func TestDRWADestinationSettlementExpiryBoundary(t *testing.T) {
 	tests := []struct {
 		name         string
 		currentRound uint64
-		wantRefund   bool
+		wantDenied   bool
 	}{
 		{name: "before expiry", currentRound: 99},
 		{name: "at expiry", currentRound: 100},
-		{name: "after expiry", currentRound: 101, wantRefund: true},
+		{name: "after expiry", currentRound: 101, wantDenied: true},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			destination, input, account, artifacts := newDRWADestinationFixture(t, true)
+			destination, input, account, _ := newDRWADestinationFixture(t, true)
 			require.NoError(t, destination.setBlockchainHook(&testscommon.BlockChainHookStub{
 				CurrentRoundCalled: func() uint64 { return test.currentRound },
 			}))
 
 			output, err := destination.ProcessBuiltinFunction(nil, account, input)
-			require.NoError(t, err)
-			if test.wantRefund {
-				requireDRWASingleRefund(t, output, artifacts.Envelope.Context.SourceHolder)
-				require.Contains(t, output.ReturnMessage, "settlement expired")
+			if test.wantDenied {
+				require.Nil(t, output)
+				require.ErrorIs(t, err, ErrDRWADestinationDenied)
+				require.ErrorContains(t, err, "settlement expired")
 				return
 			}
+			require.NoError(t, err)
 			require.Equal(t, vmcommon.Ok, output.ReturnCode)
 			require.Equal(t, vmcommon.ProtocolExecutionOutcomeSettlementReceipt, output.ProtocolExecution.Outcome)
 		})
@@ -296,7 +297,7 @@ func TestDRWADestinationProgramDenialsAreFailClosedAndDoNotCredit(t *testing.T) 
 		{name: "unavailable round", mutate: func(_ *testing.T, destination *drwaDestination, _ *vmcommon.ContractCallInput, _ *vmcommonMocks.UserAccountStub, _ *drwa.DirectValueArtifacts) {
 			destination.blockchainHook = nil
 		}},
-		{name: "settlement expired", wantRefund: true, mutate: func(t *testing.T, destination *drwaDestination, _ *vmcommon.ContractCallInput, _ *vmcommonMocks.UserAccountStub, _ *drwa.DirectValueArtifacts) {
+		{name: "settlement expired", mutate: func(t *testing.T, destination *drwaDestination, _ *vmcommon.ContractCallInput, _ *vmcommonMocks.UserAccountStub, _ *drwa.DirectValueArtifacts) {
 			require.NoError(t, destination.setBlockchainHook(&testscommon.BlockChainHookStub{CurrentRoundCalled: func() uint64 { return 101 }}))
 		}},
 		{name: "CEB mismatch", wantRefund: true, mutate: func(_ *testing.T, destination *drwaDestination, _ *vmcommon.ContractCallInput, _ *vmcommonMocks.UserAccountStub, _ *drwa.DirectValueArtifacts) {

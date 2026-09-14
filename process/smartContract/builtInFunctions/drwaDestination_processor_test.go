@@ -64,7 +64,7 @@ func TestDRWAAccountingSeamPreservesOrdinaryBuiltInAcrossBothProcessors(t *testi
 	for _, processorCase := range processors {
 		t.Run(processorCase.name, func(t *testing.T) {
 			processor, accountsDB, tokenID, destinationAddress, forwarded, observations := newDRWADestinationProcessorFixture(
-				t, processorCase.create, true, false, false, false,
+				t, processorCase.create, true, false, false, false, 7,
 			)
 			ordinarySender := bytes.Repeat([]byte{0x11}, drwaAddressLength)
 			scr := &smartContractResult.SmartContractResult{
@@ -145,7 +145,7 @@ func TestDRWADestinationProcessorSuccessAndRollbackControls(t *testing.T) {
 			test := test
 			t.Run(processorCase.name+"/"+test.name, func(t *testing.T) {
 				processor, accountsDB, tokenID, destinationAddress, forwarded, observations := newDRWADestinationProcessorFixture(
-					t, processorCase.create, test.admitted, test.postCreditFault, test.accountingFault, test.initialFrozen,
+					t, processorCase.create, test.admitted, test.postCreditFault, test.accountingFault, test.initialFrozen, 7,
 				)
 				scr := newDRWADestinationSCR(t, tokenID, destinationAddress)
 				returnCode, executionErr := processor.ProcessSmartContractResult(scr)
@@ -201,6 +201,48 @@ func TestDRWADestinationProcessorSuccessAndRollbackControls(t *testing.T) {
 	}
 }
 
+func TestDRWADestinationExpiredEnvelopeIsNonTerminalInBothProcessors(t *testing.T) {
+	processors := []struct {
+		name   string
+		create func(args scrCommon.ArgsNewSmartContractProcessor) (drwaResultProcessor, error)
+	}{
+		{name: "legacy", create: func(args scrCommon.ArgsNewSmartContractProcessor) (drwaResultProcessor, error) {
+			return smartContract.NewSmartContractProcessor(args)
+		}},
+		{name: "v2", create: func(args scrCommon.ArgsNewSmartContractProcessor) (drwaResultProcessor, error) {
+			return processorV2.NewSmartContractProcessorV2(args)
+		}},
+	}
+
+	for _, processorCase := range processors {
+		t.Run(processorCase.name, func(t *testing.T) {
+			processor, accountsDB, tokenID, destinationAddress, forwarded, observations := newDRWADestinationProcessorFixture(
+				t, processorCase.create, true, false, false, false, 101,
+			)
+			scr := newDRWADestinationSCR(t, tokenID, destinationAddress)
+
+			returnCode, err := processor.ProcessSmartContractResult(scr)
+			require.NoError(t, err)
+			require.Equal(t, vmcommon.UserError, returnCode)
+			require.Empty(t, *forwarded)
+			require.Empty(t, observations.returns)
+			require.Len(t, observations.fees, 1)
+			require.Zero(t, observations.fees[0].Cmp(big.NewInt(100)))
+			require.Len(t, observations.devFees, 1)
+			require.Zero(t, observations.devFees[0].Sign())
+			require.Empty(t, observations.refunded)
+			require.Empty(t, observations.penalized)
+
+			canonical := loadDRWAJournalAccount(t, accountsDB, destinationAddress)
+			esdtBytes, _, loadErr := canonical.AccountDataHandler().RetrieveValue(
+				append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier), tokenID...),
+			)
+			require.NoError(t, loadErr)
+			require.Empty(t, esdtBytes)
+		})
+	}
+}
+
 func newDRWADestinationProcessorFixture(
 	t *testing.T,
 	create func(args scrCommon.ArgsNewSmartContractProcessor) (drwaResultProcessor, error),
@@ -208,6 +250,7 @@ func newDRWADestinationProcessorFixture(
 	postCreditFault bool,
 	accountingFault bool,
 	initialFrozen bool,
+	currentRound uint64,
 ) (drwaResultProcessor, *drwaTrackingAccountsDB, []byte, []byte, *[]*smartContractResult.SmartContractResult, *drwaProcessorGasObservations) {
 	t.Helper()
 	sourceAddress := bytes.Repeat([]byte{0x11}, drwaAddressLength)
@@ -288,7 +331,7 @@ func newDRWADestinationProcessorFixture(
 	observations := &drwaProcessorGasObservations{}
 	var hook *testscommon.BlockChainHookStub
 	hook = &testscommon.BlockChainHookStub{
-		CurrentRoundCalled: func() uint64 { return 7 },
+		CurrentRoundCalled: func() uint64 { return currentRound },
 		ProcessBuiltInFunctionCalled: func(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
 			if input.Function == drwaOrdinaryControlFunction {
 				return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: 70}, nil
