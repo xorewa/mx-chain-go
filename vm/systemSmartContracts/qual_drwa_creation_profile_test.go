@@ -97,6 +97,27 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 			require.Equal(t, owner, read().OwnerAddress)
 			require.Equal(t, vmcommon.Ok, call("unsetBurnRoleGlobally"), eei.returnMessage)
 			require.False(t, checkIfDefinedRoleExistsInToken(read(), []byte(vmcommon.ESDTRoleBurnForAll)))
+			// Part A E.22.3 requires family-specific applicability. Exercise real
+			// System SC admission rather than assuming a directly injected role
+			// is lawful for every token family. The native DynamicESDT flag also
+			// enables these roles for NFTv2; SFT/Meta/FT deny them on this pin.
+			for _, metadataRole := range []string{core.ESDTRoleNFTUpdate, core.ESDTRoleNFTRecreate} {
+				t.Run(metadataRole, func(t *testing.T) {
+					beforeRole := bytes.Clone(eei.GetStorage(tokenID))
+					code := call("setSpecialRole", replacement, []byte(metadataRole))
+					switch tc.family {
+					case core.NonFungibleESDTv2, core.DynamicNFTESDT, core.DynamicSFTESDT, core.DynamicMetaESDT:
+						require.Equal(t, vmcommon.Ok, code, eei.returnMessage)
+						require.True(t, checkIfDefinedRoleExistsInToken(read(), []byte(metadataRole)))
+						require.Equal(t, vmcommon.Ok, call("unSetSpecialRole", replacement, []byte(metadataRole)), eei.returnMessage)
+						require.False(t, checkIfDefinedRoleExistsInToken(read(), []byte(metadataRole)))
+					default:
+						require.Equal(t, vmcommon.UserError, code)
+						require.Equal(t, "invalid argument", eei.returnMessage)
+						require.Equal(t, beforeRole, eei.GetStorage(tokenID))
+					}
+				})
+			}
 			burnRole := core.ESDTRoleNFTBurn
 			if tc.family == core.FungibleESDT {
 				burnRole = core.ESDTRoleLocalBurn

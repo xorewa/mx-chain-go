@@ -20,13 +20,15 @@ import (
 )
 
 // TestQualDRWADynamicMetadataLocus observes the pinned upstream implementation
-// for Part A 4.5.2/E.22.3, P21 and Plan W07. This is not a DRWA policy oracle:
+// for Part A 4.5.2/E.22.3, P21 and Plan W07, including the NFTv2 contrast.
+// This is not a DRWA policy oracle:
 // metadata success does not imply that an already distributed NFT was updated.
 // The expected storage split is independently stated in Part A 4.5.2 and in
 // vm-common v1.7.2 getEsdtInfo/saveESDTMetaDataInfo and esdtDataStorage readers.
 // This in-process, same-shard experiment does not establish cross-shard finality.
 func TestQualDRWADynamicMetadataLocus(t *testing.T) {
-	for _, family := range getDynamicTokenTypes() {
+	families := append([]string{core.NonFungibleESDTv2}, getDynamicTokenTypes()...)
+	for _, family := range families {
 		for _, operation := range []struct {
 			name   string
 			role   string
@@ -79,6 +81,34 @@ func TestQualDRWADynamicMetadataLocus(t *testing.T) {
 				require.Equal(t, before, unchanged, "missing role must not change token data or supply")
 				tx := operation.makeTx(writer, writer, 100000, metadata)
 				tx.Nonce = getAccount(t, ctx, writer).GetNonce()
+				if family == core.NonFungibleESDTv2 {
+					// Unlike DynamicNFT, a metadata role alone does not create an
+					// absent local NFTv2 record. getEsdtInfo rejects isNew first.
+					code, updateErr := ctx.TxProcessor.ProcessTransaction(tx)
+					require.Equal(t, vmcommon.UserError, code)
+					require.ErrorIs(t, updateErr, process.ErrFailedTransaction)
+					require.ErrorContains(t, ctx.GetCompositeTestError(), "nil esdt data")
+					stillHeld, readErr := ctx.BlockchainHook.GetESDTToken(holder, token, 1)
+					require.NoError(t, readErr)
+					require.Equal(t, before, stillHeld)
+					stillAbsent, readErr := ctx.BlockchainHook.GetESDTToken(writer, token, 1)
+					require.NoError(t, readErr)
+					require.Zero(t, stillAbsent.Value.Sign())
+					require.Nil(t, stillAbsent.TokenMetaData)
+					// Native System SC role applicability is separately tested in
+					// TestQualDRWAUpstreamCreationProfile. Here the holder has the
+					// actual record and an explicitly provisioned admitted role.
+					utils.SetESDTRoles(t, ctx.Accounts, holder, token, [][]byte{[]byte(operation.role)})
+					holderUpdate := operation.makeTx(holder, holder, 100000, metadata)
+					holderUpdate.Nonce = getAccount(t, ctx, holder).GetNonce()
+					qualDRWAMetadataProcess(t, ctx, holderUpdate)
+					changed, readErr := ctx.BlockchainHook.GetESDTToken(holder, token, 1)
+					require.NoError(t, readErr)
+					require.Equal(t, big.NewInt(1), changed.Value)
+					require.Equal(t, holder, changed.TokenMetaData.Creator)
+					require.Equal(t, []byte("changed attributes"), changed.TokenMetaData.Attributes)
+					return
+				}
 				qualDRWAMetadataProcess(t, ctx, tx)
 				_, err = ctx.Accounts.Commit()
 				require.NoError(t, err)
@@ -114,11 +144,12 @@ func qualDRWAMetadataProcess(t *testing.T, ctx *vm.VMTestContext, tx *transactio
 // This uses two upstream in-memory shard processors and manually delivers their
 // real SCRs. It establishes only the selected metadata merge behaviour, not
 // routing, deduplication, consensus, canonical finality or localnet qualification.
-// Pending P21 coverage: DynamicNFT cross-shard behaviour and source-supported
-// Update/Recreate applicability for non-dynamic NFTv2/SFT/Meta. This quantity-3
-// fixture cannot be extrapolated to a single-unit NFT or to other operations.
+// DynamicNFT uses a single unit and exercises source-writer versus remote-holder
+// separation; SFT/Meta use three units for delayed-transfer ordering. Pending P21
+// coverage includes other operations, replay, restart and complete DRWA policies.
+// Native role admission for non-dynamic families is tested at the System SC.
 func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
-	for _, family := range []string{core.DynamicSFTESDT, core.DynamicMetaESDT} {
+	for _, family := range []string{core.DynamicNFTESDT, core.DynamicSFTESDT, core.DynamicMetaESDT} {
 		t.Run(family, func(t *testing.T) {
 			source, err := vm.CreatePreparedTxProcessorWithVMsMultiShard(0, config.EnableEpochs{}, 1)
 			require.NoError(t, err)
@@ -152,10 +183,16 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 				createAccWithBalance(t, source.Accounts, address, big.NewInt(100000000))
 			}
 			createAccWithBalance(t, destination.Accounts, holder, big.NewInt(100000000))
-			// Native NFTCreate requires NFTAddQuantity as well when quantity > 1.
-			utils.SetESDTRoles(t, source.Accounts, origin, token, [][]byte{[]byte(core.ESDTRoleNFTCreate), []byte(core.ESDTRoleNFTAddQuantity)})
+			// Native NFTCreate requires NFTAddQuantity when quantity > 1.
+			quantity := int64(1)
+			roles := [][]byte{[]byte(core.ESDTRoleNFTCreate)}
+			if family != core.DynamicNFTESDT {
+				quantity = 3
+				roles = append(roles, []byte(core.ESDTRoleNFTAddQuantity))
+			}
+			utils.SetESDTRoles(t, source.Accounts, origin, token, roles)
 			utils.SetESDTRoles(t, source.Accounts, writer, token, [][]byte{[]byte(core.ESDTRoleNFTUpdate)})
-			qualDRWAMetadataProcess(t, source, createTokenTx(origin, origin, 100000, 3, GetDefaultMetaData()))
+			qualDRWAMetadataProcess(t, source, createTokenTx(origin, origin, 100000, quantity, GetDefaultMetaData()))
 			produce := func() data.TransactionHandler {
 				t.Helper()
 				source.CleanIntermediateTransactions(t)
@@ -177,7 +214,10 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 			require.Equal(t, big.NewInt(1), before.Value)
 			require.Equal(t, []byte("attributes"), before.TokenMetaData.Attributes)
 			// Keep a distinct pre-update transfer undelivered; this is not replay.
-			oldTransfer := produce()
+			var oldTransfer data.TransactionHandler
+			if family != core.DynamicNFTESDT {
+				oldTransfer = produce()
+			}
 			require.NoError(t, source.BlockchainHook.(process.BlockChainHookHandler).SetCurrentHeader(&block.Header{Round: 7}))
 			metadata := GetDefaultMetaData()
 			metadata.Nonce = []byte("01")
@@ -192,6 +232,19 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 			remoteBeforeTransfer, err := destination.BlockchainHook.GetESDTToken(holder, token, 1)
 			require.NoError(t, err)
 			require.Equal(t, before, remoteBeforeTransfer, "remote copy remains unchanged until an actual carrying transfer")
+			if family == core.DynamicNFTESDT {
+				localWriter, readErr := source.BlockchainHook.GetESDTToken(writer, token, 1)
+				require.NoError(t, readErr)
+				require.Zero(t, localWriter.Value.Sign())
+				require.NotNil(t, localWriter.TokenMetaData)
+				require.Equal(t, writer, localWriter.TokenMetaData.Creator)
+				require.Equal(t, []byte("changed attributes"), localWriter.TokenMetaData.Attributes)
+				originFinal, readErr := source.BlockchainHook.GetESDTToken(origin, token, 1)
+				require.NoError(t, readErr)
+				require.Zero(t, originFinal.Value.Sign())
+				require.Equal(t, big.NewInt(1), remoteBeforeTransfer.Value)
+				return
+			}
 			utils.ProcessSCRResult(t, destination, produce(), vmcommon.Ok, nil)
 			fresh, err := destination.BlockchainHook.GetESDTToken(holder, token, 1)
 			require.NoError(t, err)
