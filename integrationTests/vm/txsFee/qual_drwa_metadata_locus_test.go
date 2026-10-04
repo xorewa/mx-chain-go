@@ -114,6 +114,9 @@ func qualDRWAMetadataProcess(t *testing.T, ctx *vm.VMTestContext, tx *transactio
 // This uses two upstream in-memory shard processors and manually delivers their
 // real SCRs. It establishes only the selected metadata merge behaviour, not
 // routing, deduplication, consensus, canonical finality or localnet qualification.
+// Pending P21 coverage: DynamicNFT cross-shard behaviour and source-supported
+// Update/Recreate applicability for non-dynamic NFTv2/SFT/Meta. This quantity-3
+// fixture cannot be extrapolated to a single-unit NFT or to other operations.
 func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 	for _, family := range []string{core.DynamicSFTESDT, core.DynamicMetaESDT} {
 		t.Run(family, func(t *testing.T) {
@@ -195,7 +198,7 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 			require.Equal(t, big.NewInt(2), fresh.Value)
 			require.Equal(t, []byte("changed attributes"), fresh.TokenMetaData.Attributes)
 			require.Equal(t, writer, fresh.TokenMetaData.Creator)
-			// Older data arriving after newer metadata must not roll back fields.
+			// On this upstream pin, delayed older data leaves the newer metadata unchanged.
 			utils.ProcessSCRResult(t, destination, oldTransfer, vmcommon.Ok, nil)
 			final, err := destination.BlockchainHook.GetESDTToken(holder, token, 1)
 			require.NoError(t, err)

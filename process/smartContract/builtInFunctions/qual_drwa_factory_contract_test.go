@@ -1,6 +1,7 @@
 package builtInFunctions
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -19,11 +20,33 @@ type qualDRWABaseOnlyBuiltin struct {
 // Part B 16.2 requires preservation of optional native interfaces. This observes
 // the upstream factory; it does not implement or qualify a DRWA wrapper.
 func TestQualDRWAFactoryOptionalInterfaces(t *testing.T) {
-	for _, name := range []string{
+	expectedPayment := []string{
 		core.BuiltInFunctionESDTTransfer,
 		core.BuiltInFunctionESDTNFTTransfer,
 		core.BuiltInFunctionMultiESDTNFTTransfer,
-	} {
+	}
+	expectedTime := []string{core.BuiltInFunctionESDTNFTAddURI, core.BuiltInFunctionESDTNFTUpdateAttributes, core.ESDTMetaDataRecreate, core.ESDTMetaDataUpdate, core.ESDTSetNewURIs, core.ESDTModifyRoyalties, core.ESDTModifyCreator}
+	factory, err := CreateBuiltInFunctionsFactory(createMockArguments())
+	require.NoError(t, err)
+	container := factory.BuiltInFunctionContainer()
+	var paymentNames, timeNames []string
+	for name := range container.Keys() {
+		function, getErr := container.Get(name)
+		require.NoError(t, getErr)
+		if _, ok := function.(vmcommon.AcceptPayableChecker); ok {
+			paymentNames = append(paymentNames, name)
+		}
+		if _, ok := function.(vmcommon.BlockchainDataProvider); ok {
+			timeNames = append(timeNames, name)
+		}
+	}
+	// Discover coverage independently of the pinned expected sets: an added
+	// or removed interface-bearing function must require an explicit review.
+	require.ElementsMatch(t, expectedPayment, paymentNames, "payment interface inventory")
+	require.ElementsMatch(t, expectedTime, timeNames, "time interface inventory")
+	sort.Strings(paymentNames)
+	sort.Strings(timeNames)
+	for _, name := range paymentNames {
 		t.Run("payment/"+name, func(t *testing.T) {
 			factory, err := CreateBuiltInFunctionsFactory(createMockArguments())
 			require.NoError(t, err)
@@ -38,15 +61,7 @@ func TestQualDRWAFactoryOptionalInterfaces(t *testing.T) {
 			require.NoError(t, factory.SetPayableHandler(&testscommon.BlockChainHookStub{}))
 		})
 	}
-	for _, name := range []string{
-		core.BuiltInFunctionESDTNFTAddURI,
-		core.BuiltInFunctionESDTNFTUpdateAttributes,
-		core.ESDTMetaDataRecreate,
-		core.ESDTMetaDataUpdate,
-		core.ESDTSetNewURIs,
-		core.ESDTModifyRoyalties,
-		core.ESDTModifyCreator,
-	} {
+	for _, name := range timeNames {
 		t.Run("time/"+name, func(t *testing.T) {
 			factory, err := CreateBuiltInFunctionsFactory(createMockArguments())
 			require.NoError(t, err)

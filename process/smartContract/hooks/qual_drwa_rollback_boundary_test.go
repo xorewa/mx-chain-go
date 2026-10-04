@@ -72,3 +72,68 @@ func TestQualDRWAUpstreamRollbackErrorBoundary(t *testing.T) {
 		}
 	}
 }
+
+// A VM return code and a Go error are distinct at this hook boundary. This
+// observes native account-save calls only; it does not prove outer transaction
+// acceptance, persistence or DRWA containment of a failing execution.
+func TestQualDRWAUpstreamBuiltinReturnCodeAndAccountAlias(t *testing.T) {
+	for _, sameAddress := range []bool{false, true} {
+		for _, code := range []vmcommon.ReturnCode{vmcommon.Ok, vmcommon.UserError} {
+			t.Run(fmt.Sprintf("same_address_%t/code_%d", sameAddress, code), func(t *testing.T) {
+				args := createMockBlockChainHookArgs()
+				container := vmcommonBuiltins.NewBuiltInFunctionContainer()
+				sender := stateMock.NewAccountWrapMock([]byte("sender"))
+				destination := stateMock.NewAccountWrapMock([]byte("destination"))
+				output := &vmcommon.VMOutput{ReturnCode: code, ReturnMessage: "native result"}
+				builtinCalls, loads, reverts := 0, 0, 0
+				var saved []vmcommon.AccountHandler
+				require.NoError(t, container.Add("qualProbe", &mock.BuiltInFunctionStub{
+					ProcessBuiltinFunctionCalled: func(snd, dst vmcommon.UserAccountHandler, _ *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+						builtinCalls++
+						require.Same(t, sender, snd)
+						if sameAddress {
+							require.Same(t, sender, dst)
+						} else {
+							require.Same(t, destination, dst)
+						}
+						return output, nil
+					},
+				}))
+				args.BuiltInFunctions = container
+				args.Accounts = &stateMock.AccountsStub{
+					GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+						require.Equal(t, sender.AddressBytes(), address)
+						return sender, nil
+					},
+					LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+						loads++
+						require.Equal(t, destination.AddressBytes(), address)
+						return destination, nil
+					},
+					SaveAccountCalled:      func(account vmcommon.AccountHandler) error { saved = append(saved, account); return nil },
+					RevertToSnapshotCalled: func(int) error { reverts++; return nil },
+				}
+				hook, err := hooks.NewBlockChainHookImpl(args)
+				require.NoError(t, err)
+				recipient := destination.AddressBytes()
+				if sameAddress {
+					recipient = sender.AddressBytes()
+				}
+				actual, err := hook.ProcessBuiltInFunction(createContractCallInput("qualProbe", sender.AddressBytes(), recipient))
+				require.NoError(t, err)
+				require.Same(t, output, actual)
+				require.Equal(t, 1, builtinCalls)
+				require.Zero(t, reverts)
+				if sameAddress {
+					require.Zero(t, loads)
+					require.Len(t, saved, 1)
+				} else {
+					require.Equal(t, 1, loads)
+					require.Len(t, saved, 2)
+					require.Same(t, destination, saved[1])
+				}
+				require.Same(t, sender, saved[0])
+			})
+		}
+	}
+}
