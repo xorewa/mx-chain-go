@@ -128,7 +128,7 @@ func TestQualDRWAResultItemImport(t *testing.T) {
 	for _, node := range proof {
 		limit += len(node)
 	}
-	for _, name := range []string{"valid", "wrong_H", "wrong_S", "wrong_key", "wrong_shard", "missing_proof", "corrupt_proof", "over_budget", "wrong_result_root", "duplicate_result"} {
+	for _, name := range []string{"valid", "wrong_H", "wrong_S", "wrong_key", "wrong_shard", "missing_proof", "corrupt_proof", "reordered_native_proof", "over_budget", "wrong_result_root", "duplicate_result"} {
 		t.Run(name, func(t *testing.T) {
 			candidateH, candidateS, k := bytes.Clone(hBytes), bytes.Clone(sBytes), bytes.Clone(key)
 			nodes := make([][]byte, len(proof))
@@ -149,6 +149,23 @@ func TestQualDRWAResultItemImport(t *testing.T) {
 				nodes = nil
 			case "corrupt_proof":
 				nodes[0][0] ^= 1
+			case "reordered_native_proof":
+				// Native GetProof emits a root-to-leaf sequence (trie/
+				// patriciaMerkleTrie.go:557-647). VerifyProof checks that
+				// sequence; content-addressed Recreate/Get does not. This
+				// distinguishes the existing gate without claiming that
+				// proof ordering is a selected DRWA production wire format.
+				require.Greater(t, len(nodes), 1)
+				nodes[0], nodes[len(nodes)-1] = nodes[len(nodes)-1], nodes[0]
+				db := testscommon.NewMemDbMock()
+				for _, node := range nodes {
+					require.NoError(t, db.Put(hsh.Compute(string(node)), bytes.Clone(node)))
+				}
+				rebuilt, rebuildErr := qualItemTrie(t, db).Recreate(holders.NewDefaultRootHashesHolder(root))
+				require.NoError(t, rebuildErr)
+				recovered, _, readErr := rebuilt.Get(key)
+				require.NoError(t, readErr)
+				require.Equal(t, expected, recovered, "reconstruction alone accepts the reordered node set")
 			case "over_budget":
 				budget--
 			case "wrong_result_root", "duplicate_result":
