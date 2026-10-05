@@ -64,13 +64,13 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 			require.Equal(t, vmcommon.Ok, e.Execute(input), eei.returnMessage)
 			require.Len(t, eei.output, 1)
 			tokenID := bytes.Clone(eei.output[0])
-			read := func() *ESDTDataV2 {
+			read := func(t *testing.T) *ESDTDataV2 {
 				t.Helper()
 				token, err := e.getExistingToken(tokenID)
 				require.NoError(t, err)
 				return token
 			}
-			token := read()
+			token := read(t)
 			require.Equal(t, tc.family, string(token.TokenType))
 			require.Zero(t, token.MintedValue.Sign())
 			require.Zero(t, token.BurntValue.Sign())
@@ -81,7 +81,7 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 			// Upstream cleanup-enabled issuance still grants BurnForAll; false
 			// canUpgrade and GlobalMintBurnFlag do not remove that separate role.
 			require.True(t, checkIfDefinedRoleExistsInToken(token, []byte(vmcommon.ESDTRoleBurnForAll)))
-			call := func(method string, argv ...[]byte) vmcommon.ReturnCode {
+			call := func(t *testing.T, method string, argv ...[]byte) vmcommon.ReturnCode {
 				t.Helper()
 				eei.returnMessage = ""
 				eei.gasRemaining = 1000000
@@ -89,14 +89,14 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 				in.CallerAddr = owner
 				return e.Execute(in)
 			}
-			require.Equal(t, vmcommon.UserError, call("controlChanges", []byte(upgradable), []byte("true")))
+			require.Equal(t, vmcommon.UserError, call(t, "controlChanges", []byte(upgradable), []byte("true")))
 			require.Contains(t, eei.returnMessage, "token is not upgradable")
-			require.False(t, read().Upgradable)
-			require.Equal(t, vmcommon.UserError, call("transferOwnership", replacement))
+			require.False(t, read(t).Upgradable)
+			require.Equal(t, vmcommon.UserError, call(t, "transferOwnership", replacement))
 			require.Equal(t, "cannot change owner of the token", eei.returnMessage)
-			require.Equal(t, owner, read().OwnerAddress)
-			require.Equal(t, vmcommon.Ok, call("unsetBurnRoleGlobally"), eei.returnMessage)
-			require.False(t, checkIfDefinedRoleExistsInToken(read(), []byte(vmcommon.ESDTRoleBurnForAll)))
+			require.Equal(t, owner, read(t).OwnerAddress)
+			require.Equal(t, vmcommon.Ok, call(t, "unsetBurnRoleGlobally"), eei.returnMessage)
+			require.False(t, checkIfDefinedRoleExistsInToken(read(t), []byte(vmcommon.ESDTRoleBurnForAll)))
 			// Part A E.22.3 requires family-specific applicability. Exercise real
 			// System SC admission rather than assuming a directly injected role
 			// is lawful for every token family. The native DynamicESDT flag also
@@ -104,13 +104,13 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 			for _, metadataRole := range []string{core.ESDTRoleNFTUpdate, core.ESDTRoleNFTRecreate} {
 				t.Run(metadataRole, func(t *testing.T) {
 					beforeRole := bytes.Clone(eei.GetStorage(tokenID))
-					code := call("setSpecialRole", replacement, []byte(metadataRole))
+					code := call(t, "setSpecialRole", replacement, []byte(metadataRole))
 					switch tc.family {
 					case core.NonFungibleESDTv2, core.DynamicNFTESDT, core.DynamicSFTESDT, core.DynamicMetaESDT:
 						require.Equal(t, vmcommon.Ok, code, eei.returnMessage)
-						require.True(t, checkIfDefinedRoleExistsInToken(read(), []byte(metadataRole)))
-						require.Equal(t, vmcommon.Ok, call("unSetSpecialRole", replacement, []byte(metadataRole)), eei.returnMessage)
-						require.False(t, checkIfDefinedRoleExistsInToken(read(), []byte(metadataRole)))
+						require.True(t, checkIfDefinedRoleExistsInToken(read(t), []byte(metadataRole)))
+						require.Equal(t, vmcommon.Ok, call(t, "unSetSpecialRole", replacement, []byte(metadataRole)), eei.returnMessage)
+						require.False(t, checkIfDefinedRoleExistsInToken(read(t), []byte(metadataRole)))
 					default:
 						require.Equal(t, vmcommon.UserError, code)
 						require.Equal(t, "invalid argument", eei.returnMessage)
@@ -122,31 +122,31 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 			if tc.family == core.FungibleESDT {
 				burnRole = core.ESDTRoleLocalBurn
 			}
-			require.Equal(t, vmcommon.Ok, call("setSpecialRole", origin, []byte(burnRole)), eei.returnMessage)
-			require.True(t, checkIfDefinedRoleExistsInToken(read(), []byte(burnRole)))
-			require.Equal(t, vmcommon.Ok, call("unSetSpecialRole", origin, []byte(burnRole)), eei.returnMessage)
-			require.False(t, checkIfDefinedRoleExistsInToken(read(), []byte(burnRole)))
+			require.Equal(t, vmcommon.Ok, call(t, "setSpecialRole", origin, []byte(burnRole)), eei.returnMessage)
+			require.True(t, checkIfDefinedRoleExistsInToken(read(t), []byte(burnRole)))
+			require.Equal(t, vmcommon.Ok, call(t, "unSetSpecialRole", origin, []byte(burnRole)), eei.returnMessage)
+			require.False(t, checkIfDefinedRoleExistsInToken(read(t), []byte(burnRole)))
 			if tc.family != core.FungibleESDT {
-				require.Equal(t, vmcommon.Ok, call("setSpecialRole", origin, []byte(core.ESDTRoleNFTCreate)), eei.returnMessage)
+				require.Equal(t, vmcommon.Ok, call(t, "setSpecialRole", origin, []byte(core.ESDTRoleNFTCreate)), eei.returnMessage)
 				beforeHandover := bytes.Clone(eei.GetStorage(tokenID))
-				require.Equal(t, vmcommon.UserError, call("unSetSpecialRole", origin, []byte(core.ESDTRoleNFTCreate)))
+				require.Equal(t, vmcommon.UserError, call(t, "unSetSpecialRole", origin, []byte(core.ESDTRoleNFTCreate)))
 				require.Contains(t, eei.returnMessage, "cannot un set NFT create role")
 				require.Equal(t, beforeHandover, eei.GetStorage(tokenID))
-				require.Equal(t, vmcommon.UserError, call("setSpecialRole", replacement, []byte(core.ESDTRoleNFTCreate)))
+				require.Equal(t, vmcommon.UserError, call(t, "setSpecialRole", replacement, []byte(core.ESDTRoleNFTCreate)))
 				require.Equal(t, "NFT create role already exists", eei.returnMessage)
 				require.Equal(t, beforeHandover, eei.GetStorage(tokenID))
-				require.Equal(t, vmcommon.UserError, call("transferNFTCreateRole", origin, replacement))
+				require.Equal(t, vmcommon.UserError, call(t, "transferNFTCreateRole", origin, replacement))
 				require.Contains(t, eei.returnMessage, "NFT create role transfer is not allowed")
 				require.Equal(t, beforeHandover, eei.GetStorage(tokenID))
 				// The permanent stop is available but is not a creator handover.
-				require.Equal(t, vmcommon.Ok, call("stopNFTCreate"), eei.returnMessage)
-				require.True(t, read().NFTCreateStopped)
-				require.False(t, checkIfDefinedRoleExistsInToken(read(), []byte(core.ESDTRoleNFTCreate)))
-				require.Equal(t, vmcommon.UserError, call("setSpecialRole", replacement, []byte(core.ESDTRoleNFTCreate)))
+				require.Equal(t, vmcommon.Ok, call(t, "stopNFTCreate"), eei.returnMessage)
+				require.True(t, read(t).NFTCreateStopped)
+				require.False(t, checkIfDefinedRoleExistsInToken(read(t), []byte(core.ESDTRoleNFTCreate)))
+				require.Equal(t, vmcommon.UserError, call(t, "setSpecialRole", replacement, []byte(core.ESDTRoleNFTCreate)))
 				require.Contains(t, eei.returnMessage, "NFT creation was stopped")
 			}
-			require.False(t, read().Upgradable)
-			require.Zero(t, read().MintedValue.Sign())
+			require.False(t, read(t).Upgradable)
+			require.Zero(t, read(t).MintedValue.Sign())
 		})
 	}
 }

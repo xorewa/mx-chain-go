@@ -54,8 +54,8 @@ func TestQualDRWAEvaluatedHeaderTime(t *testing.T) {
 				require.Equal(t, tc.header.GetNonce(), hook.CurrentNonce())
 				require.Equal(t, tc.header.GetEpoch(), hook.CurrentEpoch())
 				require.Equal(t, uint64(77000), hook.LastTimeStampMs())
-				// A rejected installation must not be treated as installation of
-				// the attempted header. Native callers must propagate the error.
+				// Nil input is rejected before header-state processing. Non-nil
+				// trigger/storage failures are exercised separately below.
 				require.ErrorIs(t, hook.SetCurrentHeader(nil), hooks.ErrNilCurrentHeader)
 				require.Equal(t, tc.milliseconds, hook.CurrentTimeStampMs())
 			})
@@ -64,25 +64,56 @@ func TestQualDRWAEvaluatedHeaderTime(t *testing.T) {
 }
 
 func TestQualDRWAHeaderInstallationFailureKeepsPreviousContext(t *testing.T) {
-	args := createMockBlockChainHookArgs()
-	flags, err := enablers.NewEnableEpochsHandler(config.EnableEpochs{SupernovaEnableEpoch: 10}, &epochNotifier.EpochNotifierStub{})
-	require.NoError(t, err)
-	args.EnableEpochsHandler = flags
 	expected := errors.New("epoch-start header unavailable")
-	args.EpochStartTrigger = &testscommon.EpochStartTriggerStub{
-		LastCommitedEpochStartHdrCalled: func() (data.HeaderHandler, error) { return nil, expected },
+	for _, tc := range []struct {
+		name                             string
+		lastNil                          bool
+		lastErr, storageErr, expectedErr error
+		storageCalls                     int
+	}{
+		{"trigger_error", false, expected, nil, expected, 0},
+		{"trigger_nil", true, nil, nil, hooks.ErrNilLastCommitedEpochStartHdr, 0},
+		{"storage_error", false, nil, expected, expected, 1},
+		{"storage_nil", false, nil, nil, hooks.ErrNilLastCommitedEpochStartHdr, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := createMockBlockChainHookArgs()
+			flags, err := enablers.NewEnableEpochsHandler(config.EnableEpochs{SupernovaEnableEpoch: 10}, &epochNotifier.EpochNotifierStub{})
+			require.NoError(t, err)
+			args.EnableEpochsHandler = flags
+			previous := &block.Header{Epoch: 9, Round: 91, Nonce: 5, TimeStamp: 1234}
+			lastCalls, storageCalls := 0, 0
+			args.EpochStartTrigger = &testscommon.EpochStartTriggerStub{
+				LastCommitedEpochStartHdrCalled: func() (data.HeaderHandler, error) {
+					lastCalls++
+					if tc.lastNil || tc.lastErr != nil {
+						return nil, tc.lastErr
+					}
+					return previous, nil
+				},
+				GetEpochStartHdrFromStorageCalled: func(epoch uint32) (data.HeaderHandler, error) {
+					storageCalls++
+					require.Equal(t, uint32(10), epoch)
+					return nil, tc.storageErr
+				},
+			}
+			hook, err := hooks.NewBlockChainHookImpl(args)
+			require.NoError(t, err)
+			require.NoError(t, hook.SetEpochStartHeader(previous))
+			require.NoError(t, hook.SetCurrentHeader(previous))
+			attempted := &block.HeaderV3{Epoch: 10, Round: 100, Nonce: 6, TimestampMs: 2345678}
+			require.ErrorIs(t, hook.SetCurrentHeader(attempted), tc.expectedErr)
+			require.Equal(t, 1, lastCalls)
+			require.Equal(t, tc.storageCalls, storageCalls)
+			require.Equal(t, uint64(1234000), hook.CurrentTimeStampMs())
+			require.Equal(t, uint32(9), hook.CurrentEpoch())
+			require.Equal(t, uint64(91), hook.CurrentRound())
+			require.Equal(t, uint64(5), hook.CurrentNonce())
+			require.Equal(t, uint64(1234000), hook.EpochStartBlockTimeStampMs())
+			require.Equal(t, uint64(91), hook.EpochStartBlockRound())
+			require.Equal(t, uint64(5), hook.EpochStartBlockNonce())
+		})
 	}
-	hook, err := hooks.NewBlockChainHookImpl(args)
-	require.NoError(t, err)
-	previous := &block.Header{Epoch: 9, Round: 91, Nonce: 5, TimeStamp: 1234}
-	require.NoError(t, hook.SetEpochStartHeader(previous))
-	require.NoError(t, hook.SetCurrentHeader(previous))
-	attempted := &block.HeaderV3{Epoch: 10, Round: 100, Nonce: 6, TimestampMs: 2345678}
-	require.ErrorIs(t, hook.SetCurrentHeader(attempted), expected)
-	require.Equal(t, uint64(1234000), hook.CurrentTimeStampMs())
-	require.Equal(t, uint32(9), hook.CurrentEpoch())
-	require.Equal(t, uint64(91), hook.CurrentRound())
-	require.Equal(t, uint64(5), hook.CurrentNonce())
 }
 
 func TestQualDRWATimeConversionUsesHeaderEpochAndBounds(t *testing.T) {
@@ -113,16 +144,32 @@ func TestQualDRWATimeConversionUsesHeaderEpochAndBounds(t *testing.T) {
 }
 
 func TestQualDRWAProposedMetaEpochIsNotRawHeaderEpoch(t *testing.T) {
-	args := createMockBlockChainHookArgs()
-	flags, err := enablers.NewEnableEpochsHandler(config.EnableEpochs{SupernovaEnableEpoch: 10, FixEpochChangeProposedCurrentEpochEnableEpoch: 11}, &epochNotifier.EpochNotifierStub{})
-	require.NoError(t, err)
-	args.EnableEpochsHandler = flags
-	hook, err := hooks.NewBlockChainHookImpl(args)
-	require.NoError(t, err)
-	header := &block.MetaBlockV3{Epoch: 10, Round: 100, TimestampMs: 1234567, EpochChangeProposed: true}
-	require.NoError(t, hook.SetEpochStartHeader(header))
-	require.NoError(t, hook.SetCurrentHeader(header))
-	require.Equal(t, uint32(10), header.GetEpoch())
-	require.Equal(t, uint32(11), hook.CurrentEpoch())
-	require.Equal(t, uint64(1234567), hook.CurrentTimeStampMs())
+	for _, tc := range []struct {
+		name                    string
+		header                  data.HeaderHandler
+		fixEpoch, expectedEpoch uint32
+	}{
+		{"fix_enabled_at_next_epoch", &block.MetaBlockV3{Epoch: 10, Round: 100, TimestampMs: 1234567, EpochChangeProposed: true}, 11, 11},
+		{"fix_disabled_at_next_epoch", &block.MetaBlockV3{Epoch: 10, Round: 100, TimestampMs: 1234567, EpochChangeProposed: true}, 12, 10},
+		{"not_proposed", &block.MetaBlockV3{Epoch: 10, Round: 100, TimestampMs: 1234567}, 11, 10},
+		{"legacy_meta", &block.MetaBlock{Epoch: 10, Round: 100, TimeStamp: 1234567}, 11, 10},
+		{"shard_v3", &block.HeaderV3{Epoch: 10, Round: 100, TimestampMs: 1234567}, 11, 10},
+	} {
+		for _, notification := range []uint32{0, math.MaxUint32} {
+			t.Run(fmt.Sprintf("%s/notified_epoch_%d", tc.name, notification), func(t *testing.T) {
+				args := createMockBlockChainHookArgs()
+				flags, err := enablers.NewEnableEpochsHandler(config.EnableEpochs{SupernovaEnableEpoch: 10, FixEpochChangeProposedCurrentEpochEnableEpoch: tc.fixEpoch}, &epochNotifier.EpochNotifierStub{})
+				require.NoError(t, err)
+				flags.EpochConfirmed(notification, 0)
+				args.EnableEpochsHandler = flags
+				hook, err := hooks.NewBlockChainHookImpl(args)
+				require.NoError(t, err)
+				require.NoError(t, hook.SetEpochStartHeader(tc.header))
+				require.NoError(t, hook.SetCurrentHeader(tc.header))
+				require.Equal(t, uint32(10), tc.header.GetEpoch())
+				require.Equal(t, tc.expectedEpoch, hook.CurrentEpoch())
+				require.Equal(t, uint64(1234567), hook.CurrentTimeStampMs())
+			})
+		}
+	}
 }
