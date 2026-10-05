@@ -134,11 +134,17 @@ func TestQualDRWACommittedAccountItem(t *testing.T) {
 					require.NoError(t, e)
 					return b
 				}
-				for _, name := range []string{"valid", "wrong_H_hash", "wrong_S_hash", "swapped_S_H",
+				cases := []string{"valid", "wrong_H_hash", "wrong_S_hash", "substituted_S_content", "swapped_S_H",
 					"wrong_origin_shard", "missing_result", "duplicate_result", "result_nonce", "result_round",
 					"result_epoch", "result_root", "substituted_gas", "substituted_receipts", "malformed_header",
 					"malformed_result", "wrong_account", "wrong_item", "missing_account_nodes", "missing_data_nodes",
-					"corrupt_data_node", "aggregate_limit", "negative_limit"} {
+					"corrupt_data_node", "aggregate_limit", "negative_limit"}
+				// MetaBlockV3.GetShardID is intrinsically MetachainShardId; it has
+				// no independent shard field to substitute (core v1.5.1:212-214).
+				if shard != core.MetachainShardId {
+					cases = append(cases, "executed_header_wrong_shard")
+				}
+				for _, name := range cases {
 					t.Run(name, func(t *testing.T) {
 						var s, h data.HeaderHandler
 						if shard == core.MetachainShardId {
@@ -147,6 +153,13 @@ func TestQualDRWACommittedAccountItem(t *testing.T) {
 						} else {
 							s = &block.HeaderV3{Nonce: 11, Round: 21, Epoch: 3, ShardID: shard}
 							h = &block.HeaderV3{Nonce: 15, Round: 25, Epoch: 4, ShardID: shard}
+						}
+						if name == "executed_header_wrong_shard" {
+							// Commit the actual S bytes and result consistently. H stays
+							// on the producing shard, so only S's shard binding rejects.
+							require.NoError(t, s.SetShardID((shard+1)%3))
+							require.Equal(t, shard, h.GetShardID())
+							require.NotEqual(t, shard, s.GetShardID())
 						}
 						sb := marshal(s)
 						expectedS := hash.Compute(string(sb))
@@ -203,6 +216,17 @@ func TestQualDRWACommittedAccountItem(t *testing.T) {
 							expectedH = []byte("other-H")
 						case "wrong_S_hash":
 							expectedS = []byte("other-S")
+						case "substituted_S_content":
+							// Keep the trusted S identity and H's committed result.
+							// A replacement with identical shard/nonce/round/epoch is
+							// distinguished only by hashing its different content.
+							require.NoError(t, s.SetPrevHash([]byte("different-parent")))
+							sb = marshal(s)
+							require.NotEqual(t, expectedS, hash.Compute(string(sb)))
+							require.Equal(t, shard, s.GetShardID())
+							require.Equal(t, base.HeaderNonce, s.GetNonce())
+							require.Equal(t, base.HeaderRound, s.GetRound())
+							require.Equal(t, base.HeaderEpoch, s.GetEpoch())
 						case "swapped_S_H":
 							sb, hb = hb, sb
 							expectedS, expectedH = hash.Compute(string(sb)), hash.Compute(string(hb))
