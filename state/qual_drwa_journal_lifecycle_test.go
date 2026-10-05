@@ -7,6 +7,7 @@ import (
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/state/accounts"
 	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
 	trieMock "github.com/multiversx/mx-chain-go/testscommon/trie"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
@@ -174,6 +175,110 @@ func TestQualDRWACommitJournalAndLastRootBoundary(t *testing.T) {
 				last = newRoot
 			}
 			require.Equal(t, [][]byte{oldRoot, last}, recreated, "failed commit cannot advance lastRootHash")
+		})
+	}
+}
+
+// The native TrieStub does not expose a dirty-hash error callback. Keep this
+// override in the qualification file instead of adding a production test seam.
+type qualDirtyHashTrie struct {
+	*trieMock.TrieStub
+	dirty func() (common.ModifiedHashes, error)
+}
+
+func (q *qualDirtyHashTrie) GetDirtyHashes() (common.ModifiedHashes, error) { return q.dirty() }
+
+func TestQualDRWACommitDataTrieAndEvictionFailures(t *testing.T) {
+	for _, kind := range []string{"data_hash_error", "data_commit_error", "main_hash_error", "eviction_error", "success"} {
+		t.Run(kind, func(t *testing.T) {
+			nativeErr := errors.New("injected additional commit error")
+			oldRoot, newRoot, dataRoot := []byte("old"), []byte("new"), []byte("data")
+			var order []string
+			var recreated [][]byte
+			main := &qualDirtyHashTrie{TrieStub: &trieMock.TrieStub{}}
+			child := &qualDirtyHashTrie{TrieStub: &trieMock.TrieStub{}}
+			main.dirty = func() (common.ModifiedHashes, error) {
+				order = append(order, "main_hash")
+				if kind == "main_hash_error" {
+					return nil, nativeErr
+				}
+				return common.ModifiedHashes{"main": {}}, nil
+			}
+			child.dirty = func() (common.ModifiedHashes, error) {
+				order = append(order, "data_hash")
+				if kind == "data_hash_error" {
+					return nil, nativeErr
+				}
+				return common.ModifiedHashes{"data": {}}, nil
+			}
+			child.CommitCalled = func() error {
+				order = append(order, "data_commit")
+				if kind == "data_commit_error" {
+					return nativeErr
+				}
+				return nil
+			}
+			main.CommitCalled = func() error { order = append(order, "main_commit"); return nil }
+			main.RootCalled = func() ([]byte, error) { order = append(order, "root"); return newRoot, nil }
+			main.GetOldRootCalled = func() []byte { return oldRoot }
+			main.RecreateCalled = func(h common.RootHashHolder) (common.Trie, error) {
+				if string(h.GetRootHash()) == string(dataRoot) {
+					return child, nil
+				}
+				recreated = append(recreated, append([]byte(nil), h.GetRootHash()...))
+				return main, nil
+			}
+			args := createMockAccountsDBArgs()
+			main.GetStorageManagerCalled = args.Trie.GetStorageManager
+			args.Trie = main
+			args.PruningEnabled = true
+			args.StoragePruningManager = &stateMock.StoragePruningManagerStub{MarkForEvictionCalled: func(old, next []byte, _, changed common.ModifiedHashes) error {
+				order = append(order, "eviction")
+				require.Equal(t, oldRoot, old)
+				require.Equal(t, newRoot, next)
+				require.Equal(t, common.ModifiedHashes{"main": {}, "data": {}}, changed)
+				if kind == "eviction_error" {
+					return nativeErr
+				}
+				return nil
+			}}
+			args.StateAccessesCollector = &stateMock.StateAccessesCollectorStub{CommitCollectedAccessesCalled: func(root []byte) error {
+				require.Equal(t, newRoot, root)
+				order = append(order, "collector")
+				return nil
+			}}
+			adb, err := state.NewAccountsDB(args)
+			require.NoError(t, err)
+			require.NoError(t, adb.RecreateTrie(holders.NewDefaultRootHashesHolder(oldRoot)))
+			account, err := accounts.NewUserAccount([]byte("account"), &trieMock.DataTrieTrackerStub{}, &trieMock.TrieLeafParserStub{})
+			require.NoError(t, err)
+			account.SetRootHash(dataRoot)
+			require.NoError(t, adb.LoadDataTrieConcurrentSafe(account))
+			require.Same(t, child, account.DataTrie())
+			adb.Journalize(&journalEntryStub{revertCalled: func() (vmcommon.AccountHandler, error) { t.Fatal("commit must clear journal"); return nil, nil }})
+			root, err := adb.Commit()
+			if kind == "success" {
+				require.NoError(t, err)
+				require.Equal(t, newRoot, root)
+			} else {
+				require.ErrorIs(t, err, nativeErr)
+				require.Nil(t, root)
+			}
+			require.Zero(t, adb.JournalLen())
+			expected := map[string][]string{
+				"data_hash_error":   {"data_hash"},
+				"data_commit_error": {"data_hash", "data_commit"},
+				"main_hash_error":   {"data_hash", "data_commit", "main_hash"},
+				"eviction_error":    {"data_hash", "data_commit", "main_hash", "main_commit", "root", "collector", "eviction"},
+				"success":           {"data_hash", "data_commit", "main_hash", "main_commit", "root", "collector", "eviction"},
+			}
+			require.Equal(t, expected[kind], order)
+			require.NoError(t, adb.RevertToSnapshot(0))
+			last := oldRoot
+			if kind == "success" {
+				last = newRoot
+			}
+			require.Equal(t, [][]byte{oldRoot, last}, recreated)
 		})
 	}
 }
