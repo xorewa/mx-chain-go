@@ -24,10 +24,11 @@ import (
 // The selected result root and expected address/key are TRUSTED INPUTS here.
 // H/S/M/B finality, production address/key allocation, transport and gas remain
 // separate prerequisites. This fixture uses the upstream integration helper's
-// SHA-256/marshaller and legacy (AutoBalanceDataTriesFlag disabled) configuration;
-// it is not a selected production cryptographic or activation configuration.
+// SHA-256/marshaller. The caller supplies the trusted activation handler, never
+// the witness producer. Both legacy and auto-balanced reads are exercised below;
+// these fixtures do not select a production cryptographic or activation profile.
 // No remote response's separate Value or data-root field is accepted as evidence.
-func qualReadAccountWitness(t *testing.T, root, address, key []byte, accountNodes, dataNodes [][]byte, limit int) ([]byte, error) {
+func qualReadAccountWitness(t *testing.T, root, address, key []byte, accountNodes, dataNodes [][]byte, limit int, enableEpochs common.EnableEpochsHandler) ([]byte, error) {
 	t.Helper()
 	deny := errors.New("qualification account witness rejected")
 	if len(root) == 0 || len(address) == 0 || len(key) == 0 || len(accountNodes) == 0 || len(dataNodes) == 0 {
@@ -53,7 +54,7 @@ func qualReadAccountWitness(t *testing.T, root, address, key []byte, accountNode
 		}
 		tr, err := trie.NewTrie(&storageManager.StorageManagerStub{
 			GetCalled: db.Get, GetFromCurrentEpochCalled: db.Get, PutCalled: db.Put,
-		}, integrationTests.TestMarshalizer, integrationTests.TestHasher, &enableEpochsHandlerMock.EnableEpochsHandlerStub{}, 5)
+		}, integrationTests.TestMarshalizer, integrationTests.TestHasher, enableEpochs, 5)
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +70,7 @@ func qualReadAccountWitness(t *testing.T, root, address, key []byte, accountNode
 	}
 	creator, err := factory.NewAccountCreator(factory.ArgsAccountCreator{
 		Hasher: integrationTests.TestHasher, Marshaller: integrationTests.TestMarshalizer,
-		EnableEpochsHandler:    &enableEpochsHandlerMock.EnableEpochsHandlerStub{},
+		EnableEpochsHandler:    enableEpochs,
 		StateAccessesCollector: &stateMock.StateAccessesCollectorStub{},
 	})
 	if err != nil {
@@ -181,13 +182,171 @@ func TestQualDRWAAccountWitness(t *testing.T) {
 				ap[0], ap[len(ap)-1] = ap[len(ap)-1], ap[0]
 				dp[0], dp[len(dp)-1] = dp[len(dp)-1], dp[0]
 			}
-			value, readErr := qualReadAccountWitness(t, r, a, k, ap, dp, budget)
+			value, readErr := qualReadAccountWitness(t, r, a, k, ap, dp, budget, &enableEpochsHandlerMock.EnableEpochsHandlerStub{})
 			if name == "valid" || name == "reordered_node_set" {
 				require.NoError(t, readErr)
 				require.Equal(t, expected, value)
 			} else {
 				require.Error(t, readErr)
 				require.Empty(t, value)
+			}
+		})
+	}
+}
+
+func TestQualDRWAAccountWitnessAddressBinding(t *testing.T) {
+	adb := createAccountsDBTestSetup()
+	t.Cleanup(func() { require.NoError(t, adb.Close()) })
+	address, otherAddress := bytes.Repeat([]byte{41}, 32), bytes.Repeat([]byte{42}, 32)
+	key, expected := []byte("item"), []byte("other account's authenticated item")
+	acc, err := adb.LoadAccount(otherAddress)
+	require.NoError(t, err)
+	require.NoError(t, acc.(state.UserAccountHandler).SaveKeyValue(key, expected))
+	require.NoError(t, adb.SaveAccount(acc))
+	root, err := adb.Commit()
+	require.NoError(t, err)
+	main, err := adb.GetTrie(root)
+	require.NoError(t, err)
+	accountBytes, _, err := main.Get(otherAddress)
+	require.NoError(t, err)
+	data, err := adb.GetTrie(acc.(state.UserAccountHandler).GetRootHash())
+	require.NoError(t, err)
+	dp, _, err := data.GetProof(key)
+	require.NoError(t, err)
+
+	// Deliberately malformed main-trie fixture: authenticated bytes at the
+	// requested key decode as a DIFFERENT account. Not an AccountsDB write or
+	// a claim that honest account saves can create this state. Shared main-trie
+	// key space must not turn membership alone into account identity.
+	require.NoError(t, main.Update(address, accountBytes))
+	root, err = main.RootHash()
+	require.NoError(t, err)
+	ap, gotAccountBytes, err := main.GetProof(address)
+	require.NoError(t, err)
+	require.Equal(t, accountBytes, gotAccountBytes, "lookup succeeds before the identity check")
+	flags := &enableEpochsHandlerMock.EnableEpochsHandlerStub{}
+	budget := 0
+	for _, nodes := range [][][]byte{ap, dp} {
+		for _, node := range nodes {
+			budget += len(node)
+		}
+	}
+	value, err := qualReadAccountWitness(t, root, address, key, ap, dp, budget, flags)
+	require.Error(t, err, "authenticated bytes for another address must not become this account")
+	require.Empty(t, value)
+}
+
+func TestQualDRWAAccountWitnessAutoBalance(t *testing.T) {
+	// Reuse native account creation, SaveKeyValue, AccountsDB journals/commit,
+	// versioned trie storage, and RetrieveValue's hashed-first lookup. No local
+	// substitute for the native migration or value decoder is introduced.
+	for _, layout := range []string{"legacy_fallback", "hashed_only", "migrated", "hashed_precedence"} {
+		t.Run(layout, func(t *testing.T) {
+			adb := createAccountsDBTestSetup()
+			t.Cleanup(func() { require.NoError(t, adb.Close()) })
+			flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
+			creator, err := factory.NewAccountCreator(factory.ArgsAccountCreator{
+				Hasher: integrationTests.TestHasher, Marshaller: integrationTests.TestMarshalizer,
+				EnableEpochsHandler: flags, StateAccessesCollector: &stateMock.StateAccessesCollectorStub{},
+			})
+			require.NoError(t, err)
+			address := bytes.Repeat([]byte{41}, 32)
+			acc, err := creator.CreateAccount(address)
+			require.NoError(t, err)
+			user := acc.(state.UserAccountHandler)
+			key := qualProtectedFixtureKey([]byte("item"), []byte("action-A"))
+			hashedKey := integrationTests.TestHasher.Compute(string(key))
+			expected := []byte("literal predecessor-A;target-B;dependency-C")
+			// Native trie nibbles run in reverse byte order (node.go). This
+			// neighbour shares the hashed path but is absent at hashedKey.
+			// Its non-membership node is not in the raw-key membership proof.
+			neighbour := bytes.Clone(hashedKey)
+			neighbour[0] ^= 1
+			require.NoError(t, user.SaveKeyValue(neighbour, []byte("unrelated legacy value")))
+			if layout == "legacy_fallback" || layout == "migrated" {
+				require.NoError(t, user.SaveKeyValue(key, expected))
+			}
+			require.NoError(t, adb.SaveAccount(acc))
+			_, err = adb.Commit()
+			require.NoError(t, err)
+			flags.AddActiveFlags(common.AutoBalanceDataTriesFlag)
+			if layout != "legacy_fallback" {
+				require.NoError(t, user.SaveKeyValue(key, expected))
+				require.NoError(t, adb.SaveAccount(acc))
+			}
+			if layout == "hashed_precedence" {
+				// Adversarial mixed layout: a stale raw value cannot override
+				// a present hashed value. Normal migration deletes the raw key.
+				flags.RemoveActiveFlags(common.AutoBalanceDataTriesFlag)
+				require.NoError(t, user.SaveKeyValue(key, []byte("stale raw value")))
+				require.NoError(t, adb.SaveAccount(acc))
+				flags.AddActiveFlags(common.AutoBalanceDataTriesFlag)
+			}
+			root, err := adb.Commit()
+			require.NoError(t, err)
+			main, err := adb.GetTrie(root)
+			require.NoError(t, err)
+			ap, _, err := main.GetProof(address)
+			require.NoError(t, err)
+			data, err := adb.GetTrie(user.GetRootHash())
+			require.NoError(t, err)
+			hashedValue, _, err := data.Get(hashedKey)
+			require.NoError(t, err)
+			rawValue, _, err := data.Get(key)
+			require.NoError(t, err)
+			if layout == "legacy_fallback" {
+				require.Empty(t, hashedValue)
+				require.NotEmpty(t, rawValue)
+			} else {
+				require.NotEmpty(t, hashedValue)
+				if layout == "hashed_precedence" {
+					require.NotEmpty(t, rawValue)
+				} else {
+					require.Empty(t, rawValue, "hashed-only and native migration leave no raw value")
+				}
+			}
+			// Full SMALL fixture node set, not a proposed production proof
+			// size or transport. It includes nodes proving hashed-key absence
+			// before fallback; GetProof alone supplies membership only.
+			dp, remaining, err := data.GetSerializedNodes(user.GetRootHash(), 1<<20)
+			require.NoError(t, err)
+			require.Positive(t, remaining)
+			budget := 0
+			for _, nodes := range [][][]byte{ap, dp} {
+				for _, node := range nodes {
+					budget += len(node)
+				}
+			}
+			t.Run("valid", func(t *testing.T) {
+				value, readErr := qualReadAccountWitness(t, root, address, key, ap, dp, budget, flags)
+				require.NoError(t, readErr)
+				require.Equal(t, expected, value)
+			})
+			t.Run("absent_item", func(t *testing.T) {
+				value, readErr := qualReadAccountWitness(t, root, address, []byte("absent-item"), ap, dp, budget, flags)
+				require.Error(t, readErr)
+				require.Empty(t, value)
+			})
+			t.Run("incomplete_nodes", func(t *testing.T) {
+				require.Greater(t, len(dp), 1)
+				value, readErr := qualReadAccountWitness(t, root, address, key, ap, dp[1:], budget, flags)
+				require.Error(t, readErr)
+				require.Empty(t, value)
+			})
+			if layout == "legacy_fallback" {
+				t.Run("raw_membership_cannot_replace_hashed_absence", func(t *testing.T) {
+					rawProof, _, proofErr := data.GetProof(key)
+					require.NoError(t, proofErr)
+					// Same root/raw proof succeeds with legacy semantics.
+					value, readErr := qualReadAccountWitness(t, root, address, key, ap, rawProof, budget, &enableEpochsHandlerMock.EnableEpochsHandlerStub{})
+					require.NoError(t, readErr)
+					require.Equal(t, expected, value)
+					// Under active semantics missing nodes are UNKNOWN, not
+					// authenticated absence permitting the raw-key fallback.
+					value, readErr = qualReadAccountWitness(t, root, address, key, ap, rawProof, budget, flags)
+					require.Error(t, readErr)
+					require.Empty(t, value)
+				})
 			}
 		})
 	}
