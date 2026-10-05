@@ -37,7 +37,7 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 			args.Eei = eei
 			flags := args.EnableEpochsHandler.(*enableEpochsHandlerMock.EnableEpochsHandlerStub)
 			flags.RemoveActiveFlags(common.GlobalMintBurnFlag)
-			flags.AddActiveFlags(common.DynamicESDTFlag, common.ManagedCryptoAPIsFlag, common.NFTStopCreateFlag)
+			flags.AddActiveFlags(common.DynamicESDTFlag, common.ManagedCryptoAPIsFlag, common.NFTStopCreateFlag, common.ESDTTransferRoleFlag)
 			e, err := NewESDTSmartContract(args)
 			require.NoError(t, err)
 			owner := bytes.Repeat([]byte{1}, 32)
@@ -99,9 +99,10 @@ func TestQualDRWAUpstreamCreationProfile(t *testing.T) {
 			require.False(t, checkIfDefinedRoleExistsInToken(read(t), []byte(vmcommon.ESDTRoleBurnForAll)))
 			// Part A E.22.3 requires family-specific applicability. Exercise real
 			// System SC admission rather than assuming a directly injected role
-			// is lawful for every token family. The native DynamicESDT flag also
-			// enables these roles for NFTv2; SFT/Meta/FT deny them on this pin.
-			for _, metadataRole := range []string{core.ESDTRoleNFTUpdate, core.ESDTRoleNFTRecreate} {
+			// is lawful for every token family. With DynamicESDT and
+			// ESDTTransferRole enabled, NFTv2 and dynamic families admit these
+			// roles; SFT/Meta/FT deny them on this pin.
+			for _, metadataRole := range []string{core.ESDTRoleNFTUpdate, core.ESDTRoleNFTRecreate, core.ESDTRoleModifyCreator, core.ESDTRoleModifyRoyalties, core.ESDTRoleSetNewURI, core.ESDTRoleNFTUpdateAttributes, core.ESDTRoleNFTAddURI} {
 				t.Run(metadataRole, func(t *testing.T) {
 					beforeRole := bytes.Clone(eei.GetStorage(tokenID))
 					code := call(t, "setSpecialRole", replacement, []byte(metadataRole))
