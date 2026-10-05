@@ -8,32 +8,77 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This is an executable, NON-NORMATIVE expected-model draft for Part A 3.1
-// (G3/AM-011/AR-15) and 7.2. It is not a production implementation or an accepted
-// oracle. Opaque strings below stand for already established identities, NOT
-// serialized fields or numeric discriminator choices.
+// This is an executable, NON-NORMATIVE expected-model draft for Part A 3.1,
+// 6.1 and 7.2 (G3/AM-011/AR-01/AR-15). It is not a production
+// implementation or an accepted oracle. Strings stand for already established
+// canonical identities or commitments; they do not select a codec, hash
+// algorithm, storage key, protobuf field or numeric discriminator.
 //
-// The model assumes an external adapter supplies authenticated transition and
-// applied-result evidence. It does not implement/prove that adapter, AR-01/P13,
-// ID allocation, signing, transport, gas, journal persistence or phase commitment.
-// It cannot justify wiring a production ACK consumer before those gates close.
+// The model separates the stable transition/action binding from the result
+// that carries each acknowledgement. A native adapter still has to establish
+// the complete S -> result/root -> H -> M -> B relation below from authenticated
+// committed inputs. An SCR content hash, OriginalTxHash, PrevTxHash or nonce is
+// not accepted as that adapter.
 type qualTransitionBinding struct {
 	family, instance, phase, subject, target, dependencies, requiredShardSet string
 }
 
+type qualCanonicalAction struct {
+	actionID     string
+	actionDigest string
+	binding      qualTransitionBinding
+}
+
+type qualAckPayload struct {
+	binding                qualTransitionBinding
+	actionID, actionDigest string
+	shard                  uint32
+	localExecutionIdentity string
+	appliedStateHash       string
+}
+
+type qualExecutionResult struct {
+	identity, executedHeader, rootHash string
+	ack                                qualAckPayload
+}
+
+type qualCarryingHeader struct {
+	identity string
+	results  map[string]qualExecutionResult
+}
+
+type qualReferenceEntry struct {
+	carryingHeader, executedHeader, executionResult string
+}
+
+type qualMetachainReference struct {
+	identity string
+	entries  []qualReferenceEntry
+}
+
+type qualConsumingBlock struct {
+	identity, authenticatedReference string
+}
+
+type qualResultWitness struct {
+	executedHeader, executionResult, carryingHeader, metachainReference, consumingBlock string
+	fullResult                                                                          qualExecutionResult
+}
+
+type qualCanonicalInputs struct {
+	action     qualCanonicalAction
+	carriers   map[string]qualCarryingHeader
+	references map[string]qualMetachainReference
+	consumers  map[string]qualConsumingBlock
+}
+
 type qualApplicationEvidence struct {
-	binding qualTransitionBinding
-	shard   uint32
-	// The opaque origin denotes the canonical transition realization, separate
-	// from a reused identifier on a discarded branch. This is a fixture marker,
-	// not an additional proposed wire field.
-	origin                                                       string
-	authenticated, canonicalFinal, applied, dependenciesResolved bool
+	ack     qualAckPayload
+	witness qualResultWitness
 }
 
 type qualConvergenceModel struct {
-	binding      qualTransitionBinding
-	origin       string
+	inputs       qualCanonicalInputs
 	required     map[uint32]bool
 	acknowledged map[uint32]bool
 }
@@ -41,12 +86,54 @@ type qualConvergenceModel struct {
 var errQualAckRejected = errors.New("model: acknowledgement rejected")
 
 func (m *qualConvergenceModel) observe(e qualApplicationEvidence) error {
-	if !e.authenticated || !e.canonicalFinal || !e.applied || !e.dependenciesResolved ||
-		e.binding != m.binding || e.origin != m.origin || !m.required[e.shard] {
+	if !m.required[e.ack.shard] || e.ack.binding != m.inputs.action.binding ||
+		e.ack.actionID != m.inputs.action.actionID || e.ack.actionDigest != m.inputs.action.actionDigest ||
+		e.ack.appliedStateHash != m.inputs.action.binding.target ||
+		!qualCanonicalResultBindsAck(m.inputs, e) {
 		return errQualAckRejected
 	}
-	m.acknowledged[e.shard] = true
+	m.acknowledged[e.ack.shard] = true
 	return nil
+}
+
+func qualCanonicalResultBindsAck(inputs qualCanonicalInputs, e qualApplicationEvidence) bool {
+	w := e.witness
+	if w.fullResult.identity != w.executionResult || w.fullResult.executedHeader != w.executedHeader ||
+		w.fullResult.ack != e.ack {
+		return false
+	}
+
+	carrier, ok := inputs.carriers[w.carryingHeader]
+	if !ok || carrier.identity != w.carryingHeader {
+		return false
+	}
+	committedResult, ok := carrier.results[w.executionResult]
+	if !ok || committedResult != w.fullResult {
+		return false
+	}
+
+	reference, ok := inputs.references[w.metachainReference]
+	if !ok || reference.identity != w.metachainReference {
+		return false
+	}
+	foundBoundEntry := false
+	for _, entry := range reference.entries {
+		if entry == (qualReferenceEntry{
+			carryingHeader:  w.carryingHeader,
+			executedHeader:  w.executedHeader,
+			executionResult: w.executionResult,
+		}) {
+			foundBoundEntry = true
+			break
+		}
+	}
+	if !foundBoundEntry {
+		return false
+	}
+
+	consumer, ok := inputs.consumers[w.consumingBlock]
+	return ok && consumer.identity == w.consumingBlock &&
+		consumer.authenticatedReference == w.metachainReference
 }
 
 func (m *qualConvergenceModel) complete() bool {
@@ -58,42 +145,84 @@ func (m *qualConvergenceModel) complete() bool {
 	return true
 }
 
-func qualNewConvergenceFixture() (*qualConvergenceModel, qualApplicationEvidence) {
-	binding := qualTransitionBinding{"family-A", "instance-A", "phase-A", "token-A", "target-A", "dependencies-A", "shard-set-A"}
-	m := &qualConvergenceModel{
-		binding: binding, origin: "canonical-realization-A",
-		required: map[uint32]bool{0: true, 1: true, 2: true}, acknowledged: make(map[uint32]bool),
+func qualNewConvergenceFixture() (*qualConvergenceModel, map[uint32]qualApplicationEvidence) {
+	binding := qualTransitionBinding{
+		family: "CEB_CURRENTIZATION", instance: "gas-action-A", phase: "CURRENT_ACK",
+		subject: "token-A", target: "ceb-target-A", dependencies: "dependencies-A",
+		requiredShardSet: "shard-set-A",
 	}
-	return m, qualApplicationEvidence{binding: binding, shard: 0, origin: m.origin,
-		authenticated: true, canonicalFinal: true, applied: true, dependenciesResolved: true}
+	action := qualCanonicalAction{actionID: binding.instance, actionDigest: "action-digest-A", binding: binding}
+	inputs := qualCanonicalInputs{
+		action: action, carriers: make(map[string]qualCarryingHeader),
+		references: make(map[string]qualMetachainReference), consumers: make(map[string]qualConsumingBlock),
+	}
+	evidence := make(map[uint32]qualApplicationEvidence)
+	for shard := uint32(0); shard < 3; shard++ {
+		suffix := fmt.Sprint(shard)
+		ack := qualAckPayload{
+			binding: binding, actionID: action.actionID, actionDigest: action.actionDigest, shard: shard,
+			localExecutionIdentity: "local-apply-S" + suffix, appliedStateHash: binding.target,
+		}
+		result := qualExecutionResult{
+			identity: "R" + suffix, executedHeader: "S" + suffix, rootHash: "root-" + suffix, ack: ack,
+		}
+		carrier := qualCarryingHeader{identity: "H" + suffix, results: map[string]qualExecutionResult{result.identity: result}}
+		reference := qualMetachainReference{identity: "M" + suffix, entries: []qualReferenceEntry{{
+			carryingHeader: carrier.identity, executedHeader: result.executedHeader, executionResult: result.identity,
+		}}}
+		consumer := qualConsumingBlock{identity: "B" + suffix, authenticatedReference: reference.identity}
+		inputs.carriers[carrier.identity] = carrier
+		inputs.references[reference.identity] = reference
+		inputs.consumers[consumer.identity] = consumer
+		evidence[shard] = qualApplicationEvidence{ack: ack, witness: qualResultWitness{
+			executedHeader: result.executedHeader, executionResult: result.identity, carryingHeader: carrier.identity,
+			metachainReference: reference.identity, consumingBlock: consumer.identity, fullResult: result,
+		}}
+	}
+	return &qualConvergenceModel{
+		inputs: inputs, required: map[uint32]bool{0: true, 1: true, 2: true},
+		acknowledged: make(map[uint32]bool),
+	}, evidence
 }
 
 func TestQualDRWATransitionIdentityModelRejectsMismatchedEvidence(t *testing.T) {
 	cases := []struct {
-		name   string
-		change func(*qualApplicationEvidence)
+		name          string
+		syncResultAck bool
+		change        func(*qualApplicationEvidence)
 	}{
-		{"family", func(e *qualApplicationEvidence) { e.binding.family = "family-B" }},
-		{"instance", func(e *qualApplicationEvidence) { e.binding.instance = "instance-B" }},
-		{"phase", func(e *qualApplicationEvidence) { e.binding.phase = "phase-B" }},
-		{"subject", func(e *qualApplicationEvidence) { e.binding.subject = "token-B" }},
-		{"target", func(e *qualApplicationEvidence) { e.binding.target = "target-B" }},
-		{"dependencies", func(e *qualApplicationEvidence) { e.binding.dependencies = "dependencies-B" }},
-		{"required_shard_set", func(e *qualApplicationEvidence) { e.binding.requiredShardSet = "shard-set-B" }},
-		{"wrong_shard", func(e *qualApplicationEvidence) { e.shard = 3 }},
-		{"unauthenticated", func(e *qualApplicationEvidence) { e.authenticated = false }},
-		{"speculative_result", func(e *qualApplicationEvidence) { e.canonicalFinal = false }},
-		{"received_but_not_applied", func(e *qualApplicationEvidence) { e.applied = false }},
-		{"dependency_not_resolved", func(e *qualApplicationEvidence) { e.dependenciesResolved = false }},
-		{"discarded_branch_same_numeric_identity", func(e *qualApplicationEvidence) { e.origin = "discarded-realization" }},
+		{"family", true, func(e *qualApplicationEvidence) { e.ack.binding.family = "OTHER_FAMILY" }},
+		{"instance", true, func(e *qualApplicationEvidence) { e.ack.binding.instance = "gas-action-B" }},
+		{"phase", true, func(e *qualApplicationEvidence) { e.ack.binding.phase = "PREPARED_ACK" }},
+		{"subject", true, func(e *qualApplicationEvidence) { e.ack.binding.subject = "token-B" }},
+		{"target", true, func(e *qualApplicationEvidence) { e.ack.binding.target = "ceb-target-B" }},
+		{"dependencies", true, func(e *qualApplicationEvidence) { e.ack.binding.dependencies = "dependencies-B" }},
+		{"required_shard_set", true, func(e *qualApplicationEvidence) { e.ack.binding.requiredShardSet = "shard-set-B" }},
+		{"action_id", true, func(e *qualApplicationEvidence) { e.ack.actionID = "gas-action-B" }},
+		{"action_digest", true, func(e *qualApplicationEvidence) { e.ack.actionDigest = "action-digest-B" }},
+		{"wrong_shard", true, func(e *qualApplicationEvidence) { e.ack.shard = 3 }},
+		{"wrong_applied_state", true, func(e *qualApplicationEvidence) { e.ack.appliedStateHash = "different-state" }},
+		{"ack_payload_substitution", false, func(e *qualApplicationEvidence) { e.witness.fullResult.ack.localExecutionIdentity = "other-apply" }},
+		{"root_substitution", false, func(e *qualApplicationEvidence) { e.witness.fullResult.rootHash = "other-root" }},
+		{"execution_result_substitution", false, func(e *qualApplicationEvidence) { e.witness.executionResult = "other-result" }},
+		{"executed_header_substitution", false, func(e *qualApplicationEvidence) { e.witness.executedHeader = "other-S" }},
+		{"carrying_header_substitution", false, func(e *qualApplicationEvidence) { e.witness.carryingHeader = "other-H" }},
+		{"metachain_reference_substitution", false, func(e *qualApplicationEvidence) { e.witness.metachainReference = "other-M" }},
+		{"discarded_consumer_branch", false, func(e *qualApplicationEvidence) { e.witness.consumingBlock = "discarded-B" }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := qualNewConvergenceFixture()
-			require.NoError(t, m.observe(e)) // earlier valid progress must survive denial
-			e.shard = 1
-			tc.change(&e)
-			require.ErrorIs(t, m.observe(e), errQualAckRejected)
+			m, evidence := qualNewConvergenceFixture()
+			require.NoError(t, m.observe(evidence[0])) // earlier valid progress must survive denial
+			candidate := evidence[1]
+			tc.change(&candidate)
+			if tc.syncResultAck {
+				candidate.witness.fullResult.ack = candidate.ack
+				carrier := m.inputs.carriers[candidate.witness.carryingHeader]
+				carrier.results[candidate.witness.executionResult] = candidate.witness.fullResult
+				m.inputs.carriers[carrier.identity] = carrier
+			}
+			require.ErrorIs(t, m.observe(candidate), errQualAckRejected)
 			require.Equal(t, map[uint32]bool{0: true}, m.acknowledged)
 			require.False(t, m.complete())
 		})
@@ -106,11 +235,10 @@ func TestQualDRWATransitionIdentityModelConvergence(t *testing.T) {
 	orders := [][]uint32{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
 	for _, order := range orders {
 		t.Run(fmt.Sprint(order), func(t *testing.T) {
-			m, e := qualNewConvergenceFixture()
+			m, evidence := qualNewConvergenceFixture()
 			for i, shard := range order {
-				e.shard = shard
-				require.NoError(t, m.observe(e))
-				require.NoError(t, m.observe(e)) // same canonical duplicate sets one bit
+				require.NoError(t, m.observe(evidence[shard]))
+				require.NoError(t, m.observe(evidence[shard])) // same canonical result sets one bit
 				require.Len(t, m.acknowledged, i+1)
 				require.Equal(t, i == 2, m.complete())
 			}
@@ -122,51 +250,61 @@ func TestQualDRWATransitionIdentityModelConvergence(t *testing.T) {
 }
 
 func TestQualDRWATransitionIdentityModelPhaseAndFamilyIsolation(t *testing.T) {
-	t.Run("same_instance_target_new_phase", func(t *testing.T) {
-		m, old := qualNewConvergenceFixture()
-		m.binding.phase = "phase-B"
+	t.Run("same_action_target_new_phase", func(t *testing.T) {
+		m, evidence := qualNewConvergenceFixture()
+		old := evidence[0]
+		m.inputs.action.binding.phase = "TERMINAL_ACK"
 		require.ErrorIs(t, m.observe(old), errQualAckRejected)
 		require.Empty(t, m.acknowledged)
-		current := old
-		current.binding.phase = "phase-B"
-		require.NoError(t, m.observe(current))
 	})
-	t.Run("same_instance_target_other_family", func(t *testing.T) {
-		m, old := qualNewConvergenceFixture()
-		m.binding.family = "family-B"
+	t.Run("same_action_target_other_family", func(t *testing.T) {
+		m, evidence := qualNewConvergenceFixture()
+		old := evidence[0]
+		m.inputs.action.binding.family = "RECOVERY_CEB"
 		require.ErrorIs(t, m.observe(old), errQualAckRejected)
 		require.Empty(t, m.acknowledged)
-		current := old
-		current.binding.family = "family-B"
-		require.NoError(t, m.observe(current))
 	})
 	t.Run("completed_predecessor_cannot_fill_successor", func(t *testing.T) {
-		predecessor, old := qualNewConvergenceFixture()
+		predecessor, evidence := qualNewConvergenceFixture()
 		for _, shard := range []uint32{0, 1, 2} {
-			old.shard = shard
-			require.NoError(t, predecessor.observe(old))
+			require.NoError(t, predecessor.observe(evidence[shard]))
 		}
 		require.True(t, predecessor.complete())
 		successor, _ := qualNewConvergenceFixture()
-		successor.binding.instance = "instance-B"
-		require.ErrorIs(t, successor.observe(old), errQualAckRejected)
+		successor.inputs.action.actionID = "gas-action-B"
+		successor.inputs.action.binding.instance = "gas-action-B"
+		require.ErrorIs(t, successor.observe(evidence[0]), errQualAckRejected)
 		require.Empty(t, successor.acknowledged)
 		require.False(t, successor.complete())
 	})
 }
 
+func TestQualDRWATransitionIdentityModelBoundReferenceRelation(t *testing.T) {
+	m, evidence := qualNewConvergenceFixture()
+	e := evidence[0]
+	reference := m.inputs.references[e.witness.metachainReference]
+	// Legitimate co-presence of the same S and H identities in different entries
+	// does not prove the required H -> result(S) relation.
+	reference.entries = []qualReferenceEntry{
+		{carryingHeader: e.witness.carryingHeader, executedHeader: "other-S", executionResult: "other-R"},
+		{carryingHeader: "other-H", executedHeader: e.witness.executedHeader, executionResult: e.witness.executionResult},
+	}
+	m.inputs.references[reference.identity] = reference
+	require.ErrorIs(t, m.observe(e), errQualAckRejected)
+	require.Empty(t, m.acknowledged)
+}
+
 func TestQualDRWATransitionIdentityModelCopyBoundary(t *testing.T) {
 	// Pure-model snapshot copies exercise the oracle's expected rollback/replay
 	// distinction. They prove nothing about AccountsDB, crash safety or storage.
-	m, e := qualNewConvergenceFixture()
-	require.NoError(t, m.observe(e))
+	m, evidence := qualNewConvergenceFixture()
+	require.NoError(t, m.observe(evidence[0]))
 	snapshot := *m
 	snapshot.acknowledged = map[uint32]bool{0: true}
-	e.shard = 1
-	require.NoError(t, m.observe(e))
+	require.NoError(t, m.observe(evidence[1]))
 	require.Equal(t, map[uint32]bool{0: true}, snapshot.acknowledged)
-	require.NoError(t, snapshot.observe(e)) // legitimate replay after restoring prior progress
-	require.NoError(t, snapshot.observe(e)) // repeat does not duplicate credit
+	require.NoError(t, snapshot.observe(evidence[1])) // legitimate replay after restoring prior progress
+	require.NoError(t, snapshot.observe(evidence[1])) // repeat does not duplicate credit
 	require.Equal(t, m.acknowledged, snapshot.acknowledged)
 	require.False(t, snapshot.complete())
 }
