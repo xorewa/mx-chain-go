@@ -19,6 +19,8 @@ import (
 // the complete S -> result/root -> H -> M -> B relation below from authenticated
 // committed inputs. An SCR content hash, OriginalTxHash, PrevTxHash or nonce is
 // not accepted as that adapter.
+// Authentication and ACK membership under rootHash are assumed fixture inputs;
+// equality of these model values is not a membership proof or a finality proof.
 type qualTransitionBinding struct {
 	family, instance, phase, subject, target, dependencies, requiredShardSet string
 }
@@ -42,13 +44,20 @@ type qualExecutionResult struct {
 	ack                                qualAckPayload
 }
 
+type qualExecutedHeader struct {
+	identity string
+	shard    uint32
+}
+
 type qualCarryingHeader struct {
 	identity string
+	shard    uint32
 	results  map[string]qualExecutionResult
 }
 
 type qualReferenceEntry struct {
 	carryingHeader, executedHeader, executionResult string
+	shard                                           uint32
 }
 
 type qualMetachainReference struct {
@@ -66,10 +75,11 @@ type qualResultWitness struct {
 }
 
 type qualCanonicalInputs struct {
-	action     qualCanonicalAction
-	carriers   map[string]qualCarryingHeader
-	references map[string]qualMetachainReference
-	consumers  map[string]qualConsumingBlock
+	action          qualCanonicalAction
+	executedHeaders map[string]qualExecutedHeader
+	carriers        map[string]qualCarryingHeader
+	references      map[string]qualMetachainReference
+	consumers       map[string]qualConsumingBlock
 }
 
 type qualApplicationEvidence struct {
@@ -103,8 +113,15 @@ func qualCanonicalResultBindsAck(inputs qualCanonicalInputs, e qualApplicationEv
 		return false
 	}
 
+	// Resolve producing-shard identity from authenticated origin header input,
+	// never from the ACK's claim or required-set membership alone (Part A 7.2).
+	origin, ok := inputs.executedHeaders[w.executedHeader]
+	if !ok || origin.identity != w.executedHeader || origin.shard != e.ack.shard {
+		return false
+	}
+
 	carrier, ok := inputs.carriers[w.carryingHeader]
-	if !ok || carrier.identity != w.carryingHeader {
+	if !ok || carrier.identity != w.carryingHeader || carrier.shard != origin.shard {
 		return false
 	}
 	committedResult, ok := carrier.results[w.executionResult]
@@ -122,6 +139,7 @@ func qualCanonicalResultBindsAck(inputs qualCanonicalInputs, e qualApplicationEv
 			carryingHeader:  w.carryingHeader,
 			executedHeader:  w.executedHeader,
 			executionResult: w.executionResult,
+			shard:           origin.shard,
 		}) {
 			foundBoundEntry = true
 			break
@@ -154,7 +172,8 @@ func qualNewConvergenceFixture() (*qualConvergenceModel, map[uint32]qualApplicat
 	action := qualCanonicalAction{actionID: binding.instance, actionDigest: "action-digest-A", binding: binding}
 	inputs := qualCanonicalInputs{
 		action: action, carriers: make(map[string]qualCarryingHeader),
-		references: make(map[string]qualMetachainReference), consumers: make(map[string]qualConsumingBlock),
+		executedHeaders: make(map[string]qualExecutedHeader),
+		references:      make(map[string]qualMetachainReference), consumers: make(map[string]qualConsumingBlock),
 	}
 	evidence := make(map[uint32]qualApplicationEvidence)
 	for shard := uint32(0); shard < 3; shard++ {
@@ -166,9 +185,10 @@ func qualNewConvergenceFixture() (*qualConvergenceModel, map[uint32]qualApplicat
 		result := qualExecutionResult{
 			identity: "R" + suffix, executedHeader: "S" + suffix, rootHash: "root-" + suffix, ack: ack,
 		}
-		carrier := qualCarryingHeader{identity: "H" + suffix, results: map[string]qualExecutionResult{result.identity: result}}
+		inputs.executedHeaders[result.executedHeader] = qualExecutedHeader{identity: result.executedHeader, shard: shard}
+		carrier := qualCarryingHeader{identity: "H" + suffix, shard: shard, results: map[string]qualExecutionResult{result.identity: result}}
 		reference := qualMetachainReference{identity: "M" + suffix, entries: []qualReferenceEntry{{
-			carryingHeader: carrier.identity, executedHeader: result.executedHeader, executionResult: result.identity,
+			carryingHeader: carrier.identity, executedHeader: result.executedHeader, executionResult: result.identity, shard: shard,
 		}}}
 		consumer := qualConsumingBlock{identity: "B" + suffix, authenticatedReference: reference.identity}
 		inputs.carriers[carrier.identity] = carrier
@@ -208,7 +228,7 @@ func TestQualDRWATransitionIdentityModelRejectsMismatchedEvidence(t *testing.T) 
 		{"executed_header_substitution", false, func(e *qualApplicationEvidence) { e.witness.executedHeader = "other-S" }},
 		{"carrying_header_substitution", false, func(e *qualApplicationEvidence) { e.witness.carryingHeader = "other-H" }},
 		{"metachain_reference_substitution", false, func(e *qualApplicationEvidence) { e.witness.metachainReference = "other-M" }},
-		{"discarded_consumer_branch", false, func(e *qualApplicationEvidence) { e.witness.consumingBlock = "discarded-B" }},
+		{"unknown_consumer_block", false, func(e *qualApplicationEvidence) { e.witness.consumingBlock = "unknown-B" }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -307,4 +327,73 @@ func TestQualDRWATransitionIdentityModelCopyBoundary(t *testing.T) {
 	require.NoError(t, snapshot.observe(evidence[1])) // repeat does not duplicate credit
 	require.Equal(t, m.acknowledged, snapshot.acknowledged)
 	require.False(t, snapshot.complete())
+}
+
+// Part A 7.2: an ACK sets only the shard bit of its canonical producing result.
+// Keep the payload, complete result and carrier mutually consistent so only
+// the authoritative origin-shard relation distinguishes an invalid claim.
+func TestQualDRWATransitionIdentityModelProducingShard(t *testing.T) {
+	for producingShard := uint32(0); producingShard < 3; producingShard++ {
+		for claimedShard := uint32(0); claimedShard < 3; claimedShard++ {
+			t.Run(fmt.Sprintf("origin_%d_claim_%d", producingShard, claimedShard), func(t *testing.T) {
+				m, evidence := qualNewConvergenceFixture()
+				e := evidence[producingShard]
+				e.ack.shard = claimedShard
+				e.witness.fullResult.ack = e.ack
+				carrier := m.inputs.carriers[e.witness.carryingHeader]
+				carrier.results[e.witness.executionResult] = e.witness.fullResult
+				m.inputs.carriers[carrier.identity] = carrier
+				if producingShard != claimedShard {
+					require.ErrorIs(t, m.observe(e), errQualAckRejected)
+					require.Empty(t, m.acknowledged)
+					return
+				}
+				require.NoError(t, m.observe(e))
+				require.NoError(t, m.observe(e))
+				require.Equal(t, map[uint32]bool{producingShard: true}, m.acknowledged)
+				require.False(t, m.complete())
+			})
+		}
+	}
+}
+
+func TestQualDRWATransitionIdentityModelOriginMetadata(t *testing.T) {
+	cases := []struct {
+		name   string
+		change func(*qualCanonicalInputs, qualResultWitness)
+	}{
+		{"missing_origin", func(inputs *qualCanonicalInputs, w qualResultWitness) {
+			delete(inputs.executedHeaders, w.executedHeader)
+		}},
+		{"origin_identity", func(inputs *qualCanonicalInputs, w qualResultWitness) {
+			origin := inputs.executedHeaders[w.executedHeader]
+			origin.identity = "other-S"
+			inputs.executedHeaders[w.executedHeader] = origin
+		}},
+		{"origin_shard", func(inputs *qualCanonicalInputs, w qualResultWitness) {
+			origin := inputs.executedHeaders[w.executedHeader]
+			origin.shard = 2
+			inputs.executedHeaders[w.executedHeader] = origin
+		}},
+		{"carrier_shard", func(inputs *qualCanonicalInputs, w qualResultWitness) {
+			carrier := inputs.carriers[w.carryingHeader]
+			carrier.shard = 2
+			inputs.carriers[w.carryingHeader] = carrier
+		}},
+		{"reference_shard", func(inputs *qualCanonicalInputs, w qualResultWitness) {
+			reference := inputs.references[w.metachainReference]
+			reference.entries[0].shard = 2
+			inputs.references[w.metachainReference] = reference
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, evidence := qualNewConvergenceFixture()
+			require.NoError(t, m.observe(evidence[0]))
+			tc.change(&m.inputs, evidence[1].witness)
+			require.ErrorIs(t, m.observe(evidence[1]), errQualAckRejected)
+			require.Equal(t, map[uint32]bool{0: true}, m.acknowledged)
+			require.False(t, m.complete())
+		})
+	}
 }
