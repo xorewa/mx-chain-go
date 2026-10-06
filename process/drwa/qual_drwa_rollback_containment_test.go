@@ -28,6 +28,7 @@ import (
 // are the real pinned AccountsDB over a real trie and a memory backing store.
 type qualNativeStore struct {
 	state.AccountsAdapter
+	backing                                    *testscommon.MemDbMock
 	revertErr, recreateErr, commitErr, saveErr error
 	reverts, recreates, commits                int
 }
@@ -84,7 +85,7 @@ func qualContainmentStore(t *testing.T) *qualNativeStore {
 		AddressConverter:       &testscommon.PubkeyConverterMock{},
 	})
 	require.NoError(t, err)
-	s := &qualNativeStore{AccountsAdapter: adb}
+	s := &qualNativeStore{AccountsAdapter: adb, backing: db}
 	require.NoError(t, qualContainmentBalance(s, 100))
 	_, err = adb.Commit()
 	require.NoError(t, err)
@@ -336,4 +337,73 @@ func TestQualDRWANativeContainmentPartialNativeUndo(t *testing.T) {
 	require.Zero(t, s.commits)
 	require.NoError(t, c.Recover())
 	qualAssertContainmentBalance(t, s, 100)
+}
+
+func TestQualDRWANativeContainmentPartialCommitRecovery(t *testing.T) {
+	for _, retained := range []bool{true, false} {
+		name := "original_roots_retained"
+		if !retained {
+			name = "original_root_unavailable"
+		}
+		t.Run(name, func(t *testing.T) {
+			first, second := qualContainmentStore(t), qualContainmentStore(t)
+			c, err := NewRollbackContainment(first, second)
+			require.NoError(t, err)
+			originalRoots := [][]byte{bytes.Clone(c.roots[0]), bytes.Clone(c.roots[1])}
+			originalNode, err := first.backing.Get(originalRoots[0])
+			require.NoError(t, err)
+			require.NoError(t, c.Execute(func() (*vmcommon.VMOutput, error) {
+				if e := qualContainmentBalance(first, 70); e != nil {
+					return nil, e
+				}
+				if e := qualContainmentBalance(second, 130); e != nil {
+					return nil, e
+				}
+				return &vmcommon.VMOutput{ReturnData: [][]byte{[]byte("pending only")}}, nil
+			}))
+			commitFault := errors.New("second native store commit failed")
+			second.commitErr = commitFault
+			roots, outputs, err := c.Commit()
+			require.Same(t, commitFault, err)
+			require.Nil(t, roots)
+			require.Nil(t, outputs)
+			require.Equal(t, 1, first.commits)
+			require.Equal(t, 1, second.commits)
+			require.Zero(t, first.JournalLen(), "first store really persisted and cleared its journal")
+			require.Positive(t, second.JournalLen(), "second store did not persist")
+			persistedRoot, err := first.RootHash()
+			require.NoError(t, err)
+			require.NotEqual(t, originalRoots[0], persistedRoot)
+			qualAssertContainmentBalance(t, first, 70)
+			qualAssertContainmentBalance(t, second, 130)
+			called := false
+			require.ErrorIs(t, c.Execute(func() (*vmcommon.VMOutput, error) { called = true; return nil, nil }), commitFault)
+			require.False(t, called)
+			if !retained {
+				// Real backing-store removal, not a RecreateTrie stub fault:
+				// admission cannot assume recovery after native pruning/removal.
+				require.NoError(t, first.backing.Remove(originalRoots[0]))
+				require.ErrorIs(t, c.Recover(), commitFault)
+				_, outputs, err = c.Commit()
+				require.ErrorIs(t, err, commitFault)
+				require.Nil(t, outputs)
+				require.ErrorIs(t, c.Execute(func() (*vmcommon.VMOutput, error) { called = true; return nil, nil }), commitFault)
+				require.False(t, called)
+				qualAssertContainmentBalance(t, second, 100)
+				require.NoError(t, first.backing.Put(originalRoots[0], originalNode))
+			}
+			require.NoError(t, c.Recover())
+			for i, store := range []*qualNativeStore{first, second} {
+				root, rootErr := store.RootHash()
+				require.NoError(t, rootErr)
+				require.Equal(t, originalRoots[i], root)
+				require.Zero(t, store.JournalLen())
+				qualAssertContainmentBalance(t, store, 100)
+			}
+			require.Equal(t, 1, first.commits, "recovery never retries native persistence")
+			require.Equal(t, 1, second.commits)
+			require.ErrorIs(t, c.Execute(func() (*vmcommon.VMOutput, error) { called = true; return nil, nil }), ErrExecutionClosed)
+			require.False(t, called)
+		})
+	}
 }

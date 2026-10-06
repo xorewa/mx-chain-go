@@ -33,6 +33,9 @@ var (
 // must not publish outputs independently or commit its stores directly. No such
 // wiring exists yet. Commit releases outputs only after all native commits
 // succeed; it does not prove canonical multi-store commit or disk recovery.
+// Admission also requires the original main/data-trie roots to remain available
+// throughout candidate persistence and recovery. Native pruning/root retention
+// must establish this before wiring; this component does not pin trie nodes.
 type RollbackContainment struct {
 	mut     sync.Mutex
 	stores  []state.AccountsAdapter
@@ -137,6 +140,9 @@ func (c *RollbackContainment) Execute(operation func() (*vmcommon.VMOutput, erro
 // Commit refuses a failed candidate before any store commit or output release.
 // A native commit failure also closes off continuation: native Commit can clear
 // its journal before failing (accountsDB.go:939-987 at 06c383cf).
+// Native stores persist sequentially, so an earlier store may already persist
+// when a later one fails. No roots/outputs are released; Recover must reconstruct
+// EVERY store, including already persisted stores, at the retained boundary.
 func (c *RollbackContainment) Commit() ([][]byte, []*vmcommon.VMOutput, error) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
