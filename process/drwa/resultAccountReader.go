@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/hashing"
 	"github.com/multiversx/mx-chain-core-go/marshal"
@@ -73,6 +74,10 @@ func NewResultAccountReader(args ArgsResultAccountReader) (*ResultAccountReader,
 }
 
 // Read returns only the native value at the caller-owned address/logical key.
+// It supports HeaderV3/ExecutionResult for execution shards and
+// MetaBlockV3/MetaExecutionResult for the metachain. The trusted producingShard
+// selects the native header family; neither family establishes canonical
+// finality or selects the candidate's required metachain context.
 // committedH, producingShard, address and itemKey are trusted owning-caller
 // inputs, not facts learned from the witness. proofByteLimit is an explicit
 // caller bound across BOTH proofs, not an invented production profile/default.
@@ -97,30 +102,10 @@ func (r *ResultAccountReader) Read(committedH []byte, producingShard uint32,
 			used += len(node)
 		}
 	}
-	h, s := &block.HeaderV3{}, &block.HeaderV3{}
-	if r.args.Marshaller.Unmarshal(h, w.Header) != nil ||
-		r.args.Marshaller.Unmarshal(s, w.ExecutedHeader) != nil ||
-		h.ShardID != producingShard || s.ShardID != producingShard {
-		return nil, ErrInvalidAccountWitness
+	root, err := r.executionRoot(producingShard, w)
+	if err != nil {
+		return nil, err
 	}
-	sHash := r.args.Hasher.Compute(string(w.ExecutedHeader))
-	var result *block.ExecutionResult
-	for _, candidate := range h.ExecutionResults {
-		if candidate == nil || candidate.BaseExecutionResult == nil {
-			return nil, ErrInvalidAccountWitness
-		}
-		if bytes.Equal(candidate.BaseExecutionResult.HeaderHash, sHash) {
-			if result != nil {
-				return nil, ErrInvalidAccountWitness
-			}
-			result = candidate
-		}
-	}
-	if result == nil || result.BaseExecutionResult.HeaderNonce != s.Nonce ||
-		result.BaseExecutionResult.HeaderRound != s.Round || result.BaseExecutionResult.HeaderEpoch != s.Epoch {
-		return nil, ErrInvalidAccountWitness
-	}
-	root := result.BaseExecutionResult.RootHash
 	valid, err := r.proofTrie.VerifyProof(root, address, w.AccountProof)
 	if err != nil || !valid {
 		return nil, ErrInvalidAccountWitness
@@ -162,6 +147,58 @@ func (r *ResultAccountReader) Read(committedH []byte, producingShard uint32,
 		return nil, ErrInvalidAccountWitness
 	}
 	return bytes.Clone(value), nil
+}
+
+// executionRoot adopts the native result wrappers. A meta header's own
+// GetRootHash is nil: only the result for the exact executed header supplies
+// the account root (Part A L5263; native core metaBlockV3.go L211-219).
+func (r *ResultAccountReader) executionRoot(producingShard uint32, w AccountItemWitness) ([]byte, error) {
+	var nonce, round uint64
+	var epoch uint32
+	var results []*block.BaseExecutionResult
+	if producingShard == core.MetachainShardId {
+		h, s := &block.MetaBlockV3{}, &block.MetaBlockV3{}
+		if r.args.Marshaller.Unmarshal(h, w.Header) != nil ||
+			r.args.Marshaller.Unmarshal(s, w.ExecutedHeader) != nil {
+			return nil, ErrInvalidAccountWitness
+		}
+		nonce, round, epoch = s.Nonce, s.Round, s.Epoch
+		for _, result := range h.ExecutionResults {
+			if result == nil || result.ExecutionResult == nil || result.ExecutionResult.BaseExecutionResult == nil {
+				return nil, ErrInvalidAccountWitness
+			}
+			results = append(results, result.ExecutionResult.BaseExecutionResult)
+		}
+	} else {
+		h, s := &block.HeaderV3{}, &block.HeaderV3{}
+		if r.args.Marshaller.Unmarshal(h, w.Header) != nil ||
+			r.args.Marshaller.Unmarshal(s, w.ExecutedHeader) != nil ||
+			h.ShardID != producingShard || s.ShardID != producingShard {
+			return nil, ErrInvalidAccountWitness
+		}
+		nonce, round, epoch = s.Nonce, s.Round, s.Epoch
+		for _, result := range h.ExecutionResults {
+			if result == nil || result.BaseExecutionResult == nil {
+				return nil, ErrInvalidAccountWitness
+			}
+			results = append(results, result.BaseExecutionResult)
+		}
+	}
+	sHash := r.args.Hasher.Compute(string(w.ExecutedHeader))
+	var result *block.BaseExecutionResult
+	for _, candidate := range results {
+		if bytes.Equal(candidate.HeaderHash, sHash) {
+			if result != nil {
+				return nil, ErrInvalidAccountWitness
+			}
+			result = candidate
+		}
+	}
+	if result == nil || result.HeaderNonce != nonce ||
+		result.HeaderRound != round || result.HeaderEpoch != epoch {
+		return nil, ErrInvalidAccountWitness
+	}
+	return result.RootHash, nil
 }
 
 func (r *ResultAccountReader) cacheProof(nodes [][]byte) error {
