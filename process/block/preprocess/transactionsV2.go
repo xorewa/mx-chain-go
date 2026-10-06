@@ -70,9 +70,6 @@ func (txs *transactions) createAndProcessMiniBlocksFromMeV2(
 			receiverShardID,
 			mbInfo)
 		if err != nil {
-			if _, stateErr := txs.accounts.RootHash(); stateErr != nil {
-				return nil, nil, nil, errors.Join(err, stateErr)
-			}
 			if core.IsGetNodeFromDBError(err) {
 				return nil, nil, nil, err
 			}
@@ -226,9 +223,6 @@ func (txs *transactions) processTransaction(
 		mbInfo.gasInfo.totalGasConsumedInSelfShard = oldTotalGasConsumedInSelfShard
 		txs.addUnExecutableTransaction(txHash)
 
-		if errRevert != nil {
-			return false, errors.Join(err, errRevert)
-		}
 		return false, err
 	}
 

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"runtime/debug"
 	"strings"
@@ -88,15 +87,9 @@ type AccountsDB struct {
 	entries                []JournalEntry
 	stateAccessesCollector StateAccessesCollector
 	mutOp                  sync.RWMutex
-	// P-05: failed undo makes the execution overlay unavailable. Only a
-	// successful native undo to the failed (or earlier) boundary, or full
-	// reconstruction, can restore it. Native entries restore saved values;
-	// completed entries are removed by the existing undo loop. Protected by mutOp.
-	rollbackErr          error
-	rollbackSnapshot     int
-	loadCodeMeasurements *loadingMeasurements
-	addressConverter     core.PubkeyConverter
-	pruningEnabled       bool
+	loadCodeMeasurements   *loadingMeasurements
+	addressConverter       core.PubkeyConverter
+	pruningEnabled         bool
 
 	stackDebug []byte
 }
@@ -202,11 +195,6 @@ func (adb *AccountsDB) StartSnapshotIfNeeded() error {
 
 // GetCode returns the code for the given account
 func (adb *AccountsDB) GetCode(codeHash []byte) []byte {
-	adb.mutOp.RLock()
-	defer adb.mutOp.RUnlock()
-	if adb.rollbackErr != nil {
-		return nil
-	}
 	if len(codeHash) == 0 {
 		return nil
 	}
@@ -219,7 +207,7 @@ func (adb *AccountsDB) GetCode(codeHash []byte) []byte {
 		adb.loadCodeMeasurements.addMeasurement(len(codeEntry.Code), duration)
 	}()
 
-	val, _, err := adb.mainTrie.Get(codeHash)
+	val, _, err := adb.getMainTrie().Get(codeHash)
 	if err != nil {
 		return nil
 	}
@@ -247,12 +235,8 @@ func (adb *AccountsDB) ImportAccount(account vmcommon.AccountHandler) error {
 		return fmt.Errorf("%w in accountsDB ImportAccount", ErrNilAccountHandler)
 	}
 
-	adb.mutOp.Lock()
-	defer adb.mutOp.Unlock()
-	if adb.rollbackErr != nil {
-		return adb.rollbackErr
-	}
-	_, err := adb.saveAccountToTrie(account, adb.mainTrie)
+	mainTrie := adb.getMainTrie()
+	_, err := adb.saveAccountToTrie(account, mainTrie)
 	return err
 }
 
@@ -272,9 +256,6 @@ func (adb *AccountsDB) SaveAccount(account vmcommon.AccountHandler) error {
 	// this is a critical section, do not remove the mutex
 	adb.mutOp.Lock()
 	defer adb.mutOp.Unlock()
-	if adb.rollbackErr != nil {
-		return adb.rollbackErr
-	}
 
 	oldAccount, err := adb.getAccount(account.AddressBytes(), adb.mainTrie)
 	if err != nil {
@@ -526,14 +507,6 @@ func saveCodeEntry(codeHash []byte, entry *CodeEntry, trie Updater, marshalizer 
 func (adb *AccountsDB) loadDataTrieConcurrentSafe(accountHandler baseAccountHandler, mainTrie common.Trie) error {
 	adb.mutOp.Lock()
 	defer adb.mutOp.Unlock()
-	if adb.rollbackErr != nil {
-		return adb.rollbackErr
-	}
-	return adb.loadDataTrie(accountHandler, mainTrie)
-}
-
-// loadDataTrie requires mutOp to be held throughout account loading.
-func (adb *AccountsDB) loadDataTrie(accountHandler baseAccountHandler, mainTrie common.Trie) error {
 
 	dataTrie := adb.dataTries.Get(accountHandler.AddressBytes())
 	if dataTrie != nil {
@@ -620,9 +593,6 @@ func (adb *AccountsDB) RemoveAccount(address []byte) error {
 	// this is a critical section, do not remove the mutex
 	adb.mutOp.Lock()
 	defer adb.mutOp.Unlock()
-	if adb.rollbackErr != nil {
-		return adb.rollbackErr
-	}
 
 	acnt, err := adb.getAccount(address, adb.mainTrie)
 	if err != nil {
@@ -729,12 +699,7 @@ func (adb *AccountsDB) LoadAccount(address []byte) (vmcommon.AccountHandler, err
 
 	log.Trace("accountsDB.LoadAccount", "address", address)
 
-	adb.mutOp.Lock()
-	defer adb.mutOp.Unlock()
-	if adb.rollbackErr != nil {
-		return nil, adb.rollbackErr
-	}
-	mainTrie := adb.mainTrie
+	mainTrie := adb.getMainTrie()
 	acnt, err := adb.getAccount(address, mainTrie)
 	if err != nil {
 		return nil, err
@@ -745,7 +710,7 @@ func (adb *AccountsDB) LoadAccount(address []byte) (vmcommon.AccountHandler, err
 
 	baseAcc, ok := acnt.(baseAccountHandler)
 	if ok {
-		err = adb.loadDataTrie(baseAcc, mainTrie)
+		err = adb.loadDataTrieConcurrentSafe(baseAcc, mainTrie)
 		if err != nil {
 			return nil, err
 		}
@@ -808,12 +773,7 @@ func (adb *AccountsDB) GetExistingAccount(address []byte) (vmcommon.AccountHandl
 
 	log.Trace("accountsDB.GetExistingAccount", "address", address)
 
-	adb.mutOp.Lock()
-	defer adb.mutOp.Unlock()
-	if adb.rollbackErr != nil {
-		return nil, adb.rollbackErr
-	}
-	mainTrie := adb.mainTrie
+	mainTrie := adb.getMainTrie()
 	acnt, err := adb.getAccount(address, mainTrie)
 	if err != nil {
 		return nil, err
@@ -824,7 +784,7 @@ func (adb *AccountsDB) GetExistingAccount(address []byte) (vmcommon.AccountHandl
 
 	baseAcc, ok := acnt.(baseAccountHandler)
 	if ok {
-		err = adb.loadDataTrie(baseAcc, mainTrie)
+		err = adb.loadDataTrieConcurrentSafe(baseAcc, mainTrie)
 		if err != nil {
 			return nil, err
 		}
@@ -837,11 +797,6 @@ func (adb *AccountsDB) GetExistingAccount(address []byte) (vmcommon.AccountHandl
 func (adb *AccountsDB) GetAccountFromBytes(address []byte, accountBytes []byte) (vmcommon.AccountHandler, error) {
 	if len(address) == 0 {
 		return nil, fmt.Errorf("%w in GetAccountFromBytes", ErrNilAddress)
-	}
-	adb.mutOp.Lock()
-	defer adb.mutOp.Unlock()
-	if adb.rollbackErr != nil {
-		return nil, adb.rollbackErr
 	}
 
 	acnt, err := adb.accountFactory.CreateAccount(address)
@@ -859,7 +814,7 @@ func (adb *AccountsDB) GetAccountFromBytes(address []byte, accountBytes []byte) 
 		return acnt, nil
 	}
 
-	err = adb.loadDataTrie(baseAcc, adb.mainTrie)
+	err = adb.loadDataTrieConcurrentSafe(baseAcc, adb.getMainTrie())
 	if err != nil {
 		return nil, err
 	}
@@ -890,48 +845,21 @@ func (adb *AccountsDB) loadCode(accountHandler baseAccountHandler) error {
 
 // RevertToSnapshot apply Revert method over accounts object and removes entries from the list
 // Calling with 0 will revert everything. If the snapshot value is out of bounds, an err will be returned
-func (adb *AccountsDB) RevertToSnapshot(snapshot int) (resultErr error) {
+func (adb *AccountsDB) RevertToSnapshot(snapshot int) error {
 	log.Trace("accountsDB.RevertToSnapshot started",
 		"snapshot", snapshot,
 	)
 
 	adb.mutOp.Lock()
 
-	rollbackAttempted := false
 	defer func() {
-		if resultErr != nil {
-			failedBoundary := snapshot
-			if snapshot < 0 || snapshot > len(adb.entries) {
-				failedBoundary = 0
-			}
-			if adb.rollbackErr == nil {
-				adb.rollbackErr = resultErr
-				adb.rollbackSnapshot = failedBoundary
-			} else {
-				// A failed earlier retry moves the recovery boundary earlier,
-				// even when it reports the same error as the first failed undo.
-				if rollbackAttempted && failedBoundary < adb.rollbackSnapshot {
-					adb.rollbackSnapshot = failedBoundary
-				}
-				if !errors.Is(resultErr, adb.rollbackErr) {
-					adb.rollbackErr = errors.Join(adb.rollbackErr, resultErr)
-				}
-			}
-			resultErr = adb.rollbackErr
-		} else {
-			adb.rollbackErr = nil
-		}
 		log.Trace("accountsDB.RevertToSnapshot ended")
 		adb.mutOp.Unlock()
 	}()
-	if adb.rollbackErr != nil && snapshot != 0 && (snapshot < 0 || snapshot > adb.rollbackSnapshot) {
-		return adb.rollbackErr
-	}
 
 	if snapshot > len(adb.entries) || snapshot < 0 {
 		return ErrSnapshotValueOutOfBounds
 	}
-	rollbackAttempted = true
 
 	if snapshot == 0 {
 		log.Trace("revert snapshot to adb.lastRootHash", "hash", adb.lastRootHash)
@@ -975,11 +903,6 @@ func (adb *AccountsDB) JournalLen() int {
 // CommitInEpoch will commit the current trie state in the given epoch
 func (adb *AccountsDB) CommitInEpoch(currentEpoch uint32, epochToCommit uint32) ([]byte, error) {
 	adb.mutOp.Lock()
-	if adb.rollbackErr != nil {
-		err := adb.rollbackErr
-		adb.mutOp.Unlock()
-		return nil, err
-	}
 	defer func() {
 		adb.mainTrie.GetStorageManager().SetEpochForPutOperation(currentEpoch)
 		adb.mainTrie.GetStorageManager().GetStateStatsHandler().Reset()
@@ -1014,9 +937,6 @@ func (adb *AccountsDB) Commit() ([]byte, error) {
 }
 
 func (adb *AccountsDB) commit() ([]byte, error) {
-	if adb.rollbackErr != nil {
-		return nil, adb.rollbackErr
-	}
 	log.Trace("accountsDB.Commit started")
 	adb.entries = make([]JournalEntry, 0)
 
@@ -1107,12 +1027,7 @@ func (adb *AccountsDB) commitTrie(tr common.Trie, oldHashes common.ModifiedHashe
 
 // RootHash returns the main trie's root hash
 func (adb *AccountsDB) RootHash() ([]byte, error) {
-	adb.mutOp.RLock()
-	defer adb.mutOp.RUnlock()
-	if adb.rollbackErr != nil {
-		return nil, adb.rollbackErr
-	}
-	rootHash, err := adb.mainTrie.RootHash()
+	rootHash, err := adb.getMainTrie().RootHash()
 	log.Trace("accountsDB.RootHash",
 		"root hash", rootHash,
 		"err", err,
@@ -1131,22 +1046,20 @@ func (adb *AccountsDB) RecreateTrie(options common.RootHashHolder) error {
 		return err
 	}
 	adb.lastRootHash = options.GetRootHash()
-	adb.rollbackErr = nil
 
 	return nil
 }
 
 // RecreateTrieIfNeeded is used to reload the trie based on the provided options if the root hash is different than the current one
 func (adb *AccountsDB) RecreateTrieIfNeeded(options common.RootHashHolder) error {
-	adb.mutOp.Lock()
-	defer adb.mutOp.Unlock()
 	err := adb.recreateTrieIfNeeded(options)
 	if err != nil {
 		return err
 	}
 
+	adb.mutOp.Lock()
 	adb.lastRootHash = options.GetRootHash()
-	adb.rollbackErr = nil
+	adb.mutOp.Unlock()
 
 	return nil
 }
@@ -1175,11 +1088,7 @@ func (adb *AccountsDB) recreateTrie(options common.RootHashHolder) error {
 }
 
 func (adb *AccountsDB) recreateTrieIfNeeded(options common.RootHashHolder) error {
-	// A matching root alone cannot repair a failed journal/collector undo.
-	if adb.rollbackErr != nil {
-		return adb.recreateTrie(options)
-	}
-	currentRootHash, err := adb.mainTrie.RootHash()
+	currentRootHash, err := adb.getMainTrie().RootHash()
 	if err != nil {
 		return err
 	}
@@ -1188,6 +1097,9 @@ func (adb *AccountsDB) recreateTrieIfNeeded(options common.RootHashHolder) error
 		log.Trace("accountsDB.RecreateTrieIfNeeded - no need to recreate", "root hash", currentRootHash)
 		return nil
 	}
+
+	adb.mutOp.Lock()
+	defer adb.mutOp.Unlock()
 
 	return adb.recreateTrie(options)
 }
@@ -1472,11 +1384,6 @@ func collectStats(
 
 // SetTxHashForLatestStateAccesses will return the state changes since the last call of this method
 func (adb *AccountsDB) SetTxHashForLatestStateAccesses(txHash []byte) {
-	adb.mutOp.RLock()
-	defer adb.mutOp.RUnlock()
-	if adb.rollbackErr != nil {
-		return
-	}
 	adb.stateAccessesCollector.AddTxHashToCollectedStateAccesses(txHash)
 }
 

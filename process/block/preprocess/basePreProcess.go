@@ -503,7 +503,7 @@ func (bpp *basePreProcess) handleProcessTransactionInit(preProcessorExecutionInf
 	return snapshot
 }
 
-func (bpp *basePreProcess) handleProcessTransactionError(preProcessorExecutionInfoHandler process.PreProcessorExecutionInfoHandler, snapshot int, txHash []byte) error {
+func (bpp *basePreProcess) handleProcessTransactionError(preProcessorExecutionInfoHandler process.PreProcessorExecutionInfoHandler, snapshot int, txHash []byte) {
 	bpp.gasHandler.RestoreGasSinceLastReset(txHash)
 
 	errRevert := bpp.accounts.RevertToSnapshot(snapshot)
@@ -513,7 +513,6 @@ func (bpp *basePreProcess) handleProcessTransactionError(preProcessorExecutionIn
 
 	preProcessorExecutionInfoHandler.RevertProcessedTxsResults([][]byte{txHash}, txHash)
 	bpp.txExecutionOrderHandler.Remove(txHash)
-	return errRevert
 }
 
 func getMiniBlockHeaderOfMiniBlock(headerHandler data.HeaderHandler, miniBlockHash []byte) (data.MiniBlockHeaderHandler, error) {

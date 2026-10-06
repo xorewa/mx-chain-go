@@ -3,7 +3,6 @@ package hooks
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math/big"
 	"path"
@@ -599,18 +598,14 @@ func (bh *BlockChainHookImpl) ProcessBuiltInFunction(input *vmcommon.ContractCal
 	snapshot := bh.accounts.JournalLen()
 	vmOutput, err := function.ProcessBuiltinFunction(sndAccount, dstAccount, input)
 	if err != nil {
-		if revertErr := bh.accounts.RevertToSnapshot(snapshot); revertErr != nil {
-			return nil, errors.Join(err, revertErr)
-		}
+		_ = bh.accounts.RevertToSnapshot(snapshot)
 		return nil, err
 	}
 
 	if !check.IfNil(sndAccount) {
 		err = bh.accounts.SaveAccount(sndAccount)
 		if err != nil {
-			if revertErr := bh.accounts.RevertToSnapshot(snapshot); revertErr != nil {
-				return nil, errors.Join(err, revertErr)
-			}
+			_ = bh.accounts.RevertToSnapshot(snapshot)
 			return nil, err
 		}
 	}
@@ -618,9 +613,7 @@ func (bh *BlockChainHookImpl) ProcessBuiltInFunction(input *vmcommon.ContractCal
 	if !check.IfNil(dstAccount) && !bytes.Equal(input.CallerAddr, input.RecipientAddr) {
 		err = bh.accounts.SaveAccount(dstAccount)
 		if err != nil {
-			if revertErr := bh.accounts.RevertToSnapshot(snapshot); revertErr != nil {
-				return nil, errors.Join(err, revertErr)
-			}
+			_ = bh.accounts.RevertToSnapshot(snapshot)
 			return nil, err
 		}
 	}
