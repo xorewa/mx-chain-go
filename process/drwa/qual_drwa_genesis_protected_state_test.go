@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -14,8 +15,10 @@ import (
 	"github.com/multiversx/mx-chain-go/state/factory"
 	pruningDisabled "github.com/multiversx/mx-chain-go/state/storagePruningManager/disabled"
 	"github.com/multiversx/mx-chain-go/testscommon"
+	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	"github.com/multiversx/mx-chain-go/trie"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	"github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,6 +28,11 @@ import (
 func qualGenesisAccounts(t *testing.T, auto bool) *state.AccountsDB {
 	t.Helper()
 	a := qualReaderArgs(auto)
+	return qualGenesisAccountsFromArgs(t, a)
+}
+
+func qualGenesisAccountsFromArgs(t *testing.T, a ArgsResultAccountReader) *state.AccountsDB {
+	t.Helper()
 	tr, err := trie.NewTrie(a.StorageManager, a.Marshaller, a.Hasher, a.EnableEpochsHandler, 5)
 	require.NoError(t, err)
 	collector := stateDisabled.NewDisabledStateAccessesCollector()
@@ -38,6 +46,87 @@ func qualGenesisAccounts(t *testing.T, auto bool) *state.AccountsDB {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	return db
+}
+
+func TestQualDRWAGenesisProtectedReopen(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		t.Run(fmt.Sprint(auto), func(t *testing.T) {
+			args := qualReaderArgs(auto)
+			db := qualGenesisAccountsFromArgs(t, args)
+			before, err := db.RootHash()
+			require.NoError(t, err)
+			s, err := newProtectedState(db)
+			require.NoError(t, err)
+			owner, err := NewRollbackContainment(db)
+			require.NoError(t, err)
+			require.NoError(t, owner.Execute(func() (*vmcommon.VMOutput, error) { return nil, s.provisionGenesis() }))
+			// A different native adapter at the retained boundary sees no staged
+			// record. This is in-memory reopen evidence, not disk/node restart.
+			prior := qualGenesisAccountsFromArgs(t, args)
+			require.NoError(t, prior.RecreateTrie(holders.NewDefaultRootHashesHolder(before)))
+			_, err = prior.GetExistingAccount(core.SystemAccountAddress)
+			require.ErrorIs(t, err, state.ErrAccNotFound)
+			roots, _, err := owner.Commit()
+			require.NoError(t, err)
+			reopened := qualGenesisAccountsFromArgs(t, args)
+			require.NoError(t, reopened.RecreateTrie(holders.NewDefaultRootHashesHolder(roots[0])))
+			a, err := reopened.GetExistingAccount(core.SystemAccountAddress)
+			require.NoError(t, err)
+			value, _, err := a.(state.UserAccountHandler).RetrieveValue([]byte("ELRONDDRWA@registry@count"))
+			require.NoError(t, err)
+			require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, value)
+		})
+	}
+}
+
+func TestQualDRWAGenesisProtectedMigration(t *testing.T) {
+	for _, destination := range []string{"exact", "family", "ordinary"} {
+		t.Run(destination, func(t *testing.T) {
+			args := qualReaderArgs(false)
+			db := qualGenesisAccountsFromArgs(t, args)
+			s, err := newProtectedState(db)
+			require.NoError(t, err)
+			owner, err := NewRollbackContainment(db)
+			require.NoError(t, err)
+			require.NoError(t, owner.Execute(func() (*vmcommon.VMOutput, error) { return nil, s.provisionGenesis() }))
+			roots, _, err := owner.Commit()
+			require.NoError(t, err)
+			args.EnableEpochsHandler.(*enableEpochsHandlerMock.EnableEpochsHandlerStub).AddActiveFlags(common.AutoBalanceDataTriesFlag)
+			address := bytes.Clone(core.SystemAccountAddress)
+			if destination == "family" {
+				address[31] = 0
+			}
+			if destination == "ordinary" {
+				address = bytes.Repeat([]byte{7}, 32)
+			}
+			a, err := db.LoadAccount(address)
+			require.NoError(t, err)
+			if destination == "ordinary" {
+				require.NoError(t, a.(state.UserAccountHandler).SaveKeyValue([]byte("ordinary-existing-leaf"), []byte("untouched")))
+				require.NoError(t, db.SaveAccount(a))
+				a, err = db.GetExistingAccount(address)
+				require.NoError(t, err)
+			}
+			fn, err := builtInFunctions.NewMigrateDataTrieFunc(vmcommon.BuiltInCost{TrieLoadPerNode: 1, TrieStorePerNode: 1}, args.EnableEpochsHandler, db)
+			require.NoError(t, err)
+			out, err := fn.ProcessBuiltinFunction(nil, a.(vmcommon.UserAccountHandler), &vmcommon.ContractCallInput{VMInput: vmcommon.VMInput{CallValue: big.NewInt(0), GasProvided: 1000000}, RecipientAddr: address})
+			require.NoError(t, err)
+			require.Equal(t, vmcommon.Ok, out.ReturnCode)
+			require.NoError(t, db.SaveAccount(a))
+			_, err = db.Commit()
+			require.NoError(t, err)
+			for _, root := range [][]byte{nil, roots[0]} {
+				if root != nil {
+					require.NoError(t, db.RecreateTrie(holders.NewDefaultRootHashesHolder(root)))
+				}
+				system, err := db.GetExistingAccount(core.SystemAccountAddress)
+				require.NoError(t, err)
+				value, _, err := system.(state.UserAccountHandler).RetrieveValue([]byte("ELRONDDRWA@registry@count"))
+				require.NoError(t, err)
+				require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, value, "migration and old-root restore preserve the exact construction record")
+			}
+		})
+	}
 }
 
 func TestQualDRWAGenesisProtectedLifecycle(t *testing.T) {
