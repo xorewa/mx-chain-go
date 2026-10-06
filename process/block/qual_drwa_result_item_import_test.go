@@ -28,8 +28,9 @@ func qualItemTrie(t *testing.T, db *testscommon.MemDbMock) common.Trie {
 	t.Helper()
 	tr, err := trie.NewTrie(&storageManager.StorageManagerStub{
 		GetCalled: db.Get, GetFromCurrentEpochCalled: db.Get, PutCalled: db.Put,
+		GetStateStatsHandlerCalled: db.GetStateStatsHandler, GetIdentifierCalled: db.GetIdentifier,
 	}, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(),
-		&enableEpochsHandlerMock.EnableEpochsHandlerStub{}, 5)
+		enableEpochsHandlerMock.NewEnableEpochsHandlerStub(), 5)
 	require.NoError(t, err)
 	return tr
 }

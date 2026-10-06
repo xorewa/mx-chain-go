@@ -80,22 +80,25 @@ func qualObserveDomainItem(t *testing.T, m *qualConvergenceModel, e qualApplicat
 	if err != nil {
 		return err
 	}
-	if len(value) != 64+len(e.ack.actionDigest) {
+	if !qualDomainValueMatches(m, e, localDomain, immutableActionBody, value, w.shard) {
 		return errQualAckRejected
 	}
-	if !bytes.Equal(value[:32], localDomain) {
-		return errQualAckRejected
+	return m.observe(e)
+}
+
+// Shared qualification-only domain predicate for synthetic and account-backed
+// item readers. Neither predicate writes progress; observe remains the writer.
+func qualDomainValueMatches(m *qualConvergenceModel, e qualApplicationEvidence,
+	localDomain, immutableActionBody, value []byte, shard uint32) bool {
+	if len(localDomain) != 32 || bytes.Equal(localDomain, make([]byte, 32)) ||
+		len(value) != 64+len(e.ack.actionDigest) || !bytes.Equal(value[:32], localDomain) {
+		return false
 	}
 	preimage := append([]byte("DRWA/GAS/v1"), localDomain...)
 	preimage = append(preimage, immutableActionBody...)
 	expectedID := blake2b.NewBlake2b().Compute(string(preimage))
-	if !bytes.Equal(value[32:64], expectedID) ||
-		hex.EncodeToString(expectedID) != m.inputs.action.actionID ||
-		!bytes.Equal(value[64:], []byte(e.ack.actionDigest)) || w.shard != e.ack.shard {
-		return errQualAckRejected
-	}
-	// No ACK/replay state is touched before all item/domain/action checks.
-	return m.observe(e)
+	return bytes.Equal(value[32:64], expectedID) && hex.EncodeToString(expectedID) == m.inputs.action.actionID &&
+		bytes.Equal(value[64:], []byte(e.ack.actionDigest)) && shard == e.ack.shard
 }
 
 func qualDomainConvergenceFixture(t *testing.T) (*qualConvergenceModel, map[uint32]qualApplicationEvidence) {
@@ -208,33 +211,34 @@ func qualDomainAckKey(ack qualAckPayload) []byte {
 func qualObserveResultBoundDomainItem(t *testing.T, m *qualConvergenceModel, e qualApplicationEvidence,
 	localDomain, body []byte, w qualDomainItemWitness) error {
 	t.Helper()
-	// Admission checks precede the existing consumer's only bitmap write.
-	// Native protobuf + hash + proof semantics are reused, with no new state
-	// store, commitment or transport. Single-result H is this fixture's scope.
-	if !bytes.Equal(w.key, qualDomainAckKey(e.ack)) {
-		return errQualAckRejected
-	}
-	mar, hash := &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b()
-	h := &coreBlock.HeaderV3{}
-	if mar.Unmarshal(h, w.h) != nil || len(h.ExecutionResults) != 1 {
-		return errQualAckRejected
-	}
-	r := h.ExecutionResults[0]
-	if r == nil || r.BaseExecutionResult == nil {
-		return errQualAckRejected
-	}
-	rb, err := mar.Marshal(r)
-	if err != nil {
-		return errQualAckRejected
-	}
-	sID, hID := hex.EncodeToString(hash.Compute(string(w.s))), hex.EncodeToString(hash.Compute(string(w.h)))
-	rID, root := hex.EncodeToString(hash.Compute(string(rb))), hex.EncodeToString(r.BaseExecutionResult.RootHash)
-	if e.witness.executedHeader != sID || e.witness.carryingHeader != hID ||
-		e.witness.executionResult != rID || e.witness.fullResult.identity != rID ||
-		e.witness.fullResult.executedHeader != sID || e.witness.fullResult.rootHash != root {
+	if !bytes.Equal(w.key, qualDomainAckKey(e.ack)) || !qualNativeResultMatches(e, w) {
 		return errQualAckRejected
 	}
 	return qualObserveDomainItem(t, m, e, localDomain, body, w)
+}
+
+// Byte identities only: membership and canonical M/B remain separate gates.
+// This bounded join accepts single-result H only. Multi-result native import
+// is supported by qualImportResultItem but is deliberately outside this join.
+func qualNativeResultMatches(e qualApplicationEvidence, w qualDomainItemWitness) bool {
+	mar, hash := &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b()
+	h := &coreBlock.HeaderV3{}
+	if mar.Unmarshal(h, w.h) != nil || len(h.ExecutionResults) != 1 {
+		return false
+	}
+	r := h.ExecutionResults[0]
+	if r == nil || r.BaseExecutionResult == nil {
+		return false
+	}
+	rb, err := mar.Marshal(r)
+	if err != nil {
+		return false
+	}
+	sID, hID := hex.EncodeToString(hash.Compute(string(w.s))), hex.EncodeToString(hash.Compute(string(w.h)))
+	rID, root := hex.EncodeToString(hash.Compute(string(rb))), hex.EncodeToString(r.BaseExecutionResult.RootHash)
+	return e.witness.executedHeader == sID && e.witness.carryingHeader == hID &&
+		e.witness.executionResult == rID && e.witness.fullResult.identity == rID &&
+		e.witness.fullResult.executedHeader == sID && e.witness.fullResult.rootHash == root
 }
 
 // Bind the EXPECTED canonical model inputs to one native fixture, before any
@@ -271,7 +275,7 @@ func TestQualDRWADomainResultJoin(t *testing.T) {
 		for _, name := range []string{"valid", "other_authenticated_ACK", "ack_family", "ack_instance", "ack_subject",
 			"ack_target", "ack_dependencies", "ack_shard_set", "ack_action_id", "ack_action_digest", "ack_shard",
 			"ack_local_execution", "ack_applied_state", "other_native_S", "other_native_H",
-			"other_native_root", "other_complete_result", "other_model_root"} {
+			"other_native_root", "other_complete_result", "other_model_root", "other_model_S"} {
 			t.Run(fmt.Sprintf("shard_%d/%s", shard, name), func(t *testing.T) {
 				m, evidence := qualDomainConvergenceFixture(t)
 				other := (shard + 1) % 3
@@ -376,6 +380,21 @@ func TestQualDRWADomainResultJoin(t *testing.T) {
 					carrier := m.inputs.carriers[e.witness.carryingHeader]
 					carrier.results[e.witness.executionResult] = e.witness.fullResult
 					m.inputs.carriers[carrier.identity] = carrier
+				case "other_model_S":
+					// All opaque model relations remain internally valid, while
+					// native S/H/result/root bytes are unchanged. Only the S join
+					// comparisons distinguish this substitution (GJ-01).
+					e.witness.executedHeader = "different-model-S"
+					e.witness.fullResult.executedHeader = e.witness.executedHeader
+					m.inputs.executedHeaders[e.witness.executedHeader] = qualExecutedHeader{
+						identity: e.witness.executedHeader, shard: shard,
+					}
+					carrier := m.inputs.carriers[e.witness.carryingHeader]
+					carrier.results[e.witness.executionResult] = e.witness.fullResult
+					m.inputs.carriers[carrier.identity] = carrier
+					ref := m.inputs.references[e.witness.metachainReference]
+					ref.entries[0].executedHeader = e.witness.executedHeader
+					m.inputs.references[ref.identity] = ref
 				}
 				// Baseline control: both the native membership and opaque model
 				// admit these substitutions separately. The join must reject them.
@@ -399,5 +418,66 @@ func TestQualDRWADomainResultJoin(t *testing.T) {
 				require.False(t, m.complete())
 			})
 		}
+	}
+}
+
+// GJ-02: disclose and exercise the single-result join's admission boundary.
+// A valid native item import with several results does not imply that this
+// bounded model join supports them. M/B ancestry and finality remain assumed.
+func TestQualDRWADomainResultCardinality(t *testing.T) {
+	for _, name := range []string{"valid", "zero_results", "two_results", "empty_result", "malformed_header"} {
+		t.Run(name, func(t *testing.T) {
+			m, evidence := qualDomainConvergenceFixture(t)
+			e := evidence[1]
+			domain, body := qualDomainHex(t, qualDomainKAT), qualDomainHex(t, qualDomainBodyHex)
+			value := append(bytes.Clone(domain), qualDomainHex(t, qualDomainActionKAT)...)
+			value = append(value, []byte(e.ack.actionDigest)...)
+			w := qualDomainItemProof(t, value, 1, qualDomainAckKey(e.ack))
+			e = qualBindDomainResultFixture(t, m, e, w)
+			mar, hash := &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b()
+			h := &coreBlock.HeaderV3{}
+			require.NoError(t, mar.Unmarshal(h, w.h))
+			switch name {
+			case "zero_results":
+				h.ExecutionResults = nil
+			case "two_results":
+				other := createDummyShardExecutionResult()
+				other.BaseExecutionResult.HeaderHash = []byte("unrelated-origin")
+				h.ExecutionResults = append(h.ExecutionResults, other)
+			case "empty_result":
+				// Protobuf represents an empty result as a non-nil entry with
+				// nil BaseExecutionResult; no nil repeated-message is encoded.
+				h.ExecutionResults = []*coreBlock.ExecutionResult{{}}
+			}
+			var err error
+			w.h, err = mar.Marshal(h)
+			require.NoError(t, err)
+			if name == "malformed_header" {
+				w.h = []byte{0xff}
+			}
+			w.hHash = hash.Compute(string(w.h))
+			// Keep only H's opaque model identity consistent with the new H.
+			// Do not fabricate another native result or change its expected ID.
+			carrier := m.inputs.carriers[e.witness.carryingHeader]
+			e.witness.carryingHeader = hex.EncodeToString(w.hHash)
+			carrier.identity = e.witness.carryingHeader
+			m.inputs.carriers[carrier.identity] = carrier
+			ref := m.inputs.references[e.witness.metachainReference]
+			ref.entries[0].carryingHeader = carrier.identity
+			m.inputs.references[ref.identity] = ref
+			if name == "two_results" {
+				got, importErr := qualImportResultItem(t, w.hHash, w.h, w.s, w.key, w.nodes, 1, w.limit)
+				require.NoError(t, importErr)
+				require.Equal(t, value, got, "native import supports unrelated additional results")
+			}
+			err = qualObserveResultBoundDomainItem(t, m, e, domain, body, w)
+			if name == "valid" {
+				require.NoError(t, err)
+				require.Equal(t, map[uint32]bool{1: true}, m.acknowledged)
+			} else {
+				require.ErrorIs(t, err, errQualAckRejected)
+				require.Empty(t, m.acknowledged)
+			}
+		})
 	}
 }
