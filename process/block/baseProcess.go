@@ -453,6 +453,7 @@ func (bp *baseProcessor) verifyStateRoot(rootHash []byte) bool {
 	trieRootHash, err := bp.accountsDB[state.UserAccountsState].RootHash()
 	if err != nil {
 		log.Debug("verify account.RootHash", "error", err.Error())
+		return false
 	}
 
 	return bytes.Equal(trieRootHash, rootHash)
@@ -2658,7 +2659,20 @@ func (bp *baseProcessor) commitInLastEpoch(currentEpoch uint32) error {
 	return bp.commitInEpoch(currentEpoch, lastEpoch)
 }
 
+func (bp *baseProcessor) checkAccountsState() error {
+	// A failed undo in either account store must bar all stores from committing.
+	for key := range bp.accountsDB {
+		if _, err := bp.accountsDB[key].RootHash(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (bp *baseProcessor) commit() error {
+	if err := bp.checkAccountsState(); err != nil {
+		return err
+	}
 	for key := range bp.accountsDB {
 		_, err := bp.accountsDB[key].Commit()
 		if err != nil {
@@ -2670,6 +2684,9 @@ func (bp *baseProcessor) commit() error {
 }
 
 func (bp *baseProcessor) commitInEpoch(currentEpoch uint32, epochToCommit uint32) error {
+	if err := bp.checkAccountsState(); err != nil {
+		return err
+	}
 	for key := range bp.accountsDB {
 		_, err := bp.accountsDB[key].CommitInEpoch(currentEpoch, epochToCommit)
 		if err != nil {

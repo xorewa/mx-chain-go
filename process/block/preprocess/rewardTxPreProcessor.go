@@ -1,6 +1,7 @@
 package preprocess
 
 import (
+	"errors"
 	"time"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -483,7 +484,9 @@ func (rtp *rewardTxPreprocessor) ProcessMiniBlock(
 		rtp.txExecutionOrderHandler.Add(miniBlockTxHashes[txIndex])
 		err = rtp.rewardsProcessor.ProcessRewardTransaction(miniBlockRewardTxs[txIndex])
 		if err != nil {
-			rtp.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, miniBlockTxHashes[txIndex])
+			if revertErr := rtp.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, miniBlockTxHashes[txIndex]); revertErr != nil {
+				return processedTxHashes, txIndex - 1, true, errors.Join(err, revertErr)
+			}
 			break
 		}
 

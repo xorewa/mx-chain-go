@@ -1464,6 +1464,7 @@ func (sc *scProcessor) processIfErrorWithAddedLogs(acntSnd state.UserAccountHand
 
 	err := sc.accounts.RevertToSnapshot(failureContext.snapshot)
 	if err != nil {
+		log.Debug("failed transaction rollback", "txHash", failureContext.txHash, "returnCode", failureContext.errorMessage, "returnMessage", string(failureContext.returnMessage), "error", err)
 		if !core.IsClosingError(err) {
 			log.Warn("revert to snapshot", "error", err.Error())
 		}

@@ -1,6 +1,7 @@
 package preprocess
 
 import (
+	"errors"
 	"time"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -617,7 +618,9 @@ func (scr *smartContractResults) ProcessMiniBlock(
 		scr.txExecutionOrderHandler.Add(miniBlockTxHashes[txIndex])
 		_, err = scr.scrProcessor.ProcessSmartContractResult(miniBlockScrs[txIndex])
 		if err != nil {
-			scr.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, miniBlockTxHashes[txIndex])
+			if revertErr := scr.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, miniBlockTxHashes[txIndex]); revertErr != nil {
+				return processedTxHashes, txIndex - 1, true, errors.Join(err, revertErr)
+			}
 			break
 		}
 

@@ -1371,6 +1371,7 @@ func TestTransactionCoordinator_AtomicFailureKeepsPerSenderSkip(t *testing.T) {
 	args := createMockTransactionCoordinatorArguments()
 	numAccountReverts := 0
 	args.Accounts = &stateMock.AccountsStub{
+		RootHashCalled: func() ([]byte, error) { return nil, nil },
 		JournalLenCalled: func() int {
 			return 1
 		},

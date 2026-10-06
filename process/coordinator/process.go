@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -716,6 +717,9 @@ func (tc *transactionCoordinator) CreateMbsAndProcessCrossShardTransactionsDstMe
 		errProc := tc.processCompleteMiniBlock(preproc, miniBlock, miniBlockInfo.Hash, haveTime, haveAdditionalTime, scheduledMode, allowPartialExecution, processedMbInfo, headerHash, gasProcessingPolicy)
 		tc.handleProcessMiniBlockExecution(oldIndexOfLastTxProcessed, miniBlock, processedMbInfo, createMBDestMeExecutionInfo)
 		if errProc != nil {
+			if _, stateErr := tc.accounts.RootHash(); stateErr != nil {
+				return nil, 0, false, errors.Join(errProc, stateErr)
+			}
 			shouldSkipShard[miniBlockInfo.SenderShardID] = true
 			log.Debug("transactionCoordinator.CreateMbsAndProcessCrossShardTransactionsDstMe: processed complete mini block failed",
 				"scheduled mode", scheduledMode,
@@ -1313,7 +1317,9 @@ func (tc *transactionCoordinator) processCompleteMiniBlock(
 		)
 
 		if shouldRevert {
-			tc.handleProcessTransactionError(snapshot, miniBlockHash, txsToBeReverted)
+			if revertErr := tc.handleProcessTransactionError(snapshot, miniBlockHash, txsToBeReverted); revertErr != nil {
+				return errors.Join(err, revertErr)
+			}
 		} else {
 			if allowPartialExecution {
 				processedMbInfo.IndexOfLastTxProcessed = int32(indexOfLastTxProcessed)
@@ -1338,7 +1344,7 @@ func (tc *transactionCoordinator) handleProcessMiniBlockInit(miniBlockHash []byt
 	return snapshot
 }
 
-func (tc *transactionCoordinator) handleProcessTransactionError(snapshot int, miniBlockHash []byte, txsToBeReverted [][]byte) {
+func (tc *transactionCoordinator) handleProcessTransactionError(snapshot int, miniBlockHash []byte, txsToBeReverted [][]byte) error {
 	tc.gasHandler.RestoreGasSinceLastReset(miniBlockHash)
 
 	err := tc.accounts.RevertToSnapshot(snapshot)
@@ -1350,6 +1356,7 @@ func (tc *transactionCoordinator) handleProcessTransactionError(snapshot int, mi
 		tc.RevertProcessedTxsResults(txsToBeReverted, miniBlockHash)
 	}
 	tc.txExecutionOrderHandler.RemoveMultiple(txsToBeReverted)
+	return err
 }
 
 // InitProcessedTxsResults inits processed txs results for the given key

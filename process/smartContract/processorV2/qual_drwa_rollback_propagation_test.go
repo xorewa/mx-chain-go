@@ -71,7 +71,7 @@ func TestQualDRWARollbackProcessIfErrorBoundary(t *testing.T) {
 			address := []byte("local-address")
 			reloadErr := errors.New("stop at reload boundary")
 			sc := &scProcessor{
-				shardCoordinator: &testscommon.ShardsCoordinatorMock{},
+				shardCoordinator: &testscommon.ShardsCoordinatorMock{ComputeIdCalled: func([]byte) uint32 { return 0 }, SelfIDCalled: func() uint32 { return 0 }},
 				vmOutputCacher: &cacheMock.CacherStub{PutCalled: func(key []byte, value interface{}, size int) bool {
 					require.Equal(t, hash, key)
 					require.Zero(t, size)

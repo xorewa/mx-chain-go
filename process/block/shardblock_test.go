@@ -3216,6 +3216,7 @@ func TestShardProcessor_CommitBlockShouldRevertCurrentBlockWhenErr(t *testing.T)
 	coreComponents, dataComponents, bootstrapComponents, statusComponents := createComponentHolderMocks()
 	arguments := CreateMockArguments(coreComponents, dataComponents, bootstrapComponents, statusComponents)
 	arguments.AccountsDB[state.UserAccountsState] = &stateMock.AccountsStub{
+		RootHashCalled:         func() ([]byte, error) { return nil, nil },
 		RevertToSnapshotCalled: revToSnapshot,
 	}
 	bp, _ := blproc.NewShardProcessor(arguments)

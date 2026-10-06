@@ -1255,8 +1255,8 @@ func (mp *metaProcessor) createAndProcessCrossMiniBlocksDstMe(
 			// shard header must be processed completely
 			errAccountState := mp.accountsDB[state.UserAccountsState].RevertToSnapshot(snapshot)
 			if errAccountState != nil {
-				// TODO: evaluate if reloading the trie from disk might solve the problem
 				log.Warn("accounts.RevertToSnapshot", "error", errAccountState.Error())
+				return nil, 0, 0, errAccountState
 			}
 			continue
 		}
@@ -1310,6 +1310,10 @@ func (mp *metaProcessor) CommitBlock(
 	commitEntryTime := time.Now()
 	err := checkForNils(headerHandler, bodyHandler)
 	if err != nil {
+		return err
+	}
+
+	if err = mp.checkAccountsState(); err != nil {
 		return err
 	}
 
@@ -2799,7 +2803,11 @@ func (mp *metaProcessor) applyBodyToHeader(metaHdr data.MetaHeaderHandler, bodyH
 		return nil, err
 	}
 
-	err = metaHdr.SetRootHash(mp.getRootHash())
+	rootHash, err := mp.accountsDB[state.UserAccountsState].RootHash()
+	if err != nil {
+		return nil, err
+	}
+	err = metaHdr.SetRootHash(rootHash)
 	if err != nil {
 		return nil, err
 	}

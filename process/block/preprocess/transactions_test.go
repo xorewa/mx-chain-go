@@ -239,7 +239,7 @@ func createDefaultTransactionsProcessorArgs() ArgsTransactionPreProcessor {
 			Hasher:                     &hashingMocks.HasherMock{},
 			Marshalizer:                &mock.MarshalizerMock{},
 			ShardCoordinator:           mock.NewMultiShardsCoordinatorMock(3),
-			Accounts:                   &stateMock.AccountsStub{},
+			Accounts:                   &stateMock.AccountsStub{RootHashCalled: func() ([]byte, error) { return nil, nil }},
 			AccountsProposal:           &stateMock.AccountsStub{},
 			OnRequestTransaction:       requestTransaction,
 			GasHandler:                 &mock.GasHandlerMock{},

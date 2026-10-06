@@ -1451,6 +1451,7 @@ func TestMetaProcessor_CommitBlockMarshalizerFailForHeaderShouldErr(t *testing.T
 	t.Parallel()
 
 	accounts := &stateMock.AccountsStub{
+		RootHashCalled: func() ([]byte, error) { return nil, nil },
 		RevertToSnapshotCalled: func(snapshot int) error {
 			return nil
 		},
@@ -1582,6 +1583,7 @@ func TestMetaProcessor_CommitBlockNoTxInPoolShouldErr(t *testing.T) {
 	hdr := createMetaBlockHeader()
 	body := &block.Body{}
 	accounts := &stateMock.AccountsStub{
+		RootHashCalled: func() ([]byte, error) { return nil, nil },
 		RevertToSnapshotCalled: func(snapshot int) error {
 			return nil
 		},
@@ -1792,6 +1794,7 @@ func TestMetaProcessor_CommitBlockShouldRevertCurrentBlockWhenErr(t *testing.T) 
 	dataComponents.Storage = initStore()
 	arguments := createMockMetaArguments(coreComponents, dataComponents, bootstrapComponents, statusComponents)
 	arguments.AccountsDB[state.UserAccountsState] = &stateMock.AccountsStub{
+		RootHashCalled:         func() ([]byte, error) { return nil, nil },
 		RevertToSnapshotCalled: revToSnapshot,
 	}
 	mp, _ := processBlock.NewMetaProcessor(arguments)

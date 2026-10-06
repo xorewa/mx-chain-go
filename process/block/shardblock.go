@@ -1203,6 +1203,10 @@ func (sp *shardProcessor) CommitBlock(
 		return err
 	}
 
+	if err = sp.checkAccountsState(); err != nil {
+		return err
+	}
+
 	prevBlockHeader := sp.blockChain.GetCurrentBlockHeader()
 	prevBlockHeaderHash := sp.blockChain.GetCurrentBlockHeaderHash()
 
@@ -2969,7 +2973,11 @@ func (sp *shardProcessor) applyBodyToHeader(
 		return nil, err
 	}
 
-	err = shardHeader.SetRootHash(sp.getRootHash())
+	rootHash, err := sp.accountsDB[state.UserAccountsState].RootHash()
+	if err != nil {
+		return nil, err
+	}
+	err = shardHeader.SetRootHash(rootHash)
 	if err != nil {
 		return nil, err
 	}

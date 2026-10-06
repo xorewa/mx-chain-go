@@ -1289,6 +1289,9 @@ func (txs *transactions) createAndProcessMiniBlocksFromMeV1(
 
 		err = txs.processMiniBlockBuilderTx(mbBuilder, wtx, tx)
 		if err != nil {
+			if _, stateErr := txs.accounts.RootHash(); stateErr != nil {
+				return nil, nil, errors.Join(err, stateErr)
+			}
 			if core.IsGetNodeFromDBError(err) {
 				return nil, nil, err
 			}
@@ -1355,7 +1358,9 @@ func (txs *transactions) processMiniBlockBuilderTx(
 	mb.stats.totalProcessingTime += elapsedTime
 
 	if err != nil && !errors.Is(err, process.ErrFailedTransaction) {
-		txs.handleBadTransaction(err, wtx, tx, mb, snapshot)
+		if revertErr := txs.handleBadTransaction(err, wtx, tx, mb, snapshot); revertErr != nil {
+			return errors.Join(err, revertErr)
+		}
 		return err
 	}
 
@@ -1377,14 +1382,15 @@ func (txs *transactions) handleBadTransaction(
 	tx *transaction.Transaction,
 	mbb *miniBlocksBuilder,
 	snapshot int,
-) {
+) error {
 	log.Trace("bad tx", "error", err.Error(), "hash", wtx.TxHash)
 	errRevert := txs.accounts.RevertToSnapshot(snapshot)
 	if errRevert != nil && !core.IsClosingError(errRevert) {
-		log.Warn("revert to snapshot", "error", err.Error())
+		log.Warn("revert to snapshot", "error", errRevert.Error())
 	}
 
 	mbb.handleBadTransaction(err, wtx, tx)
+	return errRevert
 }
 
 func (txs *transactions) refundGas(
@@ -1759,6 +1765,11 @@ func (txs *transactions) ProcessMiniBlock(
 		numTXsProcessed++
 	}
 
+	if err != nil {
+		if _, stateErr := txs.accounts.RootHash(); stateErr != nil {
+			return processedTxHashes, txIndex - 1, true, errors.Join(err, stateErr)
+		}
+	}
 	if err != nil && (!partialMbExecutionMode || scheduledMode) {
 		return processedTxHashes, txIndex - 1, true, err
 	}
@@ -1810,7 +1821,9 @@ func (txs *transactions) processInNormalMode(
 	txs.txExecutionOrderHandler.Add(txHash)
 	_, err := txs.txProcessor.ProcessTransaction(tx)
 	if err != nil {
-		txs.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, txHash)
+		if revertErr := txs.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, txHash); revertErr != nil {
+			return errors.Join(err, revertErr)
+		}
 		return err
 	}
 

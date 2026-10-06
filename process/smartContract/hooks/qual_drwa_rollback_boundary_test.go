@@ -5,24 +5,46 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-go/process/mock"
 	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
+	"github.com/multiversx/mx-chain-go/testscommon"
+	"github.com/multiversx/mx-chain-go/testscommon/cache"
+	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
+	"github.com/multiversx/mx-chain-go/testscommon/epochNotifier"
 	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	vmcommonBuiltins "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	"github.com/stretchr/testify/require"
 )
 
+func qualRollbackHookArgs() hooks.ArgBlockChainHook {
+	args := createMockBlockChainHookArgs()
+	args.CompiledSCPool = &cache.CacherStub{ClearCalled: func() {}}
+	args.EpochNotifier.(*epochNotifier.EpochNotifierStub).RegisterNotifyHandlerCalled = func(handler vmcommon.EpochSubscriberHandler) { handler.EpochConfirmed(0, 0) }
+	args.GasSchedule.(*testscommon.GasScheduleNotifierMock).RegisterNotifyHandlerCalled = func(handler core.GasScheduleSubscribeHandler) {
+		handler.GasScheduleChange(make(map[string]map[string]uint64))
+	}
+	epochs := args.EnableEpochsHandler.(*enableEpochsHandlerMock.EnableEpochsHandlerStub)
+	epochs.IsFlagDefinedCalled = func(core.EnableEpochFlag) bool { return true }
+	epochs.IsFlagEnabledCalled = func(core.EnableEpochFlag) bool { return false }
+	epochs.GetActivationEpochCalled = func(core.EnableEpochFlag) uint32 { return 0 }
+	coordinator := mock.NewOneShardCoordinatorMock()
+	coordinator.ComputeIdCalled = func([]byte) uint32 { return 0 }
+	args.ShardCoordinator = coordinator
+	return args
+}
+
 // Part A F.2.1 P-05 and Part B 16.2 require containment of rollback failure.
-// This records the unmodified hook's error boundary, not a conforming DRWA
-// implementation, real trie corruption, partial commit or an exploit.
-func TestQualDRWAUpstreamRollbackErrorBoundary(t *testing.T) {
+// The descendant preserves both causes on failed rollback and the exact
+// original error on successful rollback. Store containment is tested separately.
+func TestQualDRWARollbackErrorBoundary(t *testing.T) {
 	for _, phase := range []string{"builtin", "save_sender", "save_destination"} {
 		for _, rollbackFails := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/rollback_fails_%t", phase, rollbackFails), func(t *testing.T) {
 				primary := errors.New("injected operation failure")
 				rollback := errors.New("injected rollback failure")
-				args := createMockBlockChainHookArgs()
+				args := qualRollbackHookArgs()
 				container := vmcommonBuiltins.NewBuiltInFunctionContainer()
 				builtinCalls, saveCalls, rollbackCalls := 0, 0, 0
 				require.NoError(t, container.Add("qualProbe", &mock.BuiltInFunctionStub{
@@ -36,6 +58,7 @@ func TestQualDRWAUpstreamRollbackErrorBoundary(t *testing.T) {
 				}))
 				args.BuiltInFunctions = container
 				args.Accounts = &stateMock.AccountsStub{
+					RootHashCalled: func() ([]byte, error) { return []byte("healthy root"), nil },
 					GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
 						return stateMock.NewAccountWrapMock(address), nil
 					},
@@ -64,7 +87,10 @@ func TestQualDRWAUpstreamRollbackErrorBoundary(t *testing.T) {
 				output, err := hook.ProcessBuiltInFunction(createContractCallInput("qualProbe", []byte("sender"), []byte("destination")))
 				require.Nil(t, output)
 				require.ErrorIs(t, err, primary)
-				require.False(t, errors.Is(err, rollback), "upstream discards the rollback error in every exercised branch")
+				require.Equal(t, rollbackFails, errors.Is(err, rollback), "rollback cause survives only when undo fails")
+				if !rollbackFails {
+					require.Same(t, primary, err)
+				}
 				require.Equal(t, 1, builtinCalls)
 				require.Equal(t, 1, rollbackCalls)
 				require.Equal(t, map[string]int{"builtin": 0, "save_sender": 1, "save_destination": 2}[phase], saveCalls)
@@ -80,7 +106,7 @@ func TestQualDRWAUpstreamBuiltinReturnCodeAndAccountAlias(t *testing.T) {
 	for _, sameAddress := range []bool{false, true} {
 		for _, code := range []vmcommon.ReturnCode{vmcommon.Ok, vmcommon.UserError} {
 			t.Run(fmt.Sprintf("same_address_%t/code_%d", sameAddress, code), func(t *testing.T) {
-				args := createMockBlockChainHookArgs()
+				args := qualRollbackHookArgs()
 				container := vmcommonBuiltins.NewBuiltInFunctionContainer()
 				sender := stateMock.NewAccountWrapMock([]byte("sender"))
 				destination := stateMock.NewAccountWrapMock([]byte("destination"))
@@ -101,6 +127,8 @@ func TestQualDRWAUpstreamBuiltinReturnCodeAndAccountAlias(t *testing.T) {
 				}))
 				args.BuiltInFunctions = container
 				args.Accounts = &stateMock.AccountsStub{
+					JournalLenCalled: func() int { return 0 },
+					RootHashCalled:   func() ([]byte, error) { return []byte("healthy root"), nil },
 					GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
 						require.Equal(t, sender.AddressBytes(), address)
 						return sender, nil
