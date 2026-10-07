@@ -106,6 +106,33 @@ func (r *ResultAccountReader) Read(committedH []byte, producingShard uint32,
 	if err != nil {
 		return nil, err
 	}
+	return r.readAccountItem(root, address, itemKey, w)
+}
+
+// readRegistryItem consumes a root selected from the caller-validated native
+// candidate context, including a retained LastExecutionResult. It is private to
+// the T08 registry construction and fixes the account to the L26 system account.
+// It cannot select its authority from the witness. Native ownership/finality,
+// epoch configuration and stable inputs remain the selecting caller's duties.
+func (r *ResultAccountReader) readRegistryItem(anchor *metaRegistryAnchor,
+	itemKey []byte, w AccountItemWitness, proofByteLimit int) ([]byte, error) {
+	r.mut.Lock()
+	defer r.mut.Unlock()
+	if anchor == nil || len(anchor.candidateHash) == 0 || len(anchor.metaHash) == 0 ||
+		len(anchor.executedHash) == 0 || len(anchor.root) == 0 || len(itemKey) == 0 ||
+		len(w.Header) != 0 || len(w.ExecutedHeader) != 0 {
+		return nil, ErrInvalidAccountWitness
+	}
+	if _, err := registryProofBytes(w, proofByteLimit); err != nil {
+		return nil, err
+	}
+	return r.readAccountItem(anchor.root, bytes.Clone(core.SystemAccountAddress), itemKey, w)
+}
+
+// readAccountItem requires the reader mutex and validated native root/proof
+// bounds. Both native result paths reuse exactly the same proof/account decoder.
+func (r *ResultAccountReader) readAccountItem(root, address, itemKey []byte,
+	w AccountItemWitness) ([]byte, error) {
 	valid, err := r.proofTrie.VerifyProof(root, address, w.AccountProof)
 	if err != nil || !valid {
 		return nil, ErrInvalidAccountWitness
