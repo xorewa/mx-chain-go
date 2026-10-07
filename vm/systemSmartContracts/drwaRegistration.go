@@ -77,6 +77,12 @@ func (s *drwaRegistrationEI) GetStorage(key []byte) []byte {
 // record bundle. No profile, address, fee or encoding is allocated here.
 //
 // The retained immutable properties are checked before any native account save.
+// Ledger L39 selects the transfer-enabled creation profile for the six native
+// NFTCreate-role families; fungible tokens retain the false field. This checks
+// the native property shape only. A reviewed version/hash must be bound by the
+// full registration owner before wiring. It does not authorize public/legacy
+// creator transfer or stop: those regulated routes still require the protected
+// VerifiedDRWAAdminContext and receiving action/step fences (Part A L3151-3161).
 // E10 uses the permitted same-operation native burn-role removal candidate. The
 // native set/type/unset fan-out remains pending; T44 must prove materialization
 // and ordering before every receiving effect, and activation still needs all
@@ -92,9 +98,12 @@ func (e *esdt) registerDRWAToken(registration drwaRegistrationOwner, request drw
 		request.decimals < minNumberOfDecimals || request.decimals > maxNumberOfDecimals {
 		return errInvalidDRWARegistration
 	}
+	transferCreationRole := false
 	switch string(request.family) {
-	case core.FungibleESDT, core.NonFungibleESDTv2, core.SemiFungibleESDT, core.MetaESDT,
+	case core.FungibleESDT:
+	case core.NonFungibleESDTv2, core.SemiFungibleESDT, core.MetaESDT,
 		core.DynamicNFTESDT, core.DynamicSFTESDT, core.DynamicMetaESDT:
+		transferCreationRole = true
 	default:
 		return errInvalidDRWARegistration
 	}
@@ -125,7 +134,7 @@ func (e *esdt) registerDRWAToken(registration drwaRegistrationOwner, request drw
 			return nil, nil, createErr
 		}
 		if token.Upgradable || !token.CanAddSpecialRoles || token.CanFreeze || token.CanWipe || token.CanPause ||
-			token.CanChangeOwner || token.CanCreateMultiShard || token.CanTransferNFTCreateRole || token.Mintable || token.Burnable {
+			token.CanChangeOwner || token.CanCreateMultiShard || token.CanTransferNFTCreateRole != transferCreationRole || token.Mintable || token.Burnable {
 			return nil, nil, errInvalidDRWARegistration
 		}
 		if checkIfDefinedRoleExistsInToken(token, []byte(vmcommon.ESDTRoleBurnForAll)) {

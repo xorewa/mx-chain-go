@@ -106,6 +106,9 @@ func TestQualDRWANativeRegistrationFamilies(t *testing.T) {
 		t.Run(family, func(t *testing.T) {
 			e, ctx, s, r, c, request := qualNativeRegistration(t)
 			request.family = []byte(family)
+			if family != core.FungibleESDT {
+				request.properties = append(request.properties, []byte(canTransferNFTCreateRole), []byte("true"))
+			}
 			original := e.eei
 			require.NoError(t, e.registerDRWAToken(r, request))
 			require.Same(t, original, e.eei)
@@ -125,7 +128,7 @@ func TestQualDRWANativeRegistrationFamilies(t *testing.T) {
 			require.False(t, native.CanPause)
 			require.False(t, native.CanChangeOwner)
 			require.False(t, native.CanCreateMultiShard)
-			require.False(t, native.CanTransferNFTCreateRole)
+			require.Equal(t, family != core.FungibleESDT, native.CanTransferNFTCreateRole) // Owner L39; other fixed fields unchanged.
 			require.False(t, native.Mintable)
 			require.False(t, native.Burnable)
 			require.Empty(t, native.SpecialRoles)
@@ -138,12 +141,51 @@ func TestQualDRWANativeRegistrationFamilies(t *testing.T) {
 			require.NotEmpty(t, out[0].OutputAccounts)
 			require.NotEmpty(t, out[0].Logs)
 			require.NoError(t, s.RecreateTrie(holders.NewDefaultRootHashesHolder(roots[0])))
-			require.NotEmpty(t, qualNativeRegistrationValue(t, s, core.ESDTSCAddress, id))
+			persisted := &ESDTDataV2{}
+			require.NoError(t, e.marshalizer.Unmarshal(persisted, qualNativeRegistrationValue(t, s, core.ESDTSCAddress, id)))
+			require.Equal(t, native, persisted)
 			require.Equal(t, []byte{1}, qualNativeRegistrationValue(t, s, core.SystemAccountAddress, append([]byte(core.ProtectedKeyPrefix+"DRWA@registry@member@"), id...)))
 			require.Empty(t, ctx.storageUpdate)
 			for _, a := range out[0].OutputAccounts {
 				require.Empty(t, a.StorageUpdates)
 			}
+		})
+	}
+}
+
+// The family/property expectation is the owner-selected L39 contract, not a
+// generated profile or authority boolean. Failure must discard the native
+// creator's tentative overlays/outputs and leave this candidate usable.
+func TestQualDRWANativeRegistrationL39Profile(t *testing.T) {
+	for _, family := range []string{core.FungibleESDT, core.NonFungibleESDTv2, core.SemiFungibleESDT, core.MetaESDT, core.DynamicNFTESDT, core.DynamicSFTESDT, core.DynamicMetaESDT} {
+		t.Run(family, func(t *testing.T) {
+			e, ctx, s, r, c, request := qualNativeRegistration(t)
+			request.family = []byte(family)
+			wrong := "false"
+			correct := "true"
+			if family == core.FungibleESDT {
+				wrong, correct = "true", "false"
+			}
+			request.properties = append(request.properties, []byte(canTransferNFTCreateRole), []byte(wrong))
+			root, err := s.RootHash()
+			require.NoError(t, err)
+			require.ErrorIs(t, e.registerDRWAToken(r, request), errInvalidDRWARegistration)
+			after, err := s.RootHash()
+			require.NoError(t, err)
+			require.Equal(t, root, after)
+			require.Zero(t, s.JournalLen())
+			require.Equal(t, make([]byte, 8), qualNativeRegistrationValue(t, s, core.SystemAccountAddress, []byte(core.ProtectedKeyPrefix+"DRWA@registry@count")))
+			require.Empty(t, ctx.storageUpdate)
+			require.Empty(t, ctx.output)
+			require.Empty(t, ctx.outputAccounts)
+			require.Empty(t, ctx.logs)
+			require.Same(t, ctx, e.eei)
+			request.properties[len(request.properties)-1] = []byte(correct)
+			require.NoError(t, e.registerDRWAToken(r, request))
+			_, outputs, err := c.Commit()
+			require.NoError(t, err)
+			require.Len(t, outputs, 1)
+			require.Equal(t, ctx.output[0], outputs[0].ReturnData[0])
 		})
 	}
 }
