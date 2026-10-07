@@ -25,6 +25,7 @@ import (
 func TestQualDRWAAbsentRawReferenceNativeFailure(t *testing.T) {
 	token := []byte("AAA-abcdef") // Test identifier, not a protocol allocation.
 	id := hex.EncodeToString(token)
+	destination := hex.EncodeToString([]byte("12345678901234567890123456789022"))
 	cases := []struct {
 		name, function, arguments string
 		self                      bool
@@ -32,6 +33,12 @@ func TestQualDRWAAbsentRawReferenceNativeFailure(t *testing.T) {
 		{"transfer", core.BuiltInFunctionESDTTransfer, id + "@01", false},
 		{"mint", core.BuiltInFunctionESDTLocalMint, id + "@01", true},
 		{"create", core.BuiltInFunctionESDTNFTCreate, id + "@01@4e@00@48@41@55", true},
+		{"add_quantity", core.BuiltInFunctionESDTNFTAddQuantity, id + "@01@01", true},
+		{"local_burn", core.BuiltInFunctionESDTLocalBurn, id + "@01", true},
+		{"nft_burn", core.BuiltInFunctionESDTNFTBurn, id + "@01@01", true},
+		{"nft_transfer", core.BuiltInFunctionESDTNFTTransfer, id + "@01@01@" + destination, true},
+		{"multi_fungible", core.BuiltInFunctionMultiESDTNFTTransfer, destination + "@01@" + id + "@00@01", true},
+		{"multi_nft", core.BuiltInFunctionMultiESDTNFTTransfer, destination + "@01@" + id + "@01@01", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
