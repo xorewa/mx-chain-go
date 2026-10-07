@@ -45,9 +45,9 @@ func TestQualDRWAPrivilegedConsentHostileSelectedEvidence(t *testing.T) {
 			a, err := ctx.Accounts.LoadAccount(s.Address)
 			require.NoError(t, err)
 			u := a.(state.UserAccountHandler)
-			require.NoError(t, u.SaveKeyValue(experimentalPrivilegedConsentKey, encodeExperimentalConsent(s, u.GetNonce(), 0)))
 			require.NoError(t, ctx.Accounts.SaveAccount(a))
-			h, w, budget := qualConsentWitnessAddress(t, ctx, 0, s.Address)
+			require.NoError(t, savePrivilegedConsent(ctx.Accounts, s.Address, s.Token, s.Program, encodeExperimentalConsent(s, u.GetNonce(), 0)))
+			h, w, budget := qualConsentWitnessScope(t, ctx, 0, s)
 			shard := uint32(1)
 			if name == "meta" {
 				old := &block.HeaderV3{}
@@ -131,11 +131,14 @@ func TestQualDRWAPrivilegedConsentReaderFaults(t *testing.T) {
 			failure := errors.New("qualification native reader boundary")
 			expected := error(failure)
 			originalMarshal := r.args.Marshaller
+			var observedProof *qualConsentEOAProofBoundary
 			switch name {
 			case "T06_error":
 				h = []byte("unselected H")
 				expected = ErrInvalidAccountWitness
 			case "root_error":
+				observedProof = &qualConsentEOAProofBoundary{Trie: r.proofTrie, boundary: func() (bool, error) { return false, nil }}
+				r.proofTrie = observedProof
 				calls := 0
 				expected = ErrInvalidAccountWitness
 				r.args.Marshaller = &qualConsentReadMarshal{originalMarshal, func(v interface{}, b []byte) error {
@@ -198,6 +201,9 @@ func TestQualDRWAPrivilegedConsentReaderFaults(t *testing.T) {
 			}
 			require.NotPanics(t, func() { err = c.ReadEvidence(r, h, 1, s, w, budget) })
 			require.ErrorIs(t, err, expected)
+			if observedProof != nil {
+				require.Equal(t, 2, observedProof.calls, "a failed root selection must not proceed to EOA proof verification")
+			}
 		})
 	}
 }

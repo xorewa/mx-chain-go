@@ -23,10 +23,7 @@ import (
 // Ledger L29 adopts the action, not these choices. No dispatcher installs it.
 const ExperimentalPrivilegedConsentEndpoint = "DRWAPrivilegedConsentCandidate"
 
-var (
-	ErrPrivilegedConsent             = errors.New("invalid DRWA privileged consent candidate")
-	experimentalPrivilegedConsentKey = []byte(core.ProtectedKeyPrefix + "drwa/experimental/privileged-consent")
-)
+var ErrPrivilegedConsent = errors.New("invalid DRWA privileged consent candidate")
 
 // PrivilegedConsentScope is an experimental exact tuple, not a CEB codec.
 // Roles contains the owning caller's canonical bound-role encoding; selecting
@@ -43,12 +40,13 @@ type PrivilegedConsentScope struct {
 // must refuse proposal commit/output publication when containment fails, even
 // if native error processing later returns UserError/nil (T04 contract).
 // Native failed-transaction nonce/fees remain outside this operation's snapshot.
-// A single protected account slot bounds retained record cardinality per EOA;
-// newer consent replaces older scope. This retention choice needs owner review.
+// Ledger L34 retains one system-account record per EOA/token/programme. A new
+// target for that tuple replaces its previous record, not another token's.
 type PrivilegedConsentCandidate struct {
 	mut                          sync.Mutex
 	accounts                     state.AccountsAdapter
 	containment                  *RollbackContainment
+	references                   PrivilegedConsentReferenceReader
 	domain                       []byte
 	addressLength, maxFieldBytes int
 	reserved                     [][]byte
@@ -58,17 +56,19 @@ type PrivilegedConsentCandidate struct {
 	expectedHash                 []byte
 	pendingAccount               state.UserAccountHandler
 	pendingRecord                []byte
+	pendingToken, pendingProgram []byte
 	pendingOutput                *vmcommon.VMOutput
 }
 
 func NewPrivilegedConsentCandidate(accounts state.AccountsAdapter, containment *RollbackContainment,
-	domain []byte, addressLength, maxFieldBytes int, reserved [][]byte, epoch func() uint32, gas uint64) (*PrivilegedConsentCandidate, error) {
+	domain []byte, addressLength, maxFieldBytes int, reserved [][]byte, epoch func() uint32, gas uint64,
+	references PrivilegedConsentReferenceReader) (*PrivilegedConsentCandidate, error) {
 	if check.IfNil(accounts) || containment == nil || len(domain) == 0 || addressLength <= core.NumInitCharactersForScAddress ||
-		len(domain) > maxFieldBytes || epoch == nil || gas == 0 {
+		len(domain) > maxFieldBytes || epoch == nil || gas == 0 || check.IfNil(references) {
 		return nil, ErrPrivilegedConsent
 	}
 	r := &PrivilegedConsentCandidate{accounts: accounts, containment: containment, domain: bytes.Clone(domain),
-		addressLength: addressLength, maxFieldBytes: maxFieldBytes, epoch: epoch, gas: gas}
+		addressLength: addressLength, maxFieldBytes: maxFieldBytes, epoch: epoch, gas: gas, references: references}
 	for _, address := range reserved {
 		r.reserved = append(r.reserved, bytes.Clone(address))
 	}
@@ -148,11 +148,15 @@ func (c *PrivilegedConsentCandidate) ProcessBuiltinFunction(sender, _ vmcommon.U
 	if !hasNativeCode || len(codeAccount.GetCode()) != 0 {
 		return nil, ErrPrivilegedConsent
 	}
+	if err = checkPrivilegedConsentReference(c.accounts, c.references, s.Token, s.Program); err != nil {
+		return nil, err
+	}
 	record := encodeExperimentalConsent(s, sender.GetNonce(), c.epoch())
 	output := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: input.GasProvided - c.gas}
 	// Stage only. Native processing can still fail after this return; it must
 	// finish successfully before any authenticated consent slot is written.
 	c.pendingAccount, c.pendingRecord, c.pendingOutput = account, record, output
+	c.pendingToken, c.pendingProgram = bytes.Clone(s.Token), bytes.Clone(s.Program)
 	return output, nil
 }
 
@@ -189,6 +193,7 @@ func (c *PrivilegedConsentCandidate) ExecuteNativeTransaction(tx *transaction.Tr
 		c.expectedHash = nil
 		c.pendingAccount = nil
 		c.pendingRecord = nil
+		c.pendingToken, c.pendingProgram = nil, nil
 		c.pendingOutput = nil
 		c.mut.Unlock()
 	}()
@@ -214,10 +219,10 @@ func (c *PrivilegedConsentCandidate) ExecuteNativeTransaction(tx *transaction.Tr
 		if !ok || current.GetNonce() != c.pendingAccount.GetNonce() || len(current.GetCodeHash()) != 0 {
 			return nil, ErrPrivilegedConsent
 		}
-		if saveErr := current.SaveKeyValue(bytes.Clone(experimentalPrivilegedConsentKey), c.pendingRecord); saveErr != nil {
-			return nil, saveErr
+		if referenceErr := checkPrivilegedConsentReference(c.accounts, c.references, c.pendingToken, c.pendingProgram); referenceErr != nil {
+			return nil, referenceErr
 		}
-		if saveErr := c.accounts.SaveAccount(current); saveErr != nil {
+		if saveErr := savePrivilegedConsent(c.accounts, current.AddressBytes(), c.pendingToken, c.pendingProgram, c.pendingRecord); saveErr != nil {
 			return nil, saveErr
 		}
 		return c.pendingOutput, nil

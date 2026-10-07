@@ -307,7 +307,7 @@ func TestQualDRWAPrivilegedConsentSlotLifecycle(t *testing.T) {
 	require.NoError(t, c.ReadEvidence(reader, oldH, 1, s, oldW, oldBudget))
 	// Ordinary native SaveKeyValue cannot forge or replace a protected action
 	// record. Its failure/nonce effects follow the unchanged native processor.
-	data := []byte("SaveKeyValue@" + hex.EncodeToString(experimentalPrivilegedConsentKey) + "@" + hex.EncodeToString([]byte("forged")))
+	data := []byte("SaveKeyValue@" + hex.EncodeToString(privilegedConsentRecordKey(s.Address, s.Token, s.Program)) + "@" + hex.EncodeToString([]byte("forged")))
 	tx := qualConsentTx(t, ctx, data, nil)
 	code, err := ctx.TxProcessor.ProcessTransaction(tx)
 	require.Equal(t, vmcommon.UserError, code)
@@ -319,7 +319,7 @@ func TestQualDRWAPrivilegedConsentSlotLifecycle(t *testing.T) {
 	h, w, budget := qualConsentWitness(t, ctx, 0)
 	require.Error(t, c.ReadEvidence(reader, h, 1, s, w, budget))
 	// The unchanged owner key grants no freshness waiver. A new successful
-	// native action refreshes this single slot; the old roles no longer match.
+	// native action refreshes this EOA/token/programme slot; old roles no longer match.
 	c, owner = qualConsentInstall(t, ctx, 0)
 	next := s
 	next.Roles = []byte("next fixture roles")
@@ -390,8 +390,7 @@ func qualConsentNativeSnapshot(t *testing.T, ctx *vm.VMTestContext) []byte {
 		require.NoError(t, err)
 		scrs = append(scrs, raw)
 	}
-	value, _, _ := a.(state.UserAccountHandler).RetrieveValue(experimentalPrivilegedConsentKey)
-	require.Empty(t, value)
+	require.Empty(t, qualConsentValue(t, ctx))
 	encoded, err := json.Marshal([]interface{}{root, raw, ctx.GetGasRemaining(), ctx.TxFeeHandler.GetAccumulatedFees().String(), ctx.TxFeeHandler.GetDeveloperFees().String(), logs, scrs})
 	require.NoError(t, err)
 	return encoded

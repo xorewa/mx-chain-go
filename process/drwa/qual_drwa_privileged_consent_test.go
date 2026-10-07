@@ -52,6 +52,7 @@ func qualConsentContextConfig(t *testing.T, epochs config.EnableEpochs) *vm.VMTe
 	ctx, err := vm.CreatePreparedTxProcessorWithVMsWithShardCoordinator(epochs, coordinator, 1)
 	require.NoError(t, err)
 	t.Cleanup(ctx.Close)
+	qualConsentSeedMembership(t, ctx.Accounts)
 	a, err := ctx.Accounts.LoadAccount(qualConsentEOA)
 	require.NoError(t, err)
 	require.NoError(t, a.(state.UserAccountHandler).AddToBalance(big.NewInt(1000000000)))
@@ -66,7 +67,7 @@ func qualConsentInstall(t *testing.T, ctx *vm.VMTestContext, epoch uint32) (*Pri
 	require.NoError(t, err)
 	owner, err := NewRollbackContainment(ctx.Accounts)
 	require.NoError(t, err)
-	c, err := NewPrivilegedConsentCandidate(ctx.Accounts, owner, []byte("fixture-domain"), 32, 256, nil, func() uint32 { return epoch }, 10)
+	c, err := NewPrivilegedConsentCandidate(ctx.Accounts, owner, []byte("fixture-domain"), 32, 256, nil, func() uint32 { return epoch }, 10, qualConsentReferenceFixture())
 	require.NoError(t, err)
 	container := ctx.BlockchainHook.(*hooks.BlockChainHookImpl).GetBuiltinFunctionsContainer()
 	if _, exists := container.Keys()[ExperimentalPrivilegedConsentEndpoint]; exists {
@@ -106,10 +107,7 @@ func qualConsentProcess(t *testing.T, ctx *vm.VMTestContext, data []byte, guardi
 }
 func qualConsentValue(t *testing.T, ctx *vm.VMTestContext) []byte {
 	t.Helper()
-	a, err := ctx.Accounts.GetExistingAccount(qualConsentEOA)
-	require.NoError(t, err)
-	v, _, _ := a.(state.UserAccountHandler).RetrieveValue(experimentalPrivilegedConsentKey)
-	return v
+	return qualConsentScopedValue(t, ctx.Accounts, qualConsentScope())
 }
 func qualConsentGuard(t *testing.T, ctx *vm.VMTestContext) uint32 {
 	t.Helper()
@@ -207,16 +205,18 @@ func TestQualDRWAPrivilegedConsentGuards(t *testing.T) {
 	for _, name := range []string{"nil_sender", "nil_input", "unbound_execution", "wrong_tx_hash", "pending_action", "function", "async", "caller", "recipient", "nil_value", "value", "esdt", "error_return", "locked_gas", "gas", "argument_count", "empty_field", "field_bound", "domain", "address_binding", "short_address", "sc_address", "system_prefix", "reserved", "code", "pending_code", "vm_only_account", "missing_code_method"} {
 		t.Run(name, func(t *testing.T) {
 			f := qualNativeReaderFixture(t, false, 1)
+			qualConsentSeedMembership(t, f.adb)
 			owner, err := NewRollbackContainment(f.adb)
 			require.NoError(t, err)
 			s := qualConsentScope()
 			s.Address = f.address
-			c, err := NewPrivilegedConsentCandidate(f.adb, owner, s.Domain, 32, 256, [][]byte{bytes.Repeat([]byte{0x66}, 32)}, func() uint32 { return 3 }, 10)
+			c, err := NewPrivilegedConsentCandidate(f.adb, owner, s.Domain, 32, 256, [][]byte{bytes.Repeat([]byte{0x66}, 32)}, func() uint32 { return 3 }, 10, qualConsentReferenceFixture())
 			require.NoError(t, err)
 			a, err := f.adb.LoadAccount(f.address)
 			require.NoError(t, err)
 			u := a.(state.UserAccountHandler)
 			var sender vmcommon.UserAccountHandler = u.(vmcommon.UserAccountHandler)
+			var observedCode *qualConsentObservedCode
 			in := &vmcommon.ContractCallInput{VMInput: vmcommon.VMInput{CallerAddr: f.address, Arguments: [][]byte{s.Domain, s.Token, s.Program, s.Target, s.Roles, s.Address}, CallValue: big.NewInt(0), GasProvided: 10}, RecipientAddr: f.address, Function: ExperimentalPrivilegedConsentEndpoint}
 			c.executing = true
 			c.expectedHash = []byte("native-tx-hash")
@@ -259,9 +259,13 @@ func TestQualDRWAPrivilegedConsentGuards(t *testing.T) {
 			case "empty_field":
 				in.Arguments[2] = nil
 			case "field_bound":
-				in.Arguments[2] = bytes.Repeat([]byte{1}, 257)
+				// Roles do not influence the admitted token/programme resolver;
+				// its denial cannot mask the independent input-size obligation.
+				in.Arguments[4] = bytes.Repeat([]byte{1}, 257)
 			case "domain":
 				in.Arguments[0] = []byte("other")
+				observedCode = &qualConsentObservedCode{qualConsentAccount: u.(qualConsentAccount)}
+				sender = observedCode
 			case "address_binding":
 				in.Arguments[5] = qualConsentEOA
 			case "short_address", "sc_address", "system_prefix", "reserved":
@@ -298,7 +302,10 @@ func TestQualDRWAPrivilegedConsentGuards(t *testing.T) {
 			out, err := c.ProcessBuiltinFunction(sender, nil, in)
 			require.Error(t, err)
 			require.Nil(t, out)
-			v, _, _ := u.RetrieveValue(experimentalPrivilegedConsentKey)
+			if observedCode != nil {
+				require.Zero(t, observedCode.codeHashCalls, "invalid scope must return before account fact processing")
+			}
+			v, _, _ := u.RetrieveValue(privilegedConsentRecordKey(s.Address, s.Token, s.Program))
 			require.Empty(t, v)
 		})
 	}
@@ -315,8 +322,21 @@ type qualConsentAccount interface {
 }
 type qualConsentMissingCode struct{ qualConsentAccount }
 
+// A qualification observation only: verifies the scope-error boundary without
+// claiming account authentication or replacing the native no-code predicate.
+type qualConsentObservedCode struct {
+	qualConsentAccount
+	codeHashCalls int
+}
+
+func (a *qualConsentObservedCode) GetCodeHash() []byte {
+	a.codeHashCalls++
+	return a.qualConsentAccount.GetCodeHash()
+}
+func (a *qualConsentObservedCode) GetCode() []byte { return nil }
+
 func TestQualDRWAPrivilegedConsentConstructor(t *testing.T) {
-	for _, name := range []string{"accounts", "containment", "domain", "length", "bound", "domain_bound", "epoch", "gas"} {
+	for _, name := range []string{"accounts", "containment", "domain", "length", "bound", "domain_bound", "epoch", "gas", "references", "typed_nil_references"} {
 		t.Run(name, func(t *testing.T) {
 			f := qualNativeReaderFixture(t, false, 1)
 			owner, err := NewRollbackContainment(f.adb)
@@ -326,6 +346,7 @@ func TestQualDRWAPrivilegedConsentConstructor(t *testing.T) {
 			length, bound := 32, 256
 			epoch := func() uint32 { return 3 }
 			gas := uint64(10)
+			var references PrivilegedConsentReferenceReader = qualConsentReferenceFixture()
 			switch name {
 			case "accounts":
 				accounts = nil
@@ -343,8 +364,12 @@ func TestQualDRWAPrivilegedConsentConstructor(t *testing.T) {
 				epoch = nil
 			case "gas":
 				gas = 0
+			case "references":
+				references = nil
+			case "typed_nil_references":
+				references = (*qualConsentReferences)(nil)
 			}
-			c, err := NewPrivilegedConsentCandidate(accounts, owner, domain, length, bound, nil, epoch, gas)
+			c, err := NewPrivilegedConsentCandidate(accounts, owner, domain, length, bound, nil, epoch, gas, references)
 			require.Error(t, err)
 			require.Nil(t, c)
 		})

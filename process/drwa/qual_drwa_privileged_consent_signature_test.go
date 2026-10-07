@@ -112,8 +112,7 @@ func TestQualDRWAPrivilegedConsentNativeSignatures(t *testing.T) {
 				require.Len(t, outputs, 1)
 				a, err = ctx.Accounts.GetExistingAccount(address)
 				require.NoError(t, err)
-				value, _, err := a.(state.UserAccountHandler).RetrieveValue(experimentalPrivilegedConsentKey)
-				require.NoError(t, err)
+				value := qualConsentScopedValue(t, ctx.Accounts, s)
 				require.Equal(t, encodeExperimentalConsent(s, 1, epoch), value)
 				if relayed {
 					// Native fee payer is the relayer (baseProcess.go L244-270).
@@ -127,7 +126,7 @@ func TestQualDRWAPrivilegedConsentNativeSignatures(t *testing.T) {
 				require.Error(t, err)
 				a, err = ctx.Accounts.GetExistingAccount(address)
 				require.NoError(t, err)
-				value, _, _ := a.(state.UserAccountHandler).RetrieveValue(experimentalPrivilegedConsentKey)
+				value := qualConsentScopedValue(t, ctx.Accounts, s)
 				require.Empty(t, value)
 				require.Zero(t, a.GetNonce())
 			}

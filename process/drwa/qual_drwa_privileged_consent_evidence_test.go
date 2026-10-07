@@ -17,16 +17,22 @@ import (
 
 // H/S wrappers are explicit proof fixtures, NOT canonical/finality evidence.
 // Their root/account/data bytes come from the real native transaction result.
-func qualConsentWitness(t *testing.T, ctx *vm.VMTestContext, epoch uint32) ([]byte, AccountItemWitness, int) {
+func qualConsentWitness(t *testing.T, ctx *vm.VMTestContext, epoch uint32) ([]byte, PrivilegedConsentWitness, int) {
 	return qualConsentWitnessAddress(t, ctx, epoch, qualConsentEOA)
 }
 
-func qualConsentWitnessAddress(t *testing.T, ctx *vm.VMTestContext, epoch uint32, address []byte) ([]byte, AccountItemWitness, int) {
+func qualConsentWitnessAddress(t *testing.T, ctx *vm.VMTestContext, epoch uint32, address []byte) ([]byte, PrivilegedConsentWitness, int) {
+	s := qualConsentScope()
+	s.Address = bytes.Clone(address)
+	return qualConsentWitnessScope(t, ctx, epoch, s)
+}
+
+func qualConsentWitnessScope(t *testing.T, ctx *vm.VMTestContext, epoch uint32, scope PrivilegedConsentScope) ([]byte, PrivilegedConsentWitness, int) {
 	t.Helper()
 	root, err := ctx.Accounts.Commit()
 	require.NoError(t, err)
 	s := &block.HeaderV3{Nonce: 11, Round: 21, Epoch: epoch, ShardID: 1}
-	w := AccountItemWitness{}
+	w := PrivilegedConsentWitness{}
 	w.ExecutedHeader, err = ctx.Marshalizer.Marshal(s)
 	require.NoError(t, err)
 	h := &block.HeaderV3{Nonce: 15, Round: 25, Epoch: epoch, ShardID: 1, ExecutionResults: []*block.ExecutionResult{{BaseExecutionResult: &block.BaseExecutionResult{
@@ -35,24 +41,27 @@ func qualConsentWitnessAddress(t *testing.T, ctx *vm.VMTestContext, epoch uint32
 	require.NoError(t, err)
 	mainTrie, err := ctx.Accounts.GetTrie(root)
 	require.NoError(t, err)
-	w.AccountProof, _, err = mainTrie.GetProof(address)
+	w.EOAProof, _, err = mainTrie.GetProof(scope.Address)
 	require.NoError(t, err)
-	a, err := ctx.Accounts.GetExistingAccount(address)
+	w.AccountProof, _, err = mainTrie.GetProof(core.SystemAccountAddress)
+	require.NoError(t, err)
+	a, err := ctx.Accounts.GetExistingAccount(core.SystemAccountAddress)
 	require.NoError(t, err)
 	u := a.(state.UserAccountHandler)
-	key := experimentalPrivilegedConsentKey
+	logicalKey := privilegedConsentRecordKey(scope.Address, scope.Token, scope.Program)
+	key := logicalKey
 	if ctx.EnableEpochsHandler.IsFlagEnabled(common.AutoBalanceDataTriesFlag) {
 		key = integrationTests.TestHasher.Compute(string(key))
 	}
 	// Native empty tries have no membership proof. An absent consent supplies
 	// no data proof and must be rejected; a nonce is never evidence of consent.
-	value, _, _ := u.RetrieveValue(experimentalPrivilegedConsentKey)
+	value, _, _ := u.RetrieveValue(logicalKey)
 	if len(value) != 0 {
 		w.DataProof, _, err = u.DataTrie().(common.Trie).GetProof(key)
 		require.NoError(t, err)
 	}
 	budget := 0
-	for _, nodes := range [][][]byte{w.AccountProof, w.DataProof} {
+	for _, nodes := range [][][]byte{w.AccountProof, w.DataProof, w.EOAProof} {
 		for _, node := range nodes {
 			budget += len(node)
 		}
@@ -91,14 +100,20 @@ func TestQualDRWAPrivilegedConsentEvidence(t *testing.T) {
 					if name == "code" {
 						u.SetCode([]byte("code-install-state-origin-challenge"))
 					}
-					if name == "malformed_record" {
-						require.NoError(t, u.SaveKeyValue(experimentalPrivilegedConsentKey, []byte("not a consent record")))
-					}
 					if name == "nonce_without_action" {
 						u.IncreaseNonce(1)
-						require.NoError(t, u.SaveKeyValue(experimentalPrivilegedConsentKey, nil))
 					}
 					require.NoError(t, ctx.Accounts.SaveAccount(u))
+					if name != "code" {
+						system, e := ctx.Accounts.GetExistingAccount(core.SystemAccountAddress)
+						require.NoError(t, e)
+						var value []byte
+						if name == "malformed_record" {
+							value = []byte("not a consent record")
+						}
+						require.NoError(t, system.(state.UserAccountHandler).SaveKeyValue(privilegedConsentRecordKey(s.Address, s.Token, s.Program), value))
+						require.NoError(t, ctx.Accounts.SaveAccount(system))
+					}
 				}
 				anchor, w, budget := qualConsentWitness(t, ctx, 0)
 				reader := qualConsentReader(t, ctx)
