@@ -25,6 +25,10 @@ type qualRegistryTransportFixture struct {
 // Candidate selection uses the real native ancestry validator from the earlier
 // context fixture. There is no claimed native network/finality validation.
 func qualRegistryTransport(t *testing.T, auto bool, count []byte, marker []byte, overrideIDs ...[]byte) *qualRegistryTransportFixture {
+	return qualRegistryTransportAtLocus(t, auto, count, marker, false, overrideIDs...)
+}
+
+func qualRegistryTransportAtLocus(t *testing.T, auto bool, count []byte, marker []byte, localWriter bool, overrideIDs ...[]byte) *qualRegistryTransportFixture {
 	t.Helper()
 	f := qualNativeReaderFixture(t, auto, 1)
 	a, err := f.adb.LoadAccount(bytes.Clone(core.SystemAccountAddress))
@@ -38,10 +42,19 @@ func qualRegistryTransport(t *testing.T, auto bool, count []byte, marker []byte,
 	if len(overrideIDs) != 0 {
 		ids = overrideIDs
 	}
-	for _, id := range ids {
-		require.NoError(t, u.SaveKeyValue(append([]byte("ELRONDDRWA@membership@"), id...), marker))
+	if !localWriter {
+		for _, id := range ids {
+			require.NoError(t, u.SaveKeyValue(append([]byte("ELRONDDRWA@registry@member@"), id...), marker))
+		}
 	}
 	require.NoError(t, f.adb.SaveAccount(u))
+	if localWriter {
+		s, e := newProtectedState(f.adb)
+		require.NoError(t, e)
+		for _, id := range ids {
+			require.NoError(t, s.materializeMembership(id))
+		}
+	}
 	root, err := f.adb.Commit()
 	require.NoError(t, err)
 	// A fresh native cache is independent of the producing account store.
@@ -74,8 +87,12 @@ func qualRegistryTransport(t *testing.T, auto bool, count []byte, marker []byte,
 		return AccountItemWitness{AccountProof: accountProof, DataProof: dataProof}
 	}
 	q := &qualRegistryTransportFixture{reader: r, anchor: anchor, count: item([]byte("ELRONDDRWA@registry@count"))}
+	prefix := []byte("ELRONDDRWA@registry@member@")
+	if localWriter {
+		prefix = []byte("ELRONDDRWA@membership@")
+	}
 	for _, id := range ids {
-		q.members = append(q.members, registryMemberWitness{tokenID: bytes.Clone(id), proof: item(append([]byte("ELRONDDRWA@membership@"), id...))})
+		q.members = append(q.members, registryMemberWitness{tokenID: bytes.Clone(id), proof: item(append(bytes.Clone(prefix), id...))})
 	}
 	witnesses := []AccountItemWitness{q.count}
 	for _, member := range q.members {
@@ -157,7 +174,7 @@ func TestQualDRWARegistryTransport(t *testing.T) {
 						require.NoError(t, e)
 						f.count.AccountProof[0][0] ^= 1
 					case "wrong_data_proof":
-						_, e := f.reader.readRegistryItem(f.anchor, []byte("ELRONDDRWA@membership@BBB-123456"), f.members[1].proof, f.limit)
+						_, e := f.reader.readRegistryItem(f.anchor, []byte("ELRONDDRWA@registry@member@BBB-123456"), f.members[1].proof, f.limit)
 						require.NoError(t, e)
 						f.members[1].proof.DataProof[0][0] ^= 1
 					case "missing_account_proof":
@@ -204,6 +221,23 @@ func TestQualDRWARegistryTransport(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+// RT-01 counterexample: even with an authenticated count matching cardinality,
+// native shard-local writes on the same account/root cannot supply metachain
+// registry entries. Native proofs authenticate the old local domain exactly;
+// the production transport derives the disjoint registry domain itself.
+func TestQualDRWARegistryTransportLocalWriter(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		t.Run(fmt.Sprintf("auto_%t", auto), func(t *testing.T) {
+			f := qualRegistryTransportAtLocus(t, auto, []byte{0, 0, 0, 0, 0, 0, 0, 2}, []byte{1}, true)
+			tr, err := newRegistryTransport(f.reader, 2, f.limit)
+			require.NoError(t, err)
+			view, err := tr.reconstruct(f.anchor, f.count, f.members)
+			require.Error(t, err)
+			require.Nil(t, view)
 		})
 	}
 }

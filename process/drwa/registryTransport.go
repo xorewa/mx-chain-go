@@ -5,10 +5,18 @@ import (
 	"encoding/binary"
 	"errors"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
 
 var errInvalidRegistryTransport = errors.New("invalid DRWA registry transport")
+
+// Experimental metachain registry domain, disjoint from the shard-local
+// membership materializer. RT-01: local application must not create a counted
+// registry entry. Only the future atomic DRWARegisterToken/count producer owns
+// this domain (Part A L4845-4846/L2211-2216); no writer is exposed here.
+// This construction candidate is not a Part B L346 format allocation.
+const registryMemberKeyPrefix = core.ProtectedKeyPrefix + "DRWA@registry@member@"
 
 // registryMemberWitness contains untrusted transport data. The token identifier
 // only selects the internally derived permanent-membership key; native account
@@ -113,10 +121,7 @@ func (t *registryTransport) reconstruct(anchor *metaRegistryAnchor, countProof A
 		if _, duplicate := set[id]; duplicate {
 			return nil, errInvalidRegistryTransport
 		}
-		key, err := membershipKey(member.tokenID)
-		if err != nil {
-			return nil, err
-		}
+		key := append([]byte(registryMemberKeyPrefix), member.tokenID...)
 		value, err = read(key, member.proof)
 		if err != nil {
 			return nil, err
