@@ -28,6 +28,7 @@ func qualProtectedFixture(t *testing.T, auto bool) (*qualReaderFixture, *protect
 	// Provision a real native trie. This fixture is not production genesis
 	// authorization; the component refuses an unprovisioned/absent account.
 	require.NoError(t, u.SaveKeyValue([]byte("ordinary-existing-leaf"), []byte("untouched")))
+	require.NoError(t, u.SaveKeyValue([]byte("ELRONDDRWA@membershipIndex@count"), make([]byte, 8)))
 	require.NoError(t, f.adb.SaveAccount(u))
 	_, err = f.adb.Commit()
 	require.NoError(t, err)
@@ -269,6 +270,12 @@ func TestQualDRWAProtectedStateMigration(t *testing.T) {
 			value, _, err := a.(state.UserAccountHandler).RetrieveValue(key)
 			require.NoError(t, err)
 			require.Equal(t, []byte{1}, value, "exact typed bytes survive native representation change")
+			value, _, err = a.(state.UserAccountHandler).RetrieveValue([]byte("ELRONDDRWA@membershipIndex@count"))
+			require.NoError(t, err)
+			require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 1}, value)
+			value, _, err = a.(state.UserAccountHandler).RetrieveValue(qualIndexLiteralEntry(0))
+			require.NoError(t, err)
+			require.Equal(t, token, value)
 			value, _, err = a.(state.UserAccountHandler).RetrieveValue([]byte("ordinary-existing-leaf"))
 			require.NoError(t, err)
 			require.Equal(t, []byte("untouched"), value)

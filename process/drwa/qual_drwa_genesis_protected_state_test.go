@@ -75,6 +75,9 @@ func TestQualDRWAGenesisProtectedReopen(t *testing.T) {
 			value, _, err := a.(state.UserAccountHandler).RetrieveValue([]byte("ELRONDDRWA@registry@count"))
 			require.NoError(t, err)
 			require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, value)
+			value, _, err = a.(state.UserAccountHandler).RetrieveValue([]byte("ELRONDDRWA@membershipIndex@count"))
+			require.NoError(t, err)
+			require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, value)
 		})
 	}
 }
@@ -124,6 +127,9 @@ func TestQualDRWAGenesisProtectedMigration(t *testing.T) {
 				value, _, err := system.(state.UserAccountHandler).RetrieveValue([]byte("ELRONDDRWA@registry@count"))
 				require.NoError(t, err)
 				require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, value, "migration and old-root restore preserve the exact construction record")
+				value, _, err = system.(state.UserAccountHandler).RetrieveValue([]byte("ELRONDDRWA@membershipIndex@count"))
+				require.NoError(t, err)
+				require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, value)
 			}
 		})
 	}

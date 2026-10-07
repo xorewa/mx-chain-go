@@ -213,6 +213,9 @@ func TestQualDRWARegistryMaterializationLocalIntegrity(t *testing.T) {
 					u, err := db.GetExistingAccount(core.SystemAccountAddress)
 					require.NoError(t, err)
 					require.NoError(t, u.(state.UserAccountHandler).SaveKeyValue(append([]byte("ELRONDDRWA@membership@"), id...), value))
+					// Independent literal local index, matching the marker fixture.
+					require.NoError(t, u.(state.UserAccountHandler).SaveKeyValue([]byte("ELRONDDRWA@membershipIndex@count"), []byte{0, 0, 0, 0, 0, 0, 0, 1}))
+					require.NoError(t, u.(state.UserAccountHandler).SaveKeyValue(append([]byte("ELRONDDRWA@membershipIndex@entry@"), make([]byte, 8)...), id))
 					require.NoError(t, db.SaveAccount(u))
 					_, err = db.Commit()
 					require.NoError(t, err)

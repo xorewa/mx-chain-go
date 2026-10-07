@@ -6,9 +6,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/multiversx/mx-chain-core-go/core"
-	"github.com/multiversx/mx-chain-go/common"
-	"github.com/multiversx/mx-chain-go/common/errChan"
 	"github.com/multiversx/mx-chain-go/state"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
@@ -71,6 +68,12 @@ func sameRegistryAnchor(a, b *metaRegistryAnchor) bool {
 func (m *registryMaterialization) prepare(ctx context.Context, view *registryProjection) error {
 	m.mut.Lock()
 	defer m.mut.Unlock()
+	m.owner.mut.Lock()
+	available := m.owner.checkAvailable()
+	m.owner.mut.Unlock()
+	if available != nil {
+		return available
+	}
 	if m.members != nil || view == nil || view.members == nil || !sameRegistryAnchor(&m.required, &view.anchor) {
 		return errInvalidRegistryTransport
 	}
@@ -100,43 +103,56 @@ func (m *registryMaterialization) prepare(ctx context.Context, view *registryPro
 	return nil
 }
 
-// checkLocalMembership uses the existing native logical leaf parser only at
-// reconstruction. Permanent local membership must never disappear from the
-// selected complete projection (Part A L4875-4881). A stale projection, malformed
-// local record or failed/cancelled native walk supplies no ordinary absence.
-// This is not an added per-operation trie read or a separate storage index.
+// checkLocalMembership reads the sole local writer's native ordinal records
+// only at reconstruction. Its work is bounded by the authenticated complete
+// global projection, itself bounded by max_ever_regulated_tokens. Unrelated
+// system-account leaves are never enumerated (Part A L4874-4881; MT-01).
+// Index completeness requires the native writer/count invariant; an arbitrary
+// forged canonical store or an old unindexed experimental layout is not admitted.
 func (m *registryMaterialization) checkLocalMembership(ctx context.Context, view *registryProjection) error {
 	if ctx == nil {
 		return errInvalidRegistryTransport
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	account, err := m.state.systemAccount()
 	if err != nil {
 		return err
 	}
-	channels := &common.TrieIteratorChannels{LeavesChan: make(chan core.KeyValueHolder), ErrChan: errChan.NewErrChanWrapper()}
-	if err = account.GetAllLeaves(channels, ctx); err != nil {
+	count, err := readLocalMembershipCount(account)
+	if err != nil {
 		return err
 	}
-	var invalid bool
-	for leaf := range channels.LeavesChan {
-		key := leaf.Key()
-		if !bytes.HasPrefix(key, []byte(membershipKeyPrefix)) {
-			continue
-		}
-		id := key[len(membershipKeyPrefix):]
-		_, present := view.members[string(id)]
-		if !present || !vmcommon.ValidateToken(id) || !bytes.Equal(leaf.Value(), []byte{1}) {
-			invalid = true
-		}
-	}
-	if err = channels.ErrChan.ReadFromChanNonBlocking(); err != nil {
-		return err
-	}
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-	if invalid {
+	if count > uint64(len(view.members)) {
 		return errInvalidRegistryTransport
+	}
+	seen := make(map[string]struct{}, count)
+	for ordinal := uint64(0); ordinal < count; ordinal++ {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		id, _, readError := account.RetrieveValue(localMembershipEntryKey(ordinal))
+		if readError != nil {
+			return readError
+		}
+		_, present := view.members[string(id)]
+		_, duplicate := seen[string(id)]
+		if !present || duplicate || !vmcommon.ValidateToken(id) {
+			return errInvalidRegistryTransport
+		}
+		key, e := membershipKey(id)
+		if e != nil {
+			return e
+		}
+		marked, e := readMembership(account, key)
+		if e != nil {
+			return e
+		}
+		if !marked {
+			return errInvalidRegistryTransport
+		}
+		seen[string(id)] = struct{}{}
 	}
 	return nil
 }

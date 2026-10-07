@@ -106,11 +106,18 @@ func (s *protectedState) materializeMembership(tokenID []byte) error {
 	if err != nil {
 		return err
 	}
+	count, err := readLocalMembershipCount(account)
+	if err != nil {
+		return err
+	}
 	present, err := readMembership(account, key)
 	if err != nil || present {
 		return err
 	}
 	if err = account.SaveKeyValue(key, []byte{1}); err != nil {
+		return err
+	}
+	if err = appendLocalMembershipIndex(account, tokenID, count); err != nil {
 		return err
 	}
 	return s.accounts.SaveAccount(account)

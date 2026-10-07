@@ -35,6 +35,9 @@ func qualRegistryTransportAtLocus(t *testing.T, auto bool, count []byte, marker 
 	require.NoError(t, err)
 	u := a.(state.UserAccountHandler)
 	require.NoError(t, u.SaveKeyValue([]byte("ELRONDDRWA@registry@count"), count))
+	if localWriter {
+		require.NoError(t, u.SaveKeyValue([]byte("ELRONDDRWA@membershipIndex@count"), make([]byte, 8)))
+	}
 	ids := [][]byte{[]byte("AAA-abcdef"), []byte("BBB-123456")}
 	if bytes.Equal(count, []byte{0, 0, 0, 0, 0, 0, 0, 0}) {
 		ids = nil

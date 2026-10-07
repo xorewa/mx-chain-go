@@ -50,5 +50,8 @@ func (s *protectedState) provisionGenesis() error {
 	if err = u.SaveKeyValue([]byte(registryCountKey), make([]byte, 8)); err != nil {
 		return err
 	}
+	if err = u.SaveKeyValue([]byte(localMembershipCountKey), make([]byte, 8)); err != nil {
+		return err
+	}
 	return s.accounts.SaveAccount(u)
 }
