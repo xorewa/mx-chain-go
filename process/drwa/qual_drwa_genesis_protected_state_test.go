@@ -265,3 +265,35 @@ func TestQualDRWAGenesisProtectedDenials(t *testing.T) {
 		})
 	}
 }
+
+func TestQualDRWAGenesisProtectedRegistryCountFailure(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		t.Run(fmt.Sprint(auto), func(t *testing.T) {
+			db := qualGenesisAccounts(t, auto)
+			fault := errors.New("native genesis registry-count save failed")
+			adapter := &qualGenesisFault{AccountsAdapter: db, load: func(address []byte) (vmcommon.AccountHandler, error) {
+				a, err := db.LoadAccount(address)
+				if err != nil {
+					return nil, err
+				}
+				// The local-index count save delegates normally; it must not
+				// mask a swallowed registry-count error (T08-R1).
+				return &qualIndexItemFault{UserAccountHandler: a.(state.UserAccountHandler),
+					key: []byte("ELRONDDRWA@registry@count"), err: fault}, nil
+			}}
+			s, err := newProtectedState(adapter)
+			require.NoError(t, err)
+			owner, err := NewRollbackContainment(db)
+			require.NoError(t, err)
+			before, err := db.RootHash()
+			require.NoError(t, err)
+			require.ErrorIs(t, owner.Execute(func() (*vmcommon.VMOutput, error) { return nil, s.provisionGenesis() }), fault)
+			after, err := db.RootHash()
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			require.Zero(t, db.JournalLen())
+			_, err = db.GetExistingAccount(core.SystemAccountAddress)
+			require.ErrorIs(t, err, state.ErrAccNotFound)
+		})
+	}
+}

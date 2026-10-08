@@ -246,6 +246,88 @@ func TestQualDRWARegistryMaterializationLocalIntegrity(t *testing.T) {
 	}
 }
 
+// Cancellation is triggered by a successful native ordinal read, not elapsed
+// time or a goroutine. Count and marker reads remain native (T08-R2).
+type qualRegistryOrdinalCancellation struct {
+	state.UserAccountHandler
+	cancel       context.CancelFunc
+	ordinalsRead int
+}
+
+func (a *qualRegistryOrdinalCancellation) RetrieveValue(key []byte) ([]byte, uint32, error) {
+	value, depth, err := a.UserAccountHandler.RetrieveValue(key)
+	if err == nil && bytes.HasPrefix(key, []byte("ELRONDDRWA@membershipIndex@entry@")) {
+		a.ordinalsRead++
+		if a.ordinalsRead == 1 && a.cancel != nil {
+			a.cancel()
+		}
+	}
+	return value, depth, err
+}
+
+func TestQualDRWARegistryMaterializationOrdinalCancellation(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		for _, prepare := range []bool{false, true} {
+			for _, cancelled := range []bool{false, true} {
+				t.Run(fmt.Sprintf("auto_%t/prepare_%t/cancelled_%t", auto, prepare, cancelled), func(t *testing.T) {
+					m, view, db, _ := qualRegistryMaterialization(t, auto)
+					a, err := db.GetExistingAccount(core.SystemAccountAddress)
+					require.NoError(t, err)
+					u := a.(state.UserAccountHandler)
+					// Independently seed two valid ordinal/marker pairs. The next
+					// iteration must observe cancellation after reading the first.
+					require.NoError(t, u.SaveKeyValue([]byte("ELRONDDRWA@membershipIndex@count"), []byte{0, 0, 0, 0, 0, 0, 0, 2}))
+					for i, id := range []string{"AAA-abcdef", "BBB-123456"} {
+						require.NoError(t, u.SaveKeyValue(qualIndexLiteralEntry(byte(i)), []byte(id)))
+						require.NoError(t, u.SaveKeyValue(append([]byte("ELRONDDRWA@membership@"), []byte(id)...), []byte{1}))
+					}
+					require.NoError(t, db.SaveAccount(u))
+					_, err = db.Commit()
+					require.NoError(t, err)
+					m, err = newRegistryMaterialization(db, &view.anchor)
+					require.NoError(t, err)
+					a, err = db.GetExistingAccount(core.SystemAccountAddress)
+					require.NoError(t, err)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					observed := &qualRegistryOrdinalCancellation{UserAccountHandler: a.(state.UserAccountHandler)}
+					if cancelled {
+						observed.cancel = cancel
+					}
+					m.state.accounts = &qualProtectedAccountSource{AccountsAdapter: db, account: observed}
+					before, err := db.RootHash()
+					require.NoError(t, err)
+					require.NoError(t, ctx.Err(), "context starts active; cancellation occurs inside the read")
+					if prepare {
+						err = m.prepare(ctx, view)
+					} else {
+						err = m.checkLocalMembership(ctx, view)
+					}
+					if cancelled {
+						require.ErrorIs(t, err, context.Canceled)
+						require.Equal(t, 1, observed.ordinalsRead, "second ordinal must not be read")
+					} else {
+						require.NoError(t, err)
+						require.Equal(t, 2, observed.ordinalsRead)
+					}
+					present, classifyErr := m.classify(view.anchor.candidateHash, []byte("AAA-abcdef"))
+					if prepare && !cancelled {
+						require.NoError(t, classifyErr)
+						require.True(t, present)
+					} else {
+						require.Error(t, classifyErr)
+						require.False(t, present, "failed or absent prepare publishes no usable view")
+					}
+					after, err := db.RootHash()
+					require.NoError(t, err)
+					require.Equal(t, before, after)
+					require.Zero(t, db.JournalLen())
+				})
+			}
+		}
+	}
+}
+
 func TestQualDRWARegistryMaterializationConcurrent(t *testing.T) {
 	m, view, _, _ := qualRegistryMaterialization(t, true)
 	require.NoError(t, m.prepare(context.Background(), view))
