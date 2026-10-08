@@ -155,7 +155,6 @@ func TestQualDRWANativeRegistrationBurnForAllAllShards(t *testing.T) {
 					}
 				}
 				observed := 0
-				normalized := []bool{false, false, false}
 				for shard := byte(0); shard < 3; shard++ {
 					a := qualE10Args()
 					db := qualE10DB(t, a, true)
@@ -181,7 +180,7 @@ func TestQualDRWANativeRegistrationBurnForAllAllShards(t *testing.T) {
 					settings, err := builtInFunctions.NewESDTGlobalSettingsFunc(db, a.Marshaller, false, vmcommon.BuiltInFunctionESDTUnSetBurnRoleForAll, func() bool { return flags.IsFlagEnabled(common.SendAlwaysFlag) })
 					require.NoError(t, err)
 					parser := parsers.NewCallArgsParser()
-					// Original and reversed delivery: raw effects never authorize registered
+					// Original fan-out delivery: raw effects never authorize registered
 					// toggles. Type fan-out uses its unchanged native implementation.
 					for _, transfer := range transfers {
 						require.Empty(t, transfer.SenderAddress)
@@ -203,7 +202,6 @@ func TestQualDRWANativeRegistrationBurnForAllAllShards(t *testing.T) {
 						}
 					}
 					if shard == 2 {
-						require.Equal(t, []bool{true, true, false}, normalized, "partial fan-out is not all-shard absence")
 						prior := qualE10Value(t, db, id)
 						before, err := db.RootHash()
 						require.NoError(t, err)
@@ -214,7 +212,6 @@ func TestQualDRWANativeRegistrationBurnForAllAllShards(t *testing.T) {
 						require.NoError(t, err)
 						require.Equal(t, before, after)
 						require.Equal(t, prior, qualE10Value(t, db, id))
-						require.Equal(t, []bool{true, true, false}, normalized)
 						adapter.failAt, adapter.saveFault = 0, nil
 					}
 					require.NoError(t, b.Normalize(id, w))
@@ -239,6 +236,7 @@ func TestQualDRWANativeRegistrationBurnForAllAllShards(t *testing.T) {
 							}
 						}
 					}
+					qualE10OrdinaryPrecedence(t, b, db, a, shard)
 					localRoots, _, err := b.Commit()
 					require.NoError(t, err)
 					_, err = b.ProcessBuiltinFunction(qualE10Input(id, vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, shard))
@@ -253,10 +251,8 @@ func TestQualDRWANativeRegistrationBurnForAllAllShards(t *testing.T) {
 					_, err = b.ProcessBuiltinFunction(qualE10Input(id, vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, shard))
 					require.Error(t, err)
 					require.Equal(t, expected, qualE10Value(t, reopened, id))
-					normalized[shard] = true
 					observed++
 				}
-				require.Equal(t, []bool{true, true, true}, normalized)
 				require.Equal(t, 3, observed, "every explicit execution shard observed, no successful-unset oracle")
 			})
 		}
@@ -454,5 +450,52 @@ func TestQualDRWANativeRegistrationBurnForAllMetachainUnsetRollback(t *testing.T
 			require.NoError(t, err)
 			require.Empty(t, outputs)
 		})
+	}
+}
+
+// M7/INV-0: actual native result/error/output and ordinary metadata are the
+// comparator, including value before arity for both SET and UNSET. This runs
+// against every receiving owner after authenticated metachain registration.
+func qualE10OrdinaryPrecedence(t *testing.T, b *drwa.BurnForAllAbsence, db state.AccountsAdapter, a drwa.ArgsResultAccountReader, shard byte) {
+	t.Helper()
+	control := qualE10DB(t, qualE10Args(), true)
+	id := []byte("OTHER-abcdef")
+	for _, function := range []string{vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, vmcommon.BuiltInFunctionESDTUnSetBurnRoleForAll} {
+		native, err := builtInFunctions.NewESDTGlobalSettingsFunc(control, a.Marshaller, function == vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, function, func() bool { return true })
+		require.NoError(t, err)
+		for _, value := range []int64{0, 1} {
+			for _, arity := range []int{1, 0, 2} {
+				input := qualE10Input(id, function, shard)
+				input.CallValue = big.NewInt(value)
+				if arity == 0 {
+					input.Arguments = nil
+				}
+				if arity == 2 {
+					input.Arguments = append(input.Arguments, []byte{1})
+				}
+				before, err := db.RootHash()
+				require.NoError(t, err)
+				controlBefore, err := control.RootHash()
+				require.NoError(t, err)
+				want, we := native.ProcessBuiltinFunction(nil, nil, input)
+				got, ge := b.ProcessBuiltinFunction(input)
+				require.Equal(t, we, ge, "function=%s value=%d arity=%d", function, value, arity)
+				require.Equal(t, want, got)
+				require.Equal(t, qualE10Value(t, control, id), qualE10Value(t, db, id))
+				if value != 0 {
+					require.ErrorIs(t, we, builtInFunctions.ErrBuiltInFunctionCalledWithValue)
+				} else if arity != 1 {
+					require.ErrorIs(t, we, builtInFunctions.ErrInvalidArguments)
+				}
+				if we != nil {
+					after, err := db.RootHash()
+					require.NoError(t, err)
+					require.Equal(t, before, after)
+					controlAfter, err := control.RootHash()
+					require.NoError(t, err)
+					require.Equal(t, controlBefore, controlAfter)
+				}
+			}
+		}
 	}
 }

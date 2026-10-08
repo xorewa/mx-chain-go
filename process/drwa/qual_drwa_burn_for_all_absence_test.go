@@ -375,16 +375,47 @@ func TestQualDRWARegistryRegistrationBurnForAllOrdinaryAndConcurrent(t *testing.
 		for _, function := range []string{vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, vmcommon.BuiltInFunctionESDTUnSetBurnRoleForAll, vmcommon.BuiltInFunctionESDTSetBurnRoleForAll} {
 			native, e := builtInFunctions.NewESDTGlobalSettingsFunc(control, f.args.Marshaller, function == vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, function, func() bool { return f.args.EnableEpochsHandler.IsFlagEnabled(common.SendAlwaysFlag) })
 			require.NoError(t, e)
-			for _, wrong := range []bool{false, true} {
-				input := qualBurnInput(ordinary, function)
-				if wrong {
-					input.CallerAddr = []byte("forged")
+			for _, value := range []int64{0, 1, -1} {
+				for _, arity := range []int{1, 0, 2} {
+					for _, wrong := range []string{"", "caller", "recipient"} {
+						input := qualBurnInput(ordinary, function)
+						input.CallValue = big.NewInt(value)
+						if arity == 0 {
+							input.Arguments = nil
+						}
+						if arity == 2 {
+							input.Arguments = append(input.Arguments, []byte{1})
+						}
+						if wrong == "caller" {
+							input.CallerAddr = []byte("forged")
+						}
+						if wrong == "recipient" {
+							input.RecipientAddr = []byte("wrong")
+						}
+						before, e := f.db.RootHash()
+						require.NoError(t, e)
+						controlBefore, e := control.RootHash()
+						require.NoError(t, e)
+						want, we := native.ProcessBuiltinFunction(nil, nil, input)
+						got, ge := f.b.ProcessBuiltinFunction(input)
+						require.Equal(t, we, ge, "epoch=%d function=%s value=%d arity=%d wrong=%s", epoch, function, value, arity, wrong)
+						require.Equal(t, want, got)
+						require.Equal(t, qualBurnValue(t, control, ordinary), qualBurnValue(t, f.db, ordinary))
+						if value != 0 {
+							require.ErrorIs(t, we, builtInFunctions.ErrBuiltInFunctionCalledWithValue)
+						} else if arity != 1 {
+							require.ErrorIs(t, we, builtInFunctions.ErrInvalidArguments)
+						}
+						if we != nil {
+							after, e := f.db.RootHash()
+							require.NoError(t, e)
+							require.Equal(t, before, after)
+							controlAfter, e := control.RootHash()
+							require.NoError(t, e)
+							require.Equal(t, controlBefore, controlAfter)
+						}
+					}
 				}
-				want, we := native.ProcessBuiltinFunction(nil, nil, input)
-				got, ge := f.b.ProcessBuiltinFunction(input)
-				require.Equal(t, we, ge)
-				require.Equal(t, want, got)
-				require.Equal(t, qualBurnValue(t, control, ordinary), qualBurnValue(t, f.db, ordinary))
 			}
 		}
 	}
@@ -392,15 +423,21 @@ func TestQualDRWARegistryRegistrationBurnForAllOrdinaryAndConcurrent(t *testing.
 	require.Equal(t, []byte{4, 0}, qualBurnValue(t, control, ordinary))
 	require.Equal(t, []byte{0, 0}, qualBurnValue(t, f.db, f.id))
 	var wg sync.WaitGroup
+	results := make(chan [2]error, 8)
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			require.NoError(t, f.b.Normalize(f.id, f.w))
-			_, e := f.b.ProcessBuiltinFunction(qualBurnInput(f.id, vmcommon.BuiltInFunctionESDTSetBurnRoleForAll))
-			require.Error(t, e)
+			normalizeErr := f.b.Normalize(f.id, f.w)
+			_, toggleErr := f.b.ProcessBuiltinFunction(qualBurnInput(f.id, vmcommon.BuiltInFunctionESDTSetBurnRoleForAll))
+			results <- [2]error{normalizeErr, toggleErr}
 		}()
 	}
 	wg.Wait()
+	close(results)
+	for result := range results {
+		require.NoError(t, result[0])
+		require.Error(t, result[1])
+	}
 	require.Equal(t, []byte{0, 0}, qualBurnValue(t, f.db, f.id))
 }

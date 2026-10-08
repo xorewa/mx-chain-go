@@ -159,10 +159,12 @@ func (b *BurnForAllAbsence) ProcessBuiltinFunction(input *vmcommon.ContractCallI
 	default:
 		return nil, builtInFunctions.ErrInvalidArguments
 	}
-	// The single token argument is the native target. Unavailable classification
-	// is never ordinary absence. Native malformed-argument result is preserved.
+	// Only a single argument supplies the native setting target. For malformed
+	// arity, delegate validation to native code: it checks CallValue first and
+	// rejects before any setting effect (vm-common v1.7.2 L94-107; INV-0).
+	// An unavailable classifier for a valid target is never ordinary absence.
 	if len(input.Arguments) != 1 {
-		return nil, builtInFunctions.ErrInvalidArguments
+		return native.ProcessBuiltinFunction(nil, nil, input)
 	}
 	regulated, err := b.material.classify(b.material.required.candidateHash, input.Arguments[0])
 	if err != nil {
