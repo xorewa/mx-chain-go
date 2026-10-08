@@ -1,0 +1,60 @@
+package drwa
+
+import (
+	"encoding/hex"
+	"github.com/stretchr/testify/require"
+	"testing"
+)
+
+// Unsigned reference bytes prepared by independent Python struct/hashlib from
+// W03_network_governance_synthetic_parameters_01.json. Public patterns are encoder
+// inputs only, not valid authority evidence. REVIEW REQUIRED BEFORE EXECUTION.
+func TestQualDRWAAuthorityNGSyntheticCodec(t *testing.T) {
+	c := w03SyntheticNGContext{
+		transition: "w03-synthetic-ng-1-to-2", lineage: "W03_SYNTHETIC_NG",
+		oldVersion: 1, newVersion: 2, threshold: 2, activation: 7,
+	}
+	for i := range c.domain {
+		c.domain[i] = 0xd1
+	}
+	for i := range c.release {
+		c.release[i] = 0xa1
+	}
+	for i := range c.predecessor {
+		c.predecessor[i] = 0xb1
+	}
+	for i := range c.successor {
+		c.successor[i] = 0xc1
+	}
+	for i := range c.members {
+		c.members[i] = 0xe1
+	}
+	for i := range c.reviewer {
+		c.reviewer[i] = 0x31
+	}
+	for i := range c.adopter {
+		c.adopter[i] = 0x32
+	}
+	for _, row := range []struct {
+		purpose, encoded, digest string
+		length                   int
+	}{
+		{"W03/SYNTHETIC_NG_RELEASE/v1", "5730332f4e472f464958545552452f7631d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d10000001b5730332f53594e5448455449435f4e475f52454c454153452f7631000000177730332d73796e7468657469632d6e672d312d746f2d3200000020a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1000000105730335f53594e5448455449435f4e47000000000000000100000020b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1000000000000000200000020c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c10000000700000020e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e10000000000000002000000203131313131313131313131313131313131313131313131313131313131313131000000203232323232323232323232323232323232323232323232323232323232323232", "a54371eae80aed7e9e620037d30208c27edeb27919f5cf81d4e203cd0a3b5994", 371},
+		{"W03/SYNTHETIC_NG_ADOPTION/v1", "5730332f4e472f464958545552452f7631d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d10000001c5730332f53594e5448455449435f4e475f41444f5054494f4e2f7631000000177730332d73796e7468657469632d6e672d312d746f2d3200000020a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1000000105730335f53594e5448455449435f4e47000000000000000100000020b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1000000000000000200000020c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c10000000700000020e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e10000000000000002000000203131313131313131313131313131313131313131313131313131313131313131000000203232323232323232323232323232323232323232323232323232323232323232", "bbefcb339641c10dd3af55dde6e524ac53e1f395ae3ee756ed6c0a21e762cfe7", 372},
+		{"W03/SYNTHETIC_SUCCESSOR_SET_PROOF/v1", "5730332f4e472f464958545552452f7631d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1000000245730332f53594e5448455449435f535543434553534f525f5345545f50524f4f462f7631000000177730332d73796e7468657469632d6e672d312d746f2d3200000020a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1000000105730335f53594e5448455449435f4e47000000000000000100000020b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1000000000000000200000020c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c10000000700000020e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e10000000000000002000000203131313131313131313131313131313131313131313131313131313131313131000000203232323232323232323232323232323232323232323232323232323232323232", "741b407a3a56e31e27ada668a950847a5c041e020653e691bcd9349f95b9dffd", 380},
+	} {
+		t.Run(row.purpose, func(t *testing.T) {
+			expected, err := hex.DecodeString(row.encoded)
+			require.NoError(t, err)
+			expectedDigest, err := hex.DecodeString(row.digest)
+			require.NoError(t, err)
+			message, err := w03NGMessage(c, row.purpose)
+			require.NoError(t, err)
+			require.Equal(t, row.length, len(message))
+			require.Equal(t, expected, message)
+			digest, err := w03NGDigest(c, row.purpose)
+			require.NoError(t, err)
+			require.Equal(t, expectedDigest, digest)
+		})
+	}
+}
