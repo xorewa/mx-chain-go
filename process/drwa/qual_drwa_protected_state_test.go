@@ -191,6 +191,40 @@ func TestQualDRWAProtectedStateItemFailure(t *testing.T) {
 	require.False(t, present)
 }
 
+func TestQualDRWAProtectedStateMarkerSaveFailure(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		t.Run(fmt.Sprint(auto), func(t *testing.T) {
+			f, _ := qualProtectedFixture(t, auto)
+			a, err := f.adb.GetExistingAccount(core.SystemAccountAddress)
+			require.NoError(t, err)
+			u := a.(state.UserAccountHandler)
+			marker := []byte("ELRONDDRWA@membership@TOKEN-000001")
+			fault := errors.New("native membership marker save failed")
+			// Only the marker fails. Later index/count saves use the native
+			// account, so they cannot mask a swallowed marker error (T07-R1).
+			s, err := newProtectedState(&qualProtectedAccountSource{AccountsAdapter: f.adb,
+				account: &qualIndexItemFault{UserAccountHandler: u, key: marker, err: fault}})
+			require.NoError(t, err)
+			before, err := f.adb.RootHash()
+			require.NoError(t, err)
+			require.ErrorIs(t, s.materializeMembership([]byte("TOKEN-000001")), fault)
+			value, _, err := u.RetrieveValue(marker)
+			require.NoError(t, err)
+			require.Empty(t, value)
+			value, _, err = u.RetrieveValue(qualIndexLiteralEntry(0))
+			require.NoError(t, err)
+			require.Empty(t, value)
+			value, _, err = u.RetrieveValue([]byte("ELRONDDRWA@membershipIndex@count"))
+			require.NoError(t, err)
+			require.Equal(t, make([]byte, 8), value)
+			after, err := f.adb.RootHash()
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			require.Zero(t, f.adb.JournalLen())
+		})
+	}
+}
+
 func TestQualDRWAProtectedStateAccountType(t *testing.T) {
 	f, _ := qualProtectedFixture(t, false)
 	s, err := newProtectedState(&qualProtectedAccountSource{AccountsAdapter: f.adb})
