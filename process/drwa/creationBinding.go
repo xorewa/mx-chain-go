@@ -12,8 +12,8 @@ import (
 // RegisterTokenForCommittedCreation is DRWA-defined, unwired construction of
 // Part A L2199-2204 using ledger L41's experimental format (proposal e30be12c).
 // It compares the actual creation tuple with the retained intent INSIDE T04,
-// before invoking the native creator. The callback receives only the minimal
-// native property arguments derived from the validated L39 profile.
+// before invoking the native creator. The callback receives the privately bound
+// actual tuple and minimal native properties derived from the validated profile.
 //
 // bodyDigest is the exact type_specific_body_digest to which the eventual T14
 // producer must authenticate fresh certificates. Supplying it is NOT authority:
@@ -25,7 +25,7 @@ import (
 // tuple, must not publish outputs, and must not commit the native journal.
 func (o *RegistrationIntentOwner) RegisterTokenForCommittedCreation(issuer, manager, family,
 	profile, name, ticker []byte, decimals uint32, bodyDigest []byte,
-	create func(state.AccountsAdapter, [][]byte) ([]byte, *vmcommon.VMOutput, error)) error {
+	create func(state.AccountsAdapter, []byte, []byte, []byte, []byte, []byte, uint32, [][]byte) ([]byte, *vmcommon.VMOutput, error)) error {
 	if o == nil || o.records == nil || create == nil {
 		return errInvalidRegistrationRecord
 	}
@@ -50,7 +50,7 @@ func (o *RegistrationIntentOwner) RegisterTokenForCommittedCreation(issuer, mana
 			if err != nil {
 				return nil, nil, err
 			}
-			return create(accounts, properties)
+			return create(accounts, issuer, manager, family, name, ticker, decimals, properties)
 		})
 }
 

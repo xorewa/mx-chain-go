@@ -90,6 +90,13 @@ func (s *drwaRegistrationEI) GetStorage(key []byte) []byte {
 func (e *esdt) registerDRWAToken(registration drwaRegistrationOwner, request drwaTokenCreation) (err error) {
 	e.mutExecution.Lock()
 	defer e.mutExecution.Unlock()
+	return e.registerDRWATokenLocked(registration, request)
+}
+
+// registerDRWATokenLocked reuses the same native implementation when the complete
+// commitment/record owner already holds mutExecution. No second journal entry or
+// nested lock is introduced; every caller must hold the exclusive native lock.
+func (e *esdt) registerDRWATokenLocked(registration drwaRegistrationOwner, request drwaTokenCreation) (err error) {
 	context, ok := e.eei.(*vmContext)
 	if !ok || check.IfNil(registration) || !bytes.Equal(e.esdtSCAddress, core.ESDTSCAddress) ||
 		!bytes.Equal(context.scAddress, core.ESDTSCAddress) || len(context.storageUpdate) != 0 ||
@@ -108,6 +115,7 @@ func (e *esdt) registerDRWAToken(registration drwaRegistrationOwner, request drw
 		return errInvalidDRWARegistration
 	}
 	original := e.eei
+	originalOutput, originalLogs := context.output, context.logs
 	defer func() {
 		e.eei = original
 		if err != nil {
@@ -115,8 +123,7 @@ func (e *esdt) registerDRWAToken(registration drwaRegistrationOwner, request drw
 			// or a later registry save. Keep native gas and error-message facts.
 			context.CleanStorageUpdates()
 			context.outputAccounts = make(map[string]*vmcommon.OutputAccount)
-			context.output = nil
-			context.logs = nil
+			context.output, context.logs = originalOutput, originalLogs
 		}
 	}()
 	return registration.RegisterToken(func(accounts state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error) {

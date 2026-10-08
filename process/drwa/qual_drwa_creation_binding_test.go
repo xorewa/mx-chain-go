@@ -89,8 +89,14 @@ func TestQualDRWARegistryRegistrationCreationBindingFamilies(t *testing.T) {
 			called := 0
 			err := o.RegisterTokenForCommittedCreation(body.issuer, bytes.Repeat([]byte{0x22}, 32), []byte(family),
 				v.profile, v.name, v.ticker, 6, v.bodyHash,
-				func(accounts state.AccountsAdapter, properties [][]byte) ([]byte, *vmcommon.VMOutput, error) {
+				func(accounts state.AccountsAdapter, issuer, manager, kind, name, ticker []byte, decimals uint32, properties [][]byte) ([]byte, *vmcommon.VMOutput, error) {
 					called++
+					require.Equal(t, body.issuer, issuer)
+					require.Equal(t, bytes.Repeat([]byte{0x22}, 32), manager)
+					require.Equal(t, []byte(family), kind)
+					require.Equal(t, []byte("RegulatedToken"), name)
+					require.Equal(t, []byte("TOKEN"), ticker)
+					require.Equal(t, uint32(6), decimals)
 					want := [][]byte{[]byte("canUpgrade"), []byte("false"), []byte("canAddSpecialRoles"), []byte("true")}
 					if family != core.FungibleESDT {
 						want = append(want, []byte("canTransferNFTCreateRole"), []byte("true"))
@@ -199,7 +205,7 @@ func TestQualDRWARegistryRegistrationCreationBindingDenial(t *testing.T) {
 			called := false
 			err = o.RegisterTokenForCommittedCreation(body.issuer, bytes.Repeat([]byte{0x22}, 32), body.requestedTokenFamily,
 				v.profile, v.name, v.ticker, decimals, v.bodyHash,
-				func(state.AccountsAdapter, [][]byte) ([]byte, *vmcommon.VMOutput, error) {
+				func(state.AccountsAdapter, []byte, []byte, []byte, []byte, []byte, uint32, [][]byte) ([]byte, *vmcommon.VMOutput, error) {
 					called = true
 					return nil, nil, nil
 				})
@@ -217,7 +223,7 @@ func TestQualDRWARegistryRegistrationCreationBindingDenial(t *testing.T) {
 func TestQualDRWARegistryRegistrationCreationBindingNil(t *testing.T) {
 	body, _, _, _, v := qualCreationIntent(core.FungibleESDT)
 	_, healthy, _ := qualCreationOwner(t, body)
-	create := func(state.AccountsAdapter, [][]byte) ([]byte, *vmcommon.VMOutput, error) {
+	create := func(state.AccountsAdapter, []byte, []byte, []byte, []byte, []byte, uint32, [][]byte) ([]byte, *vmcommon.VMOutput, error) {
 		t.Fatal("must not create")
 		return nil, nil, nil
 	}
@@ -301,8 +307,11 @@ func TestQualDRWARegistryRegistrationCreationBindingBuffersAndReadError(t *testi
 			}
 			called := false
 			err = o.RegisterTokenForCommittedCreation(body.issuer, original.manager, body.requestedTokenFamily, v.profile, v.name, v.ticker, 6, v.bodyHash,
-				func(a state.AccountsAdapter, _ [][]byte) ([]byte, *vmcommon.VMOutput, error) {
+				func(a state.AccountsAdapter, _, _, _, name, ticker []byte, decimals uint32, _ [][]byte) ([]byte, *vmcommon.VMOutput, error) {
 					called = true
+					require.Equal(t, []byte("RegulatedToken"), name)
+					require.Equal(t, []byte("TOKEN"), ticker)
+					require.Equal(t, uint32(6), decimals)
 					return qualRegistrationCreator(t, "TOKEN-abcdef")(a)
 				})
 			if fault == "caller-buffers" {
