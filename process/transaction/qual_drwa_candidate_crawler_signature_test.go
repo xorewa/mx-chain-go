@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// T09-M17 exercises the native ordinary authentication/cache path. The existing
+// T09-M17/M18 exercise native ordinary and relayed-v3 authentication/cache. The existing
 // inherited fee double is explicit: no fee, action permission, network submission,
 // actual builtin execution, whole startup or all-route crawler proof is claimed.
 func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
@@ -58,6 +58,8 @@ func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
 	require.NoError(t, err)
 	notifier.CheckEpoch(&block.Header{Epoch: 3, Round: 440})
 	require.True(t, epochs.IsFlagEnabled(common.TransactionSignedWithTxHashFlag))
+	require.True(t, epochs.IsFlagEnabled(common.RelayedTransactionsV3Flag))
+	require.True(t, epochs.IsFlagEnabled(common.RelayedTransactionsV1V2DisableFlag))
 	keyGen := signing.NewKeyGenerator(ed25519.NewEd25519())
 	signer := &singlesig.Ed25519Signer{}
 
@@ -73,19 +75,42 @@ func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
 					t.Cleanup(func() { cache.Clear(); require.NoError(t, cache.Close()) })
 					whiteList, err := interceptors.NewWhiteListDataVerifier(cache)
 					require.NoError(t, err)
-					private, public := keyGen.GeneratePair()
-					ordinary, err := public.ToByteArray()
-					require.NoError(t, err)
+					// Sampling is only an ephemeral fixture search, with no keys retained.
+					// It satisfies the real native v3 same-shard constraint without a
+					// coordinator double or an assumed address-to-shard mapping.
+					keyForShard := func() (crypto.PrivateKey, []byte) {
+						for attempt := 0; attempt < 1024; attempt++ {
+							private, public := keyGen.GeneratePair()
+							address, err := public.ToByteArray()
+							require.NoError(t, err)
+							if coordinator.ComputeId(address) == uint32(shardID) {
+								return private, address
+							}
+						}
+						t.Fatal("ephemeral fixture key search exhausted")
+						return nil, nil
+					}
+					private, ordinary := keyForShard()
+					relayerPrivate, relayer := keyForShard()
 					for _, sender := range []struct {
-						name string
-						addr []byte
-						deny bool
-					}{{"crawler", crawler, true}, {"healthy_signature", ordinary, false}} {
+						name       string
+						addr       []byte
+						deny       bool
+						relayer    []byte
+						relayerKey crypto.PrivateKey
+					}{
+						{name: "crawler", addr: crawler, deny: true},
+						{name: "healthy_signature", addr: ordinary},
+						{name: "crawler_sender_v3", addr: crawler, deny: true, relayer: relayer, relayerKey: relayerPrivate},
+						{name: "healthy_sender_and_relayer_v3", addr: ordinary, relayer: relayer, relayerKey: relayerPrivate},
+						{name: "crawler_relayer_v3", addr: ordinary, deny: true, relayer: crawler, relayerKey: private},
+					} {
 						t.Run(sender.name, func(t *testing.T) {
 							tx := &dataTransaction.Transaction{
 								Nonce: 0, Value: big.NewInt(0), SndAddr: sender.addr, RcvAddr: crawler,
 								GasPrice: 1, GasLimit: 100000, Data: []byte(function),
 								ChainID: []byte(cfg.GeneralSettings.ChainID), Version: core.InitialVersionOfTransaction,
+								RelayerAddr: sender.relayer,
 							}
 							if hashSign {
 								tx.Version = core.InitialVersionOfTransaction + 1
@@ -97,6 +122,12 @@ func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
 							require.NoError(t, err)
 							tx.Signature, err = signer.Sign(private, message)
 							require.NoError(t, err)
+							if sender.relayerKey != nil {
+								tx.RelayerSignature, err = signer.Sign(sender.relayerKey, message)
+								require.NoError(t, err)
+								require.True(t, common.IsValidRelayedTxV3(tx))
+								require.True(t, coordinator.SameShard(tx.SndAddr, tx.RelayerAddr))
+							}
 							encoded, err := proto.Marshal(tx)
 							require.NoError(t, err)
 							inTx, err := transaction.NewInterceptedTransaction(encoded, proto, signMarshal, hasher,
