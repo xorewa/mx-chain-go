@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pelletier/go-toml"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/config"
+	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,14 +39,33 @@ func qualDRWAReplaceLoaded(t *testing.T, path, before, after string) {
 
 func TestQualDRWALoadedConfigurationNativeLoaderControl(t *testing.T) {
 	paths, overlay := qualDRWALoadedFiles(t)
-	c, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, LegacyMetaESDT: true})
+	c, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
 	require.NoError(t, err)
 	require.NoError(t, c.CheckEnforcedBlock(3, 440))
 }
 
+// E05 L606 is a native route condition, not a MetaESDT family exclusion.
+// Protected DRWA creation calls createNewToken directly; the separate native
+// registerMetaESDT route requires its flag when included in the route matrix.
+func TestQualDRWALoadedConfigurationRegisterMetaESDTPath(t *testing.T) {
+	for _, supported := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct-creation", true: "registerMetaESDT"}[supported], func(t *testing.T) {
+			paths, overlay := qualDRWALoadedFiles(t)
+			qualDRWAReplaceLoaded(t, paths.Epoch, "\n    MetaESDTSetEnableEpoch = 1", "\n    MetaESDTSetEnableEpoch = 4")
+			candidate, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: supported})
+			if supported {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.NoError(t, candidate.CheckEnforcedBlock(3, 440))
+			}
+		})
+	}
+}
+
 func TestQualDRWALoadedConfigurationJointPredicate(t *testing.T) {
 	paths, overlay := qualDRWALoadedFiles(t)
-	c, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, LegacyMetaESDT: true})
+	c, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
 	require.NoError(t, err)
 	// All four actual native Supernova epoch/round cases, plus the independent
 	// DRWA enforcement boundary. Expected values come from A L568-580/L683-688.
@@ -142,7 +161,7 @@ func TestQualDRWALoadedConfigurationStartupConsumers(t *testing.T) {
 			require.NoError(t, err)
 			mutate(cfg)
 			qualDRWAEncodeLoaded(t, paths.MainConfig, cfg)
-			_, err = LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, LegacyMetaESDT: true})
+			_, err = LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
 			require.Error(t, err)
 		})
 	}
@@ -164,7 +183,7 @@ func TestQualDRWALoadedConfigurationStartupConsumers(t *testing.T) {
 				}
 				qualDRWAEncodeLoaded(t, paths.Ratings, cfg)
 			}
-			_, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, LegacyMetaESDT: true})
+			_, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
 			require.Error(t, err)
 		})
 	}
@@ -179,7 +198,7 @@ func TestQualDRWALoadedConfigurationPrerequisiteDenials(t *testing.T) {
 		t.Run(field, func(t *testing.T) {
 			paths, overlay := qualDRWALoadedFiles(t)
 			qualDRWAReplaceLoaded(t, paths.Epoch, "\n    "+field+" = 1", "\n    "+field+" = 4")
-			_, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, LegacyMetaESDT: true})
+			_, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
 			require.Error(t, err, "first enforcement epoch is 3; native flag polarity must deny")
 		})
 	}
@@ -207,7 +226,7 @@ func TestQualDRWALoadedConfigurationMalformedAndAbsent(t *testing.T) {
 			case "enforcement-before-supernova":
 				require.NoError(t, os.WriteFile(overlay, []byte("DRWAEnforcementEnableEpoch = 1\n"), 0600))
 			}
-			_, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, LegacyMetaESDT: true})
+			_, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
 			require.Error(t, err)
 		})
 	}

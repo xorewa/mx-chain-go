@@ -18,7 +18,10 @@ import (
 // Its values are not defaults or a grant to exclude an architecture obligation.
 // Owner admission and T10's transitive inventory remain separate prerequisites.
 type DRWAConfigurationSupport struct {
-	ProcessorV1, RelayedV3, LegacyMetaESDT bool
+	ProcessorV1, RelayedV3 bool
+	// RegisterMetaESDTPath denotes a supported path calling the native
+	// registerMetaESDT handler (E05 L606); it does not select a token family.
+	RegisterMetaESDTPath bool
 }
 
 // DRWAConfigurationCandidate retains native handlers built from actual files.
@@ -118,7 +121,7 @@ func (c *DRWAConfigurationCandidate) checkPrerequisites(epoch uint32) error {
 	required := []nativeCore.EnableEpochFlag{common.SupernovaFlag, common.DynamicESDTFlag,
 		common.ESDTFlag, common.NFTStopCreateFlag, common.SetGuardianFlag,
 		common.EGLDInESDTMultiTransferFlag, common.ManagedCryptoAPIsFlag}
-	if c.support.LegacyMetaESDT {
+	if c.support.RegisterMetaESDTPath {
 		required = append(required, common.MetaESDTSetFlag)
 	}
 	if !c.support.ProcessorV1 {
