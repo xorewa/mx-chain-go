@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,32 @@ import (
 	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/require"
 )
+
+// T09-M15: E05 is a minimum. The retained native multi-transfer builtin also
+// requires ESDTNFTImprovementV1Flag, bound to ESDTMultiTransferEnableEpoch.
+func TestQualDRWALoadedConfigurationMultiTransferPrerequisite(t *testing.T) {
+	for _, processorV1 := range []bool{false, true} {
+		for _, activation := range []uint32{0, 1, 3, 4, ^uint32(0)} {
+			t.Run(fmt.Sprintf("processorV1_%t_activation_%d", processorV1, activation), func(t *testing.T) {
+				paths, overlay := qualDRWALoadedFiles(t)
+				qualDRWAReplaceLoaded(t, paths.Epoch, "\n    ESDTMultiTransferEnableEpoch = 1",
+					fmt.Sprintf("\n    ESDTMultiTransferEnableEpoch = %d", activation))
+				candidate, err := LoadDRWAConfigurationCandidate(paths, overlay,
+					DRWAConfigurationSupport{ProcessorV1: processorV1, RelayedV3: true, RegisterMetaESDTPath: true})
+				if activation > 3 {
+					require.ErrorContains(t, err, string(common.ESDTNFTImprovementV1Flag))
+					require.Nil(t, candidate)
+					return
+				}
+				require.NoError(t, err)
+				require.NoError(t, candidate.CheckEnforcedBlock(3, 440))
+				require.True(t, candidate.epochs.IsFlagEnabledInEpoch(common.ESDTNFTImprovementV1Flag, 3))
+				epochs, _ := candidate.ActivationInventory()
+				require.Equal(t, activation, epochs["ESDTMultiTransferEnableEpoch"])
+			})
+		}
+	}
+}
 
 // DEVELOPMENT under L46. These are exact loaded, non-normative fixture values,
 // not accepted deployment values, complete startup or route qualification.

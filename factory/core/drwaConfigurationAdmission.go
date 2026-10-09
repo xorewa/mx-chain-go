@@ -116,11 +116,15 @@ func (c *DRWAConfigurationCandidate) checkPrerequisites(epoch uint32) error {
 	if c == nil || c.epochs == nil || c.rounds == nil {
 		return fmt.Errorf("missing DRWA loaded configuration candidate")
 	}
-	// E05's positive predicates, plus ManagedCryptoAPIsFlag required by the
-	// MetaESDT special-role validation consumer. Do not infer polarity from names.
+	// E05's positive predicates, plus actual transitive native consumers:
+	// ManagedCryptoAPIsFlag for MetaESDT special-role validation and
+	// ESDTNFTImprovementV1Flag for the retained multi-transfer builtin.
+	// EGLDInESDTMultiTransferFlag alone does not activate that builtin.
+	// Do not infer polarity from names; the remaining T10 inventory stays due.
 	required := []nativeCore.EnableEpochFlag{common.SupernovaFlag, common.DynamicESDTFlag,
 		common.ESDTFlag, common.NFTStopCreateFlag, common.SetGuardianFlag,
-		common.EGLDInESDTMultiTransferFlag, common.ManagedCryptoAPIsFlag}
+		common.EGLDInESDTMultiTransferFlag, common.ManagedCryptoAPIsFlag,
+		common.ESDTNFTImprovementV1Flag}
 	if c.support.RegisterMetaESDTPath {
 		required = append(required, common.MetaESDTSetFlag)
 	}
