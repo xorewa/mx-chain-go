@@ -131,6 +131,11 @@ func (c *DRWAConfigurationCandidate) checkPrerequisites(epoch uint32) error {
 	if !c.support.ProcessorV1 {
 		required = append(required, common.SCProcessorV2Flag)
 	}
+	// The native proxy selects V1 only while this actual predicate is false.
+	// V1 dispatch requires BuiltInFunctionsFlag; V2 does not inherit that gate.
+	if !c.epochs.IsFlagEnabledInEpoch(common.SCProcessorV2Flag, epoch) {
+		required = append(required, common.BuiltInFunctionsFlag)
+	}
 	if c.support.RelayedV3 {
 		required = append(required, common.RelayedTransactionsV3Flag,
 			common.RelayedTransactionsV3FixESDTTransferFlag, common.FixRelayedBaseCostFlag,

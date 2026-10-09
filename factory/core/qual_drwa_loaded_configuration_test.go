@@ -41,6 +41,39 @@ func TestQualDRWALoadedConfigurationMultiTransferPrerequisite(t *testing.T) {
 
 // DEVELOPMENT under L46. These are exact loaded, non-normative fixture values,
 // not accepted deployment values, complete startup or route qualification.
+// T09-M16 preserves the native processor-specific prerequisite. Synthetic V1
+// support does not override the processor selected by the real epoch predicate.
+func TestQualDRWALoadedConfigurationProcessorBuiltInPrerequisite(t *testing.T) {
+	for _, selectedV1 := range []bool{false, true} {
+		for _, activation := range []uint32{0, 1, 3, 4, ^uint32(0)} {
+			t.Run(fmt.Sprintf("selectedV1_%t_activation_%d", selectedV1, activation), func(t *testing.T) {
+				paths, overlay := qualDRWALoadedFiles(t)
+				qualDRWAReplaceLoaded(t, paths.Epoch, "\n    BuiltInFunctionsEnableEpoch = 0",
+					fmt.Sprintf("\n    BuiltInFunctionsEnableEpoch = %d", activation))
+				if selectedV1 {
+					qualDRWAReplaceLoaded(t, paths.Epoch, "\n    SCProcessorV2EnableEpoch = 1",
+						"\n    SCProcessorV2EnableEpoch = 4")
+				}
+				candidate, err := LoadDRWAConfigurationCandidate(paths, overlay,
+					DRWAConfigurationSupport{ProcessorV1: selectedV1, RelayedV3: true, RegisterMetaESDTPath: true})
+				if selectedV1 && activation > 3 {
+					require.ErrorContains(t, err, string(common.BuiltInFunctionsFlag))
+					require.Nil(t, candidate)
+					return
+				}
+				require.NoError(t, err)
+				require.NoError(t, candidate.CheckEnforcedBlock(3, 440))
+				require.Equal(t, !selectedV1, candidate.epochs.IsFlagEnabledInEpoch(common.SCProcessorV2Flag, 3))
+				epochs, _ := candidate.ActivationInventory()
+				require.Equal(t, activation, epochs["BuiltInFunctionsEnableEpoch"])
+				if selectedV1 {
+					require.Equal(t, uint32(4), epochs["SCProcessorV2EnableEpoch"])
+				}
+			})
+		}
+	}
+}
+
 func qualDRWALoadedFiles(t *testing.T) (config.ConfigurationPathsHolder, string) {
 	t.Helper()
 	dir := t.TempDir()
