@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// T09-M17/M18 exercise native ordinary and relayed-v3 authentication/cache. The existing
+// T09-M17/M18/M19 exercise native ordinary and relayed authentication/cache. The existing
 // inherited fee double is explicit: no fee, action permission, network submission,
 // actual builtin execution, whole startup or all-route crawler proof is claimed.
 func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
@@ -150,6 +150,94 @@ func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
 							reencoded, err := proto.Marshal(inTx.Transaction())
 							require.NoError(t, err)
 							require.Equal(t, encoded, reencoded, "signature checking rewrites no native transaction field")
+						})
+					}
+				})
+			}
+		}
+	}
+
+	// Legacy relay authentication uses an independent handler at the actual loaded
+	// epoch-zero coordinate. This is neither DRWA enablement nor relay execution.
+	legacyNotifier := forking.NewGenericEpochNotifier()
+	legacyEpochs, err := enablers.NewEnableEpochsHandler(epochCfg.EnableEpochs, legacyNotifier)
+	require.NoError(t, err)
+	legacyNotifier.CheckEpoch(&block.Header{Epoch: 0, Round: 0})
+	require.False(t, legacyEpochs.IsFlagEnabled(common.RelayedTransactionsV1V2DisableFlag))
+	require.False(t, legacyEpochs.IsFlagEnabled(common.RelayedTransactionsV3Flag))
+	require.False(t, legacyEpochs.IsFlagEnabled(common.TransactionSignedWithTxHashFlag))
+	require.False(t, legacyEpochs.IsFlagEnabled(common.SendAlwaysFlag))
+	for shardID, crawler := range crawlers {
+		for _, function := range []string{vmcommon.ESDTAddMetadata, vmcommon.ESDTDeleteMetadata} {
+			for _, relay := range []string{core.RelayedTransaction, core.RelayedTransactionV2} {
+				t.Run(fmt.Sprintf("legacy_shard_%d_%s_%s", shardID, function, relay), func(t *testing.T) {
+					coordinator, err := sharding.NewMultiShardCoordinator(3, uint32(shardID))
+					require.NoError(t, err)
+					private, public := keyGen.GeneratePair()
+					ordinary, err := public.ToByteArray()
+					require.NoError(t, err)
+					for _, user := range []struct {
+						name string
+						addr []byte
+						deny bool
+					}{{"crawler_inner", crawler, true}, {"healthy_inner", ordinary, false}} {
+						t.Run(user.name, func(t *testing.T) {
+							cache, err := storageunit.NewCache(storageFactory.GetCacherFromConfig(cfg.WhiteListerVerifiedTxs))
+							require.NoError(t, err)
+							t.Cleanup(func() { cache.Clear(); require.NoError(t, cache.Close()) })
+							whiteList, err := interceptors.NewWhiteListDataVerifier(cache)
+							require.NoError(t, err)
+							inner := &dataTransaction.Transaction{
+								Nonce: 7, Value: big.NewInt(0), SndAddr: user.addr, RcvAddr: crawler,
+								GasPrice: 1, GasLimit: 100000, Data: []byte(function),
+								ChainID: []byte(cfg.GeneralSettings.ChainID), Version: core.InitialVersionOfTransaction,
+							}
+							if relay == core.RelayedTransactionV2 {
+								inner.GasLimit = 0 // exact native v2 signing contract
+							}
+							message, err := inner.GetDataForSigning(converter, signMarshal, signHasher)
+							require.NoError(t, err)
+							inner.Signature, err = signer.Sign(private, message)
+							require.NoError(t, err)
+							var callData []byte
+							if relay == core.RelayedTransaction {
+								innerBytes, err := signMarshal.Marshal(inner)
+								require.NoError(t, err)
+								callData = []byte(fmt.Sprintf("%s@%x", relay, innerBytes))
+							} else {
+								callData = []byte(fmt.Sprintf("%s@%x@%x@%x@%x", relay, inner.RcvAddr,
+									new(big.Int).SetUint64(inner.Nonce).Bytes(), inner.Data, inner.Signature))
+							}
+							outer := &dataTransaction.Transaction{
+								Nonce: 9, Value: big.NewInt(0), SndAddr: ordinary, RcvAddr: user.addr,
+								GasPrice: 1, GasLimit: 100000, Data: callData,
+								ChainID: inner.ChainID, Version: core.InitialVersionOfTransaction,
+							}
+							message, err = outer.GetDataForSigning(converter, signMarshal, signHasher)
+							require.NoError(t, err)
+							outer.Signature, err = signer.Sign(private, message)
+							require.NoError(t, err)
+							encoded, err := proto.Marshal(outer)
+							require.NoError(t, err)
+							inTx, err := transaction.NewInterceptedTransaction(encoded, proto, signMarshal, hasher,
+								keyGen, signer, converter, coordinator, createFreeTxFeeHandler(), whiteList,
+								smartContract.NewArgumentParser(), outer.ChainID, false, signHasher,
+								versioning.NewTxVersionChecker(cfg.GeneralSettings.MinTransactionVersion), legacyEpochs)
+							require.NoError(t, err)
+							require.Equal(t, hasher.Compute(string(encoded)), inTx.Hash())
+							require.False(t, whiteList.IsWhiteListed(inTx))
+							for attempt := 0; attempt < 2; attempt++ {
+								if user.deny {
+									require.ErrorIs(t, inTx.CheckValidity(), crypto.ErrInvalidPublicKey)
+									require.False(t, whiteList.IsWhiteListed(inTx))
+								} else {
+									require.NoError(t, inTx.CheckValidity())
+									require.True(t, whiteList.IsWhiteListed(inTx))
+								}
+							}
+							reencoded, err := proto.Marshal(inTx.Transaction())
+							require.NoError(t, err)
+							require.Equal(t, encoded, reencoded)
 						})
 					}
 				})
