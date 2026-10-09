@@ -28,7 +28,7 @@ import (
 
 // T09 M11 under L46: constructor-input compatibility only. Account and guardian
 // doubles are explicit; no built-in executes and no DRWA consumer is enabled.
-func qualDRWACandidateBuiltInArgs(t *testing.T, shardID uint32) (builtInFunctions.ArgsCreateBuiltInFunctionContainer, *config.Config, *config.EpochConfig) {
+func qualDRWACandidateBuiltInArgs(t *testing.T, shardID uint32) (builtInFunctions.ArgsCreateBuiltInFunctionContainer, *config.Config, *config.EpochConfig, *sync.RWMutex) {
 	t.Helper()
 	cfg, err := common.LoadMainConfig(qualDRWACandidateGenesisPath(t, "config.toml"))
 	require.NoError(t, err)
@@ -49,9 +49,10 @@ func qualDRWACandidateBuiltInArgs(t *testing.T, shardID uint32) (builtInFunction
 	notifier := forking.NewGenericEpochNotifier()
 	enabler, err := enablers.NewEnableEpochsHandler(epochs.EnableEpochs, notifier)
 	require.NoError(t, err)
+	vmLocker := &sync.RWMutex{}
 	gas, err := forking.NewGasScheduleNotifier(forking.ArgsNewGasScheduleNotifier{
 		GasScheduleConfig: epochs.GasSchedule, ConfigDir: qualDRWACandidateGenesisPath(t, "gasSchedules"),
-		EpochNotifier: notifier, WasmVMChangeLocker: &sync.RWMutex{},
+		EpochNotifier: notifier, WasmVMChangeLocker: vmLocker,
 	})
 	require.NoError(t, err)
 	marshaller, err := marshalFactory.NewMarshalizer(cfg.Marshalizer.Type)
@@ -76,7 +77,7 @@ func qualDRWACandidateBuiltInArgs(t *testing.T, shardID uint32) (builtInFunction
 		EpochNotifier: notifier, EnableEpochsHandler: enabler,
 		GuardedAccountHandler:     &guardianMocks.GuardedAccountHandlerStub{},
 		AutomaticCrawlerAddresses: crawlers, MaxNumNodesInTransferRole: cfg.BuiltInFunctions.MaxNumAddressesInTransferRole,
-	}, cfg, epochs
+	}, cfg, epochs, vmLocker
 }
 
 func TestQualDRWACandidateBuiltInFactoryNativeInputs(t *testing.T) {
@@ -89,7 +90,7 @@ func TestQualDRWACandidateBuiltInFactoryNativeInputs(t *testing.T) {
 	}
 	for _, shardID := range []uint32{0, 1, 2, nativeCore.MetachainShardId} {
 		t.Run(fmt.Sprint(shardID), func(t *testing.T) {
-			args, _, epochs := qualDRWACandidateBuiltInArgs(t, shardID)
+			args, _, epochs, _ := qualDRWACandidateBuiltInArgs(t, shardID)
 			require.Equal(t, []config.GasScheduleByEpochs{{StartEpoch: 0, FileName: "gasScheduleV9.toml"}}, epochs.GasSchedule.GasScheduleByEpochs)
 			require.Equal(t, uint32(100), args.MaxNumNodesInTransferRole)
 			allowed, err := builtInFunctions.GetAllowedAddress(args.ShardCoordinator, args.AutomaticCrawlerAddresses)
@@ -118,7 +119,7 @@ func TestQualDRWACandidateBuiltInFactoryNativeInputs(t *testing.T) {
 func TestQualDRWACandidateBuiltInFactoryNativeDenials(t *testing.T) {
 	for _, field := range []string{"crawler", "dns"} {
 		t.Run("malformed_"+field, func(t *testing.T) {
-			_, cfg, _ := qualDRWACandidateBuiltInArgs(t, 0)
+			_, cfg, _, _ := qualDRWACandidateBuiltInArgs(t, 0)
 			converter, err := converterFactory.NewPubkeyConverter(cfg.AddressPubkeyConverter)
 			require.NoError(t, err)
 			values := append([]string(nil), cfg.BuiltInFunctions.AutomaticCrawlerAddresses...)
@@ -131,13 +132,13 @@ func TestQualDRWACandidateBuiltInFactoryNativeDenials(t *testing.T) {
 		})
 	}
 	t.Run("missing_shard_crawler", func(t *testing.T) {
-		args, _, _ := qualDRWACandidateBuiltInArgs(t, 1)
+		args, _, _, _ := qualDRWACandidateBuiltInArgs(t, 1)
 		args.AutomaticCrawlerAddresses = args.AutomaticCrawlerAddresses[:1]
 		_, err := builtInFunctions.CreateBuiltInFunctionsFactory(args)
 		require.ErrorIs(t, err, process.ErrNilCrawlerAllowedAddress)
 	})
 	t.Run("zero_initial_builtin_cost", func(t *testing.T) {
-		args, _, _ := qualDRWACandidateBuiltInArgs(t, 0)
+		args, _, _, _ := qualDRWACandidateBuiltInArgs(t, 0)
 		gas, err := common.LoadGasScheduleConfig(qualDRWACandidateGenesisPath(t, "gasSchedules/gasScheduleV9.toml"))
 		require.NoError(t, err)
 		gas[nativeCore.BuiltInCostString]["ESDTTransfer"] = 0
@@ -154,7 +155,7 @@ func TestQualDRWACandidateBuiltInFactoryNativeDenials(t *testing.T) {
 	})
 	for _, fault := range []string{"empty_schedule", "missing_selected", "missing_future"} {
 		t.Run(fault, func(t *testing.T) {
-			_, _, epochs := qualDRWACandidateBuiltInArgs(t, 0)
+			_, _, epochs, _ := qualDRWACandidateBuiltInArgs(t, 0)
 			schedule := epochs.GasSchedule
 			switch fault {
 			case "empty_schedule":
