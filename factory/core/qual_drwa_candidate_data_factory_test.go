@@ -18,6 +18,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func qualDRWACandidateDataArgs(t *testing.T, epoch, shard uint32) dataFactory.DataComponentsFactoryArgs {
+	t.Helper()
+	coreArgs := qualDRWACandidateCoreArgs(t)
+	coreFactory, err := NewCoreComponentsFactory(coreArgs)
+	require.NoError(t, err)
+	coreHandler, err := NewManagedCoreComponents(coreFactory)
+	require.NoError(t, err)
+	require.NoError(t, coreHandler.Create())
+	t.Cleanup(func() { require.NoError(t, coreHandler.Close()) })
+	require.NoError(t, coreHandler.CheckSubcomponents())
+
+	cryptoArgs := qualDRWACandidateCryptoArgs(t)
+	cryptoArgs.CoreComponentsHolder = coreHandler
+	cryptoNativeFactory, err := cryptoFactory.NewCryptoComponentsFactory(cryptoArgs)
+	require.NoError(t, err)
+	cryptoHandler, err := cryptoFactory.NewManagedCryptoComponents(cryptoNativeFactory)
+	require.NoError(t, err)
+	require.NoError(t, cryptoHandler.Create())
+	t.Cleanup(func() { require.NoError(t, cryptoHandler.Close()) })
+	require.NoError(t, cryptoHandler.CheckSubcomponents())
+	coordinator, err := sharding.NewMultiShardCoordinator(3, shard)
+	require.NoError(t, err)
+	return dataFactory.DataComponentsFactoryArgs{
+		Config: coreArgs.Config, PrefsConfig: cryptoArgs.PrefsConfig.Preferences,
+		ShardCoordinator: coordinator, Core: coreHandler, Crypto: cryptoHandler,
+		StatusCore: &factoryStub.StatusCoreComponentsStub{
+			AppStatusHandlerField:  &statusHandler.AppStatusHandlerStub{},
+			StateStatsHandlerField: statistics.NewStateStatistics(),
+		},
+		CurrentEpoch: epoch, NodeProcessingMode: common.Normal,
+	}
+}
+
 // T09-M30: native loaded-snapshot assembly and orderly storer reopen only.
 // Epoch/shard inputs and status facade are synthetic. NTP is disabled by the
 // shared core args helper; native ephemeral keys stay in memory. This does not
@@ -26,38 +59,10 @@ func TestQualDRWACandidateDataFactory(t *testing.T) {
 	for _, epoch := range []uint32{0, 3} {
 		for _, shard := range []uint32{0, 1, 2, nativeCore.MetachainShardId} {
 			t.Run(fmt.Sprintf("epoch_%d_shard_%d", epoch, shard), func(t *testing.T) {
-				coreArgs := qualDRWACandidateCoreArgs(t)
-				coreFactory, err := NewCoreComponentsFactory(coreArgs)
-				require.NoError(t, err)
-				coreHandler, err := NewManagedCoreComponents(coreFactory)
-				require.NoError(t, err)
-				require.NoError(t, coreHandler.Create())
-				t.Cleanup(func() { require.NoError(t, coreHandler.Close()) })
-				require.NoError(t, coreHandler.CheckSubcomponents())
-
-				cryptoArgs := qualDRWACandidateCryptoArgs(t)
-				cryptoArgs.CoreComponentsHolder = coreHandler
-				cryptoNativeFactory, err := cryptoFactory.NewCryptoComponentsFactory(cryptoArgs)
-				require.NoError(t, err)
-				cryptoHandler, err := cryptoFactory.NewManagedCryptoComponents(cryptoNativeFactory)
-				require.NoError(t, err)
-				require.NoError(t, cryptoHandler.Create())
-				t.Cleanup(func() { require.NoError(t, cryptoHandler.Close()) })
-				require.NoError(t, cryptoHandler.CheckSubcomponents())
-				coordinator, err := sharding.NewMultiShardCoordinator(3, shard)
-				require.NoError(t, err)
-				args := dataFactory.DataComponentsFactoryArgs{
-					Config: coreArgs.Config, PrefsConfig: cryptoArgs.PrefsConfig.Preferences,
-					ShardCoordinator: coordinator, Core: coreHandler, Crypto: cryptoHandler,
-					StatusCore: &factoryStub.StatusCoreComponentsStub{
-						AppStatusHandlerField:  &statusHandler.AppStatusHandlerStub{},
-						StateStatsHandlerField: statistics.NewStateStatistics(),
-					},
-					CurrentEpoch: epoch, NodeProcessingMode: common.Normal,
-				}
+				args := qualDRWACandidateDataArgs(t, epoch, shard)
 				// Invalid pruning count is rejected before native storage allocation.
-				dbPath := coreHandler.PathHandler().DatabasePath()
-				_, err = os.Stat(dbPath)
+				dbPath := args.Core.PathHandler().DatabasePath()
+				_, err := os.Stat(dbPath)
 				require.True(t, os.IsNotExist(err))
 				invalid := args
 				invalid.Config.StoragePruning.NumActivePersisters = 0
