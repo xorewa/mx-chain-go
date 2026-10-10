@@ -21,12 +21,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// T09-M33/M34: native genesis and installed code over the public candidate.
+// T09-M33/M34/M35: native genesis and installed code over the public candidate.
 // The native genesis pipeline creates and executes its internal transactions;
 // no transaction is submitted, node launched or DRWA root/role provisioned.
 // SS-02 applies: the capture excludes this executing-WASM root in race mode.
 // Returned roots bind native state; they are not independent root-byte oracles.
 func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
+	var sharedGenesisTime uint64
+	comparisonHeaders := make(map[uint32][]byte)
 	for _, shard := range []uint32{0, 1, 2, nativeCore.MetachainShardId} {
 		t.Run(fmt.Sprint(shard), func(t *testing.T) {
 			dataArgs := qualDRWACandidateDataArgs(t, 0, shard)
@@ -83,6 +85,13 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 			}
 			require.False(t, args.HardForkConfig.AfterHardFork)
 			require.Zero(t, args.GenesisEpoch)
+			// Candidate startTime=0 uses the local clock. Hold one observed
+			// native timestamp equal across these independent test executions;
+			// this does not select or admit a deployment genesis timestamp.
+			if shard == 0 {
+				sharedGenesisTime = args.GenesisTime
+			}
+			args.GenesisTime = sharedGenesisTime
 			before, err := args.Accounts.RootHash()
 			require.NoError(t, err)
 			for _, price := range []string{"0", "-1"} {
@@ -112,6 +121,12 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 				require.NotEmpty(t, header.GetRootHash())
 				encoded, err := coreHandler.InternalMarshalizer().Marshal(header)
 				require.NoError(t, err)
+				if shard == 0 {
+					comparisonHeaders[expectedShard] = append([]byte(nil), encoded...)
+				} else {
+					require.Equal(t, comparisonHeaders[expectedShard], encoded,
+						"independent role %d differs for genesis shard %d", shard, expectedShard)
+				}
 				hash := coreHandler.Hasher().Compute(string(encoded))
 				unit := dataRetriever.BlockHeaderUnit
 				if expectedShard == nativeCore.MetachainShardId {
