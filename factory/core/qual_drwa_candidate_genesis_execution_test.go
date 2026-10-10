@@ -10,6 +10,7 @@ import (
 	nativeCore "github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/common/ordering"
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	historyFactory "github.com/multiversx/mx-chain-go/dblookupext/factory"
@@ -21,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// T09-M33/M34/M35/M36: native genesis and installed code over the public candidate.
+// T09-M33/M34/M35/M36/M37: native genesis and installed code over the public candidate.
 // The native genesis pipeline creates and executes its internal transactions;
 // no transaction is submitted, node launched or DRWA root/role provisioned.
 // SS-02 applies: the capture excludes this executing-WASM root in race mode.
@@ -146,33 +147,36 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 			if shard != nativeCore.MetachainShardId {
 				require.NotEmpty(t, split[shard], "local balance checks must execute")
 			}
-			for _, initial := range split[shard] {
-				account, err := args.Accounts.GetExistingAccount(initial.AddressBytes())
-				require.NoError(t, err)
-				user, ok := account.(state.UserAccountHandler)
-				require.True(t, ok)
-				require.Zero(t, user.GetBalance().Cmp(initial.GetBalanceValue()))
-			}
-			localContracts := 0
-			for _, contract := range contracts.InitialSmartContracts() {
-				inputCode, err := os.ReadFile(contract.GetFilename())
-				require.NoError(t, err)
-				for _, address := range contract.AddressesBytes() {
-					if dataArgs.ShardCoordinator.ComputeId(address) != shard {
-						continue
-					}
-					account, err := args.Accounts.GetExistingAccount(address)
+			checkLocalState := func(accounts state.AccountsAdapter) {
+				for _, initial := range split[shard] {
+					account, err := accounts.GetExistingAccount(initial.AddressBytes())
 					require.NoError(t, err)
 					user, ok := account.(state.UserAccountHandler)
 					require.True(t, ok)
-					require.NotEmpty(t, user.GetCodeHash())
-					require.Equal(t, inputCode, args.Accounts.GetCode(user.GetCodeHash()))
-					localContracts++
+					require.Zero(t, user.GetBalance().Cmp(initial.GetBalanceValue()))
+				}
+				localContracts := 0
+				for _, contract := range contracts.InitialSmartContracts() {
+					inputCode, err := os.ReadFile(contract.GetFilename())
+					require.NoError(t, err)
+					for _, address := range contract.AddressesBytes() {
+						if dataArgs.ShardCoordinator.ComputeId(address) != shard {
+							continue
+						}
+						account, err := accounts.GetExistingAccount(address)
+						require.NoError(t, err)
+						user, ok := account.(state.UserAccountHandler)
+						require.True(t, ok)
+						require.NotEmpty(t, user.GetCodeHash())
+						require.Equal(t, inputCode, accounts.GetCode(user.GetCodeHash()))
+						localContracts++
+					}
+				}
+				if shard != nativeCore.MetachainShardId {
+					require.Positive(t, localContracts, "native installed code checks must execute")
 				}
 			}
-			if shard != nativeCore.MetachainShardId {
-				require.Positive(t, localContracts, "native installed code checks must execute")
-			}
+			checkLocalState(args.Accounts)
 			meta, ok := headers[nativeCore.MetachainShardId].(*block.MetaBlock)
 			require.True(t, ok)
 			metaHash, err := nativeCore.CalculateHash(coreHandler.InternalMarshalizer(), coreHandler.Hasher(), meta)
@@ -191,6 +195,59 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 			require.NotNil(t, index)
 			require.Len(t, index.StakingTxs, 36)
 			require.NotEmpty(t, index.DeploySystemScTxs)
+
+			// Native later-epoch startup returns temporary empty headers. They
+			// cannot replace the canonical metachain genesis identity source.
+			laterArgs := args
+			laterArgs.StartEpochNum = 3
+			laterCreator, err := genesisProcess.NewGenesisBlockCreator(laterArgs)
+			require.NoError(t, err)
+			laterHeaders, err := laterCreator.CreateGenesisBlocks()
+			require.NoError(t, err)
+			require.Len(t, laterHeaders, 4)
+			laterMeta := laterHeaders[nativeCore.MetachainShardId]
+			require.Empty(t, laterMeta.GetRootHash())
+			require.Empty(t, laterMeta.GetChainID())
+			laterHash, err := nativeCore.CalculateHash(coreHandler.InternalMarshalizer(), coreHandler.Hasher(), laterMeta)
+			require.NoError(t, err)
+			require.NotEqual(t, metaHash, laterHash)
+			laterDomain, err := common.ComputeDRWANetworkDomain([]byte(coreHandler.ChainID()), laterHash, coreHandler.Hasher())
+			require.NoError(t, err)
+			require.NotEqual(t, domain, laterDomain)
+			afterEmpty, err := args.Accounts.RootHash()
+			require.NoError(t, err)
+			require.Equal(t, root, afterEmpty)
+
+			// Orderly close/reopen of real native stores is a persistence check,
+			// not node restart, crash durability or a non-pruned identity path.
+			require.NoError(t, stateHandler.Close())
+			require.NoError(t, dataHandler.Close())
+			reopenedState, reopenedData := qualDRWACandidateStateComponents(t, dataArgs)
+			require.NoError(t, reopenedState.AccountsAdapter().RecreateTrie(holders.NewDefaultRootHashesHolder(root)))
+			checkLocalState(reopenedState.AccountsAdapter())
+			for id, header := range headers {
+				encoded, err := coreHandler.InternalMarshalizer().Marshal(header)
+				require.NoError(t, err)
+				hash, err := nativeCore.CalculateHash(coreHandler.InternalMarshalizer(), coreHandler.Hasher(), header)
+				require.NoError(t, err)
+				unit := dataRetriever.BlockHeaderUnit
+				if id == nativeCore.MetachainShardId {
+					unit = dataRetriever.MetaBlockUnit
+				}
+				stored, err := reopenedData.StorageService().Get(unit, hash)
+				require.NoError(t, err)
+				require.Equal(t, encoded, stored)
+				if id == nativeCore.MetachainShardId {
+					reloadedMeta := &block.MetaBlock{}
+					require.NoError(t, coreHandler.InternalMarshalizer().Unmarshal(reloadedMeta, stored))
+					reloadedHash, err := nativeCore.CalculateHash(coreHandler.InternalMarshalizer(), coreHandler.Hasher(), reloadedMeta)
+					require.NoError(t, err)
+					require.Equal(t, metaHash, reloadedHash)
+					reloadedDomain, err := common.ComputeDRWANetworkDomain([]byte(coreHandler.ChainID()), reloadedHash, coreHandler.Hasher())
+					require.NoError(t, err)
+					require.Equal(t, domain, reloadedDomain)
+				}
+			}
 		})
 	}
 }
