@@ -9,16 +9,24 @@ import (
 
 	"github.com/multiversx/mx-chain-core-go/data/smartContractResult"
 	"github.com/multiversx/mx-chain-core-go/data/transaction"
+	"github.com/multiversx/mx-chain-core-go/data/typeConverters/uint64ByteSlice"
 	vmData "github.com/multiversx/mx-chain-core-go/data/vm"
 	"github.com/multiversx/mx-chain-core-go/marshal"
+	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/node/external/transactionAPI"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/process/smartContract"
+	"github.com/multiversx/mx-chain-go/testscommon"
+	poolMocks "github.com/multiversx/mx-chain-go/testscommon/dataRetriever"
+	historyMocks "github.com/multiversx/mx-chain-go/testscommon/dblookupext"
+	storageMocks "github.com/multiversx/mx-chain-go/testscommon/storage"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	datafield "github.com/multiversx/mx-chain-vm-common-go/parsers/dataField"
 	"github.com/stretchr/testify/require"
 )
 
 // Independent published-field protobuf vectors, specified before execution in
-// T34 model03. No candidate-tree file reads, serializer-derived expectations,
+// T34 model04. No candidate-tree file reads, serializer-derived expectations,
 // actual transaction, VM guest execution, canonicality or settlement credit.
 const qualDRWAObservationCallbackVectors = `[{"name":"plain/no_async/ok","relayed":false,"async":false,"return_code":0,"message":"","data":"@00@0102@","wire_hex":"120200001a2001010101010101010101010101010101010101010101010101010101010101012220020202020202020202020202020202020202020202020202020202020202020232010042094030304030313032404a01aa5201bb581f600768028201200303030303030303030303030303030303030303030303030303030303030303"},{"name":"plain/no_async/denied","relayed":false,"async":false,"return_code":4,"message":"denied","data":"@04@64656e696564@0102@","wire_hex":"120200001a200101010101010101010101010101010101010101010101010101010101010101222002020202020202020202020202020202020202020202020202020202020202023201004216403034403634363536653639363536344030313032404a01aa5201bb581f600768027a0664656e6965648201200303030303030303030303030303030303030303030303030303030303030303"},{"name":"plain/async/ok","relayed":false,"async":true,"return_code":0,"message":"","data":"@00@0102@@a187a783807d78a12fb046fd2099f34bde7002ac2b29182ccfd35d6450bfb51d@a1b2c3@d4e5@00","wire_hex":"120200001a20010101010101010101010101010101010101010101010101010101010101010122200202020202020202020202020202020202020202020202020202020202020202320100425940303040303130324040613138376137383338303764373861313266623034366664323039396633346264653730303261633262323931383263636664333564363435306266623531644061316232633340643465354030304a01aa5201bb581f600768028201200303030303030303030303030303030303030303030303030303030303030303"},{"name":"plain/async/denied","relayed":false,"async":true,"return_code":4,"message":"denied","data":"@04@64656e696564@0102@@a187a783807d78a12fb046fd2099f34bde7002ac2b29182ccfd35d6450bfb51d@a1b2c3@d4e5@00","wire_hex":"120200001a2001010101010101010101010101010101010101010101010101010101010101012220020202020202020202020202020202020202020202020202020202020202020232010042664030344036343635366536393635363440303130324040613138376137383338303764373861313266623034366664323039396633346264653730303261633262323931383263636664333564363435306266623531644061316232633340643465354030304a01aa5201bb581f600768027a0664656e6965648201200303030303030303030303030303030303030303030303030303030303030303"},{"name":"relayed/no_async/ok","relayed":true,"async":false,"return_code":0,"message":"","data":"@00@0102@","wire_hex":"120200001a200101010101010101010101010101010101010101010101010101010101010101222002020202020202020202020202020202020202020202020202020202020202022a2004040404040404040404040404040404040404040404040404040404040404043202000042094030304030313032404a01aa5201bb581f600768028201200303030303030303030303030303030303030303030303030303030303030303"},{"name":"relayed/no_async/denied","relayed":true,"async":false,"return_code":4,"message":"denied","data":"@04@64656e696564@0102@","wire_hex":"120200001a200101010101010101010101010101010101010101010101010101010101010101222002020202020202020202020202020202020202020202020202020202020202022a200404040404040404040404040404040404040404040404040404040404040404320200004216403034403634363536653639363536344030313032404a01aa5201bb581f600768027a0664656e6965648201200303030303030303030303030303030303030303030303030303030303030303"},{"name":"relayed/async/ok","relayed":true,"async":true,"return_code":0,"message":"","data":"@00@0102@@a187a783807d78a12fb046fd2099f34bde7002ac2b29182ccfd35d6450bfb51d@a1b2c3@d4e5@00","wire_hex":"120200001a200101010101010101010101010101010101010101010101010101010101010101222002020202020202020202020202020202020202020202020202020202020202022a20040404040404040404040404040404040404040404040404040404040404040432020000425940303040303130324040613138376137383338303764373861313266623034366664323039396633346264653730303261633262323931383263636664333564363435306266623531644061316232633340643465354030304a01aa5201bb581f600768028201200303030303030303030303030303030303030303030303030303030303030303"},{"name":"relayed/async/denied","relayed":true,"async":true,"return_code":4,"message":"denied","data":"@04@64656e696564@0102@@a187a783807d78a12fb046fd2099f34bde7002ac2b29182ccfd35d6450bfb51d@a1b2c3@d4e5@00","wire_hex":"120200001a200101010101010101010101010101010101010101010101010101010101010101222002020202020202020202020202020202020202020202020202020202020202022a2004040404040404040404040404040404040404040404040404040404040404043202000042664030344036343635366536393635363440303130324040613138376137383338303764373861313266623034366664323039396633346264653730303261633262323931383263636664333564363435306266623531644061316232633340643465354030304a01aa5201bb581f600768027a0664656e6965648201200303030303030303030303030303030303030303030303030303030303030303"}]`
 
@@ -37,6 +45,24 @@ func TestQualDRWAObservationNativeCallbackProducer(t *testing.T) {
 	args.ArgsParser = smartContract.NewArgumentParser()
 	args.Marshalizer = &marshal.GogoProtoMarshalizer{}
 	processor, err := NewSmartContractProcessorV2(args)
+	require.NoError(t, err)
+	dataParser, err := datafield.NewOperationDataFieldParser(&datafield.ArgsOperationDataFieldParser{
+		AddressLength: 32, Marshalizer: args.Marshalizer, RelayedTransactionsV1V2DisableEpoch: 4,
+	})
+	require.NoError(t, err)
+	exclusion, err := common.NewRoundExclusionHandler(nil)
+	require.NoError(t, err)
+	api, err := transactionAPI.NewAPITransactionProcessor(&transactionAPI.ArgAPITransactionProcessor{
+		RoundHandler: &testscommon.RoundHandlerMock{}, Marshalizer: args.Marshalizer,
+		AddressPubKeyConverter: testscommon.NewPubkeyConverterMock(32), ShardCoordinator: args.ShardCoordinator,
+		HistoryRepository: &historyMocks.HistoryRepositoryStub{}, StorageService: &storageMocks.ChainStorerStub{},
+		DataPool: &poolMocks.PoolsHolderMock{}, Uint64ByteSliceConverter: uint64ByteSlice.NewBigEndianConverter(),
+		FeeComputer: &testscommon.FeeComputerStub{}, TxTypeHandler: args.TxTypeHandler,
+		LogsFacade: &testscommon.LogsFacadeStub{}, DataFieldParser: dataParser, TxMarshaller: args.Marshalizer,
+		EnableEpochsHandler: args.EnableEpochsHandler, EnableRoundsHandler: &testscommon.EnableRoundsHandlerStub{},
+		TxVersionChecker: &testscommon.TxVersionCheckerStub{}, ChainHandler: &testscommon.ChainHandlerMock{},
+		TxProcessor: &testscommon.TxProcessorMock{}, RoundExclusionHandler: exclusion,
+	})
 	require.NoError(t, err)
 	for _, vector := range vectors {
 		t.Run(vector.Name, func(t *testing.T) {
@@ -103,6 +129,41 @@ func TestQualDRWAObservationNativeCallbackProducer(t *testing.T) {
 			}
 			require.Equal(t, expectedDecoded, decoded, "actual producer-to-independent-decoded-field contract")
 			require.Error(t, args.Marshalizer.Unmarshal(&smartContractResult.SmartContractResult{}, expectedWire[:len(expectedWire)-1]))
+			view, err := api.UnmarshalTransaction(wire, transaction.TxTypeUnsigned, 1)
+			require.NoError(t, err)
+			require.Equal(t, expectedDecoded, view.Tx)
+			require.Equal(t, "unsigned", view.Type)
+			require.Equal(t, uint64(0), view.Nonce)
+			require.Equal(t, "0", view.Value)
+			require.Equal(t, hex.EncodeToString(bytes.Repeat([]byte{2}, 32)), view.Sender)
+			require.Equal(t, hex.EncodeToString(bytes.Repeat([]byte{1}, 32)), view.Receiver)
+			require.Equal(t, hex.EncodeToString(bytes.Repeat([]byte{3}, 32)), view.OriginalSender)
+			require.Equal(t, "aa", view.PreviousTransactionHash)
+			require.Equal(t, "bb", view.OriginalTransactionHash)
+			require.Equal(t, uint64(31), view.GasLimit)
+			require.Equal(t, uint64(7), view.GasPrice)
+			require.Equal(t, "asynchronousCallBack", view.CallType)
+			require.Equal(t, []byte(vector.Data), view.Data)
+			require.Equal(t, vector.Message, view.ReturnMessage)
+			require.Empty(t, view.Status, "decoding does not classify execution or canonicality")
+			if vector.Relayed {
+				require.Equal(t, hex.EncodeToString(bytes.Repeat([]byte{4}, 32)), view.RelayerAddress)
+				require.Equal(t, "0", view.RelayedValue)
+			} else {
+				require.Empty(t, view.RelayerAddress)
+				require.Empty(t, view.RelayedValue)
+			}
+			apiJSON, err := json.Marshal(view)
+			require.NoError(t, err)
+			var apiFields map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(apiJSON, &apiFields))
+			require.Equal(t, `"0"`, string(apiFields["value"]))
+			require.Equal(t, `"aa"`, string(apiFields["previousTransactionHash"]))
+			require.Equal(t, `"bb"`, string(apiFields["originalTransactionHash"]))
+			require.NotContains(t, apiFields, "prevTxHash")
+			invalidView, err := api.UnmarshalTransaction(wire[:len(wire)-1], transaction.TxTypeUnsigned, 1)
+			require.Error(t, err)
+			require.Nil(t, invalidView)
 			encoded, err := json.Marshal(decoded)
 			require.NoError(t, err)
 			var fields map[string]json.RawMessage
@@ -112,6 +173,7 @@ func TestQualDRWAObservationNativeCallbackProducer(t *testing.T) {
 			require.Contains(t, fields, "originalTxHash")
 			for _, unavailable := range []string{"canonicality", "drwa_outcome", "as_of_block", "effect_id", "source_completion"} {
 				require.NotContains(t, fields, unavailable)
+				require.NotContains(t, apiFields, unavailable)
 			}
 			t.Logf("native callback wire: %x", wire)
 		})
