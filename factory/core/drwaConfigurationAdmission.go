@@ -145,10 +145,20 @@ func validateDRWAStartupConfigs(cfg config.Config, rounds process.RoundNotifier)
 			internalMarshalizer = marshaller
 		}
 	}
-	for _, pubkeyCfg := range []config.PubkeyConfig{cfg.AddressPubkeyConverter, cfg.ValidatorPubkeyConverter} {
-		if _, err := converterFactory.NewPubkeyConverter(pubkeyCfg); err != nil {
+	var validatorConverter nativeCore.PubkeyConverter
+	for index, pubkeyCfg := range []config.PubkeyConfig{cfg.AddressPubkeyConverter, cfg.ValidatorPubkeyConverter} {
+		converter, err := converterFactory.NewPubkeyConverter(pubkeyCfg)
+		if err != nil {
 			return err
 		}
+		if index == 1 {
+			validatorConverter = converter
+		}
+	}
+	// Native core and processing startup decode this consumed field even when
+	// the hardfork trigger is disabled. Decoding grants no trigger authority.
+	if _, err := validatorConverter.Decode(cfg.Hardfork.PublicKeyToListenFrom); err != nil {
+		return err
 	}
 	gs := cfg.GeneralSettings
 	// E05 also binds the actual bootstrap guardian-delay consumer. Reuse its
