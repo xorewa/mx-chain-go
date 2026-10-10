@@ -167,6 +167,40 @@ func (r *pendingFinalRecords) check(c pendingFinalCandidate, encoded []byte, pro
 	return nil
 }
 
+// A verifier authenticates the operation; it cannot stage or promote this
+// record itself, including manufacturing an otherwise valid duplicate. Other
+// co-journaled state remains permitted under the existing exclusive owner.
+func (r *pendingFinalRecords) verifyState(c pendingFinalCandidate, verify func() error) error {
+	kinds := []string{"final", "pending", "item"}
+	fields := [][][]byte{{c.key}, {c.key}, {c.origin, c.key}}
+	keys := make([][]byte, len(kinds))
+	before := make([][]byte, len(kinds))
+	for i, kind := range kinds {
+		key, err := r.key(kind, fields[i]...)
+		if err != nil {
+			return err
+		}
+		keys[i] = key
+		before[i], err = r.read(key)
+		if err != nil {
+			return err
+		}
+	}
+	if err := verify(); err != nil {
+		return err
+	}
+	for i, key := range keys {
+		current, err := r.read(key)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(current, before[i]) {
+			return errPendingFinal
+		}
+	}
+	return nil
+}
+
 func (r *pendingFinalRecords) save(c pendingFinalCandidate, encoded []byte, promote bool) error {
 	pendingKey, err := r.key("pending", c.key)
 	if err != nil {
@@ -211,7 +245,7 @@ func (r *pendingFinalRecords) stage(candidate pendingFinalCandidate) error {
 	c := pendingFinalCandidate{key: bytes.Clone(f[0]), version: candidate.version,
 		predecessor: bytes.Clone(f[2]), body: bytes.Clone(f[3]), origin: bytes.Clone(f[4])}
 	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := r.host.Admit(bytes.Clone(encoded)); e != nil {
+		if e := r.verifyState(c, func() error { return r.host.Admit(bytes.Clone(encoded)) }); e != nil {
 			return nil, e
 		}
 		final, digest, e := r.final(c.key)
@@ -292,7 +326,7 @@ func (r *pendingFinalRecords) promote(candidate pendingFinalCandidate, evidence 
 		predecessor: bytes.Clone(f[2]), body: bytes.Clone(f[3]), origin: bytes.Clone(f[4])}
 	evidence = bytes.Clone(evidence)
 	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := r.host.Canonical(bytes.Clone(encoded), bytes.Clone(evidence)); e != nil {
+		if e := r.verifyState(c, func() error { return r.host.Canonical(bytes.Clone(encoded), bytes.Clone(evidence)) }); e != nil {
 			return nil, e
 		}
 		final, _, e := r.final(c.key)
