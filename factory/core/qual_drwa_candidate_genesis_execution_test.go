@@ -31,6 +31,7 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 	comparisonHeaders := make(map[uint32][]byte)
 	for _, shard := range []uint32{0, 1, 2, nativeCore.MetachainShardId} {
 		t.Run(fmt.Sprint(shard), func(t *testing.T) {
+			firstRole := len(comparisonHeaders) == 0
 			dataArgs := qualDRWACandidateDataArgs(t, 0, shard)
 			stateHandler, dataHandler := qualDRWACandidateStateComponents(t, dataArgs)
 			coreHandler := dataArgs.Core
@@ -88,7 +89,7 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 			// Candidate startTime=0 uses the local clock. Hold one observed
 			// native timestamp equal across these independent test executions;
 			// this does not select or admit a deployment genesis timestamp.
-			if shard == 0 {
+			if firstRole {
 				sharedGenesisTime = args.GenesisTime
 			}
 			args.GenesisTime = sharedGenesisTime
@@ -121,7 +122,7 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 				require.NotEmpty(t, header.GetRootHash())
 				encoded, err := coreHandler.InternalMarshalizer().Marshal(header)
 				require.NoError(t, err)
-				if shard == 0 {
+				if firstRole {
 					comparisonHeaders[expectedShard] = append([]byte(nil), encoded...)
 				} else {
 					require.Equal(t, comparisonHeaders[expectedShard], encoded,
