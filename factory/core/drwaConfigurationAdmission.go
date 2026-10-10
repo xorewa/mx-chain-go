@@ -4,10 +4,13 @@ import (
 	"fmt"
 
 	nativeCore "github.com/multiversx/mx-chain-core-go/core"
+	hashFactory "github.com/multiversx/mx-chain-core-go/hashing/factory"
+	marshalFactory "github.com/multiversx/mx-chain-core-go/marshal/factory"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/chainparametersnotifier"
 	commonConfigs "github.com/multiversx/mx-chain-go/common/configs"
 	"github.com/multiversx/mx-chain-go/common/enablers"
+	converterFactory "github.com/multiversx/mx-chain-go/common/factory"
 	"github.com/multiversx/mx-chain-go/common/forking"
 	"github.com/multiversx/mx-chain-go/common/graceperiod"
 	"github.com/multiversx/mx-chain-go/config"
@@ -125,6 +128,21 @@ func LoadDRWAConfigurationCandidate(paths config.ConfigurationPathsHolder, overl
 // throughout the tables, including future entries. No startup timer, network,
 // account adapter or parallel configuration mechanism is created here.
 func validateDRWAStartupConfigs(cfg config.Config, rounds process.RoundNotifier) error {
+	for _, name := range []string{cfg.Hasher.Type, cfg.TxSignHasher.Type} {
+		if _, err := hashFactory.NewHasher(name); err != nil {
+			return err
+		}
+	}
+	for _, name := range []string{cfg.Marshalizer.Type, cfg.VmMarshalizer.Type, cfg.TxSignMarshalizer.Type} {
+		if _, err := marshalFactory.NewMarshalizer(name); err != nil {
+			return err
+		}
+	}
+	for _, pubkeyCfg := range []config.PubkeyConfig{cfg.AddressPubkeyConverter, cfg.ValidatorPubkeyConverter} {
+		if _, err := converterFactory.NewPubkeyConverter(pubkeyCfg); err != nil {
+			return err
+		}
+	}
 	gs := cfg.GeneralSettings
 	if _, err := graceperiod.NewEpochChangeGracePeriod(gs.EpochChangeGracePeriodByEpoch); err != nil {
 		return err
