@@ -196,6 +196,17 @@ func (r *convergenceRecords) save(key, binding []byte, p *convergenceProgress) e
 	return r.codec.state.accounts.SaveAccount(account)
 }
 
+func (r *convergenceRecords) verifyParent(key, binding []byte, count int, p *convergenceProgress) error {
+	if err := r.host.VerifyParent(bytes.Clone(binding), bytes.Clone(p.commitment)); err != nil {
+		return err
+	}
+	current, err := r.load(key, binding, count)
+	if err != nil || current.status != p.status || !bytes.Equal(current.commitment, p.commitment) {
+		return errConvergence
+	}
+	return nil
+}
+
 func (r *convergenceRecords) create(t convergenceTransition) error {
 	key, binding, err := r.encode(t)
 	if err != nil {
@@ -224,12 +235,19 @@ func (r *convergenceRecords) create(t convergenceTransition) error {
 		if len(old) != 0 {
 			p, e := r.load(key, binding, count)
 			if e == nil && p.status == "COMPLETE" {
-				e = r.host.VerifyParent(bytes.Clone(binding), bytes.Clone(p.commitment))
+				e = r.verifyParent(key, binding, count, p)
 			}
 			return nil, e
 		}
 		if e = r.host.Admission(bytes.Clone(binding), retained); e != nil {
 			return nil, e
+		}
+		current, e := r.read(key)
+		if e != nil {
+			return nil, e
+		}
+		if len(current) != 0 {
+			return nil, errConvergence
 		}
 		return nil, r.save(key, binding, &convergenceProgress{status: "PENDING",
 			bitmap: make([]byte, common.GetBitmapSize(count)), acks: make([][]byte, count)})
@@ -275,7 +293,7 @@ func (r *convergenceRecords) acknowledge(t convergenceTransition, shard uint32, 
 			return nil, e
 		}
 		if p.status == "COMPLETE" {
-			return nil, r.host.VerifyParent(bytes.Clone(binding), bytes.Clone(p.commitment))
+			return nil, r.verifyParent(key, binding, count, p)
 		}
 		if p.bitmap[index/8]&(1<<uint(index%8)) != 0 {
 			return nil, nil // authenticate before recognizing the existing credit
@@ -301,7 +319,7 @@ func (r *convergenceRecords) complete(t convergenceTransition) error {
 			return nil, e
 		}
 		if p.status == "COMPLETE" {
-			return nil, r.host.VerifyParent(bytes.Clone(binding), bytes.Clone(p.commitment))
+			return nil, r.verifyParent(key, binding, count, p)
 		}
 		if !p.full() {
 			return nil, errConvergence
@@ -313,12 +331,8 @@ func (r *convergenceRecords) complete(t convergenceTransition) error {
 		if output == nil || output.ReturnCode != vmcommon.Ok {
 			return nil, errConvergence
 		}
-		if e = r.host.VerifyParent(bytes.Clone(binding), bytes.Clone(p.commitment)); e != nil {
+		if e = r.verifyParent(key, binding, count, p); e != nil {
 			return nil, e
-		}
-		current, e := r.load(key, binding, count)
-		if e != nil || current.status != p.status || !bytes.Equal(current.commitment, p.commitment) {
-			return nil, errConvergence
 		}
 		p.status = "COMPLETE"
 		return output, r.save(key, binding, p)
