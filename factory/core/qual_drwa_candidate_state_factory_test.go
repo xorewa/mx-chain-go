@@ -9,11 +9,35 @@ import (
 	nativeCore "github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-go/common/holders"
+	nativeFactory "github.com/multiversx/mx-chain-go/factory"
 	dataFactory "github.com/multiversx/mx-chain-go/factory/data"
 	stateFactory "github.com/multiversx/mx-chain-go/factory/state"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/stretchr/testify/require"
 )
+
+func qualDRWACandidateStateComponents(t *testing.T, args dataFactory.DataComponentsFactoryArgs) (nativeFactory.StateComponentsHandler, nativeFactory.DataComponentsHandler) {
+	t.Helper()
+	dataNativeFactory, err := dataFactory.NewDataComponentsFactory(args)
+	require.NoError(t, err)
+	dataHandler, err := dataFactory.NewManagedDataComponents(dataNativeFactory)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, dataHandler.Close()) })
+	require.NoError(t, dataHandler.Create())
+	require.NoError(t, dataHandler.CheckSubcomponents())
+	stateNativeFactory, err := stateFactory.NewStateComponentsFactory(stateFactory.StateComponentsFactoryArgs{
+		Config: args.Config, Core: args.Core, StatusCore: args.StatusCore,
+		StorageService: dataHandler.StorageService(), ProcessingMode: args.NodeProcessingMode,
+		ChainHandler: dataHandler.Blockchain(), ShouldSerializeSnapshots: false,
+	})
+	require.NoError(t, err)
+	handler, err := stateFactory.NewManagedStateComponents(stateNativeFactory)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, handler.Close()) })
+	require.NoError(t, handler.Create())
+	require.NoError(t, handler.CheckSubcomponents())
+	return handler, dataHandler
+}
 
 // T09-M31: actual native factory composition and ordinary account persistence.
 // Synthetic header notifications are supplied before storage subscribers exist.
@@ -32,26 +56,7 @@ func TestQualDRWACandidateStateFactory(t *testing.T) {
 				key, value := []byte("T09 ordinary account probe"), []byte("native state reopen")
 				var root []byte
 				for _, reopen := range []bool{false, true} {
-					dataNativeFactory, err := dataFactory.NewDataComponentsFactory(args)
-					require.NoError(t, err)
-					dataHandler, err := dataFactory.NewManagedDataComponents(dataNativeFactory)
-					require.NoError(t, err)
-					t.Cleanup(func() { require.NoError(t, dataHandler.Close()) })
-					require.NoError(t, dataHandler.Create())
-					require.NoError(t, dataHandler.CheckSubcomponents())
-					stateNativeFactory, err := stateFactory.NewStateComponentsFactory(stateFactory.StateComponentsFactoryArgs{
-						Config: args.Config, Core: args.Core, StatusCore: args.StatusCore,
-						StorageService: dataHandler.StorageService(), ProcessingMode: args.NodeProcessingMode,
-						ChainHandler: dataHandler.Blockchain(),
-						// No snapshot operation or import mode is exercised.
-						ShouldSerializeSnapshots: false,
-					})
-					require.NoError(t, err)
-					handler, err := stateFactory.NewManagedStateComponents(stateNativeFactory)
-					require.NoError(t, err)
-					t.Cleanup(func() { require.NoError(t, handler.Close()) })
-					require.NoError(t, handler.Create())
-					require.NoError(t, handler.CheckSubcomponents())
+					handler, dataHandler := qualDRWACandidateStateComponents(t, args)
 					require.NotNil(t, handler.PeerAccounts())
 					require.NotNil(t, handler.AccountsAdapterAPI())
 					require.NotNil(t, handler.AccountsAdapterProposal())
