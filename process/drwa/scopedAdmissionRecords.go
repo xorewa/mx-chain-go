@@ -287,6 +287,12 @@ func (s *scopedAdmissionRecords) install(context *HeaderTimeContext, owner, prog
 			return nil, e
 		}
 		defer release()
+		// The mandate adapter is an external call. Reacquire the native account
+		// before resolving its current pointer, immutable record and budget.
+		account, e = s.codec.state.systemAccount()
+		if e != nil {
+			return nil, e
+		}
 		old, _, e := account.RetrieveValue(s.key("version", id))
 		if e != nil {
 			return nil, e
@@ -377,7 +383,7 @@ func (s *scopedAdmissionRecords) admit(context *HeaderTimeContext, d scopedAdmis
 		if e != nil || !bytes.Equal(current, d.authority) {
 			return nil, errScopedAdmission
 		}
-		if e = s.mandates.Verify("ADMISSION", bytes.Clone(scope), current, bytes.Clone(payload), bytes.Clone(evidence)); e != nil {
+		if e = s.mandates.Verify("ADMISSION", bytes.Clone(scope), bytes.Clone(current), bytes.Clone(payload), bytes.Clone(evidence)); e != nil {
 			return nil, e
 		}
 		release, e := scopedAdmissionLease(context)
@@ -385,6 +391,14 @@ func (s *scopedAdmissionRecords) admit(context *HeaderTimeContext, d scopedAdmis
 			return nil, e
 		}
 		defer release()
+		account, e = s.codec.state.systemAccount()
+		if e != nil {
+			return nil, e
+		}
+		current, e = s.current(account, scope)
+		if e != nil || !bytes.Equal(current, d.authority) {
+			return nil, errScopedAdmission
+		}
 		old, _, e := account.RetrieveValue(s.key("decision", id))
 		if e != nil {
 			return nil, e
@@ -439,7 +453,7 @@ func (s *scopedAdmissionRecords) withdraw(context *HeaderTimeContext, d scopedAd
 		if e != nil {
 			return nil, e
 		}
-		if e = s.mandates.Verify("WITHDRAW", bytes.Clone(scope), current, digest, bytes.Clone(evidence)); e != nil {
+		if e = s.mandates.Verify("WITHDRAW", bytes.Clone(scope), bytes.Clone(current), bytes.Clone(digest), bytes.Clone(evidence)); e != nil {
 			return nil, e
 		}
 		release, e := scopedAdmissionLease(context)
@@ -447,6 +461,21 @@ func (s *scopedAdmissionRecords) withdraw(context *HeaderTimeContext, d scopedAd
 			return nil, e
 		}
 		defer release()
+		account, e = s.codec.state.systemAccount()
+		if e != nil {
+			return nil, e
+		}
+		verifiedCurrent, e := s.current(account, scope)
+		if e != nil || !bytes.Equal(verifiedCurrent, current) {
+			return nil, errScopedAdmission
+		}
+		stored, _, e = account.RetrieveValue(s.key("decision", id))
+		if e != nil {
+			return nil, e
+		}
+		if !bytes.Equal(stored, body) {
+			return nil, errScopedAdmission
+		}
 		old, _, e := account.RetrieveValue(s.key("withdrawn", id))
 		if e != nil {
 			return nil, e
