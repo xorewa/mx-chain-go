@@ -174,6 +174,32 @@ func (c *adminCarrier) decode(encoded []byte) (adminEffectEnvelope, error) {
 	return e, nil
 }
 
+func (c *adminCarrier) readApplied(key []byte) ([]byte, error) {
+	account, err := c.codec.state.systemAccount()
+	if err != nil {
+		return nil, err
+	}
+	applied, _, err := account.RetrieveValue(key)
+	if err != nil {
+		return nil, err
+	}
+	if len(applied) > c.codec.maxBytes {
+		return nil, errAdminCarrier
+	}
+	return bytes.Clone(applied), nil
+}
+
+func (c *adminCarrier) checkApplied(key, expected []byte) error {
+	applied, err := c.readApplied(key)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(applied, expected) {
+		return errAdminCarrier
+	}
+	return nil
+}
+
 // apply is an isolated DESTINATION foundation. It neither emits an origin leg
 // nor grants real native protocol context. Every external adapter receives a
 // separate copy; mutating an adapter's buffers cannot change our
@@ -211,6 +237,16 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 		if acked == nil || acked.ReturnCode != vmcommon.Ok {
 			return nil, errAdminCarrier
 		}
+		current, err := c.host.StateHash(fresh())
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(current, e.result) {
+			return nil, errAdminCarrier
+		}
+		if err = c.checkApplied(key, encoded); err != nil {
+			return nil, err
+		}
 		return acked, nil
 	}
 	return c.boundary.Execute(func() (*vmcommon.VMOutput, error) {
@@ -220,16 +256,15 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 		if err = c.host.ValidateLocal(fresh()); err != nil {
 			return nil, err
 		}
-		account, err := c.codec.state.systemAccount()
-		if err != nil {
-			return nil, err
-		}
-		applied, _, err := account.RetrieveValue(key)
+		applied, err := c.readApplied(key)
 		if err != nil {
 			return nil, err
 		}
 		current, err := c.host.StateHash(fresh())
 		if err != nil {
+			return nil, err
+		}
+		if err = c.checkApplied(key, applied); err != nil {
 			return nil, err
 		}
 		if len(applied) != 0 {
@@ -258,9 +293,12 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 		if err = c.host.ValidateLocal(fresh()); err != nil {
 			return nil, err
 		}
+		if err = c.checkApplied(key, nil); err != nil {
+			return nil, err
+		}
 		// The native inner effect may have saved/reloaded this same account.
 		// Never save a pre-effect account alias over its updated native data trie.
-		account, err = c.codec.state.systemAccount()
+		account, err := c.codec.state.systemAccount()
 		if err != nil {
 			return nil, err
 		}
