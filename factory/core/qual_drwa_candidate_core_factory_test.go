@@ -13,10 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// T09-M25: actual native core assembly, with NTP queries explicitly excluded.
-// Native NTP/alarm loops start and Close cancels them. This is not node startup,
-// deployment admission, authenticated header execution or network evidence.
-func TestQualDRWACandidateCoreFactoryNativeAssembly(t *testing.T) {
+func qualDRWACandidateCoreArgs(t *testing.T) CoreComponentsFactoryArgs {
+	t.Helper()
 	cfg, err := common.LoadMainConfig(qualDRWACandidateGenesisPath(t, "config.toml"))
 	require.NoError(t, err)
 	epochs, err := common.LoadEpochConfig(qualDRWACandidateGenesisPath(t, "enableEpochs.toml"))
@@ -34,11 +32,18 @@ func TestQualDRWACandidateCoreFactoryNativeAssembly(t *testing.T) {
 	// native ntp.sync enumerate zero hosts, so it never invokes its query.
 	cfg.NTPConfig.Hosts = nil
 	require.Positive(t, cfg.NTPConfig.SyncPeriodSeconds)
-	factory, err := NewCoreComponentsFactory(CoreComponentsFactoryArgs{
+	return CoreComponentsFactoryArgs{
 		Config: *cfg, EpochConfig: *epochs, RoundConfig: *rounds,
 		EconomicsConfig: *economics, RatingsConfig: *ratings, NodesConfig: nodes,
 		WorkingDirectory: t.TempDir(), ChanStopNodeProcess: make(chan endProcess.ArgEndProcess, 1),
-	})
+	}
+}
+
+// T09-M25: actual native core assembly, with NTP queries explicitly excluded.
+// Native NTP/alarm loops start and Close cancels them. This is not node startup,
+// deployment admission, authenticated header execution or network evidence.
+func TestQualDRWACandidateCoreFactoryNativeAssembly(t *testing.T) {
+	factory, err := NewCoreComponentsFactory(qualDRWACandidateCoreArgs(t))
 	require.NoError(t, err)
 	components, err := factory.Create()
 	require.NoError(t, err)
