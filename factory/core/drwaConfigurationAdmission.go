@@ -6,11 +6,14 @@ import (
 	nativeCore "github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/chainparametersnotifier"
+	commonConfigs "github.com/multiversx/mx-chain-go/common/configs"
 	"github.com/multiversx/mx-chain-go/common/enablers"
 	"github.com/multiversx/mx-chain-go/common/forking"
+	"github.com/multiversx/mx-chain-go/common/graceperiod"
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/epochStart/notifier"
 	factoryBlock "github.com/multiversx/mx-chain-go/factory/block"
+	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/sharding"
 )
 
@@ -75,8 +78,12 @@ func LoadDRWAConfigurationCandidate(paths config.ConfigurationPathsHolder, overl
 	if err != nil {
 		return nil, err
 	}
-	rounds, err := enablers.NewEnableRoundsHandler(*round, forking.NewGenericRoundNotifier())
+	roundNotifier := forking.NewGenericRoundNotifier()
+	rounds, err := enablers.NewEnableRoundsHandler(*round, roundNotifier)
 	if err != nil {
+		return nil, err
+	}
+	if err = validateDRWAStartupConfigs(*main, roundNotifier); err != nil {
 		return nil, err
 	}
 	// Reuse the WHOLE native cross-file tuple validation, including every epoch
@@ -110,6 +117,27 @@ func LoadDRWAConfigurationCandidate(paths config.ConfigurationPathsHolder, overl
 		return nil, err
 	}
 	return candidate, nil
+}
+
+// validateDRWAStartupConfigs adopts the pure native core startup constructors.
+// The activation-tuple check only requires matching boundary entries; these
+// constructors also reject missing base entries, duplicates and invalid values
+// throughout the tables, including future entries. No startup timer, network,
+// account adapter or parallel configuration mechanism is created here.
+func validateDRWAStartupConfigs(cfg config.Config, rounds process.RoundNotifier) error {
+	gs := cfg.GeneralSettings
+	if _, err := graceperiod.NewEpochChangeGracePeriod(gs.EpochChangeGracePeriodByEpoch); err != nil {
+		return err
+	}
+	if _, err := commonConfigs.NewCommonConfigsHandler(gs.EpochStartConfigsByEpoch,
+		gs.EpochStartConfigsByRound, gs.ConsensusConfigsByEpoch, gs.ConsensusConfigsByRound, false); err != nil {
+		return err
+	}
+	if _, err := commonConfigs.NewProcessConfigsHandler(gs.ProcessConfigsByEpoch, gs.ProcessConfigsByRound, rounds); err != nil {
+		return err
+	}
+	_, err := commonConfigs.NewAntifloodConfigsHandler(cfg.Antiflood, rounds)
+	return err
 }
 
 func (c *DRWAConfigurationCandidate) checkPrerequisites(epoch uint32) error {
