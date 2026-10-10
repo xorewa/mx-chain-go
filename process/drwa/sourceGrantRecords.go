@@ -130,6 +130,19 @@ func (s *sourceGrantRecords) load(key, projection []byte) (string, string, []byt
 	return status, reason, bytes.Clone(f[3]), nil
 }
 
+// check reloads the exact grant after native host work. Reloading only the
+// account at save cannot establish that this single-use fact stayed unchanged.
+func (s *sourceGrantRecords) check(key, projection []byte, status, reason string, effect []byte) error {
+	currentStatus, currentReason, currentEffect, err := s.load(key, projection)
+	if err != nil {
+		return err
+	}
+	if currentStatus != status || currentReason != reason || !bytes.Equal(currentEffect, effect) {
+		return errSourceGrant
+	}
+	return nil
+}
+
 func (s *sourceGrantRecords) save(key, projection []byte, status, reason string, effect []byte) error {
 	value, err := s.codec.frame(projection, []byte(status), []byte(reason), effect)
 	if err != nil {
@@ -169,13 +182,23 @@ func sourceGrantOutput(output *vmcommon.VMOutput, err error) (*vmcommon.VMOutput
 	return output, nil
 }
 
-func (s *sourceGrantRecords) ack(projection []byte, status, reason string, effect []byte,
+func (s *sourceGrantRecords) ack(key, projection []byte, status, reason string, effect []byte,
 	output *vmcommon.VMOutput) (*vmcommon.VMOutput, error) {
 	if output == nil {
 		output = &vmcommon.VMOutput{ReturnCode: vmcommon.Ok}
 	}
 	err := s.host.Ack(bytes.Clone(projection), status, reason, bytes.Clone(effect), output)
-	return sourceGrantOutput(output, err)
+	if _, err = sourceGrantOutput(output, err); err != nil {
+		return nil, err
+	}
+	retainedStatus := "CONSUMED"
+	if status == "UNUSED" {
+		retainedStatus = "CLOSED_UNUSED"
+	}
+	if err = s.check(key, projection, retainedStatus, reason, effect); err != nil {
+		return nil, err
+	}
+	return output, nil
 }
 
 func (s *sourceGrantRecords) install(context *HeaderTimeContext, p sourceGrantProjection, evidence []byte) error {
@@ -222,6 +245,19 @@ func (s *sourceGrantRecords) install(context *HeaderTimeContext, p sourceGrantPr
 			return nil, e
 		}
 		defer release()
+		// Admission can perform other native work; it cannot replace the exact
+		// grant's absence with a consumed/closed fact that OPEN would overwrite.
+		account, e = s.codec.state.systemAccount()
+		if e != nil {
+			return nil, e
+		}
+		old, _, e = account.RetrieveValue(key)
+		if e != nil {
+			return nil, e
+		}
+		if len(old) != 0 {
+			return nil, errSourceGrant
+		}
 		return nil, s.save(key, projection, "OPEN", "", nil)
 	})
 }
@@ -264,7 +300,7 @@ func (s *sourceGrantRecords) transition(context *HeaderTimeContext, p sourceGran
 				if status == "CLOSED_UNUSED" {
 					ack = "UNUSED"
 				}
-				return s.ack(projection, ack, retainedReason, effect, nil)
+				return s.ack(key, projection, ack, retainedReason, effect, nil)
 			}
 			return nil, errSourceGrant
 		}
@@ -291,11 +327,14 @@ func (s *sourceGrantRecords) transition(context *HeaderTimeContext, p sourceGran
 			return nil, e
 		}
 		defer release()
+		if e = s.check(key, projection, "OPEN", "", nil); e != nil {
+			return nil, e
+		}
 		if reason != "" {
 			if e = s.save(key, projection, "CLOSED_UNUSED", reason, nil); e != nil {
 				return nil, e
 			}
-			return s.ack(projection, "UNUSED", reason, nil, nil)
+			return s.ack(key, projection, "UNUSED", reason, nil, nil)
 		}
 		effect, output, e := s.host.Apply(bytes.Clone(projection))
 		if _, e = sourceGrantOutput(output, e); e != nil {
@@ -304,9 +343,12 @@ func (s *sourceGrantRecords) transition(context *HeaderTimeContext, p sourceGran
 		if len(effect) != s.codec.hasher.Size() {
 			return nil, errSourceGrant
 		}
+		if e = s.check(key, projection, "OPEN", "", nil); e != nil {
+			return nil, e
+		}
 		if e = s.save(key, projection, "CONSUMED", "", bytes.Clone(effect)); e != nil {
 			return nil, e
 		}
-		return s.ack(projection, "STARTED", "", effect, output)
+		return s.ack(key, projection, "STARTED", "", effect, output)
 	})
 }
