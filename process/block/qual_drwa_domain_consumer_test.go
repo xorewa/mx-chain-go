@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"testing"
 
+	nativeCore "github.com/multiversx/mx-chain-core-go/core"
 	coreBlock "github.com/multiversx/mx-chain-core-go/data/block"
+	"github.com/multiversx/mx-chain-core-go/hashing"
 	"github.com/multiversx/mx-chain-core-go/hashing/blake2b"
 	"github.com/multiversx/mx-chain-core-go/marshal"
+	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	"github.com/stretchr/testify/require"
 )
@@ -124,7 +127,9 @@ func TestQualDRWANetworkDomainKnownAnswers(t *testing.T) {
 	genesis := qualDomainHex(t, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
 	hash := blake2b.NewBlake2b()
 	derive := func(chain string, g []byte) []byte {
-		return hash.Compute(string(append([]byte("DRWA/NETWORK/v1"+chain), g...)))
+		value, err := common.ComputeDRWANetworkDomain([]byte(chain), g, hash)
+		require.NoError(t, err)
+		return value
 	}
 	domain := derive("local-test", genesis)
 	require.Equal(t, qualDomainKAT, hex.EncodeToString(domain))
@@ -141,6 +146,36 @@ func TestQualDRWANetworkDomainKnownAnswers(t *testing.T) {
 	preimage := append([]byte("DRWA/GAS/v1"), domain...)
 	preimage = append(preimage, qualDomainHex(t, qualDomainBodyHex)...)
 	require.Equal(t, qualDomainActionKAT, hex.EncodeToString(hash.Compute(string(preimage))))
+}
+
+func TestQualDRWANetworkDomainInvalidInputs(t *testing.T) {
+	hash := blake2b.NewBlake2b()
+	typedNil := blake2b.NewBlake2b()
+	typedNil = nil
+	genesis := qualDomainHex(t, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+	for _, tc := range []struct {
+		name      string
+		chain     []byte
+		genesis   []byte
+		hasher    hashing.Hasher
+		nilHasher bool
+	}{
+		{"empty_chain", nil, genesis, hash, false},
+		{"missing_genesis", []byte("local-test"), nil, hash, false},
+		{"short_genesis", []byte("local-test"), genesis[:31], hash, false},
+		{"long_genesis", []byte("local-test"), append(bytes.Clone(genesis), 1), hash, false},
+		{"nil_hasher", []byte("local-test"), genesis, nil, true},
+		{"typed_nil_hasher", []byte("local-test"), genesis, typedNil, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			value, err := common.ComputeDRWANetworkDomain(tc.chain, tc.genesis, tc.hasher)
+			require.Error(t, err)
+			require.Nil(t, value)
+			if tc.nilHasher {
+				require.ErrorIs(t, err, nativeCore.ErrNilHasher)
+			}
+		})
+	}
 }
 
 func TestQualDRWADomainItemConsumer(t *testing.T) {

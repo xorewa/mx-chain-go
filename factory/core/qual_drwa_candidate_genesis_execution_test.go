@@ -21,13 +21,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// T09-M33/M34/M35: native genesis and installed code over the public candidate.
+// T09-M33/M34/M35/M36: native genesis and installed code over the public candidate.
 // The native genesis pipeline creates and executes its internal transactions;
 // no transaction is submitted, node launched or DRWA root/role provisioned.
 // SS-02 applies: the capture excludes this executing-WASM root in race mode.
 // Returned roots bind native state; they are not independent root-byte oracles.
 func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 	var sharedGenesisTime uint64
+	var comparisonDomain []byte
 	comparisonHeaders := make(map[uint32][]byte)
 	for _, shard := range []uint32{0, 1, 2, nativeCore.MetachainShardId} {
 		t.Run(fmt.Sprint(shard), func(t *testing.T) {
@@ -174,6 +175,15 @@ func TestQualDRWACandidateExecutingNativeGenesis(t *testing.T) {
 			}
 			meta, ok := headers[nativeCore.MetachainShardId].(*block.MetaBlock)
 			require.True(t, ok)
+			metaHash, err := nativeCore.CalculateHash(coreHandler.InternalMarshalizer(), coreHandler.Hasher(), meta)
+			require.NoError(t, err)
+			domain, err := common.ComputeDRWANetworkDomain([]byte(coreHandler.ChainID()), metaHash, coreHandler.Hasher())
+			require.NoError(t, err)
+			if firstRole {
+				comparisonDomain = append([]byte(nil), domain...)
+			} else {
+				require.Equal(t, comparisonDomain, domain, "shared domain differs on independent role %d", shard)
+			}
 			require.Equal(t, coreHandler.EconomicsData().GenesisTotalSupply(), meta.EpochStart.Economics.TotalSupply)
 			require.Positive(t, meta.EpochStart.Economics.NodePrice.Sign())
 			require.Equal(t, systemConfig.StakingSystemSCConfig.GenesisNodePrice, meta.EpochStart.Economics.NodePrice.String())
