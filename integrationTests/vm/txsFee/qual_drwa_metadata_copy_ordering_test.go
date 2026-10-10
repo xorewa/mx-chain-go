@@ -26,7 +26,7 @@ import (
 // shards. No route finality, deduplication, network propagation, schema/authority
 // acceptance or complete P21/capacity claim follows. Native field versions are
 // rounds, not operation sequence numbers: equal versions use incoming data.
-// Expectations were independently specified before this code in T18 M1-M3.
+// Expectations were independently specified before this code in T18 M1-M3/M6.
 func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 	for _, family := range []string{core.DynamicSFTESDT, core.DynamicMetaESDT} {
 		for _, operation := range []struct {
@@ -35,6 +35,24 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 		}{
 			{core.ESDTMetaDataUpdate, core.ESDTRoleNFTUpdate, esdtMetaDataUpdateTx},
 			{core.ESDTSetNewURIs, core.ESDTRoleSetNewURI, esdtSetNewUrisTx},
+			{core.ESDTMetaDataRecreate, core.ESDTRoleNFTRecreate, esdtMetaDataRecreateTx},
+			{core.ESDTModifyCreator, core.ESDTRoleModifyCreator, esdtModifyCreatorTx},
+			{core.ESDTModifyRoyalties, core.ESDTRoleModifyRoyalties, esdtModifyRoyaltiesTx},
+			{core.BuiltInFunctionESDTNFTUpdateAttributes, core.ESDTRoleNFTUpdateAttributes,
+				func(sender, _ []byte, gas uint64, metadata *MetaData) *transaction.Transaction {
+					attributes, err := hex.DecodeString(string(metadata.Attributes))
+					if err != nil {
+						panic(err) // literal fixture encoding only
+					}
+					return utils.CreateESDTNFTUpdateAttributesTx(0, sender, []byte("tokenId"), gasPrice, gas, attributes)
+				}},
+			{core.BuiltInFunctionESDTNFTAddURI, core.ESDTRoleNFTAddURI,
+				func(sender, receiver []byte, gas uint64, metadata *MetaData) *transaction.Transaction {
+					return &transaction.Transaction{
+						SndAddr: sender, RcvAddr: receiver, GasLimit: gas, GasPrice: gasPrice, Value: big.NewInt(0),
+						Data: bytes.Join([][]byte{[]byte(core.BuiltInFunctionESDTNFTAddURI), metadata.TokenId, metadata.Nonce, metadata.Uris[0], metadata.Uris[1]}, []byte("@")),
+					}
+				}},
 		} {
 			for _, mode := range []struct {
 				name  string
@@ -50,9 +68,12 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 					origin := []byte("12345678901234567890123456789010")
 					holder := []byte("12345678901234567890123456789011")
 					writer := []byte("12345678901234567890123456789014")
+					secondWriter := []byte("12345678901234567890123456789018")
+					positionWriter := operation.name == core.BuiltInFunctionESDTNFTUpdateAttributes || operation.name == core.BuiltInFunctionESDTNFTAddURI
 					token := []byte("tokenId")
 					require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(origin))
 					require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(writer))
+					require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(secondWriter))
 					require.Equal(t, uint32(1), destination.ShardCoordinator.ComputeId(holder))
 					for _, ctx := range []*vm.VMTestContext{source, destination} {
 						require.NoError(t, ctx.BlockchainHook.(process.BlockChainHookHandler).SetCurrentHeader(&block.Header{Round: 1}))
@@ -64,12 +85,17 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 							Data: setTokenTypeTx(core.ESDTSCAddress, 0, token, family).Data,
 						}, vmcommon.Ok, nil)
 					}
-					for _, address := range [][]byte{origin, writer} {
+					for _, address := range [][]byte{origin, writer, secondWriter} {
 						createAccWithBalance(t, source.Accounts, address, big.NewInt(100000000))
 					}
 					createAccWithBalance(t, destination.Accounts, holder, big.NewInt(100000000))
-					utils.SetESDTRoles(t, source.Accounts, origin, token, [][]byte{[]byte(core.ESDTRoleNFTCreate), []byte(core.ESDTRoleNFTAddQuantity)})
+					originRoles := [][]byte{[]byte(core.ESDTRoleNFTCreate), []byte(core.ESDTRoleNFTAddQuantity)}
+					if positionWriter {
+						originRoles = append(originRoles, []byte(operation.role))
+					}
+					utils.SetESDTRoles(t, source.Accounts, origin, token, originRoles)
 					utils.SetESDTRoles(t, source.Accounts, writer, token, [][]byte{[]byte(operation.role)})
+					utils.SetESDTRoles(t, source.Accounts, secondWriter, token, [][]byte{[]byte(operation.role)})
 					qualDRWAMetadataProcess(t, source, createTokenTx(origin, origin, 100000, 3, GetDefaultMetaData()))
 					produce := func() data.TransactionHandler {
 						t.Helper()
@@ -104,17 +130,56 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 						input := GetDefaultMetaData()
 						input.Nonce = []byte("01")
 						input.Attributes = []byte(hex.EncodeToString([]byte(label)))
-						input.Uris = [][]byte{[]byte(hex.EncodeToString([]byte(label + " URI 1"))), []byte(hex.EncodeToString([]byte(label + " URI 2")))}
-						tx := operation.makeTx(writer, writer, 100000, input)
-						tx.Nonce = getAccount(t, source, writer).GetNonce()
+						input.Uris = [][]byte{[]byte(hex.EncodeToString([]byte(label + " URI 1"))), []byte(hex.EncodeToString([]byte(label + " URI 2"))), []byte(hex.EncodeToString([]byte(label + " URI 3")))}
+						activeWriter := writer
+						if positionWriter {
+							activeWriter = origin // keep native positive sender-position prerequisite
+						} else if operation.name == core.ESDTModifyCreator && label == "second" {
+							activeWriter = secondWriter
+						}
+						royalties := int64(20)
+						if label == "second" {
+							royalties = 30
+						}
+						if operation.name == core.ESDTMetaDataRecreate || operation.name == core.ESDTModifyRoyalties {
+							input.Royalties = []byte(hex.EncodeToString(big.NewInt(royalties).Bytes()))
+						}
+						if operation.name == core.ESDTMetaDataRecreate {
+							input.Name = []byte(hex.EncodeToString([]byte(label + " name")))
+							input.Hash = []byte(hex.EncodeToString([]byte(label + " hash")))
+							input.Attributes = []byte(hex.EncodeToString([]byte(label + " attributes")))
+						}
+						tx := operation.makeTx(activeWriter, activeWriter, 100000, input)
+						tx.Nonce = getAccount(t, source, activeWriter).GetNonce()
 						qualDRWAMetadataProcess(t, source, tx)
 						want := &esdt.MetaData{Nonce: 1, Name: []byte("name"), Creator: origin, Royalties: 10,
-							Hash: []byte("hash"), Attributes: []byte("attributes"), URIs: [][]byte{[]byte(label + " URI 1"), []byte(label + " URI 2")}}
-						versions := &esdt.MetaDataVersion{URIs: round}
-						if operation.name == core.ESDTMetaDataUpdate {
+							Hash: []byte("hash"), Attributes: []byte("attributes"), URIs: [][]byte{[]byte("uri")}}
+						versions := &esdt.MetaDataVersion{}
+						switch operation.name {
+						case core.ESDTMetaDataUpdate:
 							want.Creator, want.Attributes = writer, []byte(label)
 							want.URIs = [][]byte{[]byte(label + " URI 1")}
 							versions = &esdt.MetaDataVersion{Name: round, Creator: round, Royalties: round, Hash: round, URIs: round, Attributes: round}
+						case core.ESDTSetNewURIs:
+							want.URIs = [][]byte{[]byte(label + " URI 1"), []byte(label + " URI 2")}
+							versions.URIs = round
+						case core.ESDTMetaDataRecreate:
+							want.Name, want.Creator, want.Royalties = []byte(label+" name"), writer, uint32(royalties)
+							want.Hash, want.Attributes = []byte(label+" hash"), []byte(label+" attributes")
+							want.URIs = [][]byte{[]byte(label + " URI 1"), []byte(label + " URI 2"), []byte(label + " URI 3")}
+							versions = &esdt.MetaDataVersion{Name: round, Creator: round, Royalties: round, Hash: round, URIs: round, Attributes: round}
+						case core.ESDTModifyCreator:
+							want.Creator, versions.Creator = activeWriter, round
+						case core.ESDTModifyRoyalties:
+							want.Royalties, versions.Royalties = uint32(royalties), round
+						case core.BuiltInFunctionESDTNFTUpdateAttributes:
+							want.Attributes, versions.Attributes = []byte(label), round
+						case core.BuiltInFunctionESDTNFTAddURI:
+							want.URIs = append(want.URIs, []byte("first URI 1"), []byte("first URI 2"))
+							if label == "second" {
+								want.URIs = append(want.URIs, []byte("second URI 1"), []byte("second URI 2"))
+							}
+							versions.URIs = round
 						}
 						actual := read(source, origin)
 						require.Equal(t, want, actual.TokenMetaData)
