@@ -5,6 +5,7 @@ import (
 
 	nativeCore "github.com/multiversx/mx-chain-core-go/core"
 	hashFactory "github.com/multiversx/mx-chain-core-go/hashing/factory"
+	"github.com/multiversx/mx-chain-core-go/marshal"
 	marshalFactory "github.com/multiversx/mx-chain-core-go/marshal/factory"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/chainparametersnotifier"
@@ -17,6 +18,7 @@ import (
 	"github.com/multiversx/mx-chain-go/epochStart/notifier"
 	factoryBlock "github.com/multiversx/mx-chain-go/factory/block"
 	"github.com/multiversx/mx-chain-go/process"
+	"github.com/multiversx/mx-chain-go/process/guardian"
 	"github.com/multiversx/mx-chain-go/sharding"
 )
 
@@ -133,9 +135,14 @@ func validateDRWAStartupConfigs(cfg config.Config, rounds process.RoundNotifier)
 			return err
 		}
 	}
-	for _, name := range []string{cfg.Marshalizer.Type, cfg.VmMarshalizer.Type, cfg.TxSignMarshalizer.Type} {
-		if _, err := marshalFactory.NewMarshalizer(name); err != nil {
+	var internalMarshalizer marshal.Marshalizer
+	for index, name := range []string{cfg.Marshalizer.Type, cfg.VmMarshalizer.Type, cfg.TxSignMarshalizer.Type} {
+		marshaller, err := marshalFactory.NewMarshalizer(name)
+		if err != nil {
 			return err
+		}
+		if index == 0 {
+			internalMarshalizer = marshaller
 		}
 	}
 	for _, pubkeyCfg := range []config.PubkeyConfig{cfg.AddressPubkeyConverter, cfg.ValidatorPubkeyConverter} {
@@ -144,6 +151,11 @@ func validateDRWAStartupConfigs(cfg config.Config, rounds process.RoundNotifier)
 		}
 	}
 	gs := cfg.GeneralSettings
+	// E05 also binds the actual bootstrap guardian-delay consumer. Reuse its
+	// constructor and native error; this local notifier starts no runtime.
+	if _, err := guardian.NewGuardedAccount(internalMarshalizer, forking.NewGenericEpochNotifier(), gs.SetGuardianEpochsDelay); err != nil {
+		return err
+	}
 	if _, err := graceperiod.NewEpochChangeGracePeriod(gs.EpochChangeGracePeriodByEpoch); err != nil {
 		return err
 	}
