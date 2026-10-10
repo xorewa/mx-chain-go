@@ -32,7 +32,7 @@ type DRWAConfigurationSupport struct {
 	RegisterMetaESDTPath bool
 }
 
-// DRWAConfigurationCandidate retains native handlers built from actual files.
+// DRWAConfigurationCandidate retains native handlers built from native inputs.
 // This unwired T09 component checks the E05 minimum and the existing native
 // startup tuple. It does not admit a profile, validate the entire node startup,
 // appoint authorities, launch a node, or grant an enforcement capability.
@@ -79,21 +79,48 @@ func LoadDRWAConfigurationCandidate(paths config.ConfigurationPathsHolder, overl
 	if err != nil {
 		return nil, err
 	}
-	epochs, err := enablers.NewEnableEpochsHandler(epoch.EnableEpochs, forking.NewGenericEpochNotifier())
+	return NewDRWAConfigurationCandidate(&config.Configs{GeneralConfig: main,
+		EpochConfig: epoch, RoundConfig: round, EconomicsConfig: economics, RatingsConfig: ratings},
+		*drwa.DRWAEnforcementEnableEpoch, support)
+}
+
+// NewDRWAConfigurationCandidate validates the effective native objects supplied
+// AFTER the startup owner's preferences and CLI overrides. It never reloads
+// earlier file values or applies overrides itself. These are the five consumed
+// objects, not a proof of complete startup provenance or configuration admission.
+// The caller must serialize and finish its changes before validation; a later
+// modification requires a fresh candidate and the owning admission checks.
+func NewDRWAConfigurationCandidate(configs *config.Configs, enforcement uint32,
+	support DRWAConfigurationSupport) (*DRWAConfigurationCandidate, error) {
+	if configs == nil || configs.GeneralConfig == nil || configs.EpochConfig == nil ||
+		configs.RoundConfig == nil || configs.EconomicsConfig == nil || configs.RatingsConfig == nil {
+		return nil, fmt.Errorf("missing DRWA effective configuration inputs")
+	}
+	main := *configs.GeneralConfig
+	// NewHeaderVersionHandler sorts its supplied slice in place. Validate a
+	// private slice while retaining the original effective startup object/order.
+	main.Versions.VersionsByEpochs = append([]config.VersionByEpochs(nil), main.Versions.VersionsByEpochs...)
+	// LoadMainConfig runs these native shape checks before preferences/CLI
+	// overrides. Repeat their existing composition on the final objects.
+	// This is no proof of authentic predecessor history or recovery admission.
+	if _, err := common.NewConfiguredRoundExclusionHandler(&main); err != nil {
+		return nil, err
+	}
+	epochs, err := enablers.NewEnableEpochsHandler(configs.EpochConfig.EnableEpochs, forking.NewGenericEpochNotifier())
 	if err != nil {
 		return nil, err
 	}
 	roundNotifier := forking.NewGenericRoundNotifier()
-	rounds, err := enablers.NewEnableRoundsHandler(*round, roundNotifier)
+	rounds, err := enablers.NewEnableRoundsHandler(*configs.RoundConfig, roundNotifier)
 	if err != nil {
 		return nil, err
 	}
-	if err = validateDRWAStartupConfigs(*main, roundNotifier); err != nil {
+	if err = validateDRWAStartupConfigs(main, roundNotifier); err != nil {
 		return nil, err
 	}
 	// Reuse the WHOLE native cross-file tuple validation, including every epoch
 	// and round table, versions, economics, ratings and round-duration changes.
-	if err = validateSupernovaActivationTuple(*main, *economics, *ratings,
+	if err = validateSupernovaActivationTuple(main, *configs.EconomicsConfig, *configs.RatingsConfig,
 		epochs.GetActivationEpoch(common.SupernovaFlag), rounds.GetActivationRound(common.SupernovaRoundFlag)); err != nil {
 		return nil, err
 	}
@@ -112,11 +139,11 @@ func LoadDRWAConfigurationCandidate(paths config.ConfigurationPathsHolder, overl
 	if err != nil {
 		return nil, err
 	}
-	if err = validateSupernovaActivationTuple(*main, *economics, *ratings,
+	if err = validateSupernovaActivationTuple(main, *configs.EconomicsConfig, *configs.RatingsConfig,
 		epochs.GetActivationEpoch(common.SupernovaFlag), rounds.GetActivationRound(common.SupernovaRoundFlag)); err != nil {
 		return nil, err
 	}
-	candidate := &DRWAConfigurationCandidate{enforcement: *drwa.DRWAEnforcementEnableEpoch,
+	candidate := &DRWAConfigurationCandidate{enforcement: enforcement,
 		epochs: epochs, rounds: rounds, support: support}
 	if err = candidate.checkPrerequisites(candidate.enforcement); err != nil {
 		return nil, err
