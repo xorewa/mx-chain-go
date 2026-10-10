@@ -31,9 +31,7 @@ import (
 // No node/core Create, genesis execution, WASM call or deployment occurs.
 func qualDRWACandidateGenesisPath(t *testing.T, name string) string {
 	t.Helper()
-	p, err := filepath.Abs(filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_03", name))
-	require.NoError(t, err)
-	return p
+	return filepath.Join(qualDRWACandidateFixtureDir(t), name)
 }
 
 func qualDRWACandidateGenesisArgs(t *testing.T) genesis.AccountsParserArgs {

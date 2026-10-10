@@ -35,7 +35,7 @@ import (
 // inherited fee double is explicit: no fee, action permission, network submission,
 // actual builtin execution, whole startup or all-route crawler proof is claimed.
 func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
-	candidate := filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_03")
+	candidate := qualDRWACandidateFixtureDir(t)
 	cfg, err := common.LoadMainConfig(filepath.Join(candidate, "config.toml"))
 	require.NoError(t, err)
 	epochCfg, err := common.LoadEpochConfig(filepath.Join(candidate, "enableEpochs.toml"))

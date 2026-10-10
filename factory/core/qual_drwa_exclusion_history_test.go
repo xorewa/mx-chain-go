@@ -19,8 +19,9 @@ import (
 func qualDRWAHistoryFiles(t *testing.T) (config.ConfigurationPathsHolder, string) {
 	t.Helper()
 	dir := t.TempDir()
+	fixture := qualDRWACandidateFixtureDir(t)
 	for _, name := range []string{"config.toml", "enableEpochs.toml", "enableRounds.toml", "economics.toml", "ratings.toml", "drwa.toml"} {
-		body, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_02", name))
+		body, err := os.ReadFile(filepath.Join(fixture, name))
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), body, 0600))
 	}

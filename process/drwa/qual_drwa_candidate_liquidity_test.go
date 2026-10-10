@@ -203,7 +203,7 @@ func TestQualDRWACandidateLiquidityGates(t *testing.T) {
 }
 
 func TestQualDRWACandidateLiquidityLoadedProposal(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_02", "enableEpochs.toml")
+	path := filepath.Join(qualDRWACandidateFixtureDir(t), "enableEpochs.toml")
 	cfg, err := common.LoadEpochConfig(path)
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), cfg.EnableEpochs.OptimizeNFTStoreEnableEpoch)

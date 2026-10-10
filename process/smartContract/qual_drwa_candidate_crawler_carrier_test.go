@@ -28,7 +28,7 @@ import (
 // These tests do not authenticate VM output or execute a contract/token effect.
 func qualDRWACandidateCrawlerProcessor(t *testing.T, shardID, epoch uint32) (*scProcessor, [][]byte) {
 	t.Helper()
-	candidate := filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_03")
+	candidate := qualDRWACandidateFixtureDir(t)
 	cfg, err := common.LoadMainConfig(filepath.Join(candidate, "config.toml"))
 	require.NoError(t, err)
 	epochs, err := common.LoadEpochConfig(filepath.Join(candidate, "enableEpochs.toml"))

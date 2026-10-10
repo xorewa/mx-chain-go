@@ -34,7 +34,7 @@ import (
 // is explicitly a double that writes ONLY through the supplied wrapper. This
 // proves no actual VM/builtin/transaction effect or whole-factory API isolation.
 func TestQualDRWACandidateSimulationTrieIsolation(t *testing.T) {
-	candidate := filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_03")
+	candidate := qualDRWACandidateFixtureDir(t)
 	cfg, err := common.LoadMainConfig(filepath.Join(candidate, "config.toml"))
 	require.NoError(t, err)
 	epochCfg, err := common.LoadEpochConfig(filepath.Join(candidate, "enableEpochs.toml"))

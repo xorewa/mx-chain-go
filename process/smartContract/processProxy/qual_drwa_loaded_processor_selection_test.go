@@ -119,8 +119,8 @@ func TestQualDRWAProcessorCurrentEpochRegistration(t *testing.T) {
 }
 
 func TestQualDRWAProcessorProposedCandidate(t *testing.T) {
-	// Bound external qualification input, not a selected release default.
-	path := "../../../../../evidence/sp1_t09_configuration_candidate_02/enableEpochs.toml"
+	// Immutable public qualification fixture, not a selected release default.
+	path := filepath.Join(qualDRWACandidateFixtureDir(t), "enableEpochs.toml")
 	cfg := qualDRWAProcessorLoadedConfig(t, path)
 	require.Equal(t, uint32(1), cfg.EnableEpochs.SCProcessorV2EnableEpoch)
 	notifier := forking.NewGenericEpochNotifier()
