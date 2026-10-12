@@ -2,6 +2,7 @@ package processorV2
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -19,6 +20,10 @@ import (
 	"github.com/multiversx/mx-chain-go/common/forking"
 	"github.com/multiversx/mx-chain-go/process/smartContract"
 	"github.com/multiversx/mx-chain-go/sharding"
+	"github.com/multiversx/mx-chain-go/state/accounts"
+	"github.com/multiversx/mx-chain-go/testscommon"
+	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
+	"github.com/multiversx/mx-chain-go/testscommon/trie"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 	"github.com/stretchr/testify/require"
@@ -144,6 +149,124 @@ func TestQualDRWACandidateCrawlerPostTransferScope(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, dispatch.isSCCallSelfShard, "native dispatch predicate only; no contract executed")
 			})
+		}
+	}
+}
+
+// T09 M40: direct native code-install guard characterization. The account and
+// VM output are synthetic; this does not prove authentic origins or admission.
+func TestQualDRWACandidateCrawlerCodeInstallGuard(t *testing.T) {
+	for _, epoch := range []uint32{0, 3} {
+		for _, shard := range []uint32{0, 1, 2, core.MetachainShardId} {
+			for _, existingCode := range []bool{false, true} {
+				for _, control := range []bool{false, true} {
+					t.Run(fmt.Sprintf("epoch_%d_shard_%d_existing_%t_control_%t", epoch, shard, existingCode, control), func(t *testing.T) {
+						sc, crawlers := qualDRWACandidateCrawlerProcessor(t, shard, epoch)
+						target := append([]byte(nil), core.SystemAccountAddress...)
+						if shard != core.MetachainShardId {
+							target = append([]byte(nil), crawlers[shard]...)
+						}
+						if control {
+							target = make([]byte, 32)
+							target[8] = 5
+							target[31] = byte(shard)
+						}
+						require.Equal(t, control, core.IsSmartContractAddress(target))
+
+						account, err := accounts.NewUserAccount(target, &trie.DataTrieTrackerStub{}, &trie.TrieLeafParserStub{})
+						require.NoError(t, err)
+						require.NoError(t, account.AddToBalance(big.NewInt(17)))
+						account.IncreaseNonce(9)
+						account.SetUserName([]byte("preserved_name"))
+						account.SetRootHash([]byte("preserved_root"))
+						account.AddToDeveloperReward(big.NewInt(3))
+						owner := make([]byte, 32)
+						owner[0] = 0x42
+						owner[31] = byte(shard)
+						oldCode := []byte(nil)
+						oldMetadata := vmcommon.CodeMetadata{Upgradeable: true}
+						if existingCode {
+							oldCode = []byte("synthetic_existing_code")
+							account.SetCode(oldCode)
+							account.SetCodeHash([]byte("preserved_code_hash"))
+							account.SetCodeMetadata(oldMetadata.ToBytes())
+							account.SetOwnerAddress(owner)
+						}
+						beforeAccount, err := account.Marshal()
+						require.NoError(t, err)
+						beforeCode := append([]byte(nil), account.GetCode()...)
+						beforeNewCode := account.HasNewCode()
+
+						newMetadata := vmcommon.CodeMetadata{Upgradeable: true, Readable: true}
+						outputAccount := &vmcommon.OutputAccount{
+							Address: target, Code: []byte("synthetic_proposed_code"),
+							CodeMetadata: newMetadata.ToBytes(), CodeDeployerAddress: owner,
+							Nonce: 19, BalanceDelta: big.NewInt(0),
+						}
+						priorLog := &vmcommon.LogEntry{Identifier: []byte("preserved_log"), Address: []byte("preserved_address")}
+						output := &vmcommon.VMOutput{
+							ReturnCode: vmcommon.Ok, ReturnMessage: "preserved_result", GasRemaining: 23,
+							OutputAccounts: map[string]*vmcommon.OutputAccount{string(target): outputAccount},
+							Logs:           []*vmcommon.LogEntry{priorLog},
+						}
+						beforeOutput, err := json.Marshal(output)
+						require.NoError(t, err)
+						filters, codeReads := 0, 0
+						sc.blockChainHook = &testscommon.BlockChainHookStub{
+							FilterCodeMetadataForUpgradeCalled: func(metadata []byte) ([]byte, error) {
+								filters++
+								return append([]byte(nil), metadata...), nil
+							},
+						}
+						sc.accounts = &stateMock.AccountsStub{GetCodeCalled: func(_ []byte) []byte {
+							codeReads++
+							return append([]byte(nil), oldCode...)
+						}}
+						sc.pubkeyConv = createMockPubkeyConverter()
+
+						processor := &VMOutputAccountsProcessor{sc: sc}
+						entry, err := processor.updateSmartContractCodeStep(output, account, outputAccount)
+						require.NoError(t, err)
+						if !control {
+							require.Nil(t, entry)
+							require.Zero(t, filters)
+							require.Zero(t, codeReads)
+							afterAccount, marshalErr := account.Marshal()
+							require.NoError(t, marshalErr)
+							require.Equal(t, beforeAccount, afterAccount)
+							require.Equal(t, beforeCode, account.GetCode())
+							require.Equal(t, beforeNewCode, account.HasNewCode())
+							afterOutput, marshalErr := json.Marshal(output)
+							require.NoError(t, marshalErr)
+							require.Equal(t, beforeOutput, afterOutput)
+							return
+						}
+
+						require.NotNil(t, entry)
+						require.Equal(t, 1, filters)
+						require.Equal(t, 2, codeReads)
+						require.Equal(t, outputAccount.Code, account.GetCode())
+						require.Equal(t, newMetadata.ToBytes(), account.GetCodeMetadata())
+						require.Equal(t, owner, account.GetOwnerAddress())
+						require.True(t, account.HasNewCode())
+						wantIdentifier := core.SCDeployIdentifier
+						if existingCode {
+							wantIdentifier = core.SCUpgradeIdentifier
+						}
+						require.Equal(t, []byte(wantIdentifier), entry.Identifier)
+						require.Equal(t, target, entry.Address)
+						require.Equal(t, [][]byte{target, owner}, entry.Topics)
+						require.Len(t, output.Logs, 2)
+						require.Same(t, priorLog, output.Logs[0])
+						require.Same(t, entry, output.Logs[1])
+						require.Equal(t, big.NewInt(17), account.GetBalance())
+						require.Equal(t, uint64(9), account.GetNonce())
+						require.Equal(t, []byte("preserved_name"), account.GetUserName())
+						require.Equal(t, []byte("preserved_root"), account.GetRootHash())
+						require.Equal(t, big.NewInt(3), account.GetDeveloperReward())
+					})
+				}
+			}
 		}
 	}
 }
