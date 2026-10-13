@@ -22,11 +22,13 @@ import (
 // exercised; genesis provenance, complete profile and activation remain owed.
 func qualDRWADevelopmentMinimumGenesis(t *testing.T) minimumGenesis {
 	t.Helper()
-	dir := filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_needed_2026-10-13_02")
+	dir := filepath.Join("..", "..", "testscommon", "testdata", "drwa", "t09", "selection")
 	profile, err := os.ReadFile(filepath.Join(dir, "N05_MINIMUM_PROFILE.json"))
 	require.NoError(t, err)
 	release, err := os.ReadFile(filepath.Join(dir, "N05_GENESIS_RELEASE.json"))
 	require.NoError(t, err)
+	require.Equal(t, "4b6ea25ea85139c2eeb38e4cae88bc89a3d9d61b231c938aaf4bc27f0b369c93", fmt.Sprintf("%x", sha256.Sum256(profile)))
+	require.Equal(t, "f661cb84386a80dd6547b3c7eaa166da3886e74f15591a5ec382e191c365931d", fmt.Sprintf("%x", sha256.Sum256(release)))
 	var selected struct {
 		MaxEver    uint64 `json:"max_ever_regulated_tokens"`
 		ProofBytes uint64 `json:"registry_proof_bytes"`

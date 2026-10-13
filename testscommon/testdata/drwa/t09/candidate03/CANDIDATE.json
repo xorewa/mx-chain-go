@@ -1,0 +1,185 @@
+{
+  "status": "PROPOSED_DEVELOPMENT_CANDIDATE_NOT_ADMITTED",
+  "manifest": "evidence/sp1_t09_genesis_2026-10-09/ASSEMBLY_MANIFEST_03.json",
+  "manifest_sha256": "9fe76a0cd29408775a9da9c330e298da7299e71f4f0f1beffd1c33b6bd45fe96",
+  "assembler_sha256": "e3c2eefd54b16ae62c8c50f7adc21948a2c99f6944369ee28527a34cd188519e",
+  "files": [
+    {
+      "path": "api.toml",
+      "sha256": "36ab661c8880f2b0ff8ebd0220e2b7a6250bec425e4b53ecd4fb17d53d7c4e5d",
+      "bytes": 16423
+    },
+    {
+      "path": "config.toml",
+      "sha256": "8b78bd27e2f7b9d81a885f319e8855f3f6741182edfd2d2d5636976eb5e41635",
+      "bytes": 50711
+    },
+    {
+      "path": "drwa.toml",
+      "sha256": "c0ca19a7b6fadf6322dcacd95fe47da6d8cbf91165e41a4a92d8fec4bbb80358",
+      "bytes": 108
+    },
+    {
+      "path": "economics.toml",
+      "sha256": "72fff420a14fa79f4af49a0bdf177198e869ed6dc1f31decb88c9ab24b5fc64e",
+      "bytes": 4159
+    },
+    {
+      "path": "enableEpochs.toml",
+      "sha256": "b1ac9bc61a7eb19c3e9b0d4e7e4860921df6b25520094f462282ccb0e84eb9c8",
+      "bytes": 22291
+    },
+    {
+      "path": "enableRounds.toml",
+      "sha256": "67bbdd5d59ce7f4d634d2082fe275dc4e86505aba918d098d8c0ee44d67f3e87",
+      "bytes": 861
+    },
+    {
+      "path": "external.toml",
+      "sha256": "3cbdba978c71d74646adcd9add445191b423e59d6284eca2bff103f1905f5279",
+      "bytes": 4043
+    },
+    {
+      "path": "fullArchiveP2P.toml",
+      "sha256": "25a206cb658c9c152e3746880ed03d38fc33d03b85697b58a1dfec2871db49ca",
+      "bytes": 4940
+    },
+    {
+      "path": "gasSchedules/gasScheduleV1.toml",
+      "sha256": "02d57b7e942ada25a83a0d57477e9675d53d58d533e9ae69a25498ca025a9b09",
+      "bytes": 21472
+    },
+    {
+      "path": "gasSchedules/gasScheduleV2.toml",
+      "sha256": "5c8c5c1efb64cc61268f90a549dd973b8daa2d4510c9151786f7b7ee86ebf4f5",
+      "bytes": 21564
+    },
+    {
+      "path": "gasSchedules/gasScheduleV3.toml",
+      "sha256": "53aaff919ccbbda96d8052c17fc85278f6e5006b3242749eb7916fcbb1494fad",
+      "bytes": 21621
+    },
+    {
+      "path": "gasSchedules/gasScheduleV4.toml",
+      "sha256": "ebef4bbab2c89eb65d52c1d6145ab5fafe902bcfa6d06cfe282d2adbba4bf6b5",
+      "bytes": 21596
+    },
+    {
+      "path": "gasSchedules/gasScheduleV5.toml",
+      "sha256": "2bff51830e14257e741386069082a9e2f62cbd3a6c62368533478964443b079b",
+      "bytes": 21604
+    },
+    {
+      "path": "gasSchedules/gasScheduleV6.toml",
+      "sha256": "3d967edfe87199b344ae17d8b9f127db16fa653f2b2bf60f87845d7186f58c88",
+      "bytes": 22735
+    },
+    {
+      "path": "gasSchedules/gasScheduleV7.toml",
+      "sha256": "32b1597d8f96c40a5fc6446afb202d67bd2e93b036ce661bc4a6ef83af911a58",
+      "bytes": 23432
+    },
+    {
+      "path": "gasSchedules/gasScheduleV8.toml",
+      "sha256": "acceafc19c462bb902e04c9e007fb0f4b736ea6b8b6921c6d178bb6b977cec4e",
+      "bytes": 23459
+    },
+    {
+      "path": "gasSchedules/gasScheduleV9.toml",
+      "sha256": "817be1f854faf9082f9f254a3596bfb7ee409fae1b5fc82ad2bbbaedd804b230",
+      "bytes": 23636
+    },
+    {
+      "path": "genesis.json",
+      "sha256": "a771f5c90de455d3e06e22031a370ce9b77a419e3ca5abffd53447b8e8bc0d75",
+      "bytes": 10334
+    },
+    {
+      "path": "genesisContracts/delegation.wasm",
+      "sha256": "5f27d31e8dfccc2eca10c773d5a713ff60959e3a608e4cf7a9d4fc836125e02c",
+      "bytes": 57293
+    },
+    {
+      "path": "genesisContracts/dns.wasm",
+      "sha256": "25d0d0ae4c9c1dacf58b6a0266b7ae80a97b8471f99bb0c1ffff2109dfb966f3",
+      "bytes": 9740
+    },
+    {
+      "path": "genesisSmartContracts.json",
+      "sha256": "14b9917d0da6b95e72280b2e399722d795a85045b1fb7360d553ed8ab17010c1",
+      "bytes": 713
+    },
+    {
+      "path": "nodesSetup.json",
+      "sha256": "584ec62ab8b8542aecc019a8cd11a8d513df8ce6fa972c64ebddbfad26fc3526",
+      "bytes": 12215
+    },
+    {
+      "path": "p2p.toml",
+      "sha256": "b2ca3f214a76455b394b307616bd4d8ebaf9141b084982ea7aa250cc9dfa80eb",
+      "bytes": 5017
+    },
+    {
+      "path": "prefs.toml",
+      "sha256": "fdc3c0e8d1048c1b81894dff9925ec0107faa8ca17166043fe3264aa8c615253",
+      "bytes": 5005
+    },
+    {
+      "path": "ratings.toml",
+      "sha256": "b79d017e8447856f097d7e17adb3ec52e8bdcbc8b34ec75bac91baf4e99bbaf4",
+      "bytes": 3356
+    },
+    {
+      "path": "systemSmartContractsConfig.toml",
+      "sha256": "7076576029de787f201bf6528189db51994983518c3de9300d6f95c09954ec97",
+      "bytes": 2463
+    }
+  ],
+  "proposal": {
+    "purpose": "Offline SP1 candidate preparation for eventual three-shard development configuration; no node launch",
+    "generator_commit": "dd1ca6169298116182b33235b62a1ffc731fdf9e",
+    "public_generator_output": "evidence/t09_configuration_candidate_review_2026-10-09/generator_public_fixture_01",
+    "node_base": "06c383cf316ab391d60695a4eeb7c085fb40232b",
+    "DRWAEnforcementEnableEpoch": 3,
+    "SupernovaEnableEpoch": 2,
+    "SupernovaEnableRound": 440,
+    "processor": "V2 at DRWA enforcement; V1 exclusion remains proposed",
+    "relayed_v3": "supported candidate with four prerequisite fixes active before enforcement",
+    "families": "all seven retained; no family exclusion proposed",
+    "crawler_addresses": [
+      "erd1qyqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqquwsrdr",
+      "erd1ym5ftr7zkgnmq3wr7jyl9muc7r2altq960rrxwd38qpgsm2nlszs8epryy",
+      "erd1cutk5upafhvylw3updmq6yr8pu4zq5l69suue3jwcl7h0y4vqdaq246cn7"
+    ],
+    "geometry": "explicit previously exercised table; native constructor must reproduce 3 shards from 36 nodes",
+    "basis": "A E05 597-644; B 582-586; Plan 474; ledger L35/L36/L46",
+    "classification": "native public generator output plus pinned current-node template/geometry copy and explicit DRWA/crawler overlay. This is a proposed generation construction, not execution of scripts/testnet.",
+    "register_meta_esdt_path": false,
+    "MetaESDTSetEnableEpoch_applicability": {
+      "status": "NOT_APPLICABLE",
+      "scope": "Current protected DRWA registration construction; all seven families retained",
+      "source_reason": "DRWA registerDRWATokenLocked directly calls createNewToken, drwaRegistration.go L111-135. Pinned esdt.go createNewToken L672-721 has no MetaESDTSetFlag gate; registerMetaESDT L419 does. Native value 1 remains recorded for ordinary native routes; neither family exclusion nor ordinary behavior change. Revisit with T10 discovery of any supported DRWA registerMetaESDT path.",
+      "node_base": "06c383cf316ab391d60695a4eeb7c085fb40232b",
+      "native_esdt_sha256": "c76d95522def562ee021a14fc6f8ab43c2a7b437813f66196d273afee7656983",
+      "drwa_creation_sha256": "9c65ec6bc235b84a13797539e202455938916bf9fd6d739c814f3f6553d80a57"
+    },
+    "genesis_code_paths": {
+      "classification": "Pinned native WASM adopted unchanged; bound absolute offline candidate paths",
+      "native_source": "multiversx/mx-chain-go 06c383cf316ab391d60695a4eeb7c085fb40232b cmd/node/config/genesisContracts",
+      "scope": "Native file parser compatibility only, no execution/deployment"
+    },
+    "supersedes_candidate": {
+      "path": "evidence/sp1_t09_configuration_candidate_02/CANDIDATE.json",
+      "sha256": "7821e5e70dfa3308c4a4954916a8d31d72898f436240a4c8c7a8e4d7d334a3f2",
+      "reason": "Include two exact native WASM file inputs and explicit local path binding; keep every other candidate payload byte identical"
+    }
+  },
+  "missing": [
+    "Complete minimum supported DRWA profile and genesis parameter construction/admission (max_ever_regulated_tokens, DRWAPlaneState and other first-consumer bounds)",
+    "Complete startup/route/processor/relay and later supported transition proofs",
+    "Crawler every-route successful-invocation proof rebound to these loaded bytes",
+    "Competent U0 historical reconciliation disposition",
+    "Owner acceptance of exact values/generation construction after batch audit"
+  ],
+  "authority": "L46 development only"
+}

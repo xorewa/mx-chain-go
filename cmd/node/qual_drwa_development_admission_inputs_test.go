@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -29,18 +30,22 @@ import (
 // Only public filenames relocate into test-owned storage. No key is copied.
 func qualDRWADevelopmentCandidateInputs(t *testing.T) string {
 	t.Helper()
-	source, err := filepath.Abs(filepath.Join("..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_03"))
+	source, err := filepath.Abs(filepath.Join("..", "..", "testscommon", "testdata", "drwa", "t09", "candidate03"))
 	require.NoError(t, err)
 	var inventory struct {
 		Files []struct{ Path, SHA256 string }
 	}
 	body, err := os.ReadFile(filepath.Join(source, "CANDIDATE.json"))
 	require.NoError(t, err)
+	require.Equal(t, "e3921e16c3f442caed9678513e8f32b66012c9b80f02f28490eab7cebe4c178c", fmt.Sprintf("%x", sha256.Sum256(body)))
 	require.NoError(t, json.Unmarshal(body, &inventory))
 	root := t.TempDir()
 	for _, item := range inventory.Files {
 		require.NotEmpty(t, item.Path)
 		require.False(t, filepath.IsAbs(item.Path))
+		require.Equal(t, item.Path, filepath.Clean(item.Path))
+		require.NotEqual(t, "..", item.Path)
+		require.False(t, strings.HasPrefix(item.Path, ".."+string(filepath.Separator)))
 		raw, err := os.ReadFile(filepath.Join(source, item.Path))
 		require.NoError(t, err)
 		require.Equal(t, item.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
@@ -56,8 +61,15 @@ func qualDRWADevelopmentCandidateInputs(t *testing.T) string {
 	for _, contract := range contracts {
 		filename, ok := contract["filename"].(string)
 		require.True(t, ok)
-		require.Equal(t, filepath.Join(source, "genesisContracts"), filepath.Dir(filename))
-		contract["filename"] = filepath.Join(root, "genesisContracts", filepath.Base(filename))
+		// Absolute generator locators are preserved in the hash-bound fixture as
+		// provenance. Only the inventoried local code file can be consumed here.
+		localCode := filepath.Join("genesisContracts", filepath.Base(filename))
+		bound := false
+		for _, item := range inventory.Files {
+			bound = bound || item.Path == localCode
+		}
+		require.True(t, bound)
+		contract["filename"] = filepath.Join(root, localCode)
 	}
 	raw, err := json.Marshal(contracts)
 	require.NoError(t, err)

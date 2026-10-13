@@ -1,7 +1,10 @@
 package processProxy
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -20,8 +23,28 @@ import (
 // Runtime upgrade/relay/finality qualification is not inferred from this matrix.
 func qualDRWADevelopmentScheduleConfig(t *testing.T) *config.Configs {
 	t.Helper()
-	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "..", "..", "evidence", "sp1_t09_configuration_candidate_03"))
+	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "testscommon", "testdata", "drwa", "t09", "candidate03"))
 	require.NoError(t, err)
+	body, err := os.ReadFile(filepath.Join(dir, "CANDIDATE.json"))
+	require.NoError(t, err)
+	require.Equal(t, "e3921e16c3f442caed9678513e8f32b66012c9b80f02f28490eab7cebe4c178c", fmt.Sprintf("%x", sha256.Sum256(body)))
+	var inventory struct {
+		Files []struct{ Path, SHA256 string }
+	}
+	require.NoError(t, json.Unmarshal(body, &inventory))
+	for _, name := range []string{"config.toml", "enableEpochs.toml", "enableRounds.toml", "economics.toml", "ratings.toml"} {
+		bound := false
+		for _, item := range inventory.Files {
+			if item.Path != name {
+				continue
+			}
+			raw, readErr := os.ReadFile(filepath.Join(dir, name))
+			require.NoError(t, readErr)
+			require.Equal(t, item.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
+			bound = true
+		}
+		require.True(t, bound, name)
+	}
 	main, err := common.LoadMainConfig(filepath.Join(dir, "config.toml"))
 	require.NoError(t, err)
 	epochs, err := common.LoadEpochConfig(filepath.Join(dir, "enableEpochs.toml"))

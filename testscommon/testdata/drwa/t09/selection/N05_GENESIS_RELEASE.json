@@ -1,0 +1,11 @@
+{
+  "status": "experimental genesis release identity; no release/source/format acceptance",
+  "source_head": "3240812aa7de42f8b139f0f583701d07936573a0",
+  "profile_sha256": "4b6ea25ea85139c2eeb38e4cae88bc89a3d9d61b231c938aaf4bc27f0b369c93",
+  "architecture_sha256": "d2f6ea1d4036c32e8778da53f135961de91cf0d8576c930fb0dd76651e1c7831",
+  "purpose": "bind deterministic offline genesis experiment; no canonical genesis or deployment claim",
+  "source_files": {
+    "process/drwa/minimumGenesis.go": "31cafda704539f14d9b6f226facb5f579af1627e449e66cafc352081ff2d55df",
+    "process/drwa/qual_drwa_development_minimum_genesis_test.go": "8f67685dd126e14d000101a51648fd6c058c16481761b1f4c324de4302530d72"
+  }
+}

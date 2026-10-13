@@ -1,0 +1,27 @@
+{
+  "status": "experimental selection under R7; not operational admission",
+  "first_consumer": "T41 pre-effect classification after T10 route inventory; no consumer installed",
+  "oracles": [
+    "T09-M8"
+  ],
+  "candidate": {
+    "path": "/home/magnus/Desktop/Desk/WIP/1. Team/Dir/RWA/NewArc/3m/evidence/sp1_t09_configuration_candidate_03/CANDIDATE.json",
+    "sha256": "e3921e16c3f442caed9678513e8f32b66012c9b80f02f28490eab7cebe4c178c",
+    "snapshot": "/home/magnus/Desktop/Desk/WIP/1. Team/Dir/RWA/NewArc/3m/evidence/sp1_t09_needed_2026-10-13_02/reads/290a86b6ad8fc155.e3921e16c3f442caed9678513e8f32b66012c9b80f02f28490eab7cebe4c178c",
+    "line_count": 185
+  },
+  "processor_support": {
+    "V1_at_enforcement": false,
+    "V2_at_enforcement": true,
+    "relayV3": true
+  },
+  "token_families": "all seven architecture-required families retained; no ordinary family excluded",
+  "max_ever_regulated_tokens": 64,
+  "registry_proof_bytes": 1048576,
+  "plane": {
+    "state": "NORMAL",
+    "transition_id": 0
+  },
+  "later_profile_obligations": "Full endpoints/gas/authorities/schema/certificate/roster/bootstrap/mode/resource qualification remains owed before its owning consumer",
+  "replace_before": "testnet admission"
+}
