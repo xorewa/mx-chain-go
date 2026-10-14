@@ -100,6 +100,19 @@ func (r *currentLocalDependencies) referenceKey(ref currentLocalReference) ([]by
 	return append([]byte(currentLocalDependencyPrefix), identity...), nil
 }
 
+func (r *currentLocalDependencies) unchanged(view *currentLocalView) error {
+	for i, key := range view.keys {
+		value, err := r.read(key)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(value, view.materials[i]) {
+			return errCurrentLocalDependency
+		}
+	}
+	return nil
+}
+
 func (r *currentLocalDependencies) resolve(token []byte, epoch uint64, hash []byte) (*currentLocalView, error) {
 	if len(token) > r.codec.maxBytes || !vmcommon.ValidateToken(token) || len(hash) != r.codec.hasher.Size() {
 		return nil, errCurrentLocalDependency
@@ -134,11 +147,19 @@ func (r *currentLocalDependencies) resolve(token []byte, epoch uint64, hash []by
 	if !bytes.Equal(r.codec.hasher.Compute(string(body)), hash) {
 		return nil, errCurrentLocalDependency
 	}
+	view := &currentLocalView{owner: r, token: token, hash: hash, pointer: pointer, body: body, epoch: epoch,
+		keys: [][]byte{pointerKey, bodyKey}, materials: [][]byte{pointer, body}}
 	if err = r.host.VerifyCurrent(bytes.Clone(token), bytes.Clone(pointer), bytes.Clone(body)); err != nil {
+		return nil, err
+	}
+	if err = r.unchanged(view); err != nil {
 		return nil, err
 	}
 	refs, err := r.host.Dependencies(bytes.Clone(body))
 	if err != nil {
+		return nil, err
+	}
+	if err = r.unchanged(view); err != nil {
 		return nil, err
 	}
 	if len(refs) == 0 || len(refs) > r.maxReferences {
@@ -153,8 +174,6 @@ func (r *currentLocalDependencies) resolve(token []byte, epoch uint64, hash []by
 		}
 		ownedRefs[i] = cloneCurrentLocalReference(ref)
 	}
-	view := &currentLocalView{owner: r, token: token, hash: hash, pointer: pointer, body: body, epoch: epoch,
-		keys: [][]byte{pointerKey, bodyKey}, materials: [][]byte{pointer, body}}
 	seen := make(map[string]struct{}, len(refs))
 	for _, candidate := range ownedRefs {
 		ref := cloneCurrentLocalReference(candidate)
@@ -173,21 +192,17 @@ func (r *currentLocalDependencies) resolve(token []byte, epoch uint64, hash []by
 		if !bytes.Equal(r.codec.hasher.Compute(string(material)), ref.hash) {
 			return nil, errCurrentLocalDependency
 		}
-		if e = r.host.VerifyDependency(cloneCurrentLocalReference(ref), bytes.Clone(material)); e != nil {
-			return nil, e
-		}
 		view.keys = append(view.keys, key)
 		view.materials = append(view.materials, material)
 	}
-	// Native reads may observe candidate-state changes from earlier owner work.
-	// No stale account object or mutable verifier buffer may supply this result.
-	for i, key := range view.keys {
-		value, e := r.read(key)
-		if e != nil {
-			return nil, e
+	// Resolve the complete bounded set before any dependency callback can
+	// manufacture a later member's baseline. Check after each callback.
+	for i, ref := range ownedRefs {
+		if err = r.host.VerifyDependency(cloneCurrentLocalReference(ref), bytes.Clone(view.materials[i+2])); err != nil {
+			return nil, err
 		}
-		if !bytes.Equal(value, view.materials[i]) {
-			return nil, errCurrentLocalDependency
+		if err = r.unchanged(view); err != nil {
+			return nil, err
 		}
 	}
 	return view, nil

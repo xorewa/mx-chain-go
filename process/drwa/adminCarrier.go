@@ -237,6 +237,9 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 		if acked == nil || acked.ReturnCode != vmcommon.Ok {
 			return nil, errAdminCarrier
 		}
+		if err = c.checkApplied(key, encoded); err != nil {
+			return nil, err
+		}
 		current, err := c.host.StateHash(fresh())
 		if err != nil {
 			return nil, err
@@ -250,14 +253,20 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 		return acked, nil
 	}
 	return c.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+		applied, err := c.readApplied(key)
+		if err != nil {
+			return nil, err
+		}
 		if err = c.host.VerifyCanonical(bytes.Clone(encoded), bytes.Clone(proof)); err != nil {
+			return nil, err
+		}
+		if err = c.checkApplied(key, applied); err != nil {
 			return nil, err
 		}
 		if err = c.host.ValidateLocal(fresh()); err != nil {
 			return nil, err
 		}
-		applied, err := c.readApplied(key)
-		if err != nil {
+		if err = c.checkApplied(key, applied); err != nil {
 			return nil, err
 		}
 		current, err := c.host.StateHash(fresh())
@@ -283,12 +292,18 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 		if output == nil || output.ReturnCode != vmcommon.Ok {
 			return nil, errAdminCarrier
 		}
+		if err = c.checkApplied(key, nil); err != nil {
+			return nil, err
+		}
 		current, err = c.host.StateHash(fresh())
 		if err != nil {
 			return nil, err
 		}
 		if !bytes.Equal(current, e.result) {
 			return nil, errAdminCarrier
+		}
+		if err = c.checkApplied(key, nil); err != nil {
+			return nil, err
 		}
 		if err = c.host.ValidateLocal(fresh()); err != nil {
 			return nil, err

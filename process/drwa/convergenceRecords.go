@@ -207,6 +207,26 @@ func (r *convergenceRecords) verifyParent(key, binding []byte, count int, p *con
 	return nil
 }
 
+// Reuse the bounded native reader around each authentication callback; a
+// later verifier must never consume a progress baseline made by an earlier one.
+func (r *convergenceRecords) verifyState(key []byte, verify func() error) error {
+	before, err := r.read(key)
+	if err != nil {
+		return err
+	}
+	if err = verify(); err != nil {
+		return err
+	}
+	after, err := r.read(key)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(before, after) {
+		return errConvergence
+	}
+	return nil
+}
+
 func (r *convergenceRecords) create(t convergenceTransition) error {
 	key, binding, err := r.encode(t)
 	if err != nil {
@@ -225,7 +245,7 @@ func (r *convergenceRecords) create(t convergenceTransition) error {
 	}
 	retained := uint64(len(key)) + uint64(len(value))
 	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := r.host.VerifyTransition(bytes.Clone(binding)); e != nil {
+		if e := r.verifyState(key, func() error { return r.host.VerifyTransition(bytes.Clone(binding)) }); e != nil {
 			return nil, e
 		}
 		old, e := r.read(key)
@@ -278,10 +298,15 @@ func (r *convergenceRecords) acknowledge(t convergenceTransition, shard uint32, 
 	}
 	evidence = bytes.Clone(evidence)
 	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := r.host.VerifyTransition(bytes.Clone(binding)); e != nil {
+		if e := r.verifyState(key, func() error { return r.host.VerifyTransition(bytes.Clone(binding)) }); e != nil {
 			return nil, e
 		}
-		producer, e := r.host.VerifyAck(bytes.Clone(binding), bytes.Clone(ack), bytes.Clone(evidence))
+		var producer uint32
+		e := r.verifyState(key, func() error {
+			var err error
+			producer, err = r.host.VerifyAck(bytes.Clone(binding), bytes.Clone(ack), bytes.Clone(evidence))
+			return err
+		})
 		if e != nil {
 			return nil, e
 		}
@@ -311,7 +336,7 @@ func (r *convergenceRecords) complete(t convergenceTransition) error {
 	}
 	count := len(t.shards)
 	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := r.host.VerifyTransition(bytes.Clone(binding)); e != nil {
+		if e := r.verifyState(key, func() error { return r.host.VerifyTransition(bytes.Clone(binding)) }); e != nil {
 			return nil, e
 		}
 		p, e := r.load(key, binding, count)

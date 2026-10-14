@@ -201,6 +201,40 @@ func (s *sourceGrantRecords) ack(key, projection []byte, status, reason string, 
 	return output, nil
 }
 
+// Authentication cannot create, erase or reopen the exact grant whose
+// predecessor will supply freshness or duplicate handling after it returns.
+func (s *sourceGrantRecords) verifyProjection(key, projection, evidence []byte) error {
+	read := func() ([]byte, error) {
+		account, err := s.codec.state.systemAccount()
+		if err != nil {
+			return nil, err
+		}
+		value, _, err := account.RetrieveValue(key)
+		if err != nil {
+			return nil, err
+		}
+		if len(value) > s.codec.maxBytes {
+			return nil, errSourceGrant
+		}
+		return bytes.Clone(value), nil
+	}
+	before, err := read()
+	if err != nil {
+		return err
+	}
+	if err = s.host.VerifyProjection(bytes.Clone(projection), bytes.Clone(evidence)); err != nil {
+		return err
+	}
+	after, err := read()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(before, after) {
+		return errSourceGrant
+	}
+	return nil
+}
+
 func (s *sourceGrantRecords) install(context *HeaderTimeContext, p sourceGrantProjection, evidence []byte) error {
 	key, projection, err := s.encode(p)
 	if err != nil {
@@ -210,7 +244,7 @@ func (s *sourceGrantRecords) install(context *HeaderTimeContext, p sourceGrantPr
 		return errSourceGrant
 	}
 	return s.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := s.host.VerifyProjection(bytes.Clone(projection), bytes.Clone(evidence)); e != nil {
+		if e := s.verifyProjection(key, projection, evidence); e != nil {
 			return nil, e
 		}
 		account, e := s.codec.state.systemAccount()
@@ -282,7 +316,7 @@ func (s *sourceGrantRecords) transition(context *HeaderTimeContext, p sourceGran
 		return errSourceGrant
 	}
 	return s.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := s.host.VerifyProjection(bytes.Clone(projection), bytes.Clone(evidence)); e != nil {
+		if e := s.verifyProjection(key, projection, evidence); e != nil {
 			return nil, e
 		}
 		status, retainedReason, effect, e := s.load(key, projection)

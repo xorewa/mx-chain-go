@@ -229,15 +229,10 @@ func (g *governedActionRecords) initialize(context *HeaderTimeContext, subject, 
 	if err != nil {
 		return err
 	}
+	// External initialization can hold the caller's original buffers. Retain
+	// the authenticated input after bounded framing and before any callback.
+	subject, class, token = bytes.Clone(subject), bytes.Clone(class), bytes.Clone(token)
 	return g.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if err = g.host.Initialize(bytes.Clone(identity), bytes.Clone(token)); err != nil {
-			return nil, err
-		}
-		release, err := g.lease(context)
-		if err != nil {
-			return nil, err
-		}
-		defer release()
 		counterKey, err := g.key("nonce", g.domain, subject, class)
 		if err != nil {
 			return nil, err
@@ -246,6 +241,29 @@ func (g *governedActionRecords) initialize(context *HeaderTimeContext, subject, 
 		if err != nil {
 			return nil, err
 		}
+		snapshot := []governedActionWrite{{counterKey, counter}}
+		if len(token) != 0 {
+			key, err := g.key("active", g.domain, token)
+			if err != nil {
+				return nil, err
+			}
+			value, err := g.read(key)
+			if err != nil {
+				return nil, err
+			}
+			snapshot = append(snapshot, governedActionWrite{key, value})
+		}
+		if err = g.host.Initialize(bytes.Clone(identity), bytes.Clone(token)); err != nil {
+			return nil, err
+		}
+		if err = g.unchanged(snapshot...); err != nil {
+			return nil, err
+		}
+		release, err := g.lease(context)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 		if len(counter) != 0 && len(counter) != 8 {
 			return nil, errGovernedActionRecord
 		}

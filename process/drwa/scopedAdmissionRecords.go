@@ -162,6 +162,47 @@ func scopedAdmissionLease(context *HeaderTimeContext) (func(), error) {
 
 type scopedAdmissionWrite struct{ key, value []byte }
 
+// Capture only this operation's owned predecessors, including its retained
+// budget. An unrelated native key is not an authority or duplicate baseline.
+func (s *scopedAdmissionRecords) verifyState(keys [][]byte, verify func() error) error {
+	read := func(key []byte) ([]byte, error) {
+		account, err := s.codec.state.systemAccount()
+		if err != nil {
+			return nil, err
+		}
+		value, _, err := account.RetrieveValue(key)
+		if err != nil {
+			return nil, err
+		}
+		if len(value) > s.limits.recordBytes {
+			return nil, errScopedAdmission
+		}
+		return bytes.Clone(value), nil
+	}
+	keys = append(keys, []byte(scopedAdmissionPrefix+"budget"))
+	values := make([][]byte, len(keys))
+	for i, key := range keys {
+		value, err := read(key)
+		if err != nil {
+			return err
+		}
+		values[i] = value
+	}
+	if err := verify(); err != nil {
+		return err
+	}
+	for i, key := range keys {
+		value, err := read(key)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(values[i], value) {
+			return errScopedAdmission
+		}
+	}
+	return nil
+}
+
 // retain counts EVERY newly retained key/value, including current pointers,
 // immutable versions, decisions and withdrawal/replay tombstones. No deletion,
 // abandoned-record recycling, per-owner reservation or fee-based capacity claim.
@@ -251,6 +292,7 @@ func (s *scopedAdmissionRecords) install(context *HeaderTimeContext, owner, prog
 	if len(predecessor) != 0 && len(predecessor) != s.codec.hasher.Size() {
 		return errScopedAdmission
 	}
+	predecessor = bytes.Clone(predecessor)
 	encoded, err := s.codec.frame(scope, predecessor, body)
 	if err != nil {
 		return err
@@ -275,11 +317,13 @@ func (s *scopedAdmissionRecords) install(context *HeaderTimeContext, owner, prog
 		if _, _, e := scopedAdmissionTime(context); e != nil {
 			return nil, e
 		}
-		account, e := s.codec.state.systemAccount()
-		if e != nil {
-			return nil, e
+		keys := [][]byte{s.key("version", id), s.key("current", scopeID)}
+		if len(predecessor) != 0 {
+			keys = append(keys, s.key("version", predecessor))
 		}
-		if e = s.mandates.Verify(purpose, bytes.Clone(scope), bytes.Clone(predecessor), bytes.Clone(id), bytes.Clone(evidence)); e != nil {
+		if e := s.verifyState(keys, func() error {
+			return s.mandates.Verify(purpose, bytes.Clone(scope), bytes.Clone(predecessor), bytes.Clone(id), bytes.Clone(evidence))
+		}); e != nil {
 			return nil, e
 		}
 		release, e := scopedAdmissionLease(context)
@@ -289,7 +333,7 @@ func (s *scopedAdmissionRecords) install(context *HeaderTimeContext, owner, prog
 		defer release()
 		// The mandate adapter is an external call. Reacquire the native account
 		// before resolving its current pointer, immutable record and budget.
-		account, e = s.codec.state.systemAccount()
+		account, e := s.codec.state.systemAccount()
 		if e != nil {
 			return nil, e
 		}
@@ -383,7 +427,13 @@ func (s *scopedAdmissionRecords) admit(context *HeaderTimeContext, d scopedAdmis
 		if e != nil || !bytes.Equal(current, d.authority) {
 			return nil, errScopedAdmission
 		}
-		if e = s.mandates.Verify("ADMISSION", bytes.Clone(scope), bytes.Clone(current), bytes.Clone(payload), bytes.Clone(evidence)); e != nil {
+		scopeID, e := s.digest("SCOPE", scope)
+		if e != nil {
+			return nil, e
+		}
+		if e = s.verifyState([][]byte{s.key("current", scopeID), s.key("version", current), s.key("decision", id), s.key("withdrawn", id)}, func() error {
+			return s.mandates.Verify("ADMISSION", bytes.Clone(scope), bytes.Clone(current), bytes.Clone(payload), bytes.Clone(evidence))
+		}); e != nil {
 			return nil, e
 		}
 		release, e := scopedAdmissionLease(context)
@@ -453,7 +503,13 @@ func (s *scopedAdmissionRecords) withdraw(context *HeaderTimeContext, d scopedAd
 		if e != nil {
 			return nil, e
 		}
-		if e = s.mandates.Verify("WITHDRAW", bytes.Clone(scope), bytes.Clone(current), bytes.Clone(digest), bytes.Clone(evidence)); e != nil {
+		scopeID, e := s.digest("SCOPE", scope)
+		if e != nil {
+			return nil, e
+		}
+		if e = s.verifyState([][]byte{s.key("current", scopeID), s.key("version", current), s.key("decision", id), s.key("withdrawn", id)}, func() error {
+			return s.mandates.Verify("WITHDRAW", bytes.Clone(scope), bytes.Clone(current), bytes.Clone(digest), bytes.Clone(evidence))
+		}); e != nil {
 			return nil, e
 		}
 		release, e := scopedAdmissionLease(context)
