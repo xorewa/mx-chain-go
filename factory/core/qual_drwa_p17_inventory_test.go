@@ -20,6 +20,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-go/process/smartContract/builtInFunctions"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	nativeBuiltins "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions"
 	"github.com/stretchr/testify/require"
 )
@@ -281,6 +282,41 @@ func TestQualDRWAP17InventoryRejectsDrift(t *testing.T) {
 			actual, err := qualP17Dispatch([]byte(mutated))
 			require.NoError(t, err, "syntax rejection is not an inventory drift result")
 			require.Error(t, qualP17Compare(rows, "system_sc_dispatch", actual))
+		})
+	}
+}
+
+// Source annotations only: these assertions do not execute or admit a native
+// effect. Part A 5.5 L5155-5157 and L5162 specify these exclusions/exceptions;
+// a valid enum alone does not make a policy annotation source-supported.
+func TestQualDRWAP17SourcePolicyFloors(t *testing.T) {
+	rows := qualP17Rows(t)
+	byName := make(map[string]qualP17Row)
+	for _, row := range rows {
+		if row.Layer == "builtin_factory" {
+			byName[row.Operation] = row
+		}
+	}
+	for _, name := range []string{
+		nativeCore.BuiltInFunctionESDTPause, nativeCore.BuiltInFunctionESDTUnPause,
+		nativeCore.BuiltInFunctionESDTFreeze, nativeCore.BuiltInFunctionESDTUnFreeze,
+		nativeCore.BuiltInFunctionESDTWipe,
+		nativeCore.BuiltInFunctionESDTSetLimitedTransfer, nativeCore.BuiltInFunctionESDTUnSetLimitedTransfer,
+		vmcommon.BuiltInFunctionESDTSetBurnRoleForAll,
+		vmcommon.BuiltInFunctionESDTTransferRoleDeleteAddress, vmcommon.BuiltInFunctionESDTTransferRoleAddAddress,
+	} {
+		t.Run(name, func(t *testing.T) {
+			row, exists := byName[name]
+			require.True(t, exists)
+			require.Equal(t, "DENY", row.Class, "v1 excludes this native policy/control surface")
+		})
+	}
+	for _, name := range []string{vmcommon.BuiltInFunctionESDTUnSetBurnRoleForAll, nativeCore.ESDTSetTokenType} {
+		t.Run(name, func(t *testing.T) {
+			row, exists := byName[name]
+			require.True(t, exists)
+			require.Equal(t, "PROTECTED_ADMIN", row.Class)
+			require.Contains(t, row.Disposition, "BootstrapDeny", "only the exact owning bootstrap exception is annotated")
 		})
 	}
 }
