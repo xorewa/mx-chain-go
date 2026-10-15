@@ -82,6 +82,23 @@ func (r *registrationCandidate) BindIntent(id, digest, manager []byte,
 
 func (r *registrationCandidate) IsInterfaceNil() bool { return r == nil }
 
+// DRWAExecutionError observes the existing owner's failure without classifying
+// a token or admitting execution. Healthy contained native work can itself
+// query status; its running state is not a failure. Exclusive native ownership,
+// canonical recovery and publication admission remain the outer owner's duty.
+func (r *registrationCandidate) DRWAExecutionError() error {
+	if r == nil || r.writer == nil || r.writer.boundary == nil {
+		return errInvalidMetaContext
+	}
+	owner := r.writer.boundary
+	owner.mut.Lock()
+	defer owner.mut.Unlock()
+	if err := owner.checkAvailable(); err != ErrExecutionBusy {
+		return err
+	}
+	return nil
+}
+
 func (r *registrationCandidate) registerTokenForIntent(records *registrationRecords,
 	id, digest, manager []byte, create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
 	return r.register(func(creator func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {

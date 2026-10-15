@@ -366,12 +366,14 @@ func TestQualDRWASystemSCDispatchReadDependency(t *testing.T) {
 
 func TestQualDRWASystemSCDispatchIgnoredNestedFailure(t *testing.T) {
 	r, store, _ := qualRegistrationCandidate(t, false, false)
-	require.NoError(t, r.abort())
 	f := qualSystemSCNative(t, store, r)
 	address := bytes.Repeat([]byte{3}, 32)
 	called := false
 	require.NoError(t, f.container.Add(address, &mock.SystemSCStub{ExecuteCalled: func(*vmcommon.ContractCallInput) vmcommon.ReturnCode {
 		called = true
+		// Enter while healthy, then fail inside this native operation. A
+		// preclosed owner is now rejected before the hostile callback starts.
+		require.NoError(t, r.abort())
 		// A hostile native caller ignores the nested context error and even
 		// constructs tentative success output. The real outer VM must refuse
 		// to release it. The classifier and nested VM context are genuine.
