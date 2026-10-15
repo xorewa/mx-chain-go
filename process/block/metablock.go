@@ -28,6 +28,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/block/processedMb"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/trie"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 const (
@@ -1097,6 +1098,9 @@ func (mp *metaProcessor) createMiniBlocks(
 	}
 
 	mbsToMe, numTxs, numShardHeaders, err := mp.createAndProcessCrossMiniBlocksDstMe(haveTime, gasProcessingPolicy)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessCrossMiniBlocksDstMe", "error", err.Error())
 	}

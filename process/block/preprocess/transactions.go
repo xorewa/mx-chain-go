@@ -1775,6 +1775,9 @@ func (txs *transactions) ProcessMiniBlock(
 		numTXsProcessed++
 	}
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, indexOfLastTxProcessed, false, err
+	}
 	if err != nil && (!partialMbExecutionMode || scheduledMode) {
 		return processedTxHashes, txIndex - 1, true, err
 	}
@@ -1825,6 +1828,9 @@ func (txs *transactions) processInNormalMode(
 
 	txs.txExecutionOrderHandler.Add(txHash)
 	_, err := txs.txProcessor.ProcessTransaction(tx)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 	if err != nil {
 		txs.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, txHash)
 		return err

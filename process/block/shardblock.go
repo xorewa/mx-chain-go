@@ -30,6 +30,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/track"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/storage"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 var _ process.BlockProcessor = (*shardProcessor)(nil)
@@ -2883,6 +2884,9 @@ func (sp *shardProcessor) createMiniBlocks(haveTime func() bool, randomness []by
 	)
 	elapsedTime := time.Since(startTime)
 	log.Debug("elapsed time to create mbs to me", "time", elapsedTime)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessCrossMiniBlocksDstMe", "error", err.Error())
 	}

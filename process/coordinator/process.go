@@ -716,6 +716,9 @@ func (tc *transactionCoordinator) CreateMbsAndProcessCrossShardTransactionsDstMe
 			(allowStartingPartialExecution || isContinuation)
 
 		errProc := tc.processCompleteMiniBlock(preproc, miniBlock, miniBlockInfo.Hash, haveTime, haveAdditionalTime, scheduledMode, allowPartialExecution, processedMbInfo, headerHash, gasProcessingPolicy)
+		if errors.Is(errProc, vm.ErrDRWAExecution) {
+			return nil, 0, false, errProc
+		}
 		tc.handleProcessMiniBlockExecution(oldIndexOfLastTxProcessed, miniBlock, processedMbInfo, createMBDestMeExecutionInfo)
 		if errProc != nil {
 			shouldSkipShard[miniBlockInfo.SenderShardID] = true
@@ -1291,6 +1294,10 @@ func (tc *transactionCoordinator) processCompleteMiniBlock(
 		tc,
 		gasProcessingPolicy,
 	)
+
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 
 	log.Debug("transactionsCoordinator.processCompleteMiniBlock: after processing",
 		"num all txs processed", indexOfLastTxProcessed+1,
