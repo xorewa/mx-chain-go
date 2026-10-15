@@ -291,6 +291,19 @@ func TestQualDRWAP17InventoryRejectsDrift(t *testing.T) {
 // a valid enum alone does not make a policy annotation source-supported.
 func TestQualDRWAP17SourcePolicyFloors(t *testing.T) {
 	rows := qualP17Rows(t)
+	for _, layer := range []string{"builtin_factory", "system_sc_dispatch"} {
+		t.Run("global_burn/"+layer, func(t *testing.T) {
+			for _, row := range rows {
+				if row.Layer == layer && row.Operation == nativeCore.BuiltInFunctionESDTBurn {
+					require.Equal(t, "DENY", row.Class)
+					require.Contains(t, row.Disposition, "L5147")
+					require.NotContains(t, row.Disposition, "crawler")
+					return
+				}
+			}
+			t.Fatal("missing global burn inventory row")
+		})
+	}
 	byName := make(map[string]qualP17Row)
 	for _, row := range rows {
 		if row.Layer == "builtin_factory" {

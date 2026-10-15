@@ -1,6 +1,6 @@
 {
   "task": "T10",
-  "model_sha256": "68958dad88d9d4a131f453a8f779fc104366afde9762bc37416de2458d65500a",
+  "model_sha256": "5e1d4aaf11a6cb29387f88a80668058b3ccc9c9ae3f03310a7cd3add8be7b4d6",
   "scope": "Source-entry/loaded-constructor inventory plus source-mandated denial floors; no native token-effect admission or policy qualification.",
   "source_head": "8e73415f56a22d6ebf3668e10a2b3cdecec8f1b8",
   "native_node": "06c383cf316ab391d60695a4eeb7c085fb40232b",
@@ -138,7 +138,7 @@
       "operation_name": "ESDTBurn",
       "layer": "builtin_factory",
       "normalized_class": "DENY",
-      "DRWA_disposition": "Independent regulated invocation denied; no unselected crawler maintenance power or global supply route",
+      "DRWA_disposition": "Global ESDTBurn supply route denied in v1 for regulated tokens under Part A L5147; no second supply-mutation route.",
       "test_id": "TestQualDRWAP17LoadedBuiltinInventory",
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
@@ -738,7 +738,7 @@
       "operation_name": "ESDTBurn",
       "layer": "system_sc_dispatch",
       "normalized_class": "DENY",
-      "DRWA_disposition": "Registered-token route denied in v1 under Part A L5147/L5151-L5156; no public or generic protected replacement permits this control/property/policy mutation.",
+      "DRWA_disposition": "Global ESDTBurn supply route denied in v1 for regulated tokens under Part A L5147; no second supply-mutation route.",
       "test_id": "TestQualDRWAP17SystemDispatchInventory",
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
