@@ -13,6 +13,7 @@ import (
 )
 
 type qualRegistryTransportFixture struct {
+	source  state.AccountsAdapter
 	reader  *ResultAccountReader
 	anchor  *metaRegistryAnchor
 	count   AccountItemWitness
@@ -89,7 +90,7 @@ func qualRegistryTransportAtLocus(t *testing.T, auto bool, count []byte, marker 
 		require.NoError(t, e)
 		return AccountItemWitness{AccountProof: accountProof, DataProof: dataProof}
 	}
-	q := &qualRegistryTransportFixture{reader: r, anchor: anchor, count: item([]byte("ELRONDDRWA@registry@count"))}
+	q := &qualRegistryTransportFixture{source: f.adb, reader: r, anchor: anchor, count: item([]byte("ELRONDDRWA@registry@count"))}
 	prefix := []byte("ELRONDDRWA@registry@member@")
 	if localWriter {
 		prefix = []byte("ELRONDDRWA@membership@")
