@@ -37,10 +37,13 @@ type vmContext struct {
 
 	enableEpochsHandler common.EnableEpochsHandler
 	crtTransferIndex    uint32
+	drwaClassifier      vm.DRWATokenClassifier
+	drwaExecutionError  error
 }
 
 // VMContextArgs holds the arguments needed to create a new vmContext
 type VMContextArgs struct {
+	DRWAClassifier      vm.DRWATokenClassifier
 	BlockChainHook      vm.BlockchainHook
 	CryptoHook          vmcommon.CryptoHook
 	InputParser         vm.ArgumentsParser
@@ -52,6 +55,9 @@ type VMContextArgs struct {
 
 // NewVMContext creates a context where smart contracts can run and write
 func NewVMContext(args VMContextArgs) (*vmContext, error) {
+	if args.DRWAClassifier != nil && check.IfNil(args.DRWAClassifier) {
+		return nil, vm.ErrDRWAExecution
+	}
 	if check.IfNilReflect(args.BlockChainHook) {
 		return nil, vm.ErrNilBlockchainHook
 	}
@@ -83,6 +89,7 @@ func NewVMContext(args VMContextArgs) (*vmContext, error) {
 	}
 
 	vmc := &vmContext{
+		drwaClassifier:      args.DRWAClassifier,
 		blockChainHook:      args.BlockChainHook,
 		cryptoHook:          args.CryptoHook,
 		inputParser:         args.InputParser,
@@ -525,8 +532,14 @@ func (host *vmContext) ExecuteOnDestContext(destination []byte, sender []byte, v
 	if err != nil {
 		return nil, err
 	}
+	return host.ExecuteDRWASystemCall(callInput, func() (*vmcommon.VMOutput, error) {
+		return host.executeOnDestContext(callInput, sender)
+	})
+}
 
-	err = host.transferBeforeInternalExec(callInput, sender, "ExecuteOnDestContext")
+func (host *vmContext) executeOnDestContext(callInput *vmcommon.ContractCallInput, sender []byte) (*vmcommon.VMOutput, error) {
+
+	err := host.transferBeforeInternalExec(callInput, sender, "ExecuteOnDestContext")
 	if err != nil {
 		return nil, err
 	}

@@ -126,8 +126,28 @@ func (r *registrationCandidate) classify(candidateHash, tokenID []byte) (bool, e
 	if !r.view.parent.mut.TryRLock() {
 		return false, ErrExecutionBusy
 	}
-	r.view.parent.mut.RUnlock()
-	return r.view.classify(candidateHash, tokenID)
+	defer r.view.parent.mut.RUnlock()
+	return r.view.classifyLocked(candidateHash, tokenID)
+}
+
+// WithTokenClassification carries the existing view's read dependency through
+// actual native System-SC execution. It exposes no membership setter or account
+// handle. Admission of this private candidate remains the native owner's duty;
+// capturing its selected identity does not establish canonical authority.
+func (r *registrationCandidate) WithTokenClassification(accounts state.AccountsAdapter, tokenID []byte,
+	execute func(bool) (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {
+	if r == nil || r.writer == nil || r.view == nil || accounts != r.writer.state.accounts || execute == nil {
+		return nil, errInvalidMetaContext
+	}
+	if !r.view.parent.mut.TryRLock() {
+		return nil, ErrExecutionBusy
+	}
+	defer r.view.parent.mut.RUnlock()
+	regulated, err := r.view.classifyLocked(r.view.after.candidateHash, tokenID)
+	if err != nil {
+		return nil, err
+	}
+	return execute(regulated)
 }
 
 // commit releases only the existing containment owner's native receipt. The

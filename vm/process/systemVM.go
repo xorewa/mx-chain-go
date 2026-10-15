@@ -79,6 +79,15 @@ func (s *systemVM) RunSmartContractCreate(input *vmcommon.ContractCreateInput) (
 	if input.CallerAddr == nil {
 		return nil, vm.ErrInputCallerAddrIsNil
 	}
+	if context, ok := s.systemEI.(vm.DRWASystemCallContext); ok {
+		return context.ExecuteDRWASystemCall(nil, func() (*vmcommon.VMOutput, error) {
+			return s.runSmartContractCreate(input)
+		})
+	}
+	return s.runSmartContractCreate(input)
+}
+
+func (s *systemVM) runSmartContractCreate(input *vmcommon.ContractCreateInput) (*vmcommon.VMOutput, error) {
 
 	s.systemEI.CleanCache()
 	s.systemEI.SetSCAddress(input.CallerAddr)
@@ -108,6 +117,15 @@ func (s *systemVM) RunSmartContractCreate(input *vmcommon.ContractCreateInput) (
 func (s *systemVM) RunSmartContractCall(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
 	s.criticalSection.Lock()
 	defer s.criticalSection.Unlock()
+	if context, ok := s.systemEI.(vm.DRWASystemCallContext); ok {
+		return context.ExecuteDRWASystemCall(input, func() (*vmcommon.VMOutput, error) {
+			return s.runSmartContractCall(input)
+		})
+	}
+	return s.runSmartContractCall(input)
+}
+
+func (s *systemVM) runSmartContractCall(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
 
 	s.systemEI.CleanCache()
 	s.systemEI.SetSCAddress(input.RecipientAddr)

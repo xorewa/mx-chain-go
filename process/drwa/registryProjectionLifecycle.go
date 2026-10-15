@@ -178,6 +178,13 @@ func (v *registryCandidate) classify(candidateHash, tokenID []byte) (bool, error
 	c := v.parent
 	c.mut.RLock()
 	defer c.mut.RUnlock()
+	return v.classifyLocked(candidateHash, tokenID)
+}
+
+// classifyLocked also serves the native System-SC read dependency, whose caller
+// retains parent.mut through the native effects, rather than just the lookup.
+func (v *registryCandidate) classifyLocked(candidateHash, tokenID []byte) (bool, error) {
+	c := v.parent
 	if c.active != v || v.material == nil {
 		return false, errInvalidMetaContext
 	}

@@ -27,6 +27,7 @@ import (
 var _ process.VirtualMachinesContainerFactory = (*vmContainerFactory)(nil)
 
 type vmContainerFactory struct {
+	drwaClassifier         vm.DRWATokenClassifier
 	chanceComputer         nodesCoordinator.ChanceComputer
 	validatorAccountsDB    state.AccountsAdapter
 	userAccountsDB         state.AccountsAdapter
@@ -50,6 +51,7 @@ type vmContainerFactory struct {
 
 // ArgsNewVMContainerFactory defines the arguments needed to create a new VM container factory
 type ArgsNewVMContainerFactory struct {
+	DRWAClassifier      vm.DRWATokenClassifier
 	ArgBlockChainHook   hooks.ArgBlockChainHook
 	Economics           process.EconomicsDataHandler
 	MessageSignVerifier vm.MessageSignVerifier
@@ -123,6 +125,7 @@ func NewVMContainerFactory(args ArgsNewVMContainerFactory) (*vmContainerFactory,
 	cryptoHook := hooks.NewVMCryptoHook()
 
 	return &vmContainerFactory{
+		drwaClassifier:         args.DRWAClassifier,
 		blockChainHook:         args.BlockChainHook,
 		cryptoHook:             cryptoHook,
 		economics:              args.Economics,
@@ -188,6 +191,7 @@ func (vmf *vmContainerFactory) CreateForGenesis() (process.VirtualMachinesContai
 func (vmf *vmContainerFactory) createSystemVMFactoryAndEEI() (vm.SystemSCContainerFactory, vm.ContextHandler, error) {
 	atArgumentParser := parsers.NewCallArgsParser()
 	vmContextArgs := systemSmartContracts.VMContextArgs{
+		DRWAClassifier:      vmf.drwaClassifier,
 		BlockChainHook:      vmf.blockChainHook,
 		CryptoHook:          vmf.cryptoHook,
 		InputParser:         atArgumentParser,
