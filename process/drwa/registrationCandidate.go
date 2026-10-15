@@ -16,8 +16,10 @@ import (
 // scheduler dependencies and before-first-effect dispatch remain separate work.
 // The accounts store must be exclusively owned throughout this handle's life.
 type registrationCandidate struct {
-	writer *RegistryRegistration
-	view   *registryCandidate
+	writer          *RegistryRegistration
+	view            *registryCandidate
+	nativeCommitted bool
+	committedRoot   []byte
 }
 
 // reconstructRegistrationCandidate is only for startup/state-sync/integrity
@@ -45,11 +47,16 @@ func reconstructRegistrationCandidate(accounts state.AccountsAdapter, coordinato
 	for id := range projection.members {
 		parent.members[id] = struct{}{}
 	}
-	view := &registryCandidate{parent: parent, before: copyRegistryAnchor(a), after: copyRegistryAnchor(a),
+	return attachRegistrationCandidate(writer, owner, parent, a), nil
+}
+
+func attachRegistrationCandidate(writer *RegistryRegistration, owner *RollbackContainment,
+	parent *committedRegistry, selected *metaRegistryAnchor) *registrationCandidate {
+	view := &registryCandidate{parent: parent, before: copyRegistryAnchor(&parent.anchor), after: copyRegistryAnchor(selected),
 		added: make(map[string]struct{}), ready: true,
-		material: &registryMaterialization{state: writer.state, owner: owner, required: copyRegistryAnchor(a)}}
+		material: &registryMaterialization{state: writer.state, owner: owner, required: copyRegistryAnchor(selected)}}
 	parent.active = view
-	return &registrationCandidate{writer: writer, view: view}, nil
+	return &registrationCandidate{writer: writer, view: view}
 }
 
 func (r *registrationCandidate) RegisterToken(create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
@@ -126,14 +133,109 @@ func (r *registrationCandidate) classify(candidateHash, tokenID []byte) (bool, e
 // commit releases only the existing containment owner's native receipt. The
 // old handle closes; this does not manufacture the next authoritative anchor or
 // publish the execution-shard projection with an obsolete metachain root.
-// Incremental transfer to the next admitted native candidate is still owed by
-// its finalizer; this reconstruction function is not a substitute for that path.
+// The finalizer must subsequently supply independently admitted native context
+// to commitProjection. Local persistence does not establish that authority.
 func (r *registrationCandidate) commit() ([][]byte, []*vmcommon.VMOutput, error) {
 	if !r.view.parent.mut.TryLock() {
 		return nil, nil, ErrExecutionBusy
 	}
 	defer r.view.parent.mut.Unlock()
-	return r.writer.boundary.Commit()
+	roots, outputs, err := r.writer.boundary.Commit()
+	if err != nil {
+		return nil, nil, err
+	}
+	// NewRegistryRegistration constructs exactly one participating native store.
+	r.nativeCommitted = true
+	r.committedRoot = bytes.Clone(roots[0])
+	return roots, outputs, nil
+}
+
+// commitProjection applies only this candidate's successful additions, after
+// native persistence AND the finalizer's independently admitted anchor. This
+// field comparison is not canonical context admission. No metadata/version is
+// invented at commit, no full registry copy is made, and no output is released
+// a second time. Native finalizer/factory installation is still outstanding.
+func (r *registrationCandidate) commitProjection(admitted *metaRegistryAnchor) (*committedRegistry, error) {
+	c := r.view.parent
+	if !c.mut.TryLock() {
+		return nil, ErrExecutionBusy
+	}
+	defer c.mut.Unlock()
+	if c.active != r.view || !r.nativeCommitted || !validRegistrationAnchor(admitted) ||
+		!bytes.Equal(admitted.root, r.committedRoot) {
+		return nil, errInvalidMetaContext
+	}
+	for id := range r.view.added {
+		c.members[id] = struct{}{}
+	}
+	c.anchor = copyRegistryAnchor(admitted)
+	c.active, r.view.ready, r.view.added = nil, false, nil
+	return c, nil
+}
+
+func validRegistrationAnchor(a *metaRegistryAnchor) bool {
+	return a != nil && len(a.candidateHash) != 0 && len(a.metaHash) != 0 && len(a.executedHash) != 0 && len(a.root) != 0
+}
+
+// beginRegistration reuses this committed projection without enumerating its
+// members. The native owner must establish the selected candidate's authority
+// and ancestry independently. A later tip may retain the same LastExecutionResult;
+// its exact execution identity/root must still match the committed projection.
+func (c *committedRegistry) beginRegistration(accounts state.AccountsAdapter, coordinator sharding.Coordinator,
+	maxEver uint64, before, selected *metaRegistryAnchor) (*registrationCandidate, error) {
+	if c == nil {
+		return nil, errInvalidMetaContext
+	}
+	if !c.mut.TryLock() {
+		return nil, ErrExecutionBusy
+	}
+	defer c.mut.Unlock()
+	if c.active != nil || c.members == nil || uint64(len(c.members)) > maxEver ||
+		!validRegistrationAnchor(before) || !validRegistrationAnchor(selected) || !sameRegistryAnchor(&c.anchor, before) ||
+		!bytes.Equal(selected.root, c.anchor.root) || !bytes.Equal(selected.executedHash, c.anchor.executedHash) ||
+		selected.nonce != c.anchor.nonce || selected.round != c.anchor.round || selected.epoch != c.anchor.epoch {
+		return nil, errInvalidMetaContext
+	}
+	writer, owner, err := NewRegistryRegistration(accounts, coordinator, maxEver)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(owner.roots[0], c.anchor.root) {
+		return nil, errInvalidMetaContext
+	}
+	return attachRegistrationCandidate(writer, owner, c, selected), nil
+}
+
+// discard detaches an aborted/recovered candidate only after native containment
+// is closed at its original root. A successful commit cannot take this path.
+// The committed map/anchor never acquired this candidate's tentative additions.
+func (r *registrationCandidate) discard() (*committedRegistry, error) {
+	c := r.view.parent
+	if !c.mut.TryLock() {
+		return nil, ErrExecutionBusy
+	}
+	defer c.mut.Unlock()
+	if c.active != r.view || r.nativeCommitted {
+		return nil, errInvalidMetaContext
+	}
+	r.writer.boundary.mut.Lock()
+	failed, closed := r.writer.boundary.failure, r.writer.boundary.closed
+	r.writer.boundary.mut.Unlock()
+	if failed != nil {
+		return nil, failed
+	}
+	if !closed {
+		return nil, ErrUncommittedState
+	}
+	root, err := r.writer.state.accounts.RootHash()
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(root, r.writer.boundary.roots[0]) {
+		return nil, errInvalidMetaContext
+	}
+	c.active, r.view.ready, r.view.added = nil, false, nil
+	return c, nil
 }
 
 func (r *registrationCandidate) abort() error {
