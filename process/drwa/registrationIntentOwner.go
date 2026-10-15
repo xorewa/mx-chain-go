@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-core-go/hashing"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/state"
@@ -18,10 +19,14 @@ import (
 // and epoch, and supply the actual admitted manager/profile. No bool, caller
 // address or this object substitutes for those checks. No ordinary importer.
 type RegistrationIntentOwner struct {
-	registration *RegistryRegistration
-	records      *registrationRecords
-	id, digest   []byte
-	manager      []byte
+	registration interface {
+		registerTokenForIntent(*registrationRecords, []byte, []byte, []byte,
+			func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error
+		IsInterfaceNil() bool
+	}
+	records    *registrationRecords
+	id, digest []byte
+	manager    []byte
 }
 
 // BindIntent is an unwired production binding, not a record/authority writer.
@@ -56,7 +61,7 @@ func (o *RegistrationIntentOwner) IsInterfaceNil() bool { return o == nil }
 // commit/publication boundary, including after failed rollback.
 func (o *RegistrationIntentOwner) RegisterTokenForCreation(issuer, manager, family []byte,
 	create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
-	if o == nil || o.registration == nil || o.records == nil || create == nil {
+	if o == nil || check.IfNil(o.registration) || o.records == nil || create == nil {
 		return errInvalidRegistrationRecord
 	}
 	issuer, manager, family = bytes.Clone(issuer), bytes.Clone(manager), bytes.Clone(family)

@@ -30,6 +30,13 @@ func qualRegistryTransport(t *testing.T, auto bool, count []byte, marker []byte,
 }
 
 func qualRegistryTransportAtLocus(t *testing.T, auto bool, count []byte, marker []byte, localWriter bool, overrideIDs ...[]byte) *qualRegistryTransportFixture {
+	return qualRegistryTransportWithSetup(t, auto, count, marker, localWriter, nil, overrideIDs...)
+}
+
+// Setup provisions independent fixture bytes before the committed proof root
+// is selected. Later consumers cannot patch a projection to match a new store.
+func qualRegistryTransportWithSetup(t *testing.T, auto bool, count []byte, marker []byte, localWriter bool,
+	setup func(state.AccountsAdapter), overrideIDs ...[]byte) *qualRegistryTransportFixture {
 	t.Helper()
 	f := qualNativeReaderFixture(t, auto, 1)
 	a, err := f.adb.LoadAccount(bytes.Clone(core.SystemAccountAddress))
@@ -58,6 +65,9 @@ func qualRegistryTransportAtLocus(t *testing.T, auto bool, count []byte, marker 
 		for _, id := range ids {
 			require.NoError(t, s.materializeMembership(id))
 		}
+	}
+	if setup != nil {
+		setup(f.adb)
 	}
 	root, err := f.adb.Commit()
 	require.NoError(t, err)

@@ -3,6 +3,8 @@ package drwa
 import (
 	"bytes"
 
+	"github.com/multiversx/mx-chain-core-go/hashing"
+	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/state"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
@@ -51,6 +53,42 @@ func reconstructRegistrationCandidate(accounts state.AccountsAdapter, coordinato
 }
 
 func (r *registrationCandidate) RegisterToken(create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
+	return r.register(r.writer.RegisterToken, create)
+}
+
+// BindIntent reuses the complete T19 identity/profile/record owner. Its native
+// creator contract is unchanged, but its operation now passes through the same
+// candidate publication boundary as RegisterToken. This is not authenticated
+// ingress; BindIntent's existing current-authority obligations still apply.
+func (r *registrationCandidate) BindIntent(id, digest, manager []byte,
+	marshaller marshal.Marshalizer, hasher hashing.Hasher, maxBytes int) (*RegistrationIntentOwner, error) {
+	if r == nil || r.writer == nil || r.view == nil {
+		return nil, errInvalidRegistrationRecord
+	}
+	owner, err := r.writer.BindIntent(id, digest, manager, marshaller, hasher, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	owner.registration = r
+	return owner, nil
+}
+
+func (r *registrationCandidate) IsInterfaceNil() bool { return r == nil }
+
+func (r *registrationCandidate) registerTokenForIntent(records *registrationRecords,
+	id, digest, manager []byte, create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
+	return r.register(func(creator func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
+		return r.writer.registerTokenForIntent(records, id, digest, manager, creator)
+	}, create)
+}
+
+// register holds the existing view lock over the COMPLETE selected native
+// operation. In the intent path, record consumption can fail after creation;
+// no memory delta is published until records, token, membership and count all
+// succeed inside the unchanged T19 journal. There is no nested Execute here.
+func (r *registrationCandidate) register(
+	operation func(func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error,
+	create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
 	if create == nil {
 		return ErrInvalidOperation
 	}
@@ -59,7 +97,7 @@ func (r *registrationCandidate) RegisterToken(create func(state.AccountsAdapter)
 	}
 	defer r.view.parent.mut.Unlock()
 	var added []byte
-	err := r.writer.RegisterToken(func(accounts state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error) {
+	err := operation(func(accounts state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error) {
 		id, out, err := create(accounts)
 		// The writer and view each own their identifier bytes. A creator's
 		// retained slice must not change either identity after return.
