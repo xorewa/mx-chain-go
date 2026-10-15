@@ -1724,7 +1724,8 @@ func TestTransactionCoordinator_CreateMbsAndProcessTransactionsFromMeNothingToPr
 	haveTime := func() bool {
 		return true
 	}
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(mbs))
 }
@@ -1742,7 +1743,8 @@ func TestTransactionCoordinator_CreateMbsAndProcessTransactionsFromMeNoTime(t *t
 	haveTime := func() bool {
 		return false
 	}
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(mbs))
 }
@@ -1766,7 +1768,8 @@ func TestTransactionCoordinator_CreateMbsAndProcessTransactionsFromMeNoSpace(t *
 	haveTime := func() bool {
 		return true
 	}
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 
 	assert.Equal(t, 0, len(mbs))
 }
@@ -1819,7 +1822,8 @@ func TestTransactionCoordinator_CreateMbsAndProcessTransactionsFromMe(t *testing
 	require.Nil(t, err)
 
 	// we have one tx per shard.
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 
 	assert.Equal(t, int(nrShards), len(mbs))
 }
@@ -1880,7 +1884,8 @@ func TestTransactionCoordinator_CreateMbsAndProcessTransactionsFromMeMultipleMin
 	err = txPool.OnExecutedBlock(&block.Header{}, []byte("rootHash"))
 	require.Nil(t, err)
 	// we have one tx per shard.
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 
 	assert.Equal(t, 1, len(mbs))
 }
@@ -1958,7 +1963,8 @@ func TestTransactionCoordinator_CreateMbsAndProcessTransactionsFromMeMultipleMin
 	require.Nil(t, err)
 
 	// we have one tx per shard.
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 
 	assert.Equal(t, 1, len(mbs))
 }
@@ -2040,7 +2046,8 @@ func TestTransactionCoordinator_CompactAndExpandMiniblocksShouldWork(t *testing.
 	err = txPool.OnExecutedBlock(&block.Header{}, []byte("rootHash"))
 	require.Nil(t, err)
 
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 
 	assert.Equal(t, 1, len(mbs))
 }
@@ -2100,7 +2107,8 @@ func TestTransactionCoordinator_GetAllCurrentUsedTxs(t *testing.T) {
 	err = txPool.OnExecutedBlock(&block.Header{}, []byte("rootHash"))
 	require.Nil(t, err)
 
-	mbs := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	mbs, err := tc.CreateMbsAndProcessTransactionsFromMe(haveTime, []byte("randomness"))
+	assert.NoError(t, err)
 	require.Equal(t, 5, len(mbs))
 
 	usedTxs = tc.GetAllCurrentUsedTxs(block.TxBlock)

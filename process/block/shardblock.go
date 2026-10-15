@@ -2929,7 +2929,10 @@ func (sp *shardProcessor) createMiniBlocks(haveTime func() bool, randomness []by
 
 	startTime = time.Now()
 
-	mbsFromMe := sp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	mbsFromMe, err := sp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	if err != nil {
+		return nil, nil, err
+	}
 	elapsedTime = time.Since(startTime)
 	log.Debug("elapsed time to create mbs from me", "time", elapsedTime)
 

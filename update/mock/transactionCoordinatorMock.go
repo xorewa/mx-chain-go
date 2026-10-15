@@ -200,12 +200,12 @@ func (tcm *TransactionCoordinatorMock) GetUnExecutableTransactions() map[string]
 }
 
 // CreateMbsAndProcessTransactionsFromMe -
-func (tcm *TransactionCoordinatorMock) CreateMbsAndProcessTransactionsFromMe(haveTime func() bool, _ []byte) block.MiniBlockSlice {
+func (tcm *TransactionCoordinatorMock) CreateMbsAndProcessTransactionsFromMe(haveTime func() bool, _ []byte) (block.MiniBlockSlice, error) {
 	if tcm.CreateMbsAndProcessTransactionsFromMeCalled == nil {
-		return nil
+		return nil, nil
 	}
 
-	return tcm.CreateMbsAndProcessTransactionsFromMeCalled(haveTime)
+	return tcm.CreateMbsAndProcessTransactionsFromMeCalled(haveTime), nil
 }
 
 // CreateMarshalizedData -

@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -26,6 +27,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/factory"
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 var _ process.TransactionCoordinator = (*transactionCoordinator)(nil)
@@ -843,7 +845,7 @@ func (tc *transactionCoordinator) revertIfNeeded(createMBDestMeExecutionInfo *cr
 func (tc *transactionCoordinator) CreateMbsAndProcessTransactionsFromMe(
 	haveTime func() bool,
 	randomness []byte,
-) block.MiniBlockSlice {
+) (block.MiniBlockSlice, error) {
 
 	numMiniBlocksProcessed := 0
 	miniBlocks := make(block.MiniBlockSlice, 0)
@@ -860,11 +862,14 @@ func (tc *transactionCoordinator) CreateMbsAndProcessTransactionsFromMe(
 	for _, blockType := range tc.preProcExecution.keysTxPreProcs {
 		txPreProc := tc.preProcExecution.getPreProcessor(blockType)
 		if check.IfNil(txPreProc) {
-			return nil
+			return nil, nil
 		}
 
 		mbs, err := txPreProc.CreateAndProcessMiniBlocks(haveTime, randomness)
 		if err != nil {
+			if errors.Is(err, vm.ErrDRWAExecution) {
+				return nil, err
+			}
 			log.Debug("CreateAndProcessMiniBlocks", "error", err.Error())
 		}
 
@@ -880,7 +885,7 @@ func (tc *transactionCoordinator) CreateMbsAndProcessTransactionsFromMe(
 		miniBlocks = append(miniBlocks, interMBs...)
 	}
 
-	return miniBlocks
+	return miniBlocks, nil
 }
 
 // CreatePostProcessMiniBlocks returns all the post processed miniblocks

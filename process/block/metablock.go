@@ -1116,7 +1116,10 @@ func (mp *metaProcessor) createMiniBlocks(
 		return nil, err
 	}
 
-	mbsFromMe := mp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	mbsFromMe, err := mp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	if err != nil {
+		return nil, err
+	}
 	if len(mbsFromMe) > 0 {
 		miniBlocks = append(miniBlocks, mbsFromMe...)
 
