@@ -18,6 +18,7 @@ import (
 	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/txcache"
+	"github.com/multiversx/mx-chain-go/vm"
 
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/dataRetriever"
@@ -948,6 +949,9 @@ func (txs *transactions) processAndRemoveBadTransaction(
 ) error {
 	txs.txExecutionOrderHandler.Add(txHash)
 	_, err := txs.txProcessor.ProcessTransaction(tx)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 
 	isNotExecutable := errors.Is(err, process.ErrLowerNonceInTransaction) || errors.Is(err, process.ErrInsufficientFee) || errors.Is(err, process.ErrTransactionNotExecutable)
 	isAsyncExecEnabled := common.IsAsyncExecutionEnabled(txs.enableEpochsHandler, txs.enableRoundsHandler)
@@ -1137,6 +1141,9 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 		haveTime,
 	)
 	elapsedTime := time.Since(startTime)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("computeSortedTxs", "error", err.Error())
 		return make(block.MiniBlockSlice, 0), nil
@@ -1179,6 +1186,9 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 		"time [s]", elapsedTime,
 	)
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessMiniBlocksFromMe", "error", err.Error())
 		return make(block.MiniBlockSlice, 0), nil
@@ -1195,6 +1205,9 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 		sortedTxsForScheduled,
 		mapSCTxs,
 	)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessScheduledMiniBlocksFromMeAsProposer", "error", err.Error())
 		return make(block.MiniBlockSlice, 0), nil
@@ -1289,7 +1302,7 @@ func (txs *transactions) createAndProcessMiniBlocksFromMeV1(
 
 		err = txs.processMiniBlockBuilderTx(mbBuilder, wtx, tx)
 		if err != nil {
-			if core.IsGetNodeFromDBError(err) {
+			if core.IsGetNodeFromDBError(err) || errors.Is(err, vm.ErrDRWAExecution) {
 				return nil, nil, err
 			}
 			continue
@@ -1354,6 +1367,9 @@ func (txs *transactions) processMiniBlockBuilderTx(
 	elapsedTime := time.Since(startTime)
 	mb.stats.totalProcessingTime += elapsedTime
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 	if err != nil && !errors.Is(err, process.ErrFailedTransaction) {
 		txs.handleBadTransaction(err, wtx, tx, mb, snapshot)
 		return err

@@ -13,6 +13,7 @@ import (
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/txcache"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 func (txs *transactions) createAndProcessMiniBlocksFromMeV2(
@@ -70,7 +71,7 @@ func (txs *transactions) createAndProcessMiniBlocksFromMeV2(
 			receiverShardID,
 			mbInfo)
 		if err != nil {
-			if core.IsGetNodeFromDBError(err) {
+			if core.IsGetNodeFromDBError(err) || errors.Is(err, vm.ErrDRWAExecution) {
 				return nil, nil, nil, err
 			}
 			if shouldAddToRemaining {
@@ -201,6 +202,9 @@ func (txs *transactions) processTransaction(
 	elapsedTime = time.Since(startTime)
 	mbInfo.processingInfo.totalTimeUsedForProcess += elapsedTime
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return false, err
+	}
 	if err != nil && !errors.Is(err, process.ErrFailedTransaction) {
 		if errors.Is(err, process.ErrHigherNonceInTransaction) {
 			mbInfo.senderAddressToSkip = tx.GetSndAddr()
@@ -347,7 +351,7 @@ func (txs *transactions) createScheduledMiniBlocks(
 			receiverShardID,
 			mbInfo)
 		if err != nil {
-			if core.IsGetNodeFromDBError(err) {
+			if core.IsGetNodeFromDBError(err) || errors.Is(err, vm.ErrDRWAExecution) {
 				return nil, err
 			}
 			continue
@@ -411,6 +415,9 @@ func (txs *transactions) verifyTransaction(
 	elapsedTime = time.Since(startTime)
 	mbInfo.schedulingInfo.totalTimeUsedForScheduledVerify += elapsedTime
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 	if err != nil {
 		isTxTargetedForDeletion := errors.Is(err, process.ErrLowerNonceInTransaction) || errors.Is(err, process.ErrInsufficientFee) || errors.Is(err, process.ErrTransactionNotExecutable)
 		if isTxTargetedForDeletion {
