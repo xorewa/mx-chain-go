@@ -416,7 +416,7 @@ func (sc *scProcessor) executeSmartContractCall(
 
 	sc.wasmVMChangeLocker.RUnlock()
 	if err != nil {
-		if core.IsGetNodeFromDBError(err) {
+		if errors.Is(err, vm.ErrDRWAExecution) || core.IsGetNodeFromDBError(err) {
 			return nil, err
 		}
 		log.Debug("run smart contract call error", "error", err.Error())
@@ -1118,6 +1118,9 @@ func (sc *scProcessor) resolveBuiltInFunctions(
 
 	vmOutput, err := sc.blockChainHook.ProcessBuiltInFunction(vmInput)
 	if err != nil {
+		if errors.Is(err, vm.ErrDRWAExecution) {
+			return nil, err
+		}
 		vmOutput = &vmcommon.VMOutput{
 			ReturnCode:    vmcommon.UserError,
 			ReturnMessage: err.Error(),
@@ -1770,7 +1773,7 @@ func (sc *scProcessor) doDeploySmartContract(
 	sc.wasmVMChangeLocker.RUnlock()
 	if err != nil {
 		log.Debug("VM error", "error", err.Error())
-		if core.IsGetNodeFromDBError(err) {
+		if errors.Is(err, vm.ErrDRWAExecution) || core.IsGetNodeFromDBError(err) {
 			return vmcommon.ExecutionFailed, err
 		}
 		return vmcommon.UserError, sc.ProcessIfError(acntSnd, txHash, tx, err.Error(), []byte(""), snapshot, vmInput.GasLocked)

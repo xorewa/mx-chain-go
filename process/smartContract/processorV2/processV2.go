@@ -428,6 +428,9 @@ func (sc *scProcessor) executeSmartContractCall(
 
 	sc.arwenChangeLocker.RUnlock()
 	if err != nil {
+		if errors.Is(err, vm.ErrDRWAExecution) {
+			return nil, err
+		}
 		log.Debug("run smart contract call error", "error", err.Error())
 		failureContext.setMessages(err.Error(), []byte(""))
 		return userErrorVmOutput, nil
@@ -1002,6 +1005,9 @@ func (sc *scProcessor) doExecuteBuiltInFunctionWithoutFailureProcessing(
 
 		newVMOutput, errReturnCode, err = sc.executeSmartContractCallAndCheckGas(newVMInput, tx, newVMInput.CurrentTxHash, acntSnd, newDestSC, failureContext)
 		if err != nil {
+			if errors.Is(err, vm.ErrDRWAExecution) {
+				return vmcommon.ExecutionFailed, err
+			}
 			failureContext.setMessagesFromError(err)
 			return vmcommon.ExecutionFailed, nil
 		}
@@ -1172,6 +1178,9 @@ func (sc *scProcessor) resolveBuiltInFunctions(
 
 	vmOutput, err := sc.blockChainHook.ProcessBuiltInFunction(vmInput)
 	if err != nil {
+		if errors.Is(err, vm.ErrDRWAExecution) {
+			return nil, err
+		}
 		vmOutput = &vmcommon.VMOutput{
 			ReturnCode:    vmcommon.UserError,
 			ReturnMessage: err.Error(),
@@ -1848,6 +1857,9 @@ func (sc *scProcessor) doDeploySmartContract(
 	vmOutput, err = vmExec.RunSmartContractCreate(vmInput)
 	sc.arwenChangeLocker.RUnlock()
 	if err != nil {
+		if errors.Is(err, vm.ErrDRWAExecution) {
+			return vmcommon.ExecutionFailed, err
+		}
 		log.Debug("VM error", "error", err.Error())
 		failureContext.setMessages(err.Error(), []byte(""))
 		return vmcommon.UserError, nil
