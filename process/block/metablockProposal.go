@@ -105,6 +105,9 @@ func (mp *metaProcessor) CreateBlockProposal(
 	initialHdr data.HeaderHandler,
 	haveTime func() bool,
 ) (data.HeaderHandler, data.BodyHandler, error) {
+	if err := mp.drwaExecutionError(); err != nil {
+		return nil, nil, err
+	}
 	if check.IfNil(initialHdr) {
 		return nil, nil, process.ErrNilBlockHeader
 	}
@@ -340,6 +343,9 @@ func (mp *metaProcessor) ProcessBlockProposal(
 	headerHash []byte,
 	bodyHandler data.BodyHandler,
 ) (data.BaseExecutionResultHandler, error) {
+	if err := mp.drwaExecutionError(); err != nil {
+		return nil, err
+	}
 	if check.IfNil(headerHandler) {
 		return nil, process.ErrNilBlockHeader
 	}
@@ -481,6 +487,9 @@ func (mp *metaProcessor) ProcessBlockProposal(
 // CommitBlockProposalState commits the accounts state after processing a block proposal
 // and performs any post-commit operations (e.g. saving epoch start economics metrics).
 func (mp *metaProcessor) CommitBlockProposalState(headerHandler data.HeaderHandler, headerHash []byte) error {
+	if err := mp.drwaExecutionError(); err != nil {
+		return err
+	}
 	if check.IfNil(headerHandler) {
 		return process.ErrNilBlockHeader
 	}

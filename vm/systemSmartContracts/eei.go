@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
@@ -38,7 +39,7 @@ type vmContext struct {
 	enableEpochsHandler common.EnableEpochsHandler
 	crtTransferIndex    uint32
 	drwaClassifier      vm.DRWATokenClassifier
-	drwaExecutionError  error
+	drwaExecutionError  atomic.Pointer[error]
 }
 
 // VMContextArgs holds the arguments needed to create a new vmContext

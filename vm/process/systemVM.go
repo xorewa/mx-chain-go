@@ -161,6 +161,15 @@ func (s *systemVM) runSmartContractCall(input *vmcommon.ContractCallInput) (*vmc
 	return vmOutput, nil
 }
 
+// DRWAExecutionError forwards the context's retained failure without creating
+// another lifecycle latch. Older native contexts retain their unchanged path.
+func (s *systemVM) DRWAExecutionError() error {
+	if context, ok := s.systemEI.(interface{ DRWAExecutionError() error }); ok {
+		return context.DRWAExecutionError()
+	}
+	return nil
+}
+
 // GetVersion returns an empty string, because the system VM is not versioned
 func (s *systemVM) GetVersion() string {
 	return ""

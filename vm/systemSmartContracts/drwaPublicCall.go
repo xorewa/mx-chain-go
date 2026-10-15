@@ -23,14 +23,14 @@ func (host *vmContext) ExecuteDRWASystemCall(input *vmcommon.ContractCallInput,
 }
 
 func (host *vmContext) executeWithDRWAErrorCheck(execute func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {
-	if host.drwaExecutionError != nil {
-		return nil, host.drwaExecutionError
+	if failure := host.DRWAExecutionError(); failure != nil {
+		return nil, failure
 	}
 	output, err := execute()
 	// Native callers can ignore a nested error. Such an error cannot become a
 	// successful outer result, even when that caller returns native Ok.
-	if host.drwaExecutionError != nil {
-		return nil, host.drwaExecutionError
+	if failure := host.DRWAExecutionError(); failure != nil {
+		return nil, failure
 	}
 	return output, err
 }
@@ -55,11 +55,23 @@ func (host *vmContext) executeDRWAESDTCall(input *vmcommon.ContractCallInput,
 			// Retain the first classification failure across CleanCache and
 			// nested contexts. Recovery requires reconstruction with a newly
 			// admitted owner; clearing ordinary VM caches is not recovery.
-			host.drwaExecutionError = fmt.Errorf("%w: %w", vm.ErrDRWAExecution, err)
-			return nil, host.drwaExecutionError
+			failure := fmt.Errorf("%w: %w", vm.ErrDRWAExecution, err)
+			host.drwaExecutionError.CompareAndSwap(nil, &failure)
+			return nil, host.DRWAExecutionError()
 		}
 		return output, err
 	})
+}
+
+// DRWAExecutionError exposes the existing retained failure to the native owner.
+// It never clears VM state or admits a new candidate. Atomic publication also
+// permits read-only observation while a direct classification call fails.
+func (host *vmContext) DRWAExecutionError() error {
+	failure := host.drwaExecutionError.Load()
+	if failure == nil {
+		return nil
+	}
+	return *failure
 }
 
 // All targets below use the native Arguments[0] identifier. This is DS01-04's

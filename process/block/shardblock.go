@@ -114,6 +114,9 @@ func (sp *shardProcessor) ProcessBlock(
 	bodyHandler data.BodyHandler,
 	haveTime func() time.Duration,
 ) error {
+	if err := sp.drwaExecutionError(); err != nil {
+		return err
+	}
 	if haveTime == nil {
 		return process.ErrNilHaveTimeHandler
 	}
@@ -1086,6 +1089,9 @@ func (sp *shardProcessor) CreateBlock(
 	initialHdr data.HeaderHandler,
 	haveTime func() bool,
 ) (data.HeaderHandler, data.BodyHandler, error) {
+	if err := sp.drwaExecutionError(); err != nil {
+		return nil, nil, err
+	}
 	if check.IfNil(initialHdr) {
 		return nil, nil, process.ErrNilBlockHeader
 	}
@@ -1198,6 +1204,9 @@ func (sp *shardProcessor) CommitBlock(
 	headerHandler data.HeaderHandler,
 	bodyHandler data.BodyHandler,
 ) error {
+	if err := sp.drwaExecutionError(); err != nil {
+		return err
+	}
 	commitEntryTime := time.Now()
 	err := checkForNils(headerHandler, bodyHandler)
 	if err != nil {
