@@ -3,6 +3,7 @@ package drwa
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -94,26 +95,52 @@ func qualSystemSCNative(t *testing.T, accounts state.AccountsAdapter, classifier
 }
 
 func qualSystemSCInput(method, token string) *vmcommon.ContractCallInput {
-	return &vmcommon.ContractCallInput{VMInput: vmcommon.VMInput{
+	input := &vmcommon.ContractCallInput{VMInput: vmcommon.VMInput{
 		CallerAddr: bytes.Repeat([]byte{1}, 32), CallValue: big.NewInt(0), GasProvided: 1000000,
 		Arguments: [][]byte{[]byte(token), bytes.Repeat([]byte{2}, 32), []byte(core.ESDTRoleNFTCreate)},
 	}, RecipientAddr: bytes.Clone(core.ESDTSCAddress), Function: method}
+	switch method {
+	case "updateTokenID", "changeToDynamic", "changeToMultiShardCreate":
+		input.Arguments = input.Arguments[:1]
+	case "changeSFTToMetaESDT":
+		input.Arguments = [][]byte{[]byte(token), {}}
+	}
+	return input
 }
 
 func qualSystemSCOrdinaryCandidate(t *testing.T) (*registrationCandidate, *qualRegistrationCandidateStore) {
+	return qualSystemSCFamilyCandidate(t, core.FungibleESDT, "TOKEN-abcdef")
+}
+
+func qualSystemSCConversionFamily(method string) string {
+	switch method {
+	case "updateTokenID", "changeToMultiShardCreate":
+		return core.NonFungibleESDT
+	case "changeSFTToMetaESDT", "changeToDynamic":
+		return core.SemiFungibleESDT
+	default:
+		return ""
+	}
+}
+
+func qualSystemSCFamilyCandidate(t *testing.T, family, identifier string) (*registrationCandidate, *qualRegistrationCandidateStore) {
 	t.Helper()
 	f := qualRegistryTransportWithSetup(t, false, []byte{0, 0, 0, 0, 0, 0, 0, 2}, []byte{1}, false,
 		func(accounts state.AccountsAdapter) {
 			token := &systemSmartContracts.ESDTDataV2{OwnerAddress: bytes.Repeat([]byte{1}, 32),
-				TokenName: []byte("TokenName"), TickerName: []byte("TOKEN"), TokenType: []byte(core.FungibleESDT),
+				TokenName: []byte("TokenName"), TickerName: []byte("TOKEN"), TokenType: []byte(family),
 				Mintable: true, Burnable: true, CanPause: true, CanFreeze: true, CanWipe: true,
 				Upgradable: true, CanChangeOwner: true, CanAddSpecialRoles: true,
 				MintedValue: big.NewInt(0), BurntValue: big.NewInt(0)}
+			if family == core.NonFungibleESDT {
+				token.SpecialRoles = []*systemSmartContracts.ESDTRoles{{Address: bytes.Repeat([]byte{2}, 32),
+					Roles: [][]byte{[]byte(core.ESDTRoleNFTCreate)}}}
+			}
 			body, err := (&marshal.GogoProtoMarshalizer{}).Marshal(token)
 			require.NoError(t, err)
 			a, err := accounts.LoadAccount(core.ESDTSCAddress)
 			require.NoError(t, err)
-			require.NoError(t, a.(state.UserAccountHandler).SaveKeyValue([]byte("TOKEN-abcdef"), body))
+			require.NoError(t, a.(state.UserAccountHandler).SaveKeyValue([]byte(identifier), body))
 			require.NoError(t, accounts.SaveAccount(a))
 		})
 	transport, err := newRegistryTransport(f.reader, 2, f.limit)
@@ -127,14 +154,19 @@ func qualSystemSCOrdinaryCandidate(t *testing.T) (*registrationCandidate, *qualR
 }
 
 func TestQualDRWASystemSCDispatchDenials(t *testing.T) {
-	// Independent list from DS01-M1/M6, DS02-M1-4/M8 and DS03-M1;
+	// Independent list from DS01-M1/M6, DS02-M1-4/M8, DS03-M1 and
+	// DS04-M1/M2; these model bytes precede their respective behavior changes.
 	// do not obtain expectations or enumerate routes through the gate itself.
 	for _, method := range []string{"setBurnRoleGlobally", "unsetBurnRoleGlobally", "setSpecialRole", "unSetSpecialRole",
 		"transferOwnership", "controlChanges", "transferNFTCreateRole", "stopNFTCreate", "sendAllTransferRoleAddresses",
-		"freeze", "unFreeze", "wipe", "pause", "unPause", "freezeSingleNFT", "unFreezeSingleNFT", "wipeSingleNFT", "mint", core.BuiltInFunctionESDTBurn} {
+		"freeze", "unFreeze", "wipe", "pause", "unPause", "freezeSingleNFT", "unFreezeSingleNFT", "wipeSingleNFT", "mint", core.BuiltInFunctionESDTBurn,
+		"updateTokenID", "changeSFTToMetaESDT", "changeToDynamic", "changeToMultiShardCreate"} {
 		for _, path := range []string{"native_vm", "direct_dispatch", "nested"} {
 			t.Run(method+"/"+path, func(t *testing.T) {
 				r, store, _ := qualRegistrationCandidate(t, false, true)
+				if family := qualSystemSCConversionFamily(method); family != "" {
+					r, store = qualSystemSCFamilyCandidate(t, family, "AAA-abcdef")
+				}
 				f := qualSystemSCNative(t, store, r)
 				input := qualSystemSCInput(method, "AAA-abcdef")
 				root, err := store.RootHash()
@@ -157,6 +189,11 @@ func TestQualDRWASystemSCDispatchDenials(t *testing.T) {
 					output, err = f.context.ExecuteOnDestContext(core.ESDTSCAddress, input.CallerAddr, input.CallValue, []byte(data))
 				}
 				require.NoError(t, err)
+				if qualSystemSCConversionFamily(method) != "" {
+					raw, encodeErr := json.Marshal(output)
+					require.NoError(t, encodeErr)
+					t.Log("native_conversion_output", string(raw))
+				}
 				require.Equal(t, vmcommon.UserError, output.ReturnCode)
 				require.Equal(t, "DRWA public operation denied", output.ReturnMessage)
 				require.Empty(t, output.OutputAccounts)
@@ -246,10 +283,14 @@ func TestQualDRWASystemSCDispatchLifecycle(t *testing.T) {
 func TestQualDRWASystemSCDispatchOrdinary(t *testing.T) {
 	for _, method := range []string{"setBurnRoleGlobally", "unsetBurnRoleGlobally", "setSpecialRole", "unSetSpecialRole", "transferOwnership", "controlChanges",
 		"transferNFTCreateRole", "stopNFTCreate", "sendAllTransferRoleAddresses", "freeze", "unFreeze", "wipe", "pause", "unPause",
-		"freezeSingleNFT", "unFreezeSingleNFT", "wipeSingleNFT", "mint", core.BuiltInFunctionESDTBurn} {
+		"freezeSingleNFT", "unFreezeSingleNFT", "wipeSingleNFT", "mint", core.BuiltInFunctionESDTBurn,
+		"updateTokenID", "changeSFTToMetaESDT", "changeToDynamic", "changeToMultiShardCreate"} {
 		for _, shape := range []string{"native_input", "no_arguments", "nonzero_value", "no_gas"} {
 			t.Run(method+"/"+shape, func(t *testing.T) {
 				r, store := qualSystemSCOrdinaryCandidate(t)
+				if family := qualSystemSCConversionFamily(method); family != "" {
+					r, store = qualSystemSCFamilyCandidate(t, family, "TOKEN-abcdef")
+				}
 				before, err := store.RootHash()
 				require.NoError(t, err)
 				var outputs []*vmcommon.VMOutput
@@ -282,7 +323,7 @@ func TestQualDRWASystemSCDispatchOrdinary(t *testing.T) {
 				}
 				require.Equal(t, outputs[0], outputs[1], "full native VM output, including gas/refund/storage/results/logs")
 				require.Equal(t, readCounts[0], readCounts[1], "ordinary path adds no account/trie read")
-				if shape == "native_input" && (method == "transferOwnership" || method == "pause" || method == "controlChanges" || method == "setSpecialRole") {
+				if shape == "native_input" && (method == "transferOwnership" || method == "pause" || method == "controlChanges" || method == "setSpecialRole" || qualSystemSCConversionFamily(method) != "") {
 					require.Equal(t, vmcommon.Ok, outputs[0].ReturnCode, "ordinary valid native operation must remain reachable")
 					require.NotEmpty(t, outputs[0].OutputAccounts)
 				}

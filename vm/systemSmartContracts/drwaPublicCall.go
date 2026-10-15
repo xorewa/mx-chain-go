@@ -62,11 +62,11 @@ func (host *vmContext) executeDRWAESDTCall(input *vmcommon.ContractCallInput,
 	})
 }
 
-// All targets below use the native Arguments[0] identifier. This is DS01-03's
+// All targets below use the native Arguments[0] identifier. This is DS01-04's
 // public System-SC surface, not the closed P17 inventory or a protected admin
 // authorization path. Private bootstrap creation/normalization does not enter
-// public Execute. DS04 conversions and receiving shard built-ins are separate
-// owning constructions; this function does not claim to cover them.
+// public Execute. Receiving shard built-ins retain their separate first-effect
+// and protected-provenance obligations; this public selector cannot admit them.
 func drwaPublicTokenMutation(function string) bool {
 	switch function {
 	case "setBurnRoleGlobally", "unsetBurnRoleGlobally",
@@ -74,7 +74,8 @@ func drwaPublicTokenMutation(function string) bool {
 		"setSpecialRole", "unSetSpecialRole", "sendAllTransferRoleAddresses",
 		"freeze", "unFreeze", "wipe", "pause", "unPause",
 		"freezeSingleNFT", "unFreezeSingleNFT", "wipeSingleNFT",
-		"mint", core.BuiltInFunctionESDTBurn:
+		"mint", core.BuiltInFunctionESDTBurn,
+		"updateTokenID", "changeSFTToMetaESDT", "changeToDynamic", "changeToMultiShardCreate":
 		return true
 	default:
 		return false
