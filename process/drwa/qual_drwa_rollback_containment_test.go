@@ -422,7 +422,7 @@ func TestQualDRWANativeContainmentPartialCommitRecovery(t *testing.T) {
 // with the actual native storage manager, pruning manager and eviction list.
 // Persistence remains memory-backed; no snapshot, epoch deletion or canonical
 // owner is simulated. The capacities are experimental values under R7.
-func qualPruningContainmentStore(t *testing.T) (*qualNativeStore, common.StorageManager) {
+func qualPruningContainmentStore(t *testing.T, retainInitialReference bool) (*qualNativeStore, common.StorageManager) {
 	t.Helper()
 	args, _ := qualContainmentArgs(t)
 	db := testscommon.NewSnapshotPruningStorerMock()
@@ -452,9 +452,12 @@ func qualPruningContainmentStore(t *testing.T) (*qualNativeStore, common.Storage
 	require.NoError(t, qualContainmentBalance(s, 100))
 	root, err := adb.Commit()
 	require.NoError(t, err)
-	// Reuse the native settled-root lifecycle: the initial NewRoot reference
-	// must not independently retain the old nodes in this pruning experiment.
-	s.CancelPrune(bytes.Clone(root), state.NewRoot)
+	// The hostile pruning-lifetime experiment discards this native reference.
+	// The reference-retention experiment keeps it; actual canonical header
+	// admission and the native settled/executed-root ordering remain separate.
+	if !retainInitialReference {
+		s.CancelPrune(bytes.Clone(root), state.NewRoot)
+	}
 	require.True(t, s.IsPruningEnabled())
 	require.False(t, storage.IsPruningBlocked())
 	return s, storage
@@ -471,7 +474,7 @@ func TestQualDRWANativeContainmentPruningLifetime(t *testing.T) {
 		"buffered_native_reset_before_release",
 	} {
 		t.Run(mode, func(t *testing.T) {
-			first, storage := qualPruningContainmentStore(t)
+			first, storage := qualPruningContainmentStore(t, false)
 			second := qualContainmentStore(t)
 			buffered := mode != "unbuffered_pruning_before_recovery"
 			if buffered {
@@ -562,6 +565,74 @@ func TestQualDRWANativeContainmentPruningLifetime(t *testing.T) {
 			}
 			require.Equal(t, 1, first.commits)
 			require.Equal(t, 1, second.commits)
+		})
+	}
+}
+
+// The native EWL already retains nodes referenced by an unconsumed NewRoot.
+// Native rollback cancels the original OldRoot and prunes only the discarded
+// NewRoot. Exercise both mechanisms with actual node removal, without adding
+// buffering or ResetPruning. These direct calls do not authenticate a canonical
+// header or install the eventual native DRWA owner.
+func TestQualDRWANativeContainmentPruningReferences(t *testing.T) {
+	for _, rollback := range []bool{false, true} {
+		name := "initial_NewRoot_reference_retained"
+		if rollback {
+			name = "native_rollback_cancel_OldRoot_prune_NewRoot"
+		}
+		t.Run(name, func(t *testing.T) {
+			first, storage := qualPruningContainmentStore(t, true)
+			second := qualContainmentStore(t)
+			c, err := NewRollbackContainment(first, second)
+			require.NoError(t, err)
+			root := bytes.Clone(c.roots[0])
+			account, err := first.GetExistingAccount(qualContainmentAddress)
+			require.NoError(t, err)
+			dataRoot := bytes.Clone(account.(state.UserAccountHandler).GetRootHash())
+			require.NoError(t, c.Execute(func() (*vmcommon.VMOutput, error) {
+				if e := qualContainmentBalance(first, 70); e != nil {
+					return nil, e
+				}
+				return nil, qualContainmentBalance(second, 130)
+			}))
+			commitFault := errors.New("second native store commit failed")
+			second.commitErr = commitFault
+			roots, outputs, err := c.Commit()
+			require.Same(t, commitFault, err)
+			require.Nil(t, roots)
+			require.Nil(t, outputs)
+			candidateRoot, err := first.RootHash()
+			require.NoError(t, err)
+			require.NotEqual(t, root, candidateRoot)
+			require.Zero(t, first.JournalLen())
+			require.Positive(t, second.JournalLen())
+			require.False(t, storage.IsPruningBlocked())
+			if rollback {
+				// Same cancellation/pruning order as native PruneStateOnRollback.
+				first.CancelPrune(bytes.Clone(root), state.OldRoot)
+				first.PruneTrie(bytes.Clone(candidateRoot), state.NewRoot, state.NewPruningHandler(state.EnableDataRemoval))
+				_, readErr := first.backing.Get(candidateRoot)
+				require.Error(t, readErr, "discarded candidate nodes were actually pruned")
+			} else {
+				first.PruneTrie(bytes.Clone(root), state.OldRoot, state.NewPruningHandler(state.EnableDataRemoval))
+			}
+			for _, hash := range [][]byte{root, dataRoot} {
+				value, readErr := first.backing.Get(hash)
+				require.NoError(t, readErr)
+				require.NotEmpty(t, value)
+			}
+			require.NoError(t, c.Recover())
+			qualAssertContainmentBalance(t, first, 100)
+			qualAssertContainmentBalance(t, second, 100)
+			// Recreate again to exclude a recovered account/data-trie cache
+			// from the retained-node observation.
+			require.NoError(t, first.AccountsAdapter.RecreateTrie(holders.NewDefaultRootHashesHolder(bytes.Clone(root))))
+			qualAssertContainmentBalance(t, first, 100)
+			require.Equal(t, 1, first.commits)
+			require.Equal(t, 1, second.commits)
+			called := false
+			require.ErrorIs(t, c.Execute(func() (*vmcommon.VMOutput, error) { called = true; return nil, nil }), ErrExecutionClosed)
+			require.False(t, called)
 		})
 	}
 }
