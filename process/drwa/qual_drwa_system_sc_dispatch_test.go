@@ -245,7 +245,13 @@ func TestQualDRWASystemSCDispatchLifecycle(t *testing.T) {
 				expected = ErrExecutionClosed
 			case "wrong_store":
 				_, accounts, _ = qualRegistrationCandidate(t, false, false)
-				expected = errInvalidMetaContext
+				// An unowned store is now refused at construction, before a VM
+				// can receive it, including non-classified native call paths.
+				ctx, err := systemSmartContracts.NewVMContext(qualSystemSCBindingArgs(t, accounts, accounts, classifier))
+				require.ErrorIs(t, err, vm.ErrDRWAExecution)
+				require.ErrorIs(t, err, errInvalidMetaContext)
+				require.Nil(t, ctx)
+				return
 			case "typed_nil":
 				classifier = (*registrationCandidate)(nil)
 				// Constructor must refuse a typed-nil dependency, never treat it

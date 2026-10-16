@@ -19,6 +19,10 @@ var ErrDRWAExecution = errors.New("DRWA execution context unavailable")
 // Factory admission must supply the actual candidate owner; nil retains native
 // pre-enforcement behavior and cannot authorize DRWA enforcement.
 type DRWATokenClassifier interface {
+	// ValidateAccounts refuses native user/validator handles outside the same
+	// containment owner before a System-SC context is constructed. Identity is
+	// not canonical-context admission or proof of exclusive scheduler ownership.
+	ValidateAccounts(user, validator state.AccountsAdapter) error
 	WithTokenClassification(accounts state.AccountsAdapter, tokenID []byte,
 		execute func(regulated bool) (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error)
 	IsInterfaceNil() bool

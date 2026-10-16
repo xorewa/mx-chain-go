@@ -82,6 +82,24 @@ func (r *registrationCandidate) BindIntent(id, digest, manager []byte,
 
 func (r *registrationCandidate) IsInterfaceNil() bool { return r == nil }
 
+// ValidateAccounts binds both native System-SC account dependencies to the
+// existing containment store identities, without reading a trie or adding a
+// store after its boundary was captured. Equal roots on another adapter do not
+// establish journal ownership. Aliased user/validator handles need one owned
+// store; distinct handles must both participate. Canonical roots, hook aliases,
+// lifetime admission and exclusive native ownership remain the caller's duty.
+func (r *registrationCandidate) ValidateAccounts(user, validator state.AccountsAdapter) error {
+	if r == nil || r.writer == nil || r.writer.boundary == nil || user != r.writer.state.accounts {
+		return errInvalidMetaContext
+	}
+	for _, store := range r.writer.boundary.stores {
+		if store == validator {
+			return nil
+		}
+	}
+	return errInvalidMetaContext
+}
+
 // DRWAExecutionError observes the existing owner's failure without classifying
 // a token or admitting execution. Healthy contained native work can itself
 // query status; its running state is not a failure. Exclusive native ownership,

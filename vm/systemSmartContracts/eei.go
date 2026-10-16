@@ -89,6 +89,12 @@ func NewVMContext(args VMContextArgs) (*vmContext, error) {
 		return nil, err
 	}
 
+	if args.DRWAClassifier != nil {
+		if err = args.DRWAClassifier.ValidateAccounts(args.UserAccountsDB, args.ValidatorAccountsDB); err != nil {
+			return nil, fmt.Errorf("%w: %w", vm.ErrDRWAExecution, err)
+		}
+	}
+
 	vmc := &vmContext{
 		drwaClassifier:      args.DRWAClassifier,
 		blockChainHook:      args.BlockChainHook,
