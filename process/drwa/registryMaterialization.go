@@ -3,6 +3,7 @@ package drwa
 import (
 	"bytes"
 	"context"
+	"errors"
 	"sort"
 	"sync"
 
@@ -188,9 +189,17 @@ func (m *registryMaterialization) abort() error {
 		return err
 	}
 	m.owner.outputs = nil
-	if err := m.state.accounts.RevertToSnapshot(0); err != nil {
-		m.owner.failure = err
-		return err
+	for i := len(m.owner.stores) - 1; i >= 0; i-- {
+		if err := m.owner.stores[i].RevertToSnapshot(0); err != nil {
+			if m.owner.failure == nil {
+				m.owner.failure = err
+			} else {
+				m.owner.failure = errors.Join(m.owner.failure, err)
+			}
+		}
+	}
+	if m.owner.failure != nil {
+		return m.owner.failure
 	}
 	m.owner.closed = true
 	return nil

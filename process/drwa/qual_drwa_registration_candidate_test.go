@@ -32,7 +32,7 @@ func qualRegistrationCoordinator() sharding.Coordinator {
 // Reuse the real T08 proof producer/independent proof reader, not a test-supplied
 // membership map. The executing store is the very native store at the proved
 // root. These fixtures establish component semantics, not canonical finality.
-func qualRegistrationCandidate(t *testing.T, auto, existing bool) (*registrationCandidate, *qualRegistrationCandidateStore, *registryProjection) {
+func qualRegistrationCandidate(t *testing.T, auto, existing bool, participating ...state.AccountsAdapter) (*registrationCandidate, *qualRegistrationCandidateStore, *registryProjection) {
 	t.Helper()
 	count := make([]byte, 8)
 	if existing {
@@ -44,7 +44,7 @@ func qualRegistrationCandidate(t *testing.T, auto, existing bool) (*registration
 	projection, err := transport.reconstruct(f.anchor, f.count, f.members)
 	require.NoError(t, err)
 	s := &qualRegistrationCandidateStore{qualNativeStore: &qualNativeStore{AccountsAdapter: f.source}}
-	r, err := reconstructRegistrationCandidate(s, qualRegistrationCoordinator(), 2, projection)
+	r, err := reconstructRegistrationCandidate(s, qualRegistrationCoordinator(), 2, projection, participating...)
 	require.NoError(t, err)
 	return r, s, projection
 }

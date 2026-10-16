@@ -33,10 +33,14 @@ type RegistryRegistration struct {
 
 // NewRegistryRegistration starts one metachain candidate at a committed native
 // root. The returned native containment owner is the only commit/output-release
-// boundary; callers must not commit the store or publish creator outputs directly.
+// boundary; callers must not commit stores or publish creator outputs directly.
+// accounts is the user/registry store and remains first in native receipts.
+// participating contains the other native stores touched by the operation (for
+// example the metachain peer store), under the same exclusive ownership and
+// authoritative-root retention obligations. It adds no independent journal.
 // maxEver is the caller's actual configured bound; no numeric default is chosen.
 func NewRegistryRegistration(accounts state.AccountsAdapter, coordinator sharding.Coordinator,
-	maxEver uint64) (*RegistryRegistration, *RollbackContainment, error) {
+	maxEver uint64, participating ...state.AccountsAdapter) (*RegistryRegistration, *RollbackContainment, error) {
 	if check.IfNil(coordinator) || coordinator.SelfId() != core.MetachainShardId {
 		return nil, nil, ErrInvalidRegistryRegistration
 	}
@@ -44,7 +48,7 @@ func NewRegistryRegistration(accounts state.AccountsAdapter, coordinator shardin
 	if err != nil {
 		return nil, nil, err
 	}
-	boundary, err := NewRollbackContainment(accounts)
+	boundary, err := NewRollbackContainment(append([]state.AccountsAdapter{accounts}, participating...)...)
 	if err != nil {
 		return nil, nil, err
 	}

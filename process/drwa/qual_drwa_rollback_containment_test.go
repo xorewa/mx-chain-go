@@ -61,7 +61,7 @@ func (s *qualNativeStore) SaveAccount(account vmcommon.AccountHandler) error {
 	return s.saveErr
 }
 
-func qualContainmentStore(t *testing.T) *qualNativeStore {
+func qualContainmentArgs(t *testing.T) (state.ArgsAccountsDB, *testscommon.MemDbMock) {
 	t.Helper()
 	db := testscommon.NewMemDbMock()
 	flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
@@ -77,13 +77,19 @@ func qualContainmentStore(t *testing.T) *qualNativeStore {
 		Hasher: hash, Marshaller: mar, EnableEpochsHandler: flags, StateAccessesCollector: collector,
 	})
 	require.NoError(t, err)
-	adb, err := state.NewAccountsDB(state.ArgsAccountsDB{
+	return state.ArgsAccountsDB{
 		Trie: tr, Hasher: hash, Marshaller: mar, AccountFactory: f,
 		StateAccessesCollector: collector,
 		StoragePruningManager:  pruningDisabled.NewDisabledStoragePruningManager(),
 		SnapshotsManager:       stateDisabled.NewDisabledSnapshotsManager(),
 		AddressConverter:       &testscommon.PubkeyConverterMock{},
-	})
+	}, db
+}
+
+func qualContainmentStore(t *testing.T) *qualNativeStore {
+	t.Helper()
+	args, db := qualContainmentArgs(t)
+	adb, err := state.NewAccountsDB(args)
 	require.NoError(t, err)
 	s := &qualNativeStore{AccountsAdapter: adb, backing: db}
 	require.NoError(t, qualContainmentBalance(s, 100))

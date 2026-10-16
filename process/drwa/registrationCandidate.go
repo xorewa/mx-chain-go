@@ -14,7 +14,7 @@ import (
 // block-local view (Part A L4863-4888) to the SAME native containment owner. It
 // adds no persistence domain or journal. Native executor/factory admission,
 // scheduler dependencies and before-first-effect dispatch remain separate work.
-// The accounts store must be exclusively owned throughout this handle's life.
+// Every participating store must be exclusively owned throughout this handle's life.
 type registrationCandidate struct {
 	writer          *RegistryRegistration
 	view            *registryCandidate
@@ -28,7 +28,7 @@ type registrationCandidate struct {
 // the executing native store must be at that exact committed root. Stable input
 // ownership is required until this call returns, as for registry transport.
 func reconstructRegistrationCandidate(accounts state.AccountsAdapter, coordinator sharding.Coordinator,
-	maxEver uint64, projection *registryProjection) (*registrationCandidate, error) {
+	maxEver uint64, projection *registryProjection, participating ...state.AccountsAdapter) (*registrationCandidate, error) {
 	if projection == nil || projection.members == nil || uint64(len(projection.members)) > maxEver {
 		return nil, errInvalidRegistryTransport
 	}
@@ -36,7 +36,7 @@ func reconstructRegistrationCandidate(accounts state.AccountsAdapter, coordinato
 	if len(a.candidateHash) == 0 || len(a.metaHash) == 0 || len(a.executedHash) == 0 || len(a.root) == 0 {
 		return nil, errInvalidMetaContext
 	}
-	writer, owner, err := NewRegistryRegistration(accounts, coordinator, maxEver)
+	writer, owner, err := NewRegistryRegistration(accounts, coordinator, maxEver, participating...)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (r *registrationCandidate) commit() ([][]byte, []*vmcommon.VMOutput, error)
 	if err != nil {
 		return nil, nil, err
 	}
-	// NewRegistryRegistration constructs exactly one participating native store.
+	// The user/registry store is first; other native roots remain in the receipt.
 	r.nativeCommitted = true
 	r.committedRoot = bytes.Clone(roots[0])
 	return roots, outputs, nil
@@ -219,7 +219,7 @@ func validRegistrationAnchor(a *metaRegistryAnchor) bool {
 // and ancestry independently. A later tip may retain the same LastExecutionResult;
 // its exact execution identity/root must still match the committed projection.
 func (c *committedRegistry) beginRegistration(accounts state.AccountsAdapter, coordinator sharding.Coordinator,
-	maxEver uint64, before, selected *metaRegistryAnchor) (*registrationCandidate, error) {
+	maxEver uint64, before, selected *metaRegistryAnchor, participating ...state.AccountsAdapter) (*registrationCandidate, error) {
 	if c == nil {
 		return nil, errInvalidMetaContext
 	}
@@ -233,7 +233,7 @@ func (c *committedRegistry) beginRegistration(accounts state.AccountsAdapter, co
 		selected.nonce != c.anchor.nonce || selected.round != c.anchor.round || selected.epoch != c.anchor.epoch {
 		return nil, errInvalidMetaContext
 	}
-	writer, owner, err := NewRegistryRegistration(accounts, coordinator, maxEver)
+	writer, owner, err := NewRegistryRegistration(accounts, coordinator, maxEver, participating...)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,8 @@ func (c *committedRegistry) beginRegistration(accounts state.AccountsAdapter, co
 }
 
 // discard detaches an aborted/recovered candidate only after native containment
-// is closed at its original root. A successful commit cannot take this path.
+// is closed with every participating store at its original root. A successful
+// commit cannot take this path.
 // The committed map/anchor never acquired this candidate's tentative additions.
 func (r *registrationCandidate) discard() (*committedRegistry, error) {
 	c := r.view.parent
@@ -264,12 +265,17 @@ func (r *registrationCandidate) discard() (*committedRegistry, error) {
 	if !closed {
 		return nil, ErrUncommittedState
 	}
-	root, err := r.writer.state.accounts.RootHash()
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(root, r.writer.boundary.roots[0]) {
-		return nil, errInvalidMetaContext
+	for i, store := range r.writer.boundary.stores {
+		if store.JournalLen() != 0 {
+			return nil, ErrUncommittedState
+		}
+		root, err := store.RootHash()
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(root, r.writer.boundary.roots[i]) {
+			return nil, errInvalidMetaContext
+		}
 	}
 	c.active, r.view.ready, r.view.added = nil, false, nil
 	return c, nil
