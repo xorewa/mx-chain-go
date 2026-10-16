@@ -8,6 +8,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/vm"
+	"github.com/multiversx/mx-chain-go/vm/systemSmartContracts"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/require"
 )
@@ -110,6 +111,11 @@ func TestQualDRWASystemSCOwnerFailureStatus(t *testing.T) {
 					}
 					return
 				}
+				if phase == "closed" && observe == "status" {
+					require.NoError(t, err, "healthy closure must not poison passive status")
+					require.Zero(t, f.reads)
+					output, err = f.runtime.RunSmartContractCall(input)
+				}
 				require.ErrorIs(t, err, vm.ErrDRWAExecution)
 				require.ErrorIs(t, err, expected)
 				require.Nil(t, output)
@@ -129,8 +135,10 @@ func TestQualDRWASystemSCOwnerFailureStatus(t *testing.T) {
 				require.Zero(t, store.JournalLen())
 				f.context.CleanCache()
 				require.Same(t, failure, status.DRWAExecutionError(), "recovering stores does not revive the old VM")
-				old := qualSystemSCNative(t, store, r)
-				require.ErrorIs(t, old.runtime.(interface{ DRWAExecutionError() error }).DRWAExecutionError(), ErrExecutionClosed)
+				old, oldErr := systemSmartContracts.NewVMContext(qualSystemSCBindingArgs(t, store, store, r))
+				require.ErrorIs(t, oldErr, vm.ErrDRWAExecution)
+				require.ErrorIs(t, oldErr, ErrExecutionClosed)
+				require.Nil(t, old, "closed ownership is refused before creating native contracts")
 				parent, discardErr := r.discard()
 				require.NoError(t, discardErr)
 				fresh, freshErr := parent.beginRegistration(store, qualRegistrationCoordinator(), 2, &before, &selected)

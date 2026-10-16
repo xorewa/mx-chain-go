@@ -7,6 +7,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/vm"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
 
@@ -94,7 +95,7 @@ func (r *registrationCandidate) ValidateAccounts(user, validator state.AccountsA
 	}
 	for _, store := range r.writer.boundary.stores {
 		if store == validator {
-			return nil
+			return r.DRWAExecutionError()
 		}
 	}
 	return errInvalidMetaContext
@@ -114,6 +115,80 @@ func (r *registrationCandidate) DRWAExecutionError() error {
 	if err := owner.checkAvailable(); err != ErrExecutionBusy {
 		return err
 	}
+	return nil
+}
+
+// DRWAExecutionHealthError distinguishes a healthy closed owner from permission
+// to execute. Actual work still uses DRWAExecutionError. Recovery never revives
+// an old VM, including when that VM did not observe the original failure.
+func (r *registrationCandidate) DRWAExecutionHealthError() error {
+	if r == nil || r.writer == nil || r.writer.boundary == nil {
+		return errInvalidMetaContext
+	}
+	owner := r.writer.boundary
+	owner.mut.Lock()
+	defer owner.mut.Unlock()
+	if owner.failure != nil {
+		return owner.failure
+	}
+	if owner.recovered {
+		return ErrExecutionClosed
+	}
+	return nil
+}
+
+// WithDRWAClassifierReplacement holds the existing projection owner through
+// the VM's assignment. It authenticates private lineage/disposition, not the
+// canonical context: the native finalizer still owes that admission before use.
+// No registry scan, trie access, state publication or output release occurs.
+func (r *registrationCandidate) WithDRWAClassifierReplacement(classifier vm.DRWATokenClassifier, replace func()) error {
+	next, valid := classifier.(*registrationCandidate)
+	if r == nil || r.view == nil || r.writer == nil || r.writer.boundary == nil ||
+		!valid || next == nil || next == r || next.view == nil || next.writer == nil ||
+		next.writer.boundary == nil || next.view.parent != r.view.parent || replace == nil {
+		return errInvalidMetaContext
+	}
+	c := r.view.parent
+	if !c.mut.TryLock() {
+		return ErrExecutionBusy
+	}
+	defer c.mut.Unlock()
+	oldOwner, newOwner := r.writer.boundary, next.writer.boundary
+	if oldOwner == newOwner {
+		return errInvalidMetaContext
+	}
+	oldOwner.mut.Lock()
+	defer oldOwner.mut.Unlock()
+	newOwner.mut.Lock()
+	defer newOwner.mut.Unlock()
+	if oldOwner.failure != nil {
+		return oldOwner.failure
+	}
+	if oldOwner.recovered || !oldOwner.closed || oldOwner.running || r.view.ready || r.view.added != nil ||
+		c.active != next.view || !next.view.ready || next.nativeCommitted || newOwner.recovered ||
+		r.writer.maxEver != next.writer.maxEver || r.writer.state.accounts != next.writer.state.accounts ||
+		len(oldOwner.stores) != len(newOwner.stores) {
+		return errInvalidMetaContext
+	}
+	if err := newOwner.checkAvailable(); err != nil {
+		return err
+	}
+	for i, store := range oldOwner.stores {
+		if store != newOwner.stores[i] {
+			return errInvalidMetaContext
+		}
+	}
+	previous := &r.view.before
+	if r.nativeCommitted {
+		previous = &r.view.after
+		if !bytes.Equal(r.committedRoot, previous.root) {
+			return errInvalidMetaContext
+		}
+	}
+	if !sameRegistryAnchor(previous, &c.anchor) || !sameRegistryAnchor(previous, &next.view.before) {
+		return errInvalidMetaContext
+	}
+	replace()
 	return nil
 }
 
@@ -224,6 +299,7 @@ func (r *registrationCandidate) commitProjection(admitted *metaRegistryAnchor) (
 		c.members[id] = struct{}{}
 	}
 	c.anchor = copyRegistryAnchor(admitted)
+	r.view.after = copyRegistryAnchor(admitted)
 	c.active, r.view.ready, r.view.added = nil, false, nil
 	return c, nil
 }

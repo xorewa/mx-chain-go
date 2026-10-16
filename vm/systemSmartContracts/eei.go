@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -39,7 +40,10 @@ type vmContext struct {
 	enableEpochsHandler common.EnableEpochsHandler
 	crtTransferIndex    uint32
 	drwaClassifier      vm.DRWATokenClassifier
-	drwaExecutionError  atomic.Pointer[error]
+	// The sole write acquisition is TryLock, so nested native reads cannot
+	// deadlock behind a handoff waiting for their own execution to finish.
+	mutDRWAClassifier  sync.RWMutex
+	drwaExecutionError atomic.Pointer[error]
 }
 
 // VMContextArgs holds the arguments needed to create a new vmContext

@@ -44,6 +44,8 @@ type RollbackContainment struct {
 	failure error
 	running bool
 	closed  bool
+	// Recovery closes this owner but cannot qualify its VM for healthy handoff.
+	recovered bool
 }
 
 // NewRollbackContainment starts at native committed roots. These must be the
@@ -193,5 +195,6 @@ func (c *RollbackContainment) Recover() error {
 	c.outputs = nil
 	c.failure = nil
 	c.closed = true
+	c.recovered = true
 	return nil
 }

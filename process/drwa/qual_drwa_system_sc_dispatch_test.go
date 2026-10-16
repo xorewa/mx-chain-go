@@ -32,11 +32,13 @@ import (
 // contract and actual System VM. Header fixtures do not establish canonical
 // admission. This is the native boundary experiment, not outer block recovery.
 type qualSystemSCDispatch struct {
-	context   vm.ContextHandler
-	contract  vm.SystemSmartContract
-	runtime   vmcommon.VMExecutionHandler
-	container vm.SystemSCContainer
-	reads     int
+	context          vm.ContextHandler
+	contract         vm.SystemSmartContract
+	runtime          vmcommon.VMExecutionHandler
+	container        vm.SystemSCContainer
+	reads            int
+	gasRegistrations int
+	onRead           func()
 }
 
 func qualSystemSCNative(t *testing.T, accounts state.AccountsAdapter, classifier vm.DRWATokenClassifier, validatorAccounts ...state.AccountsAdapter) *qualSystemSCDispatch {
@@ -52,6 +54,9 @@ func qualSystemSCNative(t *testing.T, accounts state.AccountsAdapter, classifier
 	require.False(t, flags.IsFlagEnabled(common.GlobalMintBurnFlag), "E05 candidate prerequisite")
 	hook := &mock.BlockChainHookStub{
 		GetUserAccountCalled: func(address []byte) (vmcommon.UserAccountHandler, error) {
+			if f.onRead != nil {
+				f.onRead()
+			}
 			f.reads++
 			a, err := accounts.GetExistingAccount(address)
 			if err != nil {
@@ -90,6 +95,7 @@ func qualSystemSCNative(t *testing.T, accounts state.AccountsAdapter, classifier
 	gas := testscommon.NewGasScheduleNotifierMock(map[string]map[string]uint64{
 		common.BaseOpsAPICost: {common.AsyncCallStepField: 1000, common.AsyncCallbackGasLockField: 3000},
 	})
+	gas.RegisterNotifyHandlerCalled = func(core.GasScheduleSubscribeHandler) { f.gasRegistrations++ }
 	runtime, err := vmProcess.NewSystemVM(vmProcess.ArgsNewSystemVM{
 		SystemEI: ctx, SystemContracts: container, VmType: processFactory.SystemVirtualMachine, GasSchedule: gas,
 	})
@@ -224,6 +230,12 @@ func TestQualDRWASystemSCDispatchLifecycle(t *testing.T) {
 			var classifier vm.DRWATokenClassifier = r
 			accounts := store
 			var expected error
+			var f *qualSystemSCDispatch
+			if phase != "wrong_store" && phase != "typed_nil" {
+				// Pin runtime refusal after the transition; new construction now
+				// refuses the same closed/failed owner before creating contracts.
+				f = qualSystemSCNative(t, accounts, classifier)
+			}
 			switch phase {
 			case "same_candidate":
 				require.NoError(t, r.RegisterToken(qualRegistrationCreator(t, "TOKEN-abcdef")))
@@ -260,7 +272,6 @@ func TestQualDRWASystemSCDispatchLifecycle(t *testing.T) {
 				require.ErrorIs(t, err, vm.ErrDRWAExecution)
 				return
 			}
-			f := qualSystemSCNative(t, accounts, classifier)
 			output, err := f.runtime.RunSmartContractCall(qualSystemSCInput("pause", "TOKEN-abcdef"))
 			if expected != nil {
 				require.ErrorIs(t, err, expected)

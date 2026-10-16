@@ -161,6 +161,23 @@ func (s *systemVM) runSmartContractCall(input *vmcommon.ContractCallInput) (*vmc
 	return vmOutput, nil
 }
 
+// ReplaceDRWAClassifier serializes a healthy candidate handoff with the native
+// VM's existing execution boundary. It does not rebuild contracts or subscribe
+// gas handlers, and never waits when called reentrantly from native execution.
+func (s *systemVM) ReplaceDRWAClassifier(next vm.DRWATokenClassifier) error {
+	if !s.criticalSection.TryLock() {
+		return vm.ErrDRWAExecution
+	}
+	defer s.criticalSection.Unlock()
+	context, exists := s.systemEI.(interface {
+		ReplaceDRWAClassifier(vm.DRWATokenClassifier) error
+	})
+	if !exists {
+		return vm.ErrDRWAExecution
+	}
+	return context.ReplaceDRWAClassifier(next)
+}
+
 // DRWAExecutionError forwards the context's retained failure without creating
 // another lifecycle latch. Older native contexts retain their unchanged path.
 func (s *systemVM) DRWAExecutionError() error {

@@ -123,6 +123,8 @@ func TestQualDRWASystemSCOwnerHealthyCommit(t *testing.T) {
 				switch observe {
 				case "status":
 					err = status.DRWAExecutionError()
+					require.NoError(t, err, "healthy closure is passive health, not execution admission")
+					refused, err = old.runtime.RunSmartContractCall(qualSystemSCOwnerCall("getTokenProperties"))
 				case "ordinary-call":
 					refused, err = old.runtime.RunSmartContractCall(qualSystemSCOwnerCall("getTokenProperties"))
 				case "classified-call":

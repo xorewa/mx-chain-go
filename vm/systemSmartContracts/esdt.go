@@ -137,7 +137,12 @@ func NewESDTSmartContract(args ArgsNewESDTSmartContract) (*esdt, error) {
 func (e *esdt) Execute(args *vmcommon.ContractCallInput) vmcommon.ReturnCode {
 	e.mutExecution.RLock()
 	defer e.mutExecution.RUnlock()
-	if context, ok := e.eei.(*vmContext); ok && context.drwaClassifier != nil {
+	context, nativeContext := e.eei.(*vmContext)
+	if nativeContext {
+		context.mutDRWAClassifier.RLock()
+		defer context.mutDRWAClassifier.RUnlock()
+	}
+	if nativeContext && context.drwaClassifier != nil {
 		output, err := context.executeDRWAESDTCall(args, func() (*vmcommon.VMOutput, error) {
 			return &vmcommon.VMOutput{ReturnCode: e.execute(args)}, nil
 		})

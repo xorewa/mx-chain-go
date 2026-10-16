@@ -6,13 +6,14 @@ import (
 	"math/big"
 
 	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-go/vm"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
 
 // ExecuteDRWASystemCall places the native VM's value/output effects inside the
-// same classifier read dependency as ESDT dispatch. The immutable constructor
-// dependency must be the admitted native candidate owner. It is not selected by
+// same classifier read dependency as ESDT dispatch. The constructor or guarded
+// handoff dependency must be the admitted native candidate owner. It is not selected by
 // transaction arguments, manager identity, token properties or a public flag.
 func (host *vmContext) ExecuteDRWASystemCall(input *vmcommon.ContractCallInput,
 	execute func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {
@@ -23,13 +24,15 @@ func (host *vmContext) ExecuteDRWASystemCall(input *vmcommon.ContractCallInput,
 }
 
 func (host *vmContext) executeWithDRWAErrorCheck(execute func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {
-	if failure := host.DRWAExecutionError(); failure != nil {
+	host.mutDRWAClassifier.RLock()
+	defer host.mutDRWAClassifier.RUnlock()
+	if failure := host.drwaExecutionAvailabilityError(); failure != nil {
 		return nil, failure
 	}
 	output, err := execute()
 	// Native callers can ignore a nested error. Such an error cannot become a
 	// successful outer result, even when that caller returns native Ok.
-	if failure := host.DRWAExecutionError(); failure != nil {
+	if failure := host.drwaExecutionAvailabilityError(); failure != nil {
 		return nil, failure
 	}
 	return output, err
@@ -66,9 +69,15 @@ func (host *vmContext) executeDRWAESDTCall(input *vmcommon.ContractCallInput,
 // Observe that owner's existing status before native effects, then retain it in
 // the same latch. This never clears VM state or admits a replacement candidate.
 func (host *vmContext) DRWAExecutionError() error {
+	host.mutDRWAClassifier.RLock()
+	defer host.mutDRWAClassifier.RUnlock()
 	failure := host.drwaExecutionError.Load()
 	if failure == nil {
-		if owner, exists := host.drwaClassifier.(interface{ DRWAExecutionError() error }); exists {
+		if owner, exists := host.drwaClassifier.(interface{ DRWAExecutionHealthError() error }); exists {
+			if err := owner.DRWAExecutionHealthError(); err != nil {
+				return host.retainDRWAExecutionError(err)
+			}
+		} else if owner, exists := host.drwaClassifier.(interface{ DRWAExecutionError() error }); exists {
 			if err := owner.DRWAExecutionError(); err != nil {
 				return host.retainDRWAExecutionError(err)
 			}
@@ -76,6 +85,49 @@ func (host *vmContext) DRWAExecutionError() error {
 		return nil
 	}
 	return *failure
+}
+
+// Caller holds the classifier read dependency through the entire native work.
+// A healthy closed owner is not a failure of passive status, but cannot execute.
+func (host *vmContext) drwaExecutionAvailabilityError() error {
+	if failure := host.drwaExecutionError.Load(); failure != nil {
+		return *failure
+	}
+	if owner, exists := host.drwaClassifier.(interface{ DRWAExecutionError() error }); exists {
+		if err := owner.DRWAExecutionError(); err != nil {
+			return host.retainDRWAExecutionError(err)
+		}
+	}
+	return nil
+}
+
+// ReplaceDRWAClassifier keeps the native context/contracts and their gas
+// subscriptions. Only the old private owner can admit the same-lineage handoff;
+// an error leaves both the classifier and the existing failure latch unchanged.
+func (host *vmContext) ReplaceDRWAClassifier(next vm.DRWATokenClassifier) error {
+	if !host.mutDRWAClassifier.TryLock() {
+		return vm.ErrDRWAExecution
+	}
+	defer host.mutDRWAClassifier.Unlock()
+	if failure := host.drwaExecutionError.Load(); failure != nil {
+		return *failure
+	}
+	if check.IfNil(next) || check.IfNil(host.drwaClassifier) {
+		return vm.ErrDRWAExecution
+	}
+	owner, exists := host.drwaClassifier.(interface {
+		WithDRWAClassifierReplacement(vm.DRWATokenClassifier, func()) error
+	})
+	if !exists {
+		return vm.ErrDRWAExecution
+	}
+	if err := next.ValidateAccounts(host.userAccountsDB, host.validatorAccountsDB); err != nil {
+		return fmt.Errorf("%w: %w", vm.ErrDRWAExecution, err)
+	}
+	if err := owner.WithDRWAClassifierReplacement(next, func() { host.drwaClassifier = next }); err != nil {
+		return fmt.Errorf("%w: %w", vm.ErrDRWAExecution, err)
+	}
+	return nil
 }
 
 func (host *vmContext) retainDRWAExecutionError(err error) error {
