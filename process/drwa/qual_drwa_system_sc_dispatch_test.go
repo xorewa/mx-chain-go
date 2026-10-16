@@ -39,8 +39,13 @@ type qualSystemSCDispatch struct {
 	reads     int
 }
 
-func qualSystemSCNative(t *testing.T, accounts state.AccountsAdapter, classifier vm.DRWATokenClassifier) *qualSystemSCDispatch {
+func qualSystemSCNative(t *testing.T, accounts state.AccountsAdapter, classifier vm.DRWATokenClassifier, validatorAccounts ...state.AccountsAdapter) *qualSystemSCDispatch {
 	t.Helper()
+	require.LessOrEqual(t, len(validatorAccounts), 1)
+	validators := accounts
+	if len(validatorAccounts) == 1 {
+		validators = validatorAccounts[0]
+	}
 	f := &qualSystemSCDispatch{}
 	cfg := qualCandidateEpochs(t, qualDRWACandidateFixtures["enableEpochs.toml"].body)
 	flags := qualCandidateFlags(t, cfg, cfg.EnableEpochs.SupernovaEnableEpoch)
@@ -67,7 +72,7 @@ func qualSystemSCNative(t *testing.T, accounts state.AccountsAdapter, classifier
 	}
 	ctx, err := systemSmartContracts.NewVMContext(systemSmartContracts.VMContextArgs{
 		BlockChainHook: hook, CryptoHook: hooks.NewVMCryptoHook(), InputParser: parsers.NewCallArgsParser(),
-		UserAccountsDB: accounts, ValidatorAccountsDB: accounts, ChanceComputer: &mock.RaterMock{},
+		UserAccountsDB: accounts, ValidatorAccountsDB: validators, ChanceComputer: &mock.RaterMock{},
 		EnableEpochsHandler: flags, DRWAClassifier: classifier,
 	})
 	require.NoError(t, err)
@@ -108,8 +113,8 @@ func qualSystemSCInput(method, token string) *vmcommon.ContractCallInput {
 	return input
 }
 
-func qualSystemSCOrdinaryCandidate(t *testing.T) (*registrationCandidate, *qualRegistrationCandidateStore) {
-	return qualSystemSCFamilyCandidate(t, core.FungibleESDT, "TOKEN-abcdef")
+func qualSystemSCOrdinaryCandidate(t *testing.T, participating ...state.AccountsAdapter) (*registrationCandidate, *qualRegistrationCandidateStore) {
+	return qualSystemSCFamilyCandidate(t, core.FungibleESDT, "TOKEN-abcdef", participating...)
 }
 
 func qualSystemSCConversionFamily(method string) string {
@@ -123,7 +128,7 @@ func qualSystemSCConversionFamily(method string) string {
 	}
 }
 
-func qualSystemSCFamilyCandidate(t *testing.T, family, identifier string) (*registrationCandidate, *qualRegistrationCandidateStore) {
+func qualSystemSCFamilyCandidate(t *testing.T, family, identifier string, participating ...state.AccountsAdapter) (*registrationCandidate, *qualRegistrationCandidateStore) {
 	t.Helper()
 	f := qualRegistryTransportWithSetup(t, false, []byte{0, 0, 0, 0, 0, 0, 0, 2}, []byte{1}, false,
 		func(accounts state.AccountsAdapter) {
@@ -148,7 +153,7 @@ func qualSystemSCFamilyCandidate(t *testing.T, family, identifier string) (*regi
 	projection, err := transport.reconstruct(f.anchor, f.count, f.members)
 	require.NoError(t, err)
 	store := &qualRegistrationCandidateStore{qualNativeStore: &qualNativeStore{AccountsAdapter: f.source}}
-	candidate, err := reconstructRegistrationCandidate(store, qualRegistrationCoordinator(), 2, projection)
+	candidate, err := reconstructRegistrationCandidate(store, qualRegistrationCoordinator(), 2, projection, participating...)
 	require.NoError(t, err)
 	return candidate, store
 }
