@@ -40,6 +40,9 @@ func TestQualDRWAFactoryStoreBinding(t *testing.T) {
 			notifications := 0
 			gas.RegisterNotifyHandlerCalled = func(core.GasScheduleSubscribeHandler) { notifications++ }
 			args := createVmContainerMockArgument(gas)
+			args.BlockChainHook = &testscommon.BlockChainHookStub{GetAccountsAdapterCalled: func() state.AccountsAdapter {
+				return args.UserAccountsDB
+			}}
 			cause := errors.New("experimental native store admission refusal")
 			validations := 0
 			args.DRWAClassifier = &qualStoreBindingClassifier{validate: func(user, peer state.AccountsAdapter) error {

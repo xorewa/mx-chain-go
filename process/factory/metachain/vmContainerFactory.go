@@ -189,6 +189,14 @@ func (vmf *vmContainerFactory) CreateForGenesis() (process.VirtualMachinesContai
 }
 
 func (vmf *vmContainerFactory) createSystemVMFactoryAndEEI() (vm.SystemSCContainerFactory, vm.ContextHandler, error) {
+	// P-05: the native hook and System-SC user context must share the same
+	// captured journal owner. Equal roots on another adapter are insufficient.
+	// Nil classifiers retain native construction; typed nil is refused by EEI.
+	if vmf.drwaClassifier != nil && !check.IfNil(vmf.drwaClassifier) &&
+		vmf.blockChainHook.GetAccountsAdapter() != vmf.userAccountsDB {
+		return nil, nil, vm.ErrDRWAExecution
+	}
+
 	atArgumentParser := parsers.NewCallArgsParser()
 	vmContextArgs := systemSmartContracts.VMContextArgs{
 		DRWAClassifier:      vmf.drwaClassifier,
