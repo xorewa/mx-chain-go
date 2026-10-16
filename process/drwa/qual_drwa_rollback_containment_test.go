@@ -11,10 +11,14 @@ import (
 	"github.com/multiversx/mx-chain-core-go/hashing/blake2b"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/common/holders"
+	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/state"
 	stateDisabled "github.com/multiversx/mx-chain-go/state/disabled"
 	"github.com/multiversx/mx-chain-go/state/factory"
+	"github.com/multiversx/mx-chain-go/state/storagePruningManager"
 	pruningDisabled "github.com/multiversx/mx-chain-go/state/storagePruningManager/disabled"
+	"github.com/multiversx/mx-chain-go/state/storagePruningManager/evictionWaitingList"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	"github.com/multiversx/mx-chain-go/testscommon/storageManager"
@@ -410,6 +414,154 @@ func TestQualDRWANativeContainmentPartialCommitRecovery(t *testing.T) {
 			require.Equal(t, 1, second.commits)
 			require.ErrorIs(t, c.Execute(func() (*vmcommon.VMOutput, error) { called = true; return nil, nil }), ErrExecutionClosed)
 			require.False(t, called)
+		})
+	}
+}
+
+// This feasibility fixture replaces the earlier disabled pruning/stub storage
+// with the actual native storage manager, pruning manager and eviction list.
+// Persistence remains memory-backed; no snapshot, epoch deletion or canonical
+// owner is simulated. The capacities are experimental values under R7.
+func qualPruningContainmentStore(t *testing.T) (*qualNativeStore, common.StorageManager) {
+	t.Helper()
+	args, _ := qualContainmentArgs(t)
+	db := testscommon.NewSnapshotPruningStorerMock()
+	storage, err := trie.NewTrieStorageManager(trie.NewTrieStorageManagerArgs{
+		MainStorer: db, Marshalizer: args.Marshaller, Hasher: args.Hasher,
+		GeneralConfig: config.TrieStorageManagerConfig{
+			SnapshotsBufferLen: 10, SnapshotsGoroutinesPerCore: 1,
+		},
+		IdleProvider: &testscommon.ProcessStatusHandlerStub{}, Identifier: "qual-drwa-root-retention",
+		StatsCollector: db.GetStateStatsHandler(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, storage.Close()) })
+	args.Trie, err = trie.NewTrie(storage, args.Marshaller, args.Hasher,
+		enableEpochsHandlerMock.NewEnableEpochsHandlerStub(), 5)
+	require.NoError(t, err)
+	waiting, err := evictionWaitingList.NewMemoryEvictionWaitingList(evictionWaitingList.MemoryEvictionWaitingListArgs{
+		RootHashesSize: 1000, HashesSize: 1000,
+	})
+	require.NoError(t, err)
+	args.StoragePruningManager, err = storagePruningManager.NewStoragePruningManager(waiting, 1000)
+	require.NoError(t, err)
+	args.PruningEnabled = true
+	adb, err := state.NewAccountsDB(args)
+	require.NoError(t, err)
+	s := &qualNativeStore{AccountsAdapter: adb, backing: db.MemDbMock}
+	require.NoError(t, qualContainmentBalance(s, 100))
+	root, err := adb.Commit()
+	require.NoError(t, err)
+	// Reuse the native settled-root lifecycle: the initial NewRoot reference
+	// must not independently retain the old nodes in this pruning experiment.
+	s.CancelPrune(bytes.Clone(root), state.NewRoot)
+	require.True(t, s.IsPruningEnabled())
+	require.False(t, storage.IsPruningBlocked())
+	return s, storage
+}
+
+// P-05 needs roots to survive the entire recovery lifetime. Buffering is a
+// native counter, not a pin: queued prune/cancel operations execute in order.
+// ResetPruning is explored here only as a native feasibility alternative, not
+// installed as a production policy for other owners' pending pruning work.
+func TestQualDRWANativeContainmentPruningLifetime(t *testing.T) {
+	for _, mode := range []string{
+		"unbuffered_pruning_before_recovery",
+		"buffered_late_cancel_after_recovery",
+		"buffered_native_reset_before_release",
+	} {
+		t.Run(mode, func(t *testing.T) {
+			first, storage := qualPruningContainmentStore(t)
+			second := qualContainmentStore(t)
+			buffered := mode != "unbuffered_pruning_before_recovery"
+			if buffered {
+				storage.EnterPruningBufferingMode()
+				defer func() {
+					if storage.IsPruningBlocked() {
+						storage.ExitPruningBufferingMode()
+					}
+				}()
+			}
+			c, err := NewRollbackContainment(first, second)
+			require.NoError(t, err)
+			root := bytes.Clone(c.roots[0])
+			account, err := first.GetExistingAccount(qualContainmentAddress)
+			require.NoError(t, err)
+			dataRoot := bytes.Clone(account.(state.UserAccountHandler).GetRootHash())
+			for _, hash := range [][]byte{root, dataRoot} {
+				value, readErr := first.backing.Get(hash)
+				require.NoError(t, readErr)
+				require.NotEmpty(t, value)
+			}
+			require.NoError(t, c.Execute(func() (*vmcommon.VMOutput, error) {
+				if e := qualContainmentBalance(first, 70); e != nil {
+					return nil, e
+				}
+				if e := qualContainmentBalance(second, 130); e != nil {
+					return nil, e
+				}
+				return &vmcommon.VMOutput{ReturnData: [][]byte{[]byte("pending only")}}, nil
+			}))
+			commitFault := errors.New("second native store commit failed")
+			second.commitErr = commitFault
+			roots, outputs, err := c.Commit()
+			require.Same(t, commitFault, err)
+			require.Nil(t, roots)
+			require.Nil(t, outputs)
+			require.Zero(t, first.JournalLen())
+			require.Positive(t, second.JournalLen())
+			first.PruneTrie(bytes.Clone(root), state.OldRoot, state.NewPruningHandler(state.EnableDataRemoval))
+			if !buffered {
+				for _, hash := range [][]byte{root, dataRoot} {
+					_, readErr := first.backing.Get(hash)
+					require.Error(t, readErr)
+				}
+				require.ErrorIs(t, c.Recover(), commitFault)
+				called := false
+				require.ErrorIs(t, c.Execute(func() (*vmcommon.VMOutput, error) { called = true; return nil, nil }), commitFault)
+				require.False(t, called)
+				_, outputs, err = c.Commit()
+				require.ErrorIs(t, err, commitFault)
+				require.Nil(t, outputs)
+				qualAssertContainmentBalance(t, second, 100)
+			} else {
+				// This cancellation queues behind the existing prune. Recreating
+				// a trie before buffering ends does not reorder those requests.
+				first.CancelPrune(bytes.Clone(root), state.OldRoot)
+				require.NoError(t, c.Recover())
+				qualAssertContainmentBalance(t, first, 100)
+				qualAssertContainmentBalance(t, second, 100)
+				reset := mode == "buffered_native_reset_before_release"
+				if reset {
+					first.ResetPruning()
+				}
+				storage.ExitPruningBufferingMode()
+				require.False(t, storage.IsPruningBlocked())
+				// An ordinary later pruning call drains the native queue.
+				first.PruneTrie(bytes.Clone(root), state.OldRoot, state.NewPruningHandler(state.EnableDataRemoval))
+				for _, hash := range [][]byte{root, dataRoot} {
+					_, readErr := first.backing.Get(hash)
+					if reset {
+						require.NoError(t, readErr)
+					} else {
+						require.Error(t, readErr)
+					}
+				}
+				// Force fresh main/data-trie reads; a cached recovered account
+				// could otherwise hide backing-node removal after release.
+				err = first.AccountsAdapter.RecreateTrie(holders.NewDefaultRootHashesHolder(bytes.Clone(root)))
+				if reset {
+					require.NoError(t, err)
+					qualAssertContainmentBalance(t, first, 100)
+				} else {
+					require.Error(t, err)
+				}
+				called := false
+				require.ErrorIs(t, c.Execute(func() (*vmcommon.VMOutput, error) { called = true; return nil, nil }), ErrExecutionClosed)
+				require.False(t, called)
+			}
+			require.Equal(t, 1, first.commits)
+			require.Equal(t, 1, second.commits)
 		})
 	}
 }
