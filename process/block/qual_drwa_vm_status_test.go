@@ -1,6 +1,7 @@
 package block_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,8 +13,11 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/data/endProcess"
+	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/dataRetriever/blockchain"
 	"github.com/multiversx/mx-chain-go/process"
 	processBlock "github.com/multiversx/mx-chain-go/process/block"
+	"github.com/multiversx/mx-chain-go/process/drwa"
 	"github.com/multiversx/mx-chain-go/process/factory"
 	"github.com/multiversx/mx-chain-go/process/mock"
 	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
@@ -377,5 +381,123 @@ func TestQualDRWANativeStopVMContext(t *testing.T) {
 			require.Same(t, failure, runtime.DRWAExecutionError())
 			require.Zero(t, commits.Load())
 		})
+	}
+}
+
+// P-05: compose the native context selector with the existing containment owner.
+// Native chain objects select the boundary; account adapters are spies. This
+// does not admit a canonical candidate, retain physical trie nodes, reconstruct
+// a VM or establish native factory/scheduler ownership. R7 records all fixtures.
+func TestQualDRWANativeSelectedRootsContainment(t *testing.T) {
+	for _, chain := range []string{"meta", "shard"} {
+		for _, version := range []string{"legacy", "v3"} {
+			for _, relationship := range []string{"aligned", "mismatched"} {
+				t.Run(chain+"/"+version+"/"+relationship, func(t *testing.T) {
+					coreComponents, dataComponents, bootstrapComponents, statusComponents := createMockComponentHolders()
+					userRoot, peerHeaderRoot, peerResultRoot := []byte("rootHash"), []byte("peerRootHash"), []byte("peerRootHashX")
+					expected := [][]byte{userRoot}
+					if chain == "meta" {
+						peerRoot := peerHeaderRoot
+						if version == "v3" {
+							peerRoot = peerResultRoot
+						}
+						expected = append(expected, peerRoot)
+					}
+					original, rollback := errors.New("experimental original failure"), errors.New("experimental rollback failure")
+					adapters := make([]state.AccountsAdapter, len(expected))
+					recreated := make([][][]byte, len(expected))
+					commits := 0
+					for i, selected := range expected {
+						root := bytes.Clone(selected)
+						if relationship == "mismatched" {
+							root = []byte("rootHashX")
+						}
+						adapters[i] = &stateMock.AccountsStub{
+							RootHashCalled:   func() ([]byte, error) { return bytes.Clone(root), nil },
+							JournalLenCalled: func() int { return 0 },
+							RecreateTrieCalled: func(options common.RootHashHolder) error {
+								root = bytes.Clone(options.GetRootHash())
+								recreated[i] = append(recreated[i], bytes.Clone(root))
+								return nil
+							},
+							RevertToSnapshotCalled: func(int) error { return rollback },
+							CommitCalled:           func() ([]byte, error) { commits++; return nil, nil },
+						}
+					}
+					stores := map[state.AccountsDbIdentifier]state.AccountsAdapter{state.UserAccountsState: adapters[0]}
+					baseResult := &block.BaseExecutionResult{HeaderNonce: 1, HeaderHash: []byte("hash1"), RootHash: userRoot}
+					var candidate data.HeaderHandler
+					var checkContext func(data.HeaderHandler, []byte) error
+					if chain == "meta" {
+						nativeChain, err := blockchain.NewMetaChain(coreComponents.StatusField)
+						require.NoError(t, err)
+						require.NoError(t, nativeChain.SetGenesisHeader(&block.MetaBlock{}))
+						var previous data.HeaderHandler = &block.MetaBlock{Nonce: 1, ValidatorStatsRootHash: peerHeaderRoot}
+						candidate = &block.MetaBlock{Nonce: 2, PrevHash: []byte("hash1")}
+						if version == "v3" {
+							previous = &block.MetaBlockV3{Nonce: 1}
+							candidate = &block.MetaBlockV3{Nonce: 2, PrevHash: []byte("hash1")}
+						}
+						nativeChain.SetLastExecutionInfo(previous, &block.MetaExecutionResult{
+							ExecutionResult: &block.BaseMetaExecutionResult{
+								BaseExecutionResult: baseResult, ValidatorStatsRootHash: peerResultRoot,
+							},
+						})
+						dataComponents.BlockChain = nativeChain
+						args := createMockMetaArguments(coreComponents, dataComponents, bootstrapComponents, statusComponents)
+						stores[state.PeerAccountsState] = adapters[1]
+						args.AccountsDB = stores
+						processor, err := processBlock.NewMetaProcessor(args)
+						require.NoError(t, err)
+						checkContext = processor.CheckContextBeforeExecution
+					} else {
+						nativeChain, err := blockchain.NewBlockChain(coreComponents.StatusField)
+						require.NoError(t, err)
+						require.NoError(t, nativeChain.SetGenesisHeader(&block.Header{}))
+						var previous data.HeaderHandler = &block.Header{Nonce: 1}
+						candidate = &block.Header{Nonce: 2, PrevHash: []byte("hash1")}
+						if version == "v3" {
+							previous = &block.HeaderV3{Nonce: 1}
+							candidate = &block.HeaderV3{Nonce: 2, PrevHash: []byte("hash1")}
+						}
+						nativeChain.SetLastExecutionInfo(previous, &block.ExecutionResult{BaseExecutionResult: baseResult})
+						dataComponents.BlockChain = nativeChain
+						args := CreateMockArgumentsMultiShard(coreComponents, dataComponents, bootstrapComponents, statusComponents)
+						args.AccountsDB = stores
+						processor, err := processBlock.NewShardProcessor(args)
+						require.NoError(t, err)
+						checkContext = processor.CheckContextBeforeExecution
+					}
+					require.NoError(t, checkContext(candidate, []byte("headerHash")))
+					for i, selected := range expected {
+						if relationship == "aligned" {
+							require.Empty(t, recreated[i], "native equal-root selection skips recreation")
+						} else {
+							require.Equal(t, [][]byte{selected}, recreated[i])
+						}
+						recreated[i] = nil
+					}
+					owner, err := drwa.NewRollbackContainment(adapters...)
+					require.NoError(t, err)
+					err = owner.Execute(func() (*vmcommon.VMOutput, error) { return &vmcommon.VMOutput{}, original })
+					require.ErrorIs(t, err, original)
+					require.ErrorIs(t, err, rollback)
+					roots, outputs, err := owner.Commit()
+					require.ErrorIs(t, err, original)
+					require.ErrorIs(t, err, rollback)
+					require.Nil(t, roots)
+					require.Nil(t, outputs)
+					require.Zero(t, commits)
+					require.NoError(t, owner.Recover())
+					for i, selected := range expected {
+						require.Equal(t, [][]byte{selected}, recreated[i], "recovery forces every selected root, even with equal roots and empty journals")
+					}
+					require.ErrorIs(t, owner.Execute(func() (*vmcommon.VMOutput, error) {
+						t.Fatal("recovered owner must not resume execution")
+						return nil, nil
+					}), drwa.ErrExecutionClosed)
+				})
+			}
+		}
 	}
 }
