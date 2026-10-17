@@ -55,7 +55,11 @@ type ArgBlockChainHook struct {
 	Marshalizer      marshal.Marshalizer
 	// Hasher is the configured native header hasher for the DRWA typed view.
 	// An omitted hasher leaves that view unavailable, preserving ordinary hooks.
-	Hasher                   hashing.Hasher
+	Hasher hashing.Hasher
+	// DRWAHeaderTimeEnabled is the native owner's current DRWA activation
+	// predicate. An omitted predicate leaves ordinary header installation alone.
+	// It is a constructor dependency, never supplied by transaction input.
+	DRWAHeaderTimeEnabled    func() bool
 	Uint64Converter          typeConverters.Uint64ByteSliceConverter
 	BuiltInFunctions         vmcommon.BuiltInFunctionContainer
 	NFTStorageHandler        vmcommon.SimpleESDTNFTStorageHandler
@@ -156,6 +160,9 @@ func NewBlockChainHookImpl(
 	blockChainHookImpl.vmContainer = containers.NewVirtualMachinesContainer()
 	if err = blockChainHookImpl.initializeEvaluatedHeaderTime(args.Hasher); err != nil {
 		return nil, err
+	}
+	if blockChainHookImpl.drwaTime != nil {
+		blockChainHookImpl.drwaTime.enabled = args.DRWAHeaderTimeEnabled
 	}
 
 	args.EpochNotifier.RegisterNotifyHandler(blockChainHookImpl)
@@ -870,13 +877,10 @@ func (bh *BlockChainHookImpl) SetCurrentHeader(hdr data.HeaderHandler) error {
 		return ErrNilCurrentHeader
 	}
 
-	if err := bh.lockCurrentHeaderForTime(); err != nil {
-		return err
-	}
+	bh.mutCurrentHdr.Lock()
 	defer bh.mutCurrentHdr.Unlock()
-	if bh.drwaTime != nil {
-		bh.drwaTime.clock.Reset()
-	}
+	// A new evaluation may have begun while this native installation waited.
+	bh.invalidateEvaluatedHeaderTime()
 	return bh.setCurrentHeaderLocked(hdr)
 }
 

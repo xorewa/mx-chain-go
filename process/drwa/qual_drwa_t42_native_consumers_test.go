@@ -58,6 +58,7 @@ func qualT42Hook(t *testing.T, accounts state.AccountsAdapter, shard uint32, con
 	}
 	if configured {
 		args.Hasher = blake2b.NewBlake2b()
+		args.DRWAHeaderTimeEnabled = func() bool { return true }
 	}
 	hook, err := hooks.NewBlockChainHookImpl(args)
 	require.NoError(t, err)
@@ -235,8 +236,8 @@ func TestQualDRWAT42NativeConcurrentInvalidation(t *testing.T) {
 	for err := range results {
 		require.NoError(t, err)
 	}
-	require.ErrorIs(t, installErr, ErrInactiveHeaderTime)
-	require.Equal(t, uint64(111), hook.CurrentTimeStampMs())
+	require.NoError(t, installErr)
+	require.Equal(t, uint64(222), hook.CurrentTimeStampMs())
 	require.NoError(t, hook.SetCurrentHeader(qualT42Header(1, 222)))
 	fresh, exit := qualT42Install(t, hook, 1, 222)
 	_, freshErr := fresh.Milliseconds()
@@ -346,9 +347,9 @@ func TestQualDRWAT42F06NativeConsumer(t *testing.T) {
 					if name == "concurrent_replace" {
 						result := make(chan error, 1)
 						go func() { result <- hook.SetCurrentHeader(qualT42Header(1, 222)) }()
-						require.ErrorIs(t, <-result, ErrInactiveHeaderTime)
+						require.NoError(t, <-result)
 					} else {
-						require.ErrorIs(t, hook.SetCurrentHeader(qualT42Header(1, 222)), ErrInactiveHeaderTime)
+						require.NoError(t, hook.SetCurrentHeader(qualT42Header(1, 222)))
 					}
 				}
 			case "native_failure":
@@ -480,7 +481,7 @@ func TestQualDRWAT42NativeConsumerReentry(t *testing.T) {
 		root, err := f.store.RootHash()
 		require.NoError(t, err)
 		f.mandates.hook = func() {
-			require.ErrorIs(t, hook.SetCurrentHeader(qualT42Header(core.MetachainShardId, 101)), ErrInactiveHeaderTime)
+			require.NoError(t, hook.SetCurrentHeader(qualT42Header(core.MetachainShardId, 101)))
 		}
 		err = f.records.install(context, f.d.owner, f.d.program, nil, f.versionBody, f.mandates.proof("ENROLL", nil, f.d.authority))
 		require.ErrorIs(t, err, ErrInactiveHeaderTime)
@@ -505,7 +506,7 @@ func TestQualDRWAT42NativeConsumerReentry(t *testing.T) {
 		root, err := f.s.RootHash()
 		require.NoError(t, err)
 		f.h.hooks["apply"] = func() {
-			require.ErrorIs(t, hook.SetCurrentHeader(qualT42Header(core.MetachainShardId, 106)), ErrInactiveHeaderTime)
+			require.NoError(t, hook.SetCurrentHeader(qualT42Header(core.MetachainShardId, 106)))
 		}
 		require.ErrorIs(t, f.g.start(context, id, []byte("synthetic-current-start")), ErrInactiveHeaderTime)
 		qualAssertContainmentBalance(t, f.s, 100)

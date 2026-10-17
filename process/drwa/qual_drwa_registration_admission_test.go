@@ -205,7 +205,7 @@ func TestQualDRWAT44T45AdmissionNativeTimeAndRollback(t *testing.T) {
 			case "context-invalidation":
 				f.verify.hook = func(p string) {
 					if p == "REGISTER_TOKEN" {
-						require.Error(t, f.hook.SetCurrentHeader(qualT42Header(core.MetachainShardId, 2)))
+						require.NoError(t, f.hook.SetCurrentHeader(qualT42Header(core.MetachainShardId, 2)))
 					}
 				}
 			}

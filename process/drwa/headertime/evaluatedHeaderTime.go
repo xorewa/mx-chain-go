@@ -124,9 +124,9 @@ func (p *EvaluatedHeaderTime) End(context *HeaderTimeContext) {
 	}
 }
 
-// Reset invalidates contexts on owning-mode handoff, failed native installation
-// or recovery. T42 must call it before any actual attempted native installation,
-// including one that fails while leaving the old native header installed.
+// Reset invalidates contexts on an owning-mode handoff or recovery. The native
+// adapter also invalidates its operation before raw installation, including a
+// failed attempt; it need not reset this clock while a caller holds a lease.
 func (p *EvaluatedHeaderTime) Reset() {
 	p.mut.Lock()
 	defer p.mut.Unlock()
@@ -205,8 +205,8 @@ func (p *EvaluatedHeaderTime) EvaluatedHeaderTimeContext() (*HeaderTimeContext, 
 func (p *EvaluatedHeaderTime) IsInterfaceNil() bool { return p == nil }
 
 // WithHeaderTime runs inside the caller's existing T04 rollback boundary.
-// Native installation is leased across callbacks and writes. An attempted
-// reentrant installation invalidates the context; the final check therefore
+// The native operation capability is checked across callbacks and writes.
+// A reentrant installation invalidates the context; the final check therefore
 // turns an otherwise successful callback into rollback, never a committed debit.
 func WithHeaderTime(source HeaderTimeSource, context *HeaderTimeContext,
 	execute func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {

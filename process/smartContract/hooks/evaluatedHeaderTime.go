@@ -17,12 +17,13 @@ import (
 // owner is the actual hook shared by factories and native aliases, not a reader
 // wrapper. All state is local lifecycle state, never a protocol generation.
 type evaluatedHeaderTime struct {
-	clock  *drwa.EvaluatedHeaderTime
-	hasher hashing.Hasher
-	gate   sync.Mutex
-	active atomic.Pointer[evaluatedHeaderOperation]
-	leases atomic.Int32
-	closed atomic.Bool
+	clock   *drwa.EvaluatedHeaderTime
+	hasher  hashing.Hasher
+	gate    sync.Mutex
+	active  atomic.Pointer[evaluatedHeaderOperation]
+	leases  atomic.Int32
+	closed  atomic.Bool
+	enabled func() bool
 }
 
 type evaluatedHeaderOperation struct {
@@ -62,19 +63,8 @@ func (bh *BlockChainHookImpl) invalidateEvaluatedHeaderTime() {
 	}
 }
 
-// Ordinary installations retain the native blocking mutex. During an actual
-// DRWA lease, re-entry cannot block behind its own read lock: deny the attempted
-// install, having already invalidated its capability. The enclosing time-bound
-// record operation detects that invalidation before its T04 boundary commits.
-func (bh *BlockChainHookImpl) lockCurrentHeaderForTime() error {
-	if bh.drwaTime != nil && bh.drwaTime.leases.Load() != 0 {
-		if !bh.mutCurrentHdr.TryLock() {
-			return drwa.ErrInactiveHeaderTime
-		}
-		return nil
-	}
-	bh.mutCurrentHdr.Lock()
-	return nil
+func (time *evaluatedHeaderTime) isEnabled() bool {
+	return time.enabled != nil && time.enabled()
 }
 
 // BeginDRWAHeaderEvaluation is called by an admitted native operation owner.
@@ -90,16 +80,23 @@ func (bh *BlockChainHookImpl) BeginDRWAHeaderEvaluation() (func(data.HeaderHandl
 		return bh.SetCurrentHeader, func() {}, nil
 	}
 	time := bh.drwaTime
+	if !time.isEnabled() {
+		bh.invalidateEvaluatedHeaderTime()
+		return bh.SetCurrentHeader, func() {}, nil
+	}
 	if time.closed.Load() {
 		return nil, nil, drwa.ErrInactiveHeaderTime
 	}
 	if !time.gate.TryLock() {
 		return nil, nil, drwa.ErrInactiveHeaderTime
 	}
-	if err := bh.lockCurrentHeaderForTime(); err != nil {
+	// A clock lease can outlive end(). Do not reset its clock or wait on a
+	// lease held by this caller. This error belongs only to DRWA admission.
+	if time.leases.Load() != 0 {
 		time.gate.Unlock()
-		return nil, nil, err
+		return nil, nil, drwa.ErrInactiveHeaderTime
 	}
+	bh.mutCurrentHdr.Lock()
 	time.clock.Reset()
 	operation := &evaluatedHeaderOperation{hook: bh}
 	operation.valid.Store(true)
@@ -123,30 +120,35 @@ func (operation *evaluatedHeaderOperation) end() {
 
 func (operation *evaluatedHeaderOperation) install(header data.HeaderHandler) error {
 	bh, time := operation.hook, operation.hook.drwaTime
-	if time.active.Load() != operation || !operation.valid.Load() || operation.ended.Load() {
-		return drwa.ErrInactiveHeaderTime
+	// Always perform native installation, even for an invalidated/ended owner.
+	// Typed availability must never become a native installation error.
+	if time.active.Load() != operation {
+		bh.invalidateEvaluatedHeaderTime()
 	}
-	if err := bh.lockCurrentHeaderForTime(); err != nil {
-		operation.valid.Store(false)
-		return err
-	}
+	bh.mutCurrentHdr.Lock()
 	defer bh.mutCurrentHdr.Unlock()
-	if time.active.Load() != operation || !operation.valid.Load() || operation.ended.Load() {
-		return drwa.ErrInactiveHeaderTime
+	if time.active.Load() != operation {
+		bh.invalidateEvaluatedHeaderTime()
 	}
-	operation.context, operation.timeError = nil, nil
-	time.clock.Reset()
 	if err := bh.setCurrentHeaderLocked(header); err != nil {
 		operation.valid.Store(false)
 		return err
 	}
-	if !operation.valid.Load() || operation.ended.Load() {
-		return drwa.ErrInactiveHeaderTime
+	if time.active.Load() != operation || !operation.valid.Load() || operation.ended.Load() ||
+		time.closed.Load() || !time.isEnabled() || time.leases.Load() != 0 {
+		operation.valid.Store(false)
+		return nil
 	}
+	operation.context, operation.timeError = nil, nil
+	time.clock.Reset()
 	var context *drwa.HeaderTimeContext
 	context, err := time.clock.BeginBound(header,
 		func() (func(), error) { return operation.acquire(context) },
-		func() error { return operation.validateLocked(context) })
+		func() error {
+			bh.mutCurrentHdr.RLock()
+			defer bh.mutCurrentHdr.RUnlock()
+			return operation.validateLocked(context)
+		})
 	if err != nil {
 		operation.timeError = err
 		return nil
@@ -161,7 +163,11 @@ func (operation *evaluatedHeaderOperation) acquire(context *drwa.HeaderTimeConte
 	bh, time := operation.hook, operation.hook.drwaTime
 	time.leases.Add(1)
 	bh.mutCurrentHdr.RLock()
-	release := func() { bh.mutCurrentHdr.RUnlock(); time.leases.Add(-1) }
+	defer bh.mutCurrentHdr.RUnlock()
+	// The capability retains its immutable coordinate, not a native mutex
+	// across callbacks. A raw install invalidates it before doing native work;
+	// WithHeaderTime's final check makes the existing T04 owner roll back.
+	release := func() { time.leases.Add(-1) }
 	if err := operation.validateLocked(context); err != nil {
 		release()
 		return nil, err
@@ -173,6 +179,10 @@ func (operation *evaluatedHeaderOperation) validateLocked(context *drwa.HeaderTi
 	bh, time := operation.hook, operation.hook.drwaTime
 	if context == nil || time.closed.Load() || time.active.Load() != operation || !operation.valid.Load() ||
 		operation.ended.Load() || operation.context != context {
+		return drwa.ErrInactiveHeaderTime
+	}
+	if !time.isEnabled() {
+		operation.valid.Store(false)
 		return drwa.ErrInactiveHeaderTime
 	}
 	if operation.timeError != nil {
