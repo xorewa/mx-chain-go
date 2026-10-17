@@ -187,7 +187,7 @@ func TestQualDRWAP17RouteDispatchTargets(t *testing.T) {
 	require.NoError(t, err)
 	for _, declaration := range f.Decls {
 		fn, ok := declaration.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "Execute" {
+		if !ok || fn.Name.Name != "execute" {
 			continue
 		}
 		target := func(body ast.Node) string {

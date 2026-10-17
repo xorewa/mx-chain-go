@@ -104,7 +104,7 @@ func qualP17Dispatch(raw []byte) (map[string]int, error) {
 	entries := make(map[string]int)
 	for _, decl := range f.Decls {
 		fn, isFn := decl.(*ast.FuncDecl)
-		if !isFn || fn.Name.Name != "Execute" || fn.Recv == nil || len(fn.Recv.List) != 1 {
+		if !isFn || fn.Name.Name != "execute" || fn.Recv == nil || len(fn.Recv.List) != 1 {
 			continue
 		}
 		star, isStar := fn.Recv.List[0].Type.(*ast.StarExpr)
