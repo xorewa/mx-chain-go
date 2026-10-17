@@ -1037,6 +1037,11 @@ const WrongConfiguration = "wrongConfiguration"
 // ImportComplete signals that a node restart will be done because the import did complete
 const ImportComplete = "importComplete"
 
+// DRWAExecutionFailure is the DRWA-defined native stop-request reason for a
+// poisoned DRWA context. Readmission requires canonical reconstruction or sync
+// and a newly admitted VM/context; this reason does not request a soft restart.
+const DRWAExecutionFailure = "drwaExecutionFailure"
+
 // DefaultStatsPath is the default path where the node stats are logged
 const DefaultStatsPath = "stats"
 

@@ -16,6 +16,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
+	"github.com/multiversx/mx-chain-core-go/data/endProcess"
 	outportcore "github.com/multiversx/mx-chain-core-go/data/outport"
 	"github.com/multiversx/mx-chain-core-go/data/scheduled"
 	"github.com/multiversx/mx-chain-core-go/data/typeConverters"
@@ -134,6 +135,7 @@ type baseProcessor struct {
 	enableRoundsHandler           common.EnableRoundsHandler
 	vmContainerFactory            process.VirtualMachinesContainerFactory
 	vmContainer                   process.VirtualMachinesContainer
+	coreComponents                coreComponentsHolder
 	gasConsumedProvider           gasConsumedProvider
 	economicsData                 process.EconomicsDataHandler
 	epochChangeGracePeriodHandler common.EpochChangeGracePeriodHandler
@@ -238,6 +240,7 @@ func NewBaseProcessor(arguments ArgBaseProcessor) (*baseProcessor, error) {
 		epochChangeGracePeriodHandler:      arguments.CoreComponents.EpochChangeGracePeriodHandler(),
 		vmContainerFactory:                 arguments.VMContainersFactory,
 		vmContainer:                        arguments.VmContainer,
+		coreComponents:                     arguments.CoreComponents,
 		processDataTriesOnCommitEpoch:      arguments.Config.Debug.EpochStart.ProcessDataTrieOnCommitEpoch,
 		gasConsumedProvider:                arguments.GasHandler,
 		economicsData:                      arguments.CoreComponents.EconomicsData(),
@@ -940,6 +943,18 @@ func (bp *baseProcessor) drwaExecutionError() error {
 	}
 	err = status.DRWAExecutionError()
 	if errors.Is(err, vm.ErrDRWAExecution) {
+		// Read the native endpoint only after poison is recognized. Missing or
+		// unavailable endpoints cannot block the existing failure barrier.
+		if stopper, exists := bp.coreComponents.(interface {
+			ChanStopNodeProcess() chan endProcess.ArgEndProcess
+		}); exists {
+			select {
+			case stopper.ChanStopNodeProcess() <- endProcess.ArgEndProcess{
+				Reason: common.DRWAExecutionFailure, Description: vm.ErrDRWAExecution.Error(),
+			}:
+			default:
+			}
+		}
 		return err
 	}
 	return nil

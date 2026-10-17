@@ -3,19 +3,31 @@ package block_test
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
+	"github.com/multiversx/mx-chain-core-go/data/endProcess"
 	"github.com/multiversx/mx-chain-go/process"
 	processBlock "github.com/multiversx/mx-chain-go/process/block"
 	"github.com/multiversx/mx-chain-go/process/factory"
 	"github.com/multiversx/mx-chain-go/process/mock"
+	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/testscommon"
+	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	stateMock "github.com/multiversx/mx-chain-go/testscommon/state"
 	"github.com/multiversx/mx-chain-go/vm"
+	vmFactory "github.com/multiversx/mx-chain-go/vm/factory"
+	vmMock "github.com/multiversx/mx-chain-go/vm/mock"
+	vmProcess "github.com/multiversx/mx-chain-go/vm/process"
+	"github.com/multiversx/mx-chain-go/vm/systemSmartContracts"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	"github.com/multiversx/mx-chain-vm-common-go/parsers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,6 +37,40 @@ type qualDRWAStatusVM struct {
 }
 
 func (v *qualDRWAStatusVM) DRWAExecutionError() error { return v.failure }
+
+type qualDRWAStopCore struct {
+	*mock.CoreComponentsMock
+	channel chan endProcess.ArgEndProcess
+	reads   *atomic.Int64
+}
+
+func (c *qualDRWAStopCore) ChanStopNodeProcess() chan endProcess.ArgEndProcess {
+	c.reads.Add(1)
+	return c.channel
+}
+
+func qualDRWAObserveStop(args *processBlock.ArgBaseProcessor, channel chan endProcess.ArgEndProcess, reads *atomic.Int64) {
+	args.CoreComponents = &qualDRWAStopCore{
+		CoreComponentsMock: args.CoreComponents.(*mock.CoreComponentsMock), channel: channel, reads: reads,
+	}
+}
+
+func qualDRWAAssertStop(t *testing.T, channel chan endProcess.ArgEndProcess, poison bool) {
+	t.Helper()
+	if !poison {
+		require.Empty(t, channel, "ordinary status must not request node shutdown")
+		return
+	}
+	select {
+	case request := <-channel:
+		// Owner-authorized experimental reason; literal is independent of the
+		// production constant and also compiles against the pre-change source.
+		require.Equal(t, "drwaExecutionFailure", request.Reason)
+		require.Equal(t, vm.ErrDRWAExecution.Error(), request.Description)
+	default:
+		t.Fatal("retained DRWA poison did not request native shutdown")
+	}
+}
 
 // DS02-M6/M7, P-05: a native owner cannot forget its existing VM failure at the
 // next entry/commit. These malformed-input controls prove error precedence;
@@ -77,26 +123,33 @@ func TestQualDRWAVMStatusBlockEntries(t *testing.T) {
 					}}
 					var processor process.BlockProcessor
 					var err error
+					stop := make(chan endProcess.ArgEndProcess, 1)
+					var stopReads atomic.Int64
 					if chain == "meta" {
 						args := createMockMetaArguments(createMockComponentHolders())
 						args.VmContainer = container
+						qualDRWAObserveStop(&args.ArgBaseProcessor, stop, &stopReads)
 						processor, err = processBlock.NewMetaProcessor(args)
 					} else {
 						args := CreateMockArgumentsMultiShard(createMockComponentHolders())
 						args.VmContainer = container
+						qualDRWAObserveStop(&args.ArgBaseProcessor, stop, &stopReads)
 						processor, err = processBlock.NewShardProcessor(args)
 					}
 					require.NoError(t, err)
+					require.Zero(t, stopReads.Load(), "construction must not query the stop channel")
 					err = entry.call(processor)
 					if shape == "ordinary" || shape == "healthy" {
 						require.ErrorIs(t, err, process.ErrNilBlockHeader)
 						require.NotErrorIs(t, err, vm.ErrDRWAExecution)
+						require.Zero(t, stopReads.Load())
 					} else {
 						require.Same(t, failure, err)
 						if shape == "joined" {
 							require.ErrorIs(t, err, rollback)
 						}
 					}
+					qualDRWAAssertStop(t, stop, shape != "ordinary" && shape != "healthy")
 				})
 			}
 		}
@@ -132,28 +185,197 @@ func TestQualDRWAVMStatusCommitPublication(t *testing.T) {
 				var processor process.BlockProcessor
 				var header data.HeaderHandler
 				var err error
+				stop := make(chan endProcess.ArgEndProcess, 1)
+				var stopReads atomic.Int64
 				if chain == "meta" {
 					args := createMockMetaArguments(createMockComponentHolders())
 					stores[state.PeerAccountsState] = accounts
 					args.AccountsDB, args.VmContainer = stores, container
+					qualDRWAObserveStop(&args.ArgBaseProcessor, stop, &stopReads)
 					processor, err = processBlock.NewMetaProcessor(args)
 					header = &block.MetaBlockV3{}
 				} else {
 					args := CreateMockArgumentsMultiShard(createMockComponentHolders())
 					args.AccountsDB, args.VmContainer = stores, container
+					qualDRWAObserveStop(&args.ArgBaseProcessor, stop, &stopReads)
 					processor, err = processBlock.NewShardProcessor(args)
 					header = &block.HeaderV3{}
 				}
 				require.NoError(t, err)
+				require.Zero(t, stopReads.Load(), "construction must not query the stop channel")
 				err = processor.CommitBlockProposalState(header, nil)
 				if shape == "ordinary" || shape == "healthy" {
 					require.NoError(t, err)
 					require.Equal(t, len(stores), commits, "ordinary native commit remains reachable")
+					require.Zero(t, stopReads.Load())
 				} else {
 					require.Same(t, failure, err)
 					require.Zero(t, commits, "no store persistence after retained VM failure")
 				}
+				qualDRWAAssertStop(t, stop, shape != "ordinary" && shape != "healthy")
 			})
 		}
+	}
+}
+
+// Shadowing the optional method with a field preserves the inherited required
+// holder methods while exercising a native holder without a stop capability.
+type qualDRWANoStopCore struct {
+	*mock.CoreComponentsMock
+	ChanStopNodeProcess struct{}
+}
+
+func qualDRWAStopProcessor(t *testing.T, chain string, runtime vmcommon.VMExecutionHandler,
+	channel chan endProcess.ArgEndProcess, reads *atomic.Int64, absent bool,
+) (process.BlockProcessor, data.HeaderHandler, *atomic.Int64) {
+	t.Helper()
+	commits := &atomic.Int64{}
+	accounts := &stateMock.AccountsStub{CommitCalled: func() ([]byte, error) { commits.Add(1); return nil, nil }}
+	stores := map[state.AccountsDbIdentifier]state.AccountsAdapter{state.UserAccountsState: accounts}
+	container := &mock.VMContainerMock{GetCalled: func(_ []byte) (vmcommon.VMExecutionHandler, error) { return runtime, nil }}
+	attach := func(args *processBlock.ArgBaseProcessor) {
+		args.AccountsDB, args.VmContainer = stores, container
+		if absent {
+			args.CoreComponents = &qualDRWANoStopCore{CoreComponentsMock: args.CoreComponents.(*mock.CoreComponentsMock)}
+		} else {
+			qualDRWAObserveStop(args, channel, reads)
+		}
+	}
+	var processor process.BlockProcessor
+	var header data.HeaderHandler
+	var err error
+	if chain == "meta" {
+		args := createMockMetaArguments(createMockComponentHolders())
+		stores[state.PeerAccountsState] = accounts
+		attach(&args.ArgBaseProcessor)
+		processor, err = processBlock.NewMetaProcessor(args)
+		header = &block.MetaBlockV3{}
+	} else {
+		args := CreateMockArgumentsMultiShard(createMockComponentHolders())
+		attach(&args.ArgBaseProcessor)
+		processor, err = processBlock.NewShardProcessor(args)
+		header = &block.HeaderV3{}
+	}
+	require.NoError(t, err)
+	require.Zero(t, reads.Load(), "construction must not query the stop channel")
+	return processor, header, commits
+}
+
+// The native channel is receiver-owned. A missing capability or unavailable
+// endpoint cannot unblock publication, erase diagnostics or stall the caller.
+// Channel capacities, repetitions and concurrent callers are R7 fixtures.
+func TestQualDRWANativeStopUnavailable(t *testing.T) {
+	for _, chain := range []string{"meta", "shard"} {
+		for _, endpoint := range []string{"available", "absent", "nil", "full", "unbuffered"} {
+			t.Run(chain+"/"+endpoint, func(t *testing.T) {
+				original, rollback := errors.New("experimental original failure"), errors.New("experimental rollback failure")
+				failure := errors.Join(vm.ErrDRWAExecution, original, rollback)
+				runtime := &qualDRWAStatusVM{VMExecutionHandlerStub: &mock.VMExecutionHandlerStub{}, failure: failure}
+				channel := make(chan endProcess.ArgEndProcess, 1)
+				switch endpoint {
+				case "nil":
+					channel = nil
+				case "full":
+					channel <- endProcess.ArgEndProcess{}
+				case "unbuffered":
+					channel = make(chan endProcess.ArgEndProcess)
+				}
+				var reads atomic.Int64
+				processor, header, commits := qualDRWAStopProcessor(t, chain, runtime, channel, &reads, endpoint == "absent")
+				for range 2 {
+					err := processor.ProcessBlock(nil, nil, func() time.Duration { return time.Second })
+					require.Same(t, failure, err)
+					require.ErrorIs(t, err, original)
+					require.ErrorIs(t, err, rollback)
+					require.Same(t, failure, processor.CommitBlockProposalState(header, nil))
+				}
+				var callers sync.WaitGroup
+				results := make(chan error, 2)
+				for range 2 {
+					callers.Go(func() {
+						results <- processor.ProcessBlock(nil, nil, func() time.Duration { return time.Second })
+					})
+				}
+				callers.Wait()
+				for range 2 {
+					require.Same(t, failure, <-results)
+				}
+				require.Zero(t, commits.Load())
+				require.Same(t, failure, runtime.DRWAExecutionError())
+				switch endpoint {
+				case "available":
+					qualDRWAAssertStop(t, channel, true)
+				case "full":
+					require.Equal(t, endProcess.ArgEndProcess{}, <-channel, "do not overwrite an existing native request")
+				default:
+					require.Empty(t, channel)
+				}
+				if endpoint == "absent" {
+					require.Zero(t, reads.Load())
+				} else {
+					require.Positive(t, reads.Load())
+				}
+			})
+		}
+	}
+}
+
+type qualDRWAStopClassifier struct{ failure error }
+
+func (c *qualDRWAStopClassifier) ValidateAccounts(state.AccountsAdapter, state.AccountsAdapter) error {
+	return nil
+}
+func (c *qualDRWAStopClassifier) WithTokenClassification(state.AccountsAdapter, []byte,
+	func(bool) (*vmcommon.VMOutput, error),
+) (*vmcommon.VMOutput, error) {
+	return nil, c.failure
+}
+func (c *qualDRWAStopClassifier) IsInterfaceNil() bool { return c == nil }
+
+// Exercise the real native VM and VMContext latch before the block consumer.
+// Classification and account dependencies are spies: this does not establish
+// canonical owner admission, real rollback/reconstruction or node shutdown.
+func TestQualDRWANativeStopVMContext(t *testing.T) {
+	for _, chain := range []string{"meta", "shard"} {
+		t.Run(chain, func(t *testing.T) {
+			original, rollback := errors.New("experimental original failure"), errors.New("experimental rollback failure")
+			accounts := &stateMock.AccountsStub{}
+			ctx, err := systemSmartContracts.NewVMContext(systemSmartContracts.VMContextArgs{
+				DRWAClassifier: &qualDRWAStopClassifier{failure: errors.Join(original, rollback)},
+				BlockChainHook: &vmMock.BlockChainHookStub{}, CryptoHook: hooks.NewVMCryptoHook(),
+				InputParser: parsers.NewCallArgsParser(), UserAccountsDB: accounts, ValidatorAccountsDB: accounts,
+				ChanceComputer: &vmMock.RaterMock{}, EnableEpochsHandler: enableEpochsHandlerMock.NewEnableEpochsHandlerStub(),
+			})
+			require.NoError(t, err)
+			contracts := vmFactory.NewSystemSCContainer()
+			require.NoError(t, ctx.SetSystemSCContainer(contracts))
+			runtime, err := vmProcess.NewSystemVM(vmProcess.ArgsNewSystemVM{
+				SystemEI: ctx, SystemContracts: contracts, VmType: factory.SystemVirtualMachine,
+				GasSchedule: testscommon.NewGasScheduleNotifierMock(map[string]map[string]uint64{
+					"BaseOpsAPICost": {"AsyncCallStep": 1000, "AsyncCallbackGasLock": 3000},
+				}),
+			})
+			require.NoError(t, err)
+			require.NoError(t, runtime.DRWAExecutionError())
+			channel := make(chan endProcess.ArgEndProcess, 1)
+			var reads atomic.Int64
+			processor, header, commits := qualDRWAStopProcessor(t, chain, runtime, channel, &reads, false)
+			output, failure := runtime.RunSmartContractCall(&vmcommon.ContractCallInput{
+				RecipientAddr: core.ESDTSCAddress, Function: "pause",
+				VMInput: vmcommon.VMInput{Arguments: [][]byte{[]byte("TOKEN-abcdef")}},
+			})
+			require.Nil(t, output)
+			require.ErrorIs(t, failure, vm.ErrDRWAExecution)
+			require.ErrorIs(t, failure, original)
+			require.ErrorIs(t, failure, rollback)
+			ctx.CleanCache()
+			require.Same(t, failure, runtime.DRWAExecutionError())
+			require.Same(t, failure, processor.ProcessBlock(nil, nil, func() time.Duration { return time.Second }))
+			qualDRWAAssertStop(t, channel, true)
+			require.Same(t, failure, processor.CommitBlockProposalState(header, nil))
+			qualDRWAAssertStop(t, channel, true)
+			require.Same(t, failure, runtime.DRWAExecutionError())
+			require.Zero(t, commits.Load())
+		})
 	}
 }
