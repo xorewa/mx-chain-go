@@ -125,7 +125,7 @@ func qualScopedNew(t *testing.T) *qualScopedFixture {
 	// explicit withdrawal mandate. Distinct purpose does not mean another signer.
 	f.mandates.roles["WITHDRAW"] = f.mandates.roles["ADMISSION"]
 	f.records, err = newScopedAdmissionRecords(f.store, f.boundary, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(),
-		[]byte("fixture-domain"), scopedAdmissionLimits{4096, 100, 1 << 20, 100}, f.mandates)
+		[]byte("fixture-domain"), scopedAdmissionLimits{4096, 100, 1 << 20, 100}, f.mandates, qualClockSource(f.clock, f.store))
 	require.NoError(t, err)
 	return f
 }
@@ -484,7 +484,7 @@ func TestQualDRWAScopedAdmissionSelectiveWriteFaults(t *testing.T) {
 			f.boundary, err = NewRollbackContainment(faulted)
 			require.NoError(t, err)
 			f.records, err = newScopedAdmissionRecords(faulted, f.boundary, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(),
-				[]byte("fixture-domain"), scopedAdmissionLimits{4096, 100, 1 << 20, 100}, f.mandates)
+				[]byte("fixture-domain"), scopedAdmissionLimits{4096, 100, 1 << 20, 100}, f.mandates, qualClockSource(f.clock, faulted))
 			require.NoError(t, err)
 			root, err := f.store.RootHash()
 			require.NoError(t, err)
@@ -507,11 +507,11 @@ func TestQualDRWAScopedAdmissionSelectiveWriteFaults(t *testing.T) {
 func TestQualDRWAScopedAdmissionDependenciesAndRateReset(t *testing.T) {
 	f := qualScopedNew(t)
 	limits := scopedAdmissionLimits{4096, 100, 1 << 20, 100}
-	_, err := newScopedAdmissionRecords(f.store, nil, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"), limits, f.mandates)
+	_, err := newScopedAdmissionRecords(f.store, nil, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"), limits, f.mandates, qualClockSource(f.clock, f.store))
 	require.Error(t, err)
-	_, err = newScopedAdmissionRecords(f.store, f.boundary, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"), limits, nil)
+	_, err = newScopedAdmissionRecords(f.store, f.boundary, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"), limits, nil, qualClockSource(f.clock, f.store))
 	require.Error(t, err)
-	_, err = newScopedAdmissionRecords(qualRegistrationStore(t, 0), f.boundary, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"), limits, f.mandates)
+	_, err = newScopedAdmissionRecords(qualRegistrationStore(t, 0), f.boundary, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"), limits, f.mandates, qualClockSource(f.clock, f.store))
 	require.Error(t, err, "containment must own the actual store")
 	f.enroll(t)
 	f.admit(t)

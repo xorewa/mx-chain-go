@@ -18,8 +18,8 @@ type governedActionWindow struct {
 }
 
 // governedTimeAt requires T05's active evaluated-header capability at the exact
-// owning locus. It selects no header or mode. T42 must establish native header
-// installation, exclusive alias ownership and lifecycle before a real consumer.
+// owning locus. It selects no header or mode. Record consumers bind the native
+// source at construction and retain its installation/lifecycle lease via T04.
 func governedTimeAt(context *HeaderTimeContext, shard uint32) (HeaderMilliseconds, error) {
 	if context == nil {
 		return 0, ErrInactiveHeaderTime
@@ -79,15 +79,12 @@ func (w *governedActionWindow) projectionExpiry(context *HeaderTimeContext,
 	if err := w.mayStart(context); err != nil {
 		return 0, err
 	}
-	context.owner.mut.RLock()
-	defer context.owner.mut.RUnlock()
-	if context.owner.current != context {
-		return 0, ErrInactiveHeaderTime
+	time, _, release, err := context.Lease()
+	if err != nil {
+		return 0, err
 	}
-	// The captured timestamp is T05's immutable Supernova millisecond coordinate,
-	// already checked by mayStart. Do not recursively acquire its RWMutex: a
-	// pending writer could deadlock a nested RLock.
-	expiry, err := core.SafeAddUint64(context.timestamp, uint64(lifetime))
+	defer release()
+	expiry, err := core.SafeAddUint64(uint64(time), uint64(lifetime))
 	return HeaderMilliseconds(expiry), err
 }
 

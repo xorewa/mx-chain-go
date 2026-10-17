@@ -137,7 +137,7 @@ func (f *qualSourceGrantFixture) reopen(t *testing.T, accounts state.AccountsAda
 	var err error
 	f.owner, err = NewRollbackContainment(accounts)
 	require.NoError(t, err)
-	f.records, err = newSourceGrantRecords(accounts, f.owner, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096, 1, f.host)
+	f.records, err = newSourceGrantRecords(accounts, f.owner, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096, 1, f.host, qualClockSource(f.clock, accounts))
 	require.NoError(t, err)
 }
 func (f *qualSourceGrantFixture) install(t *testing.T) {
@@ -504,7 +504,7 @@ func TestQualDRWASourceGrantAdmissionAndDependencies(t *testing.T) {
 			case "meta_shard":
 				shard = core.MetachainShardId
 			}
-			got, err := newSourceGrantRecords(accounts, owner, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096, shard, host)
+			got, err := newSourceGrantRecords(accounts, owner, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096, shard, host, qualClockSource(f.clock, accounts))
 			require.ErrorIs(t, err, errSourceGrant)
 			require.Nil(t, got)
 		})

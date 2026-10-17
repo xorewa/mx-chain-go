@@ -131,7 +131,7 @@ func (f *qualGovernedActionFixture) reopen(t *testing.T, accounts state.Accounts
 	f.o, err = NewRollbackContainment(accounts)
 	require.NoError(t, err)
 	f.g, err = newGovernedActionRecords(accounts, f.o, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096,
-		[]byte("n"), 4, 2, 2, f.h)
+		[]byte("n"), 4, 2, 2, f.h, qualClockSource(f.c, accounts))
 	require.NoError(t, err)
 }
 func (f *qualGovernedActionFixture) initialize(t *testing.T) {
@@ -751,7 +751,7 @@ func TestQualDRWAGASConstructorAndInitializationGuards(t *testing.T) {
 				domain = nil
 			}
 			_, err := newGovernedActionRecords(accounts, f.o, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096, domain,
-				total, ordinary, protected, host)
+				total, ordinary, protected, host, qualClockSource(f.c, accounts))
 			require.Error(t, err)
 		})
 	}

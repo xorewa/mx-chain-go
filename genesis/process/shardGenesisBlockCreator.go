@@ -390,6 +390,7 @@ func createProcessorsForShardGenesisBlock(arg ArgsGenesisBlockCreator, enableEpo
 		BlockChain:               arg.Data.Blockchain(),
 		ShardCoordinator:         arg.ShardCoordinator,
 		Marshalizer:              arg.Core.InternalMarshalizer(),
+		Hasher:                   arg.Core.Hasher(),
 		Uint64Converter:          arg.Core.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncFactory.BuiltInFunctionContainer(),
 		NFTStorageHandler:        builtInFuncFactory.NFTStorageHandler(),

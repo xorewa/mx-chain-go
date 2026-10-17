@@ -53,16 +53,17 @@ type sourceGrantHost interface {
 // second nonce or deletion/reopening operation. Prefix/field order/status bytes
 // are experimental; native header/finality/debit serviceability is not claimed.
 type sourceGrantRecords struct {
-	codec    *registrationRecords
-	boundary *RollbackContainment
-	host     sourceGrantHost
-	shard    uint32
+	codec      *registrationRecords
+	boundary   *RollbackContainment
+	host       sourceGrantHost
+	shard      uint32
+	timeSource HeaderTimeSource
 }
 
 func newSourceGrantRecords(accounts state.AccountsAdapter, boundary *RollbackContainment,
 	marshaller marshal.Marshalizer, hasher hashing.Hasher, maxBytes int,
-	sourceShard uint32, host sourceGrantHost) (*sourceGrantRecords, error) {
-	if boundary == nil || check.IfNil(host) || sourceShard == core.MetachainShardId {
+	sourceShard uint32, host sourceGrantHost, timeSource HeaderTimeSource) (*sourceGrantRecords, error) {
+	if boundary == nil || check.IfNil(host) || check.IfNil(timeSource) || timeSource.GetAccountsAdapter() != accounts || sourceShard == core.MetachainShardId {
 		return nil, errSourceGrant
 	}
 	owned := false
@@ -78,7 +79,7 @@ func newSourceGrantRecords(accounts state.AccountsAdapter, boundary *RollbackCon
 	if err != nil {
 		return nil, err
 	}
-	return &sourceGrantRecords{codec: codec, boundary: boundary, host: host, shard: sourceShard}, nil
+	return &sourceGrantRecords{codec: codec, boundary: boundary, host: host, shard: sourceShard, timeSource: timeSource}, nil
 }
 
 func (s *sourceGrantRecords) encode(p sourceGrantProjection) (key, projection []byte, err error) {
@@ -164,12 +165,8 @@ func (s *sourceGrantRecords) lease(context *HeaderTimeContext) (func(), error) {
 	if _, err := governedTimeAt(context, s.shard); err != nil {
 		return nil, err
 	}
-	context.owner.mut.RLock()
-	if context.owner.current != context {
-		context.owner.mut.RUnlock()
-		return nil, ErrInactiveHeaderTime
-	}
-	return context.owner.mut.RUnlock, nil
+	_, _, release, err := context.Lease()
+	return release, err
 }
 
 func sourceGrantOutput(output *vmcommon.VMOutput, err error) (*vmcommon.VMOutput, error) {
@@ -243,7 +240,7 @@ func (s *sourceGrantRecords) install(context *HeaderTimeContext, p sourceGrantPr
 	if len(evidence) > s.codec.maxBytes {
 		return errSourceGrant
 	}
-	return s.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(s.boundary, s.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		if e := s.verifyProjection(key, projection, evidence); e != nil {
 			return nil, e
 		}
@@ -315,7 +312,7 @@ func (s *sourceGrantRecords) transition(context *HeaderTimeContext, p sourceGran
 	if len(evidence) > s.codec.maxBytes {
 		return errSourceGrant
 	}
-	return s.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(s.boundary, s.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		if e := s.verifyProjection(key, projection, evidence); e != nil {
 			return nil, e
 		}

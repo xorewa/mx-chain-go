@@ -51,6 +51,7 @@ type governedActionRecords struct {
 	host                       governedActionHost
 	domain                     []byte
 	total, ordinary, protected uint64
+	timeSource                 HeaderTimeSource
 }
 
 type governedActionRecord struct {
@@ -69,8 +70,8 @@ type governedActionMember struct {
 
 func newGovernedActionRecords(accounts state.AccountsAdapter, boundary *RollbackContainment,
 	marshaller marshal.Marshalizer, hasher hashing.Hasher, maxBytes int, domain []byte,
-	total, ordinary, protected uint64, host governedActionHost) (*governedActionRecords, error) {
-	if boundary == nil || check.IfNil(host) || len(domain) == 0 || len(domain) > maxBytes || total == 0 {
+	total, ordinary, protected uint64, host governedActionHost, timeSource HeaderTimeSource) (*governedActionRecords, error) {
+	if boundary == nil || check.IfNil(host) || check.IfNil(timeSource) || timeSource.GetAccountsAdapter() != accounts || len(domain) == 0 || len(domain) > maxBytes || total == 0 {
 		return nil, errGovernedActionRecord
 	}
 	sum, err := core.SafeAddUint64(ordinary, protected)
@@ -89,7 +90,7 @@ func newGovernedActionRecords(accounts state.AccountsAdapter, boundary *Rollback
 		return nil, err
 	}
 	return &governedActionRecords{codec: codec, boundary: boundary, host: host,
-		domain: bytes.Clone(domain), total: total, ordinary: ordinary, protected: protected}, nil
+		domain: bytes.Clone(domain), total: total, ordinary: ordinary, protected: protected, timeSource: timeSource}, nil
 }
 
 func (g *governedActionRecords) key(kind string, fields ...[]byte) ([]byte, error) {
@@ -141,16 +142,12 @@ func (g *governedActionRecords) unchanged(snapshot ...governedActionWrite) error
 	return nil
 }
 
-func (g *governedActionRecords) lease(context *HeaderTimeContext) (func(), error) {
+func (g *governedActionRecords) lease(context *HeaderTimeContext) (HeaderMilliseconds, func(), error) {
 	if _, err := governedTimeAt(context, core.MetachainShardId); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-	context.owner.mut.RLock()
-	if context.owner.current != context {
-		context.owner.mut.RUnlock()
-		return nil, ErrInactiveHeaderTime
-	}
-	return context.owner.mut.RUnlock, nil
+	time, _, release, err := context.Lease()
+	return time, release, err
 }
 
 func (g *governedActionRecords) aggregate(members []governedActionMember) ([]byte, error) {
@@ -232,7 +229,7 @@ func (g *governedActionRecords) initialize(context *HeaderTimeContext, subject, 
 	// External initialization can hold the caller's original buffers. Retain
 	// the authenticated input after bounded framing and before any callback.
 	subject, class, token = bytes.Clone(subject), bytes.Clone(class), bytes.Clone(token)
-	return g.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(g.boundary, g.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		counterKey, err := g.key("nonce", g.domain, subject, class)
 		if err != nil {
 			return nil, err
@@ -259,7 +256,7 @@ func (g *governedActionRecords) initialize(context *HeaderTimeContext, subject, 
 		if err = g.unchanged(snapshot...); err != nil {
 			return nil, err
 		}
-		release, err := g.lease(context)
+		_, release, err := g.lease(context)
 		if err != nil {
 			return nil, err
 		}
@@ -415,7 +412,7 @@ func (g *governedActionRecords) active(r *governedActionRecord) ([]governedActio
 
 func (g *governedActionRecords) propose(context *HeaderTimeContext, p governedActionProposal) ([]byte, error) {
 	var result []byte
-	err := g.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	err := executeWithHeaderTime(g.boundary, g.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		time, err := governedTimeAt(context, core.MetachainShardId)
 		if err != nil {
 			return nil, err
@@ -527,7 +524,7 @@ func (g *governedActionRecords) propose(context *HeaderTimeContext, p governedAc
 				return nil, err
 			}
 		}
-		release, err := g.lease(context)
+		_, release, err := g.lease(context)
 		if err != nil {
 			return nil, err
 		}
@@ -563,7 +560,7 @@ func (g *governedActionRecords) transition(context *HeaderTimeContext, id, certi
 	if len(certificates) > g.codec.maxBytes {
 		return errGovernedActionRecord
 	}
-	return g.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(g.boundary, g.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		r, key, value, err := g.load(id)
 		if err != nil {
 			return nil, err
@@ -597,7 +594,7 @@ func (g *governedActionRecords) transition(context *HeaderTimeContext, id, certi
 		if err != nil {
 			return nil, err
 		}
-		release, err := g.lease(context)
+		time, release, err := g.lease(context)
 		if err != nil {
 			return nil, err
 		}
@@ -611,9 +608,9 @@ func (g *governedActionRecords) transition(context *HeaderTimeContext, id, certi
 		r.status = "EXECUTABLE"
 		var output *vmcommon.VMOutput
 		if start {
-			r.status, r.started = "IN_PROGRESS", HeaderMilliseconds(context.timestamp)
+			r.status, r.started = "IN_PROGRESS", time
 			if arm {
-				expiry, err := core.SafeAddUint64(context.timestamp, uint64(lifetime))
+				expiry, err := core.SafeAddUint64(uint64(time), uint64(lifetime))
 				if err != nil {
 					return nil, err
 				}
@@ -648,7 +645,7 @@ func (g *governedActionRecords) cleanup(context *HeaderTimeContext, id []byte, r
 	if reason != "EXPIRED" && reason != "STALE_BINDING" || len(evidence) > g.codec.maxBytes {
 		return errGovernedActionRecord
 	}
-	return g.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(g.boundary, g.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		r, key, value, err := g.load(id)
 		if err != nil {
 			return nil, err
@@ -679,7 +676,7 @@ func (g *governedActionRecords) cleanup(context *HeaderTimeContext, id []byte, r
 		if err = g.host.Cleanup(bytes.Clone(id), bytes.Clone(r.envelope), r.status, reason, bytes.Clone(evidence)); err != nil {
 			return nil, err
 		}
-		release, err := g.lease(context)
+		_, release, err := g.lease(context)
 		if err != nil {
 			return nil, err
 		}

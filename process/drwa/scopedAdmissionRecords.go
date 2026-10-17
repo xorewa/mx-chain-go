@@ -47,17 +47,18 @@ type scopedAdmissionLimits struct {
 // admission reader reloads native state instead of retaining an allow cache.
 // Native Commit alone is NOT canonical effectivity or a finality proof.
 type scopedAdmissionRecords struct {
-	codec    *registrationRecords
-	boundary *RollbackContainment
-	mandates scopedAdmissionMandates
-	domain   []byte
-	limits   scopedAdmissionLimits
+	codec      *registrationRecords
+	boundary   *RollbackContainment
+	mandates   scopedAdmissionMandates
+	domain     []byte
+	limits     scopedAdmissionLimits
+	timeSource HeaderTimeSource
 }
 
 func newScopedAdmissionRecords(accounts state.AccountsAdapter, boundary *RollbackContainment,
 	marshaller marshal.Marshalizer, hasher hashing.Hasher, domain []byte,
-	limits scopedAdmissionLimits, mandates scopedAdmissionMandates) (*scopedAdmissionRecords, error) {
-	if boundary == nil || check.IfNil(mandates) || len(domain) == 0 ||
+	limits scopedAdmissionLimits, mandates scopedAdmissionMandates, timeSource HeaderTimeSource) (*scopedAdmissionRecords, error) {
+	if boundary == nil || check.IfNil(mandates) || check.IfNil(timeSource) || timeSource.GetAccountsAdapter() != accounts || len(domain) == 0 ||
 		limits.records == 0 || limits.retainedBytes == 0 || limits.newRecordsPerEpoch == 0 {
 		return nil, errScopedAdmission
 	}
@@ -78,7 +79,7 @@ func newScopedAdmissionRecords(accounts state.AccountsAdapter, boundary *Rollbac
 		return nil, errScopedAdmission
 	}
 	return &scopedAdmissionRecords{codec: codec, boundary: boundary, mandates: mandates,
-		domain: bytes.Clone(domain), limits: limits}, nil
+		domain: bytes.Clone(domain), limits: limits, timeSource: timeSource}, nil
 }
 
 // scope is exactly L37's native creating-owner/programme/domain tuple. Neither
@@ -140,24 +141,25 @@ func scopedAdmissionTime(context *HeaderTimeContext) (HeaderMilliseconds, uint32
 	if shard != core.MetachainShardId {
 		return 0, 0, errScopedAdmission
 	}
-	time, err := context.Milliseconds()
-	return time, context.epoch, err
+	time, epoch, release, err := context.Lease()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer release()
+	return time, epoch, nil
 }
 
 // Retain T05's existing operation capability through native reads/writes. Its
 // owner cannot Reset/Begin/End midway through a retained mutation. Acquire only
 // AFTER external mandate verification, which may invalidate that capability.
-// Native installer/whole-consumer ownership remains T42's separate obligation.
+// The bound native owner additionally leases its actual header through the
+// whole consumer callback, with a final invalidation check inside T04.
 func scopedAdmissionLease(context *HeaderTimeContext) (func(), error) {
 	if _, _, err := scopedAdmissionTime(context); err != nil {
 		return nil, err
 	}
-	context.owner.mut.RLock()
-	if context.owner.current != context {
-		context.owner.mut.RUnlock()
-		return nil, ErrInactiveHeaderTime
-	}
-	return context.owner.mut.RUnlock, nil
+	_, _, release, err := context.Lease()
+	return release, err
 }
 
 type scopedAdmissionWrite struct{ key, value []byte }
@@ -313,7 +315,7 @@ func (s *scopedAdmissionRecords) install(context *HeaderTimeContext, owner, prog
 	if len(predecessor) == 0 {
 		purpose = "ENROLL"
 	}
-	return s.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(s.boundary, s.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		if _, _, e := scopedAdmissionTime(context); e != nil {
 			return nil, e
 		}
@@ -415,7 +417,7 @@ func (s *scopedAdmissionRecords) admit(context *HeaderTimeContext, d scopedAdmis
 	if err != nil {
 		return err
 	}
-	return s.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(s.boundary, s.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		if _, _, e := scopedAdmissionTime(context); e != nil {
 			return nil, e
 		}
@@ -480,7 +482,7 @@ func (s *scopedAdmissionRecords) withdraw(context *HeaderTimeContext, d scopedAd
 	if err != nil {
 		return err
 	}
-	return s.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return executeWithHeaderTime(s.boundary, s.timeSource, context, func() (*vmcommon.VMOutput, error) {
 		if _, _, e := scopedAdmissionTime(context); e != nil {
 			return nil, e
 		}
@@ -554,6 +556,13 @@ func (s *scopedAdmissionRecords) withdraw(context *HeaderTimeContext, d scopedAd
 // serialized T04 execution before its effect; a prior successful call is not a
 // capability. No outstanding certificate can override the retained tombstone.
 func (s *scopedAdmissionRecords) checkDecision(context *HeaderTimeContext, d scopedAdmissionDecision) error {
+	_, err := withHeaderTime(s.timeSource, context, func() (*vmcommon.VMOutput, error) {
+		return nil, s.checkDecisionAt(context, d)
+	})
+	return err
+}
+
+func (s *scopedAdmissionRecords) checkDecisionAt(context *HeaderTimeContext, d scopedAdmissionDecision) error {
 	time, _, err := scopedAdmissionTime(context)
 	if err != nil {
 		return err

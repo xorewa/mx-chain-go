@@ -17,9 +17,15 @@ import (
 )
 
 // T05 unwired production construction. Fixture epoch 10 is not a selected DRWA
-// activation profile. Expected model 5fcd0aa4 remains pending independent audit;
-// these tests claim no conforming time-policy or actual-hook ownership credit.
+// activation profile. These tests exercise the unbound primitive; native-hook
+// ownership and actual record dataflow are exercised by the T42 qualifiers.
 func qualHeaderTimeOwner(t *testing.T) *EvaluatedHeaderTime {
+	t.Helper()
+	p, _ := qualHeaderTimeOwnerAndFlags(t)
+	return p
+}
+
+func qualHeaderTimeOwnerAndFlags(t *testing.T) (*EvaluatedHeaderTime, *enableEpochsHandlerMock.EnableEpochsHandlerStub) {
 	t.Helper()
 	flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
 	flags.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool {
@@ -28,14 +34,14 @@ func qualHeaderTimeOwner(t *testing.T) *EvaluatedHeaderTime {
 	flags.GetCurrentEpochCalled = func() uint32 { t.Fatal("notification epoch is not the evaluated header epoch"); return 0 }
 	p, err := NewEvaluatedHeaderTime(flags, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b())
 	require.NoError(t, err)
-	return p
+	return p, flags
 }
 
 func TestQualDRWAProductionHeaderTime(t *testing.T) {
 	for _, locus := range []string{"shard", "meta"} {
 		for _, name := range []string{"valid", "zero", "max_uint64", "end", "reset", "ABA", "failed_begin", "legacy_header", "before_supernova", "input_mutation", "equal_coordinates", "activation_lost"} {
 			t.Run(locus+"/"+name, func(t *testing.T) {
-				p := qualHeaderTimeOwner(t)
+				p, flags := qualHeaderTimeOwnerAndFlags(t)
 				var header data.HeaderHandler = &block.HeaderV3{Epoch: 10, ShardID: 1, TimestampMs: 1234567, ChainID: []byte("fixture-A")}
 				if locus == "meta" {
 					header = &block.MetaBlockV3{Epoch: 10, TimestampMs: 1234567, ChainID: []byte("fixture-A")}
@@ -90,7 +96,7 @@ func TestQualDRWAProductionHeaderTime(t *testing.T) {
 					_, err = p.Begin(next)
 					require.ErrorIs(t, err, ErrUnavailableHeaderTime)
 				case "activation_lost":
-					p.flags.(*enableEpochsHandlerMock.EnableEpochsHandlerStub).IsFlagEnabledInEpochCalled = func(core.EnableEpochFlag, uint32) bool { return false }
+					flags.IsFlagEnabledInEpochCalled = func(core.EnableEpochFlag, uint32) bool { return false }
 					_, err = context.Milliseconds()
 					require.ErrorIs(t, err, ErrUnavailableHeaderTime)
 					return

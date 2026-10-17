@@ -443,6 +443,7 @@ func (gbc *genesisBlockCreator) computeDNSAddresses(
 		BlockChain:               gbc.arg.Data.Blockchain(),
 		ShardCoordinator:         gbc.arg.ShardCoordinator,
 		Marshalizer:              gbc.arg.Core.InternalMarshalizer(),
+		Hasher:                   gbc.arg.Core.Hasher(),
 		Uint64Converter:          gbc.arg.Core.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncs,
 		NFTStorageHandler:        &disabled.SimpleNFTStorage{},

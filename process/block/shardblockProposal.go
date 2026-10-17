@@ -330,6 +330,12 @@ func (sp *shardProcessor) ProcessBlockProposal(
 	}
 	defer sp.processStatusHandler.SetIdle()
 
+	installHeader, endHeaderTime, timeErr := beginEvaluatedHeaderTime(sp.blockChainHook)
+	if timeErr != nil {
+		return nil, timeErr
+	}
+	defer endHeaderTime()
+
 	sp.roundNotifier.CheckRound(headerHandler)
 	sp.epochNotifier.CheckEpoch(headerHandler)
 	sp.requestHandler.SetEpoch(headerHandler.GetEpoch())
@@ -387,7 +393,7 @@ func (sp *shardProcessor) ProcessBlockProposal(
 		return nil, err
 	}
 
-	err = sp.blockChainHook.SetCurrentHeader(header)
+	err = installHeader(header)
 	if err != nil {
 		return nil, err
 	}

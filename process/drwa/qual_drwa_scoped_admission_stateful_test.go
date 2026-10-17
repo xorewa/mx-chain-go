@@ -76,7 +76,7 @@ func TestQualDRWAScopedAdmissionStateful(t *testing.T) {
 					require.NoError(t, err)
 					f.records, err = newScopedAdmissionRecords(f.store, f.boundary,
 						&marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"),
-						scopedAdmissionLimits{4096, 100, 1 << 20, 100}, f.mandates)
+						scopedAdmissionLimits{4096, 100, 1 << 20, 100}, f.mandates, qualClockSource(f.clock, f.store))
 					require.NoError(t, err)
 				}
 				after, err := f.store.RootHash()

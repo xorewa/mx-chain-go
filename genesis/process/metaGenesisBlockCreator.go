@@ -330,6 +330,7 @@ func createProcessorsForMetaGenesisBlock(arg ArgsGenesisBlockCreator, enableEpoc
 		BlockChain:               arg.Data.Blockchain(),
 		ShardCoordinator:         arg.ShardCoordinator,
 		Marshalizer:              arg.Core.InternalMarshalizer(),
+		Hasher:                   arg.Core.Hasher(),
 		Uint64Converter:          arg.Core.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncs,
 		NFTStorageHandler:        &disabled.SimpleNFTStorage{},

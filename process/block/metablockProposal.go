@@ -361,6 +361,12 @@ func (mp *metaProcessor) ProcessBlockProposal(
 	}
 	defer mp.processStatusHandler.SetIdle()
 
+	installHeader, endHeaderTime, timeErr := beginEvaluatedHeaderTime(mp.blockChainHook)
+	if timeErr != nil {
+		return nil, timeErr
+	}
+	defer endHeaderTime()
+
 	mp.roundNotifier.CheckRound(headerHandler)
 	mp.epochNotifier.CheckEpoch(headerHandler)
 	mp.requestHandler.SetEpoch(headerHandler.GetEpoch())
@@ -408,7 +414,7 @@ func (mp *metaProcessor) ProcessBlockProposal(
 		return nil, err
 	}
 
-	err = mp.blockChainHook.SetCurrentHeader(header)
+	err = installHeader(header)
 	if err != nil {
 		return nil, err
 	}
