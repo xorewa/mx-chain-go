@@ -213,6 +213,15 @@ func (s *scopedAdmissionRecords) verifyState(keys [][]byte, verify func() error)
 // Rate is per evaluated-header epoch, persisted with native state and rollback.
 func (s *scopedAdmissionRecords) retain(account state.UserAccountHandler, epoch uint32,
 	writes ...scopedAdmissionWrite) error {
+	return s.retainRecords(account, epoch, false, writes...)
+}
+
+// The same chain-global budget also accounts for registration's permanent
+// intent/association/activation records. Only its explicitly selected writer
+// permits positive retained-byte growth on OPEN -> CONSUMED; ordinary scope
+// pointers keep their existing fixed-size rule. No decrement or recycling.
+func (s *scopedAdmissionRecords) retainRecords(account state.UserAccountHandler, epoch uint32, allowGrowth bool,
+	writes ...scopedAdmissionWrite) error {
 	budgetKey := []byte(scopedAdmissionPrefix + "budget")
 	encoded, _, err := account.RetrieveValue(budgetKey)
 	if err != nil {
@@ -250,10 +259,10 @@ func (s *scopedAdmissionRecords) retain(account state.UserAccountHandler, epoch 
 			rate++
 			delta += uint64(len(write.key))
 		} else {
-			if len(old) != len(write.value) {
+			if len(old) != len(write.value) && (!allowGrowth || len(write.value) < len(old)) {
 				return errScopedAdmission
 			}
-			delta = 0
+			delta = uint64(len(write.value) - len(old))
 		}
 		if delta > s.limits.retainedBytes-size {
 			return errScopedAdmission

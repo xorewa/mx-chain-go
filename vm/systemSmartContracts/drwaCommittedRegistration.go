@@ -41,6 +41,12 @@ func (e *esdt) registerDRWACommittedToken(owner drwaCommittedRegistrationOwner,
 	request drwaTokenCreation, profile, bodyDigest []byte) (err error) {
 	e.mutExecution.Lock()
 	defer e.mutExecution.Unlock()
+	return e.registerDRWACommittedTokenLocked(owner, request, profile, bodyDigest)
+}
+
+// The native registration endpoint owns this same exclusive execution lock.
+func (e *esdt) registerDRWACommittedTokenLocked(owner drwaCommittedRegistrationOwner,
+	request drwaTokenCreation, profile, bodyDigest []byte) (err error) {
 	context, ok := e.eei.(*vmContext)
 	if !ok || check.IfNil(owner) || len(request.properties) != 0 ||
 		len(context.storageUpdate) != 0 || len(context.outputAccounts) != 0 ||

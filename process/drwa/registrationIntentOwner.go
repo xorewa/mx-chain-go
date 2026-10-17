@@ -21,12 +21,15 @@ import (
 type RegistrationIntentOwner struct {
 	registration interface {
 		registerTokenForIntent(*registrationRecords, []byte, []byte, []byte,
-			func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error
+			func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error), ...registrationGuard) error
 		IsInterfaceNil() bool
 	}
 	records    *registrationRecords
 	id, digest []byte
 	manager    []byte
+	guard      registrationGuard
+	boundary   *RollbackContainment
+	shards     uint32
 }
 
 // BindIntent is an unwired production binding, not a record/authority writer.
@@ -47,7 +50,7 @@ func (r *RegistryRegistration) BindIntent(id, digest, manager []byte,
 		return nil, errInvalidRegistrationRecord
 	}
 	return &RegistrationIntentOwner{registration: r, records: records,
-		id: bytes.Clone(id), digest: bytes.Clone(digest), manager: bytes.Clone(manager)}, nil
+		id: bytes.Clone(id), digest: bytes.Clone(digest), manager: bytes.Clone(manager), boundary: r.boundary, shards: r.shards}, nil
 }
 
 func (o *RegistrationIntentOwner) IsInterfaceNil() bool { return o == nil }
@@ -76,5 +79,5 @@ func (o *RegistrationIntentOwner) RegisterTokenForCreation(issuer, manager, fami
 				return nil, nil, errInvalidRegistrationRecord
 			}
 			return create(accounts)
-		})
+		}, o.guard)
 }

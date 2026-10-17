@@ -60,6 +60,7 @@ type registrationRecords struct {
 	marshaller marshal.Marshalizer
 	hasher     hashing.Hasher
 	maxBytes   int
+	retain     func(state.UserAccountHandler, ...scopedAdmissionWrite) error
 }
 
 func newRegistrationRecords(accounts state.AccountsAdapter, marshaller marshal.Marshalizer,
@@ -304,6 +305,10 @@ func (s *registrationRecords) consume(id []byte, expected *bootstrapIntentRecord
 	if err != nil {
 		return err
 	}
+	if s.retain != nil {
+		return s.retain(account, scopedAdmissionWrite{activationKey, activation}, scopedAdmissionWrite{key, association},
+			scopedAdmissionWrite{append([]byte(registrationIntentPrefix), id...), consumed})
+	}
 	if err = account.SaveKeyValue(activationKey, activation); err != nil {
 		return err
 	}
@@ -357,16 +362,20 @@ func (s *registrationRecords) registeredToken(tokenID []byte) (*bootstrapIntentR
 // native issuer/approvals/epoch/support/expiry before this production caller.
 // No ordinary route imports it, and no boolean substitutes for those predicates.
 func (r *RegistryRegistration) registerTokenForIntent(records *registrationRecords,
-	id, digest, manager []byte, create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
-	if records == nil || records.state.accounts != r.state.accounts || create == nil {
+	id, digest, manager []byte, create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error), guards ...registrationGuard) error {
+	if records == nil || records.state.accounts != r.state.accounts || create == nil || len(guards) > 1 {
 		return errInvalidRegistrationRecord
+	}
+	var guard registrationGuard
+	if len(guards) == 1 {
+		guard = guards[0]
 	}
 	// Native creation may use or mutate its own argument buffers. Retain our
 	// exact operation identities before invoking it; no mutable caller alias
 	// may select the later intent key or stored permanent manager.
 	id = bytes.Clone(id)
 	manager = bytes.Clone(manager)
-	return r.RegisterToken(func(accounts state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error) {
+	return r.registerToken(func(accounts state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error) {
 		expected, err := records.intent(id)
 		if err != nil {
 			return nil, nil, err
@@ -382,5 +391,5 @@ func (r *RegistryRegistration) registerTokenForIntent(records *registrationRecor
 			return nil, nil, err
 		}
 		return tokenID, output, nil
-	})
+	}, guard)
 }

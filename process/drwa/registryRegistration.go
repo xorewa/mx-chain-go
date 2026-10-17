@@ -29,6 +29,7 @@ type RegistryRegistration struct {
 	state    *protectedState
 	boundary *RollbackContainment
 	maxEver  uint64
+	shards   uint32
 }
 
 // NewRegistryRegistration starts one metachain candidate at a committed native
@@ -52,7 +53,7 @@ func NewRegistryRegistration(accounts state.AccountsAdapter, coordinator shardin
 	if err != nil {
 		return nil, nil, err
 	}
-	return &RegistryRegistration{state: s, boundary: boundary, maxEver: maxEver}, boundary, nil
+	return &RegistryRegistration{state: s, boundary: boundary, maxEver: maxEver, shards: coordinator.NumberOfShards()}, boundary, nil
 }
 
 func registrationCount(account state.UserAccountHandler) (uint64, error) {
@@ -74,10 +75,19 @@ func registrationCount(account state.UserAccountHandler) (uint64, error) {
 // back the entire operation; rollback failure poisons the candidate under P-05.
 // The owning production creator is the separate DRWA-only System-SC construction.
 func (r *RegistryRegistration) RegisterToken(create func(accounts state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
+	return r.registerToken(create, nil)
+}
+
+// registrationGuard surrounds the WHOLE token/intent/registry/count operation
+// inside T04. In particular, a late time invalidation cannot escape rollback
+// after intent consumption or registry publication. No independent journal.
+type registrationGuard func([]state.AccountsAdapter, func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error)
+
+func (r *RegistryRegistration) registerToken(create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error), guard registrationGuard) error {
 	if create == nil {
 		return ErrInvalidOperation
 	}
-	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	operation := func() (*vmcommon.VMOutput, error) {
 		account, err := r.state.systemAccount()
 		if err != nil {
 			return nil, err
@@ -129,6 +139,12 @@ func (r *RegistryRegistration) RegisterToken(create func(accounts state.Accounts
 			return nil, err
 		}
 		return output, nil
+	}
+	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+		if guard != nil {
+			return guard(r.boundary.stores, operation)
+		}
+		return operation()
 	})
 }
 

@@ -193,9 +193,9 @@ func (r *registrationCandidate) WithDRWAClassifierReplacement(classifier vm.DRWA
 }
 
 func (r *registrationCandidate) registerTokenForIntent(records *registrationRecords,
-	id, digest, manager []byte, create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
+	id, digest, manager []byte, create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error), guards ...registrationGuard) error {
 	return r.register(func(creator func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
-		return r.writer.registerTokenForIntent(records, id, digest, manager, creator)
+		return r.writer.registerTokenForIntent(records, id, digest, manager, creator, guards...)
 	}, create)
 }
 

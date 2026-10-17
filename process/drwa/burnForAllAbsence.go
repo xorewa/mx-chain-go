@@ -62,14 +62,17 @@ type BurnForAllMemberWitness struct {
 // registry or protocol. Its mutex serializes all local operations; account
 // aliases outside this owner remain forbidden by T04's exclusive-owner contract.
 type BurnForAllAbsence struct {
-	mut         sync.Mutex
-	material    *registryMaterialization
-	transport   *registryTransport
-	records     *registrationRecords
-	set, unset  vmcommon.BuiltinFunction
-	protected   vmcommon.BuiltinFunction
-	metadata    vmcommon.GlobalMetadataHandler
-	normalizing bool
+	mut          sync.Mutex
+	material     *registryMaterialization
+	transport    *registryTransport
+	records      *registrationRecords
+	set, unset   vmcommon.BuiltinFunction
+	protected    vmcommon.BuiltinFunction
+	metadata     vmcommon.GlobalMetadataHandler
+	tokenType    vmcommon.BuiltinFunction
+	ordinaryType vmcommon.BuiltinFunction
+	flags        common.EnableEpochsHandler
+	normalizing  bool
 }
 
 func NewBurnForAllAbsence(a ArgsBurnForAllAbsence) (*BurnForAllAbsence, error) {
@@ -96,7 +99,7 @@ func NewBurnForAllAbsence(a ArgsBurnForAllAbsence) (*BurnForAllAbsence, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &BurnForAllAbsence{material: m, transport: t, records: r}
+	b := &BurnForAllAbsence{material: m, transport: t, records: r, flags: a.EnableEpochsHandler}
 	active := func() bool { return a.EnableEpochsHandler.IsFlagEnabled(common.SendAlwaysFlag) }
 	b.set, err = builtInFunctions.NewESDTGlobalSettingsFunc(a.Accounts, a.Marshaller, true, vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, active)
 	if err != nil {
@@ -115,7 +118,117 @@ func NewBurnForAllAbsence(a ArgsBurnForAllAbsence) (*BurnForAllAbsence, error) {
 		return nil, err
 	}
 	b.protected, b.metadata = setter, setter
+	b.tokenType, err = builtInFunctions.NewESDTSetTokenTypeFunc(a.Accounts, setter, a.Marshaller,
+		func() bool { return b.normalizing && a.EnableEpochsHandler.IsFlagEnabled(common.DynamicESDTFlag) })
+	if err != nil {
+		return nil, err
+	}
+	b.ordinaryType, err = builtInFunctions.NewESDTSetTokenTypeFunc(a.Accounts, setter, a.Marshaller,
+		func() bool { return a.EnableEpochsHandler.IsFlagEnabled(common.DynamicESDTFlag) })
+	if err != nil {
+		return nil, err
+	}
 	return b, nil
+}
+
+// BuiltinFunction supplies the SAME before-first-effect guard to the native
+// container, so transaction/SCR/VM/callback paths cannot choose different
+// classification logic. The native owner must install these three entries in
+// its actual container before consumers and bind this exact candidate; obtaining
+// the wrapper alone is not canonical/configuration admission. Native flags and
+// gas configuration are delegated to the exact underlying native function.
+func (b *BurnForAllAbsence) BuiltinFunction(function string) (vmcommon.BuiltinFunction, error) {
+	if b == nil {
+		return nil, errInvalidRegistrationRecord
+	}
+	var native vmcommon.BuiltinFunction
+	switch function {
+	case vmcommon.BuiltInFunctionESDTSetBurnRoleForAll:
+		native = b.set
+	case vmcommon.BuiltInFunctionESDTUnSetBurnRoleForAll:
+		native = b.unset
+	case core.ESDTSetTokenType:
+		native = b.ordinaryType
+	default:
+		return nil, builtInFunctions.ErrInvalidArguments
+	}
+	return &registrationBuiltin{owner: b, function: function, native: native}, nil
+}
+
+// BindBuiltinFunctions is the native owner's pre-consumer binding step. It
+// wraps the actual existing native container entries, preserving their exact
+// flags/gas/ordinary implementation. It must run with exclusive configuration
+// ownership BEFORE dispatchers/VMs retain function pointers, after canonical
+// preparation of this candidate. No running-network installation is implied.
+// On an error, the container is restored; a restoration error denies admission.
+func (b *BurnForAllAbsence) BindBuiltinFunctions(container vmcommon.BuiltInFunctionContainer,
+	accounts state.AccountsAdapter, flags common.EnableEpochsHandler) error {
+	if b == nil || check.IfNil(container) || accounts != b.material.state.accounts || flags != b.flags {
+		return errInvalidRegistrationRecord
+	}
+	b.mut.Lock()
+	defer b.mut.Unlock()
+	if b.material.members == nil {
+		return errInvalidRegistryTransport
+	}
+	b.material.owner.mut.Lock()
+	err := b.material.owner.checkAvailable()
+	b.material.owner.mut.Unlock()
+	if err != nil {
+		return err
+	}
+	names := []string{vmcommon.BuiltInFunctionESDTSetBurnRoleForAll, vmcommon.BuiltInFunctionESDTUnSetBurnRoleForAll, core.ESDTSetTokenType}
+	old := make([]vmcommon.BuiltinFunction, len(names))
+	for i, name := range names {
+		old[i], err = container.Get(name)
+		if err != nil {
+			return err
+		}
+		if check.IfNil(old[i]) {
+			return errInvalidRegistrationRecord
+		}
+		if wrapped, exists := old[i].(*registrationBuiltin); exists {
+			if wrapped.owner != b || wrapped.function != name {
+				return errInvalidRegistrationRecord
+			}
+		}
+	}
+	for i, name := range names {
+		if _, exists := old[i].(*registrationBuiltin); exists {
+			continue
+		}
+		err = container.Replace(name, &registrationBuiltin{owner: b, function: name, native: old[i]})
+		if err == nil {
+			continue
+		}
+		failures := []error{err}
+		// Include the failing entry: an implementation might replace then fail.
+		for j := i; j >= 0; j-- {
+			if restore := container.Replace(names[j], old[j]); restore != nil {
+				failures = append(failures, restore)
+			}
+		}
+		return errors.Join(failures...)
+	}
+	return nil
+}
+
+type registrationBuiltin struct {
+	owner    *BurnForAllAbsence
+	function string
+	native   vmcommon.BuiltinFunction
+}
+
+func (f *registrationBuiltin) IsInterfaceNil() bool                   { return f == nil }
+func (f *registrationBuiltin) IsActive() bool                         { return f.native.IsActive() }
+func (f *registrationBuiltin) SetNewGasConfig(cost *vmcommon.GasCost) { f.native.SetNewGasConfig(cost) }
+func (f *registrationBuiltin) ProcessBuiltinFunction(_, _ vmcommon.UserAccountHandler, input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+	if input != nil && input.Function != f.function {
+		return nil, builtInFunctions.ErrInvalidArguments
+	}
+	f.owner.mut.Lock()
+	defer f.owner.mut.Unlock()
+	return f.owner.processBuiltinFunction(input, f.native)
 }
 
 // Prepare is the existing T08 bounded full-set startup/integrity operation, not
@@ -147,23 +260,33 @@ func (b *BurnForAllAbsence) Prepare(ctx context.Context, count AccountItemWitnes
 func (b *BurnForAllAbsence) ProcessBuiltinFunction(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
 	b.mut.Lock()
 	defer b.mut.Unlock()
+	return b.processBuiltinFunction(input, nil)
+}
+
+func (b *BurnForAllAbsence) processBuiltinFunction(input *vmcommon.ContractCallInput, selected vmcommon.BuiltinFunction) (*vmcommon.VMOutput, error) {
 	if input == nil {
 		return nil, builtInFunctions.ErrNilVmInput
 	}
 	var native vmcommon.BuiltinFunction
+	arity := 1
 	switch input.Function {
 	case vmcommon.BuiltInFunctionESDTSetBurnRoleForAll:
 		native = b.set
 	case vmcommon.BuiltInFunctionESDTUnSetBurnRoleForAll:
 		native = b.unset
+	case core.ESDTSetTokenType:
+		native, arity = b.ordinaryType, 2
 	default:
 		return nil, builtInFunctions.ErrInvalidArguments
+	}
+	if selected != nil {
+		native = selected
 	}
 	// Only a single argument supplies the native setting target. For malformed
 	// arity, delegate validation to native code: it checks CallValue first and
 	// rejects before any setting effect (vm-common v1.7.2 L94-107; INV-0).
 	// An unavailable classifier for a valid target is never ordinary absence.
-	if len(input.Arguments) != 1 {
+	if len(input.Arguments) != arity {
 		return native.ProcessBuiltinFunction(nil, nil, input)
 	}
 	regulated, err := b.material.classify(b.material.required.candidateHash, input.Arguments[0])
@@ -171,6 +294,9 @@ func (b *BurnForAllAbsence) ProcessBuiltinFunction(input *vmcommon.ContractCallI
 		return nil, err
 	}
 	if regulated {
+		if arity == 2 {
+			return nil, errInvalidRegistrationRecord
+		}
 		return nil, errBurnForAllDenied
 	}
 	return native.ProcessBuiltinFunction(nil, nil, input)
@@ -180,6 +306,20 @@ func (b *BurnForAllAbsence) ProcessBuiltinFunction(input *vmcommon.ContractCallI
 // anchor as the complete classifier. It creates a positively present native
 // false record; a missing record's IsBurnForAll=false is never its oracle.
 func (b *BurnForAllAbsence) Normalize(tokenID []byte, w BurnForAllRegistrationWitness) error {
+	return b.normalize(tokenID, w, false)
+}
+
+// MaterializeRegistration is T44's receiving bootstrap construction: classify
+// FIRST and authenticate the exact consumed registration/profile, then reuse
+// native type installation and false-burn normalization in the SAME journal.
+// A source set/type/unset fan-out, sender address, raw call or ACK does not
+// authenticate this path. All public raw setting replay remains denied.
+// Native DynamicESDTFlag eligibility is preserved, with no invented type map.
+func (b *BurnForAllAbsence) MaterializeRegistration(tokenID []byte, w BurnForAllRegistrationWitness) error {
+	return b.normalize(tokenID, w, true)
+}
+
+func (b *BurnForAllAbsence) normalize(tokenID []byte, w BurnForAllRegistrationWitness, installType bool) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 	regulated, err := b.material.classify(b.material.required.candidateHash, tokenID)
@@ -225,6 +365,40 @@ func (b *BurnForAllAbsence) Normalize(tokenID []byte, w BurnForAllRegistrationWi
 		// preparation. No manager CallerAddr is forged; no public input reaches it.
 		b.normalizing = true
 		defer func() { b.normalizing = false }()
+		if installType {
+			if !b.tokenType.IsActive() {
+				return nil, errBurnForAllDenied
+			}
+			output, e := b.tokenType.ProcessBuiltinFunction(nil, nil, &vmcommon.ContractCallInput{
+				VMInput: vmcommon.VMInput{CallerAddr: bytes.Clone(core.ESDTSCAddress), CallValue: big.NewInt(0),
+					Arguments: [][]byte{bytes.Clone(tokenID), bytes.Clone(body.requestedTokenFamily)}},
+				RecipientAddr: bytes.Clone(vmcommon.SystemAccountAddress), Function: core.ESDTSetTokenType})
+			if e != nil {
+				return nil, e
+			}
+			if output == nil || output.ReturnCode != vmcommon.Ok {
+				return nil, errInvalidRegistrationRecord
+			}
+			// Reload the real native result. Preserve every unrelated native bit
+			// and require the actual native type reader to agree with the profile.
+			account, e = b.material.state.systemAccount()
+			if e != nil {
+				return nil, e
+			}
+			stored, _, e := account.RetrieveValue(key)
+			if e != nil {
+				return nil, e
+			}
+			meta = builtInFunctions.ESDTGlobalMetadataFromBytes(stored)
+			actual, e := b.metadata.GetTokenType(key)
+			if e != nil {
+				return nil, e
+			}
+			want, e := core.ConvertESDTTypeToUint32(string(body.requestedTokenFamily))
+			if e != nil || len(stored) != 2 || !bytes.Equal(meta.ToBytes(), stored) || actual != want {
+				return nil, errInvalidRegistrationRecord
+			}
+		}
 		if !b.protected.IsActive() {
 			return nil, errBurnForAllDenied
 		}
