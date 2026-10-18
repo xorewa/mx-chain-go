@@ -286,8 +286,15 @@ func TestQualDRWALoadedConfigurationMalformedAndAbsent(t *testing.T) {
 			case "enforcement-before-supernova":
 				require.NoError(t, os.WriteFile(overlay, []byte("DRWAEnforcementEnableEpoch = 1\n"), 0600))
 			}
-			_, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
-			require.Error(t, err)
+			candidate, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
+			if fault == "missing-epoch" {
+				// FA-01 D-13: a later epoch-zero prerequisite denial must
+				// not conceal defaulting an absent required coordinate.
+				require.EqualError(t, err, "missing DRWAEnforcementEnableEpoch")
+			} else {
+				require.Error(t, err)
+			}
+			require.Nil(t, candidate)
 		})
 	}
 	var absent *DRWAConfigurationCandidate

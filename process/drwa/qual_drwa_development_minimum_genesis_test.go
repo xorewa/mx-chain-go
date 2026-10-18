@@ -136,6 +136,105 @@ func TestQualDRWADevelopmentMinimumGenesisMissingItem(t *testing.T) {
 	}
 }
 
+// FA-01 D-12: hostile stored bytes must be rejected by the reader itself,
+// after native commit/reopen, even when provisioning originally received valid
+// experimental N05 inputs. These are corruptions, not new profile allocations.
+func TestQualDRWADevelopmentMinimumGenesisMalformedStoredItem(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		for _, fault := range []string{"plane-state", "plane-transition", "plane-short", "plane-long",
+			"profile-short", "profile-long", "cap-short", "cap-long", "budget-short", "budget-long",
+			"release-zero", "profile-zero", "cap-zero", "budget-zero", "budget-over-int"} {
+			t.Run(fmt.Sprintf("auto_%t/%s", auto, fault), func(t *testing.T) {
+				args := qualReaderArgs(auto)
+				db := qualGenesisAccountsFromArgs(t, args)
+				s, err := newProtectedState(db)
+				require.NoError(t, err)
+				owner, err := NewRollbackContainment(db)
+				require.NoError(t, err)
+				g := qualDRWADevelopmentMinimumGenesis(t)
+				require.NoError(t, owner.Execute(func() (*vmcommon.VMOutput, error) {
+					return nil, s.provisionMinimumGenesis(g)
+				}))
+				_, _, err = owner.Commit()
+				require.NoError(t, err)
+				got, err := s.readMinimumGenesis()
+				require.NoError(t, err)
+				require.Equal(t, g, got)
+
+				// Keys and byte layouts are literal vectors, independent of the
+				// reader's key constants, decoder and valid() predicate.
+				key := "ELRONDDRWA@plane@state"
+				value := append([]byte("NORMAL\x00\x00\x00\x00\x00\x00\x00\x00"), g.releaseDigest[:]...)
+				switch fault {
+				case "plane-state":
+					value[0] = 'X'
+				case "plane-transition":
+					value[13] = 1
+				case "plane-short":
+					value = value[:45]
+				case "plane-long":
+					value = append(value, 1)
+				case "release-zero":
+					clear(value[14:])
+				case "profile-short", "profile-long", "profile-zero":
+					key = "ELRONDDRWA@profile@minimum"
+					value = bytes.Clone(g.profileDigest[:])
+					if fault == "profile-short" {
+						value = value[:31]
+					} else if fault == "profile-long" {
+						value = append(value, 1)
+					} else {
+						clear(value)
+					}
+				case "cap-short", "cap-long", "cap-zero":
+					key = "ELRONDDRWA@param@maxEverRegulatedTokens"
+					value = []byte{0, 0, 0, 0, 0, 0, 0, 64}
+					if fault == "cap-short" {
+						value = value[:7]
+					} else if fault == "cap-long" {
+						value = append(value, 1)
+					} else {
+						clear(value)
+					}
+				case "budget-short", "budget-long", "budget-zero", "budget-over-int":
+					key = "ELRONDDRWA@param@registryProofBytes"
+					value = []byte{0, 0, 0, 0, 0, 16, 0, 0}
+					if fault == "budget-short" {
+						value = value[:7]
+					} else if fault == "budget-long" {
+						value = append(value, 1)
+					} else if fault == "budget-zero" {
+						clear(value)
+					} else {
+						value = bytes.Repeat([]byte{0xff}, 8)
+					}
+				}
+				account, err := db.GetExistingAccount(core.SystemAccountAddress)
+				require.NoError(t, err)
+				require.NoError(t, account.(state.UserAccountHandler).SaveKeyValue([]byte(key), value))
+				require.NoError(t, db.SaveAccount(account))
+				root, err := db.Commit()
+				require.NoError(t, err)
+				reopened := qualGenesisAccountsFromArgs(t, args)
+				require.NoError(t, reopened.RecreateTrie(holders.NewDefaultRootHashesHolder(root)))
+				reader, err := newProtectedState(reopened)
+				require.NoError(t, err)
+				_, err = reader.readMinimumGenesis()
+				require.ErrorIs(t, err, errInvalidGenesisState)
+				after, err := reopened.RootHash()
+				require.NoError(t, err)
+				require.Equal(t, root, after, "a rejected read cannot rewrite stored genesis")
+				require.Zero(t, reopened.JournalLen())
+				retained, err := reopened.GetExistingAccount(core.SystemAccountAddress)
+				require.NoError(t, err)
+				raw, _, err := retained.(state.UserAccountHandler).RetrieveValue([]byte(key))
+				require.NoError(t, err)
+				require.Equal(t, value, raw)
+			})
+		}
+	}
+}
+
 func TestQualDRWADevelopmentMinimumGenesisSaveFailure(t *testing.T) {
 	for _, key := range []string{"ELRONDDRWA@plane@state", "ELRONDDRWA@profile@minimum", "ELRONDDRWA@param@maxEverRegulatedTokens", "ELRONDDRWA@param@registryProofBytes"} {
 		t.Run(key, func(t *testing.T) {

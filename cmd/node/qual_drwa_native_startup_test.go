@@ -116,6 +116,20 @@ func TestQualDRWANativeStartupCompleteInputs(t *testing.T) {
 	require.Equal(t, filepath.Join(dir, "genesis.json"), paths.Genesis)
 	require.Equal(t, filepath.Join(dir, "gasSchedules"), paths.GasScheduleDirectoryName)
 	require.False(t, cfgs.ImportDbConfig.IsImportDBMode)
+
+	// FA-01 D-13 / MT09-15b: the effective-object helper above bypasses
+	// LoadDRWAConfigurationCandidate. Exercise that loader with the same real
+	// startup paths, then omit the coordinate while every other input remains
+	// valid. No runtime is started and no effective object is reloaded for use.
+	loaded, err := coreFactory.LoadDRWAConfigurationCandidate(*paths, filepath.Join(dir, "drwa.toml"),
+		coreFactory.DRWAConfigurationSupport{RelayedV3: true})
+	require.NoError(t, err)
+	require.NoError(t, loaded.CheckEnforcedBlock(3, 440)) // existing experimental coordinates
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "drwa.toml"), []byte("# coordinate absent\n"), 0600))
+	loaded, err = coreFactory.LoadDRWAConfigurationCandidate(*paths, filepath.Join(dir, "drwa.toml"),
+		coreFactory.DRWAConfigurationSupport{RelayedV3: true})
+	require.EqualError(t, err, "missing DRWAEnforcementEnableEpoch")
+	require.Nil(t, loaded)
 }
 
 func TestQualDRWANativeStartupPreferencesCannotBypass(t *testing.T) {
