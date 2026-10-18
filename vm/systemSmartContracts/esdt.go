@@ -138,11 +138,9 @@ func (e *esdt) Execute(args *vmcommon.ContractCallInput) vmcommon.ReturnCode {
 	e.mutExecution.RLock()
 	defer e.mutExecution.RUnlock()
 	context, nativeContext := e.eei.(*vmContext)
-	if nativeContext {
+	if nativeContext && context.drwaClassifierConfigured {
 		context.mutDRWAClassifier.RLock()
 		defer context.mutDRWAClassifier.RUnlock()
-	}
-	if nativeContext && context.drwaClassifier != nil {
 		output, err := context.executeDRWAESDTCall(args, func() (*vmcommon.VMOutput, error) {
 			return &vmcommon.VMOutput{ReturnCode: e.execute(args)}, nil
 		})

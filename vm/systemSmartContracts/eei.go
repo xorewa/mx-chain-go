@@ -40,6 +40,9 @@ type vmContext struct {
 	enableEpochsHandler common.EnableEpochsHandler
 	crtTransferIndex    uint32
 	drwaClassifier      vm.DRWATokenClassifier
+	// Immutable after construction: a context without a classifier cannot
+	// acquire one by handoff. Reading this bit needs no replacement lock.
+	drwaClassifierConfigured bool
 	// The sole write acquisition is TryLock, so nested native reads cannot
 	// deadlock behind a handoff waiting for their own execution to finish.
 	mutDRWAClassifier  sync.RWMutex
@@ -100,14 +103,15 @@ func NewVMContext(args VMContextArgs) (*vmContext, error) {
 	}
 
 	vmc := &vmContext{
-		drwaClassifier:      args.DRWAClassifier,
-		blockChainHook:      args.BlockChainHook,
-		cryptoHook:          args.CryptoHook,
-		inputParser:         args.InputParser,
-		validatorAccountsDB: args.ValidatorAccountsDB,
-		userAccountsDB:      args.UserAccountsDB,
-		chanceComputer:      args.ChanceComputer,
-		enableEpochsHandler: args.EnableEpochsHandler,
+		drwaClassifier:           args.DRWAClassifier,
+		drwaClassifierConfigured: args.DRWAClassifier != nil,
+		blockChainHook:           args.BlockChainHook,
+		cryptoHook:               args.CryptoHook,
+		inputParser:              args.InputParser,
+		validatorAccountsDB:      args.ValidatorAccountsDB,
+		userAccountsDB:           args.UserAccountsDB,
+		chanceComputer:           args.ChanceComputer,
+		enableEpochsHandler:      args.EnableEpochsHandler,
 	}
 	vmc.CleanCache()
 

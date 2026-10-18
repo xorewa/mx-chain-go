@@ -2604,109 +2604,109 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "e692ea8005d2443a8ff9350a49ba5775dba387667d8146d3a296bc6d698b6bc4",
+      "source_sha256": "9648f580c979277cf3fd48e8f4ce406b21b0f89d45e67bbcc94fcf55971a8fa9",
       "function": "SendGlobalSettingToAll",
       "receiver": "*vmContext",
-      "start": 214,
-      "end": 238,
+      "start": 218,
+      "end": 242,
       "body_sha256": "6354e79be32f39d54d128dbdee42c9d75467a2c16048b878f55da238e4cd7cae",
       "calls": [
         {
-          "line": 216,
+          "line": 220,
           "expression": "big.NewInt"
         },
         {
-          "line": 221,
+          "line": 225,
           "expression": "uint8"
         },
         {
-          "line": 221,
+          "line": 225,
           "expression": "uint8"
         },
         {
-          "line": 221,
+          "line": 225,
           "expression": "host.blockChainHook.NumberOfShards"
         },
         {
-          "line": 222,
+          "line": 226,
           "expression": "make"
         },
         {
-          "line": 222,
+          "line": 226,
           "expression": "len"
         },
         {
-          "line": 223,
+          "line": 227,
           "expression": "copy"
         },
         {
-          "line": 224,
+          "line": 228,
           "expression": "len"
         },
         {
-          "line": 226,
-          "expression": "string"
-        },
-        {
           "line": 230,
-          "expression": "big.NewInt"
-        },
-        {
-          "line": 231,
-          "expression": "big.NewInt"
+          "expression": "string"
         },
         {
           "line": 234,
-          "expression": "host.NextOutputTransferIndex"
-        },
-        {
-          "line": 235,
-          "expression": "append"
-        },
-        {
-          "line": 236,
-          "expression": "string"
-        }
-      ]
-    },
-    {
-      "root": "node",
-      "repository": "mx-chain-go",
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
-      "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "e692ea8005d2443a8ff9350a49ba5775dba387667d8146d3a296bc6d698b6bc4",
-      "function": "Transfer",
-      "receiver": "*vmContext",
-      "start": 277,
-      "end": 298,
-      "body_sha256": "6eab9bc0cbcc2e9a62a459dba653231ae244f7e7b511257478432436b9e1e840",
-      "calls": [
-        {
-          "line": 284,
-          "expression": "host.transferValueOnly"
-        },
-        {
-          "line": 285,
-          "expression": "host.getSenderDestination"
-        },
-        {
-          "line": 287,
-          "expression": "host.NextOutputTransferIndex"
-        },
-        {
-          "line": 288,
-          "expression": "big.NewInt(0).Set"
-        },
-        {
-          "line": 288,
           "expression": "big.NewInt"
         },
         {
-          "line": 294,
+          "line": 235,
+          "expression": "big.NewInt"
+        },
+        {
+          "line": 238,
+          "expression": "host.NextOutputTransferIndex"
+        },
+        {
+          "line": 239,
+          "expression": "append"
+        },
+        {
+          "line": 240,
+          "expression": "string"
+        }
+      ]
+    },
+    {
+      "root": "node",
+      "repository": "mx-chain-go",
+      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "source_file": "vm/systemSmartContracts/eei.go",
+      "source_sha256": "9648f580c979277cf3fd48e8f4ce406b21b0f89d45e67bbcc94fcf55971a8fa9",
+      "function": "Transfer",
+      "receiver": "*vmContext",
+      "start": 281,
+      "end": 302,
+      "body_sha256": "6eab9bc0cbcc2e9a62a459dba653231ae244f7e7b511257478432436b9e1e840",
+      "calls": [
+        {
+          "line": 288,
+          "expression": "host.transferValueOnly"
+        },
+        {
+          "line": 289,
+          "expression": "host.getSenderDestination"
+        },
+        {
+          "line": 291,
+          "expression": "host.NextOutputTransferIndex"
+        },
+        {
+          "line": 292,
+          "expression": "big.NewInt(0).Set"
+        },
+        {
+          "line": 292,
+          "expression": "big.NewInt"
+        },
+        {
+          "line": 298,
           "expression": "host.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 297,
+          "line": 301,
           "expression": "append"
         }
       ]
@@ -2716,23 +2716,23 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "e692ea8005d2443a8ff9350a49ba5775dba387667d8146d3a296bc6d698b6bc4",
+      "source_sha256": "9648f580c979277cf3fd48e8f4ce406b21b0f89d45e67bbcc94fcf55971a8fa9",
       "function": "createContractCallInput",
       "receiver": "*vmContext",
-      "start": 421,
-      "end": 433,
+      "start": 425,
+      "end": 437,
       "body_sha256": "ec50ed7e250c02cf47c52f6a0c10032febf914e74f6e13bf3eb128198f5daa38",
       "calls": [
         {
-          "line": 427,
+          "line": 431,
           "expression": "host.inputParser.ParseData"
         },
         {
-          "line": 427,
+          "line": 431,
           "expression": "string"
         },
         {
-          "line": 432,
+          "line": 436,
           "expression": "createDirectCallInput"
         }
       ]
@@ -2742,39 +2742,39 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "e692ea8005d2443a8ff9350a49ba5775dba387667d8146d3a296bc6d698b6bc4",
+      "source_sha256": "9648f580c979277cf3fd48e8f4ce406b21b0f89d45e67bbcc94fcf55971a8fa9",
       "function": "transferBeforeInternalExec",
       "receiver": "*vmContext",
-      "start": 454,
-      "end": 470,
+      "start": 458,
+      "end": 474,
       "body_sha256": "d59857e8acf48fff80ce5e976d344007f881e0b22aaa9def59e8b3d9bd2fee79",
       "calls": [
         {
-          "line": 455,
+          "line": 459,
           "expression": "host.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 456,
+          "line": 460,
           "expression": "host.Transfer"
         },
         {
-          "line": 459,
+          "line": 463,
           "expression": "host.transferValueOnly"
         },
         {
-          "line": 462,
+          "line": 466,
           "expression": "[]byte"
         },
         {
-          "line": 464,
+          "line": 468,
           "expression": "callInput.CallValue.Bytes"
         },
         {
-          "line": 465,
+          "line": 469,
           "expression": "vmcommon.FormatLogDataForCall"
         },
         {
-          "line": 467,
+          "line": 471,
           "expression": "host.AddLogEntry"
         }
       ]
@@ -2784,27 +2784,27 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "e692ea8005d2443a8ff9350a49ba5775dba387667d8146d3a296bc6d698b6bc4",
+      "source_sha256": "9648f580c979277cf3fd48e8f4ce406b21b0f89d45e67bbcc94fcf55971a8fa9",
       "function": "ExecuteOnDestContext",
       "receiver": "*vmContext",
-      "start": 537,
-      "end": 549,
+      "start": 541,
+      "end": 553,
       "body_sha256": "1139bc3c6a0b15f67a5c7762cfbdb8cceff2557bab3f73ce19dbeb48c2fbb033",
       "calls": [
         {
-          "line": 538,
+          "line": 542,
           "expression": "check.IfNil"
         },
         {
-          "line": 542,
+          "line": 546,
           "expression": "host.createContractCallInput"
         },
         {
-          "line": 546,
+          "line": 550,
           "expression": "host.ExecuteDRWASystemCall"
         },
         {
-          "line": 547,
+          "line": 551,
           "expression": "host.executeOnDestContext"
         }
       ]
@@ -2814,12 +2814,12 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "Execute",
       "receiver": "*esdt",
       "start": 137,
-      "end": 158,
-      "body_sha256": "e72201a6e5270f22e6556c3cefe8f68affd655150761cb9b0a9ef02a3322b124",
+      "end": 156,
+      "body_sha256": "67d4cb61e9348b28db6d9984ac380c189b02267cfd21d25a48a975d0aeb054d6",
       "calls": [
         {
           "line": 138,
@@ -2838,19 +2838,19 @@
           "expression": "context.mutDRWAClassifier.RUnlock"
         },
         {
-          "line": 146,
+          "line": 144,
           "expression": "context.executeDRWAESDTCall"
         },
         {
-          "line": 147,
+          "line": 145,
           "expression": "e.execute"
         },
         {
-          "line": 153,
+          "line": 151,
           "expression": "context.AddReturnMessage"
         },
         {
-          "line": 157,
+          "line": 155,
           "expression": "e.execute"
         }
       ]
@@ -2860,15 +2860,15 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "init",
       "receiver": "*esdt",
-      "start": 254,
-      "end": 267,
+      "start": 252,
+      "end": 265,
       "body_sha256": "dc69389946fb29ee56509f067666abb369b5886f94d7e2c602f47e2eafd49682",
       "calls": [
         {
-          "line": 261,
+          "line": 259,
           "expression": "e.saveESDTConfig"
         }
       ]
@@ -2878,163 +2878,163 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "issue",
       "receiver": "*esdt",
-      "start": 298,
-      "end": 363,
+      "start": 296,
+      "end": 361,
       "body_sha256": "476a1730bd96a18d34563bfe090ec3a201a0ae059bc20f7df68894a64479ecef",
       "calls": [
         {
-          "line": 299,
+          "line": 297,
           "expression": "len"
         },
         {
-          "line": 300,
+          "line": 298,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 304,
+          "line": 302,
           "expression": "e.checkBasicCreateArguments"
         },
         {
-          "line": 309,
+          "line": 307,
           "expression": "len"
         },
         {
-          "line": 310,
+          "line": 308,
           "expression": "fmt.Sprintf"
         },
         {
-          "line": 311,
+          "line": 309,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 315,
+          "line": 313,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 315,
+          "line": 313,
           "expression": "big.NewInt"
         },
         {
-          "line": 316,
+          "line": 314,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 317,
+          "line": 315,
+          "expression": "initialSupply.Cmp"
+        },
+        {
+          "line": 316,
           "expression": "initialSupply.Cmp"
         },
         {
           "line": 318,
-          "expression": "initialSupply.Cmp"
-        },
-        {
-          "line": 320,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 320,
+          "line": 318,
           "expression": "vm.ErrNegativeOrZeroInitialSupply.Error"
         },
         {
-          "line": 324,
+          "line": 322,
           "expression": "uint32"
         },
         {
-          "line": 324,
+          "line": 322,
           "expression": "big.NewInt(0).SetBytes(args.Arguments[3]).Uint64"
         },
         {
-          "line": 324,
+          "line": 322,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 324,
+          "line": 322,
           "expression": "big.NewInt"
         },
         {
-          "line": 326,
+          "line": 324,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 326,
+          "line": 324,
           "expression": "fmt.Errorf(\"%w, minimum: %d, maximum: %d, provided: %d\",\n\t\t\tvm.ErrInvalidNumberOfDecimals,\n\t\t\tminNumberOfDecimals,\n\t\t\tmaxNumberOfDecimals,\n\t\t\tnumOfDecimals,\n\t\t).Error"
         },
         {
-          "line": 326,
+          "line": 324,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 335,
+          "line": 333,
           "expression": "e.createNewToken"
         },
         {
-          "line": 342,
+          "line": 340,
           "expression": "[]byte"
         },
         {
-          "line": 344,
+          "line": 342,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 344,
+          "line": 342,
           "expression": "err.Error"
         },
         {
-          "line": 348,
+          "line": 346,
           "expression": "initialSupply.Cmp"
         },
         {
-          "line": 349,
+          "line": 347,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 349,
+          "line": 347,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 349,
+          "line": 347,
           "expression": "initialSupply.Bytes"
         },
         {
-          "line": 350,
+          "line": 348,
           "expression": "e.eei.Transfer"
         },
         {
-          "line": 350,
+          "line": 348,
           "expression": "big.NewInt"
         },
         {
-          "line": 350,
+          "line": 348,
           "expression": "[]byte"
         },
         {
-          "line": 352,
+          "line": 350,
           "expression": "e.eei.Finish"
+        },
+        {
+          "line": 354,
+          "expression": "[]byte"
         },
         {
           "line": 356,
           "expression": "[]byte"
         },
         {
-          "line": 358,
-          "expression": "[]byte"
-        },
-        {
-          "line": 358,
+          "line": 356,
           "expression": "big.NewInt(int64(numOfDecimals)).Bytes"
         },
         {
-          "line": 358,
+          "line": 356,
           "expression": "big.NewInt"
         },
         {
-          "line": 358,
+          "line": 356,
           "expression": "int64"
         },
         {
-          "line": 360,
+          "line": 358,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -3044,71 +3044,71 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "registerNonFungible",
       "receiver": "*esdt",
-      "start": 365,
-      "end": 402,
+      "start": 363,
+      "end": 400,
       "body_sha256": "8f74e8c3210f3ccb04fc1a22b435b08396ba0dcf9205d29f51fecb35df2f1578",
       "calls": [
         {
-          "line": 366,
+          "line": 364,
           "expression": "e.checkBasicCreateArguments"
         },
         {
-          "line": 370,
+          "line": 368,
           "expression": "len"
         },
         {
-          "line": 371,
+          "line": 369,
           "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 373,
+          "expression": "[]byte"
+        },
+        {
+          "line": 374,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
           "line": 375,
           "expression": "[]byte"
         },
         {
-          "line": 376,
-          "expression": "e.enableEpochsHandler.IsFlagEnabled"
-        },
-        {
-          "line": 377,
-          "expression": "[]byte"
-        },
-        {
-          "line": 380,
+          "line": 378,
           "expression": "e.createNewToken"
         },
         {
-          "line": 384,
+          "line": 382,
           "expression": "big.NewInt"
         },
         {
-          "line": 389,
+          "line": 387,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 389,
+          "line": 387,
           "expression": "err.Error"
         },
         {
-          "line": 392,
+          "line": 390,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 395,
+          "line": 393,
           "expression": "[]byte"
         },
         {
-          "line": 397,
+          "line": 395,
           "expression": "big.NewInt(0).Bytes"
         },
         {
-          "line": 397,
+          "line": 395,
           "expression": "big.NewInt"
         },
         {
-          "line": 399,
+          "line": 397,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -3118,67 +3118,67 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "registerSemiFungible",
       "receiver": "*esdt",
-      "start": 404,
-      "end": 437,
+      "start": 402,
+      "end": 435,
       "body_sha256": "a1aa4c9cea39f129f29a04948476ee2391e8d4f347e9944f907f69620302cf46",
       "calls": [
         {
-          "line": 405,
+          "line": 403,
           "expression": "e.checkBasicCreateArguments"
         },
         {
-          "line": 409,
+          "line": 407,
           "expression": "len"
         },
         {
-          "line": 410,
+          "line": 408,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 414,
+          "line": 412,
           "expression": "e.createNewToken"
         },
         {
-          "line": 418,
+          "line": 416,
           "expression": "big.NewInt"
         },
         {
-          "line": 421,
+          "line": 419,
           "expression": "[]byte"
         },
         {
-          "line": 423,
+          "line": 421,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 423,
+          "line": 421,
           "expression": "err.Error"
         },
         {
-          "line": 427,
+          "line": 425,
           "expression": "e.eei.Finish"
+        },
+        {
+          "line": 428,
+          "expression": "[]byte"
         },
         {
           "line": 430,
           "expression": "[]byte"
         },
         {
-          "line": 432,
-          "expression": "[]byte"
-        },
-        {
-          "line": 432,
+          "line": 430,
           "expression": "big.NewInt(0).Bytes"
         },
         {
-          "line": 432,
+          "line": 430,
           "expression": "big.NewInt"
         },
         {
-          "line": 434,
+          "line": 432,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -3188,107 +3188,107 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "registerMetaESDT",
       "receiver": "*esdt",
-      "start": 439,
-      "end": 486,
+      "start": 437,
+      "end": 484,
       "body_sha256": "48204f755015978f0c642cb35baa5702ca384296d3f687507a94ef977e2bf781",
       "calls": [
         {
-          "line": 440,
+          "line": 438,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 441,
+          "line": 439,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 444,
+          "line": 442,
           "expression": "e.checkBasicCreateArguments"
         },
         {
-          "line": 448,
+          "line": 446,
           "expression": "len"
         },
         {
-          "line": 449,
+          "line": 447,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 452,
+          "line": 450,
           "expression": "uint32"
         },
         {
-          "line": 452,
+          "line": 450,
           "expression": "big.NewInt(0).SetBytes(args.Arguments[2]).Uint64"
         },
         {
-          "line": 452,
+          "line": 450,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 452,
+          "line": 450,
           "expression": "big.NewInt"
         },
         {
-          "line": 454,
+          "line": 452,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 454,
+          "line": 452,
           "expression": "fmt.Errorf(\"%w, minimum: %d, maximum: %d, provided: %d\",\n\t\t\tvm.ErrInvalidNumberOfDecimals,\n\t\t\tminNumberOfDecimals,\n\t\t\tmaxNumberOfDecimals,\n\t\t\tnumOfDecimals,\n\t\t).Error"
         },
         {
-          "line": 454,
+          "line": 452,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 463,
+          "line": 461,
           "expression": "e.createNewToken"
         },
         {
-          "line": 467,
+          "line": 465,
           "expression": "big.NewInt"
         },
         {
-          "line": 470,
+          "line": 468,
           "expression": "[]byte"
         },
         {
-          "line": 472,
+          "line": 470,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 472,
+          "line": 470,
           "expression": "err.Error"
         },
         {
-          "line": 476,
+          "line": 474,
           "expression": "e.eei.Finish"
+        },
+        {
+          "line": 477,
+          "expression": "[]byte"
         },
         {
           "line": 479,
           "expression": "[]byte"
         },
         {
-          "line": 481,
-          "expression": "[]byte"
-        },
-        {
-          "line": 481,
+          "line": 479,
           "expression": "big.NewInt(int64(numOfDecimals)).Bytes"
         },
         {
-          "line": 481,
+          "line": 479,
           "expression": "big.NewInt"
         },
         {
-          "line": 481,
+          "line": 479,
           "expression": "int64"
         },
         {
-          "line": 483,
+          "line": 481,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -3298,151 +3298,151 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "registerAndSetRoles",
       "receiver": "*esdt",
-      "start": 489,
-      "end": 567,
+      "start": 487,
+      "end": 565,
       "body_sha256": "ef4aff78bd246fa03740b638cb32f2c376de13d47df29303a5c3ae32e5bbfa7d",
       "calls": [
         {
-          "line": 490,
+          "line": 488,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 491,
+          "line": 489,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 495,
+          "line": 493,
           "expression": "e.checkBasicCreateArguments"
         },
         {
-          "line": 499,
+          "line": 497,
           "expression": "len"
         },
         {
-          "line": 500,
+          "line": 498,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 501,
+          "expression": "e.getTokenType"
+        },
+        {
+          "line": 503,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 503,
-          "expression": "e.getTokenType"
-        },
-        {
-          "line": 505,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 505,
           "expression": "err.Error"
+        },
+        {
+          "line": 507,
+          "expression": "uint32"
         },
         {
           "line": 509,
           "expression": "uint32"
         },
         {
-          "line": 511,
-          "expression": "uint32"
-        },
-        {
-          "line": 511,
+          "line": 509,
           "expression": "big.NewInt(0).SetBytes(args.Arguments[3]).Uint64"
         },
         {
-          "line": 511,
+          "line": 509,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 511,
+          "line": 509,
           "expression": "big.NewInt"
         },
         {
-          "line": 513,
+          "line": 511,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 513,
+          "line": 511,
           "expression": "fmt.Errorf(\"%w, minimum: %d, maximum: %d, provided: %d\",\n\t\t\t\tvm.ErrInvalidNumberOfDecimals,\n\t\t\t\tminNumberOfDecimals,\n\t\t\t\tmaxNumberOfDecimals,\n\t\t\t\tnumOfDecimals,\n\t\t\t).Error"
         },
         {
-          "line": 513,
+          "line": 511,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 523,
+          "line": 521,
           "expression": "e.createNewToken"
         },
         {
-          "line": 527,
+          "line": 525,
           "expression": "big.NewInt"
         },
         {
-          "line": 532,
+          "line": 530,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 532,
+          "line": 530,
           "expression": "err.Error"
         },
         {
-          "line": 536,
+          "line": 534,
           "expression": "e.getAllRolesForTokenType"
         },
         {
-          "line": 536,
+          "line": 534,
           "expression": "string"
         },
         {
-          "line": 538,
+          "line": 536,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 538,
+          "line": 536,
           "expression": "err.Error"
         },
         {
-          "line": 542,
+          "line": 540,
           "expression": "e.setRolesForTokenAndAddress"
         },
         {
-          "line": 547,
+          "line": 545,
           "expression": "e.prepareAndSendRoleChangeData"
         },
         {
-          "line": 552,
+          "line": 550,
           "expression": "e.saveToken"
         },
         {
-          "line": 554,
+          "line": 552,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 554,
+          "line": 552,
           "expression": "err.Error"
         },
         {
-          "line": 559,
+          "line": 557,
           "expression": "[]byte"
         },
         {
-          "line": 561,
+          "line": 559,
           "expression": "big.NewInt(int64(numOfDecimals)).Bytes"
         },
         {
-          "line": 561,
+          "line": 559,
           "expression": "big.NewInt"
         },
         {
-          "line": 561,
+          "line": 559,
           "expression": "int64"
         },
         {
-          "line": 563,
+          "line": 561,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 564,
+          "line": 562,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -3452,88 +3452,92 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "changeSFTToMetaESDT",
       "receiver": "*esdt",
-      "start": 644,
-      "end": 691,
+      "start": 642,
+      "end": 689,
       "body_sha256": "d307a5bedc41985b843d2abac138b7c875e1dab0d094ee416eff6f562912e42c",
       "calls": [
         {
-          "line": 645,
+          "line": 643,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 646,
+          "line": 644,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 649,
+          "line": 647,
           "expression": "len"
         },
         {
-          "line": 650,
+          "line": 648,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 653,
+          "line": 651,
           "expression": "uint32"
         },
         {
-          "line": 653,
+          "line": 651,
           "expression": "big.NewInt(0).SetBytes(args.Arguments[1]).Uint64"
         },
         {
-          "line": 653,
+          "line": 651,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 653,
+          "line": 651,
           "expression": "big.NewInt"
         },
         {
-          "line": 655,
+          "line": 653,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 655,
+          "line": 653,
           "expression": "fmt.Errorf(\"%w, minimum: %d, maximum: %d, provided: %d\",\n\t\t\tvm.ErrInvalidNumberOfDecimals,\n\t\t\tminNumberOfDecimals,\n\t\t\tmaxNumberOfDecimals,\n\t\t\tnumOfDecimals,\n\t\t).Error"
         },
         {
-          "line": 655,
+          "line": 653,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 663,
+          "line": 661,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 668,
+          "line": 666,
           "expression": "bytes.Equal"
         },
         {
-          "line": 668,
+          "line": 666,
           "expression": "[]byte"
         },
         {
-          "line": 669,
+          "line": 667,
           "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 671,
+          "expression": "[]byte"
         },
         {
           "line": 673,
-          "expression": "[]byte"
-        },
-        {
-          "line": 675,
           "expression": "e.saveToken"
         },
         {
-          "line": 677,
+          "line": 675,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 677,
+          "line": 675,
           "expression": "err.Error"
+        },
+        {
+          "line": 680,
+          "expression": "[]byte"
         },
         {
           "line": 682,
@@ -3541,14 +3545,10 @@
         },
         {
           "line": 684,
-          "expression": "[]byte"
-        },
-        {
-          "line": 686,
           "expression": "e.eei.AddLogEntry"
         },
         {
-          "line": 688,
+          "line": 686,
           "expression": "e.sendTokenTypeToSystemAccounts"
         }
       ]
@@ -3558,123 +3558,123 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "burn",
       "receiver": "*esdt",
-      "start": 906,
-      "end": 955,
+      "start": 904,
+      "end": 953,
       "body_sha256": "451690cd3d2a42e083fe3b174da433419d1066d88841909908c478ec45ca637f",
       "calls": [
         {
-          "line": 907,
+          "line": 905,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 908,
+          "line": 906,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 912,
+          "line": 910,
           "expression": "len"
         },
         {
-          "line": 913,
+          "line": 911,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 916,
+          "line": 914,
           "expression": "args.CallValue.Cmp"
         },
         {
-          "line": 917,
+          "line": 915,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 920,
+          "line": 918,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 920,
+          "line": 918,
           "expression": "big.NewInt"
         },
         {
-          "line": 921,
+          "line": 919,
           "expression": "burntValue.Cmp"
         },
         {
-          "line": 921,
+          "line": 919,
           "expression": "big.NewInt"
         },
         {
-          "line": 922,
+          "line": 920,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 923,
+          "expression": "e.getExistingToken"
+        },
+        {
+          "line": 925,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 925,
-          "expression": "e.getExistingToken"
-        },
-        {
-          "line": 927,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 927,
           "expression": "err.Error"
         },
         {
-          "line": 931,
+          "line": 929,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 931,
+          "line": 929,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 932,
+          "line": 930,
           "expression": "e.eei.Transfer"
         },
         {
-          "line": 932,
+          "line": 930,
           "expression": "big.NewInt"
         },
         {
-          "line": 932,
+          "line": 930,
           "expression": "[]byte"
         },
         {
-          "line": 933,
+          "line": 931,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 934,
+          "line": 932,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 940,
+          "line": 938,
           "expression": "token.BurntValue.Add"
         },
         {
-          "line": 942,
+          "line": 940,
           "expression": "e.saveToken"
         },
         {
-          "line": 944,
+          "line": 942,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 944,
+          "line": 942,
           "expression": "err.Error"
         },
         {
-          "line": 948,
+          "line": 946,
           "expression": "e.eei.UseGas"
         },
         {
-          "line": 950,
+          "line": 948,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 950,
+          "line": 948,
           "expression": "err.Error"
         }
       ]
@@ -3684,127 +3684,127 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "mint",
       "receiver": "*esdt",
-      "start": 957,
-      "end": 1007,
+      "start": 955,
+      "end": 1005,
       "body_sha256": "f2ee1d429583d8a985866967de6c8bc2ae15b8abe9309e3d3724633885d99f65",
       "calls": [
         {
-          "line": 958,
+          "line": 956,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 959,
+          "line": 957,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 963,
+          "line": 961,
           "expression": "len"
         },
         {
-          "line": 963,
+          "line": 961,
           "expression": "len"
         },
         {
-          "line": 964,
+          "line": 962,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 967,
+          "line": 965,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 971,
+          "line": 969,
           "expression": "len"
         },
         {
-          "line": 972,
+          "line": 970,
           "expression": "fmt.Sprintf"
         },
         {
-          "line": 973,
+          "line": 971,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 977,
+          "line": 975,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 977,
+          "line": 975,
           "expression": "big.NewInt"
         },
         {
-          "line": 978,
+          "line": 976,
           "expression": "mintValue.Cmp"
         },
         {
-          "line": 978,
+          "line": 976,
           "expression": "big.NewInt"
         },
         {
-          "line": 979,
+          "line": 977,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 983,
+          "line": 981,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 987,
+          "line": 985,
           "expression": "token.MintedValue.Add"
         },
         {
-          "line": 988,
+          "line": 986,
           "expression": "e.saveToken"
         },
         {
-          "line": 990,
+          "line": 988,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 990,
+          "line": 988,
           "expression": "err.Error"
         },
         {
+          "line": 993,
+          "expression": "len"
+        },
+        {
+          "line": 994,
+          "expression": "len"
+        },
+        {
+          "line": 994,
+          "expression": "len"
+        },
+        {
           "line": 995,
-          "expression": "len"
-        },
-        {
-          "line": 996,
-          "expression": "len"
-        },
-        {
-          "line": 996,
-          "expression": "len"
-        },
-        {
-          "line": 997,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1003,
+          "line": 1001,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 1003,
+          "line": 1001,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 1003,
+          "line": 1001,
           "expression": "mintValue.Bytes"
         },
         {
-          "line": 1004,
+          "line": 1002,
           "expression": "e.eei.Transfer"
         },
         {
-          "line": 1004,
+          "line": 1002,
           "expression": "big.NewInt"
         },
         {
-          "line": 1004,
+          "line": 1002,
           "expression": "[]byte"
         }
       ]
@@ -3814,51 +3814,51 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "toggleFreeze",
       "receiver": "*esdt",
-      "start": 1009,
-      "end": 1032,
+      "start": 1007,
+      "end": 1030,
       "body_sha256": "773314f83b32dd71cf142809a808add7d941538c2d3ce96b19dc42ba0cd45a81",
       "calls": [
         {
-          "line": 1010,
+          "line": 1008,
           "expression": "len"
         },
         {
-          "line": 1011,
+          "line": 1009,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1014,
+          "line": 1012,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1019,
+          "line": 1017,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1023,
+          "line": 1021,
           "expression": "e.isAddressValid"
         },
         {
-          "line": 1024,
+          "line": 1022,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1028,
+          "line": 1026,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 1029,
+          "line": 1027,
           "expression": "e.eei.Transfer"
         },
         {
-          "line": 1029,
+          "line": 1027,
           "expression": "big.NewInt"
         },
         {
-          "line": 1029,
+          "line": 1027,
           "expression": "[]byte"
         }
       ]
@@ -3868,27 +3868,27 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "wipe",
       "receiver": "*esdt",
-      "start": 1034,
-      "end": 1045,
+      "start": 1032,
+      "end": 1043,
       "body_sha256": "91708e68e1a19d624ed02991f714b86480fc5ad37637252a22cb5a91d4d06498",
       "calls": [
         {
-          "line": 1035,
+          "line": 1033,
           "expression": "len"
         },
         {
-          "line": 1036,
+          "line": 1034,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1039,
+          "line": 1037,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1043,
+          "line": 1041,
           "expression": "e.wipeTokenFromAddress"
         }
       ]
@@ -3898,71 +3898,71 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "toggleFreezeSingleNFT",
       "receiver": "*esdt",
-      "start": 1047,
-      "end": 1078,
+      "start": 1045,
+      "end": 1076,
       "body_sha256": "15d7b2f34d771e03718fcca5fbe18fe23c7afcef35c704d0dc7b48e9e8b4a649",
       "calls": [
         {
-          "line": 1048,
+          "line": 1046,
           "expression": "len"
         },
         {
-          "line": 1049,
+          "line": 1047,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1052,
+          "line": 1050,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1057,
+          "line": 1055,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1060,
+          "line": 1058,
           "expression": "string"
         },
         {
-          "line": 1061,
+          "line": 1059,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1064,
+          "line": 1062,
           "expression": "e.isAddressValid"
         },
         {
-          "line": 1065,
+          "line": 1063,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1068,
+          "line": 1066,
           "expression": "isArgumentsUint64"
         },
         {
-          "line": 1069,
+          "line": 1067,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1073,
+          "line": 1071,
           "expression": "append"
         },
         {
-          "line": 1074,
+          "line": 1072,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 1075,
+          "line": 1073,
           "expression": "e.eei.Transfer"
         },
         {
-          "line": 1075,
+          "line": 1073,
           "expression": "big.NewInt"
         },
         {
-          "line": 1075,
+          "line": 1073,
           "expression": "[]byte"
         }
       ]
@@ -3972,47 +3972,47 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "wipeSingleNFT",
       "receiver": "*esdt",
-      "start": 1113,
-      "end": 1134,
+      "start": 1111,
+      "end": 1132,
       "body_sha256": "9911d57d469d61e515323970fc004d524ab177846b79d9f00745611071d2bce3",
       "calls": [
         {
-          "line": 1114,
+          "line": 1112,
           "expression": "len"
         },
         {
-          "line": 1115,
+          "line": 1113,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1118,
+          "line": 1116,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1122,
+          "line": 1120,
           "expression": "string"
         },
         {
-          "line": 1123,
+          "line": 1121,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1126,
+          "line": 1124,
           "expression": "isArgumentsUint64"
         },
         {
-          "line": 1127,
+          "line": 1125,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1131,
+          "line": 1129,
           "expression": "append"
         },
         {
-          "line": 1132,
+          "line": 1130,
           "expression": "e.wipeTokenFromAddress"
         }
       ]
@@ -4022,67 +4022,67 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "togglePause",
       "receiver": "*esdt",
-      "start": 1136,
-      "end": 1177,
+      "start": 1134,
+      "end": 1175,
       "body_sha256": "dcc61dd2ebd32eb9dbb64271d2c70da41094a907b03117ada44bd1737ab483ce",
       "calls": [
         {
-          "line": 1137,
+          "line": 1135,
           "expression": "len"
         },
         {
-          "line": 1138,
+          "line": 1136,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1141,
+          "line": 1139,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1146,
+          "line": 1144,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1150,
+          "line": 1148,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1154,
+          "line": 1152,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 1157,
+          "expression": "e.saveToken"
+        },
+        {
+          "line": 1159,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 1159,
-          "expression": "e.saveToken"
-        },
-        {
-          "line": 1161,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 1161,
           "expression": "err.Error"
         },
         {
-          "line": 1165,
+          "line": 1163,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 1166,
+          "line": 1164,
           "expression": "e.eei.SendGlobalSettingToAll"
         },
         {
-          "line": 1166,
+          "line": 1164,
           "expression": "[]byte"
         },
         {
-          "line": 1169,
+          "line": 1167,
           "expression": "[]byte"
         },
         {
-          "line": 1174,
+          "line": 1172,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -4092,43 +4092,43 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "setBurnRoleGlobally",
       "receiver": "*esdt",
-      "start": 1205,
-      "end": 1225,
+      "start": 1203,
+      "end": 1223,
       "body_sha256": "f8f9e18faa5f0b2f5a8c67e7f46bd5903e8e2b0d95169732827d247190b7ae0b",
       "calls": [
         {
-          "line": 1206,
+          "line": 1204,
           "expression": "e.checkInputReturnDataBurnForAll"
         },
         {
-          "line": 1211,
+          "line": 1209,
           "expression": "checkIfDefinedRoleExistsInToken"
         },
         {
-          "line": 1211,
+          "line": 1209,
           "expression": "[]byte"
         },
         {
-          "line": 1213,
+          "line": 1211,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1217,
+          "line": 1215,
           "expression": "e.addBurnRoleAndSendToAllShards"
         },
         {
-          "line": 1218,
+          "line": 1216,
           "expression": "e.saveToken"
         },
         {
-          "line": 1220,
+          "line": 1218,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1220,
+          "line": 1218,
           "expression": "err.Error"
         }
       ]
@@ -4138,36 +4138,48 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "unsetBurnRoleGlobally",
       "receiver": "*esdt",
-      "start": 1227,
-      "end": 1250,
+      "start": 1225,
+      "end": 1248,
       "body_sha256": "3ad6dd2ce30377d241ab14a75bfe090146e7719fa6e6f2a5e756a8b1b950fd5a",
       "calls": [
         {
-          "line": 1228,
+          "line": 1226,
           "expression": "e.checkInputReturnDataBurnForAll"
         },
         {
-          "line": 1233,
+          "line": 1231,
           "expression": "checkIfDefinedRoleExistsInToken"
         },
         {
-          "line": 1233,
+          "line": 1231,
           "expression": "[]byte"
         },
         {
-          "line": 1235,
+          "line": 1233,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1239,
+          "line": 1237,
           "expression": "deleteRoleFromToken"
         },
         {
-          "line": 1239,
+          "line": 1237,
           "expression": "[]byte"
+        },
+        {
+          "line": 1240,
+          "expression": "[]byte"
+        },
+        {
+          "line": 1242,
+          "expression": "zero.Bytes"
+        },
+        {
+          "line": 1242,
+          "expression": "zero.Bytes"
         },
         {
           "line": 1242,
@@ -4175,22 +4187,10 @@
         },
         {
           "line": 1244,
-          "expression": "zero.Bytes"
-        },
-        {
-          "line": 1244,
-          "expression": "zero.Bytes"
-        },
-        {
-          "line": 1244,
-          "expression": "[]byte"
-        },
-        {
-          "line": 1246,
           "expression": "e.eei.AddLogEntry"
         },
         {
-          "line": 1248,
+          "line": 1246,
           "expression": "e.saveTokenAndSendForAll"
         }
       ]
@@ -4200,147 +4200,147 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "configChange",
       "receiver": "*esdt",
-      "start": 1272,
-      "end": 1325,
+      "start": 1270,
+      "end": 1323,
       "body_sha256": "57824e6d950ddddbaf85186fbcb20111440c78bbe0e38a4ef1a2d073045dd988",
       "calls": [
         {
-          "line": 1273,
+          "line": 1271,
           "expression": "e.getEsdtOwner"
         },
         {
-          "line": 1275,
+          "line": 1273,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1275,
+          "line": 1273,
           "expression": "fmt.Sprintf"
         },
         {
-          "line": 1275,
+          "line": 1273,
           "expression": "err.Error"
         },
         {
-          "line": 1279,
+          "line": 1277,
+          "expression": "bytes.Equal"
+        },
+        {
+          "line": 1277,
           "expression": "bytes.Equal"
         },
         {
           "line": 1279,
-          "expression": "bytes.Equal"
-        },
-        {
-          "line": 1281,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1284,
+          "line": 1282,
           "expression": "args.CallValue.Cmp"
         },
         {
-          "line": 1285,
+          "line": 1283,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 1286,
+          "expression": "e.eei.UseGas"
+        },
+        {
+          "line": 1288,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 1288,
-          "expression": "e.eei.UseGas"
-        },
-        {
-          "line": 1290,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 1290,
           "expression": "err.Error"
         },
         {
-          "line": 1293,
+          "line": 1291,
           "expression": "len"
         },
         {
-          "line": 1294,
+          "line": 1292,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1294,
+          "line": 1292,
           "expression": "vm.ErrInvalidNumOfArguments.Error"
         },
         {
-          "line": 1300,
+          "line": 1298,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 1300,
+          "line": 1298,
           "expression": "big.NewInt"
         },
         {
-          "line": 1301,
+          "line": 1299,
           "expression": "uint32"
         },
         {
-          "line": 1301,
+          "line": 1299,
           "expression": "big.NewInt(0).SetBytes(args.Arguments[2]).Uint64"
         },
         {
-          "line": 1301,
+          "line": 1299,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 1301,
+          "line": 1299,
           "expression": "big.NewInt"
         },
         {
-          "line": 1302,
+          "line": 1300,
           "expression": "uint32"
         },
         {
-          "line": 1302,
+          "line": 1300,
           "expression": "big.NewInt(0).SetBytes(args.Arguments[3]).Uint64"
         },
         {
-          "line": 1302,
+          "line": 1300,
           "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "line": 1302,
+          "line": 1300,
           "expression": "big.NewInt"
         },
         {
-          "line": 1305,
+          "line": 1303,
           "expression": "len"
         },
         {
-          "line": 1305,
+          "line": 1303,
           "expression": "len"
         },
         {
-          "line": 1306,
+          "line": 1304,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1309,
+          "line": 1307,
           "expression": "newConfig.BaseIssuingCost.Cmp"
         },
         {
-          "line": 1310,
+          "line": 1308,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1314,
+          "line": 1312,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 1316,
+          "expression": "e.saveESDTConfig"
+        },
+        {
+          "line": 1318,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 1318,
-          "expression": "e.saveESDTConfig"
-        },
-        {
-          "line": 1320,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 1320,
           "expression": "err.Error"
         }
       ]
@@ -4350,75 +4350,75 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "claim",
       "receiver": "*esdt",
-      "start": 1327,
-      "end": 1356,
+      "start": 1325,
+      "end": 1354,
       "body_sha256": "3e74a41b76a3ee014ebdc97cdfd02a8f2f41ec53fe77324726b3b40ef0d3538e",
       "calls": [
         {
-          "line": 1328,
+          "line": 1326,
           "expression": "e.getEsdtOwner"
         },
         {
-          "line": 1330,
+          "line": 1328,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1330,
+          "line": 1328,
           "expression": "fmt.Sprintf"
         },
         {
-          "line": 1330,
+          "line": 1328,
           "expression": "err.Error"
         },
         {
-          "line": 1334,
+          "line": 1332,
           "expression": "bytes.Equal"
         },
         {
-          "line": 1335,
+          "line": 1333,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1338,
+          "line": 1336,
           "expression": "args.CallValue.Cmp"
         },
         {
-          "line": 1339,
+          "line": 1337,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 1340,
+          "expression": "e.eei.UseGas"
+        },
+        {
+          "line": 1342,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 1342,
-          "expression": "e.eei.UseGas"
-        },
-        {
-          "line": 1344,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 1344,
           "expression": "err.Error"
         },
         {
-          "line": 1347,
+          "line": 1345,
           "expression": "len"
         },
         {
-          "line": 1348,
+          "line": 1346,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1348,
+          "line": 1346,
           "expression": "vm.ErrInvalidNumOfArguments.Error"
         },
         {
-          "line": 1352,
+          "line": 1350,
           "expression": "e.eei.GetBalance"
         },
         {
-          "line": 1353,
+          "line": 1351,
           "expression": "e.eei.Transfer"
         }
       ]
@@ -4428,56 +4428,64 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "getTokenProperties",
       "receiver": "*esdt",
-      "start": 1358,
-      "end": 1399,
+      "start": 1356,
+      "end": 1397,
       "body_sha256": "b83f8f7f05eca8b7a17331439304aad636c209cc5eb142c60baf634cd54160e2",
       "calls": [
         {
-          "line": 1359,
+          "line": 1357,
           "expression": "args.CallValue.Cmp"
         },
         {
-          "line": 1360,
+          "line": 1358,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1363,
+          "line": 1361,
           "expression": "len"
         },
         {
-          "line": 1364,
+          "line": 1362,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1364,
+          "line": 1362,
           "expression": "vm.ErrInvalidNumOfArguments.Error"
         },
         {
-          "line": 1367,
+          "line": 1365,
           "expression": "e.eei.UseGas"
         },
         {
-          "line": 1369,
+          "line": 1367,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1369,
+          "line": 1367,
           "expression": "err.Error"
         },
         {
-          "line": 1373,
+          "line": 1371,
           "expression": "e.getExistingToken"
         },
         {
-          "line": 1375,
+          "line": 1373,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1375,
+          "line": 1373,
           "expression": "err.Error"
+        },
+        {
+          "line": 1377,
+          "expression": "e.eei.Finish"
+        },
+        {
+          "line": 1378,
+          "expression": "e.eei.Finish"
         },
         {
           "line": 1379,
@@ -4488,46 +4496,62 @@
           "expression": "e.eei.Finish"
         },
         {
+          "line": 1380,
+          "expression": "[]byte"
+        },
+        {
+          "line": 1380,
+          "expression": "esdtToken.MintedValue.String"
+        },
+        {
           "line": 1381,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 1382,
-          "expression": "e.eei.Finish"
-        },
-        {
-          "line": 1382,
+          "line": 1381,
           "expression": "[]byte"
         },
         {
-          "line": 1382,
-          "expression": "esdtToken.MintedValue.String"
-        },
-        {
-          "line": 1383,
-          "expression": "e.eei.Finish"
-        },
-        {
-          "line": 1383,
-          "expression": "[]byte"
-        },
-        {
-          "line": 1383,
+          "line": 1381,
           "expression": "esdtToken.BurntValue.String"
         },
         {
-          "line": 1384,
+          "line": 1382,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 1384,
+          "line": 1382,
           "expression": "[]byte"
         },
         {
-          "line": 1384,
+          "line": 1382,
           "expression": "fmt.Sprintf"
         },
         {
+          "line": 1383,
+          "expression": "e.eei.Finish"
+        },
+        {
+          "line": 1383,
+          "expression": "[]byte"
+        },
+        {
+          "line": 1383,
+          "expression": "getStringFromBool"
+        },
+        {
+          "line": 1384,
+          "expression": "e.eei.Finish"
+        },
+        {
+          "line": 1384,
+          "expression": "[]byte"
+        },
+        {
+          "line": 1384,
+          "expression": "getStringFromBool"
+        },
+        {
           "line": 1385,
           "expression": "e.eei.Finish"
         },
@@ -4645,30 +4669,6 @@
         },
         {
           "line": 1394,
-          "expression": "getStringFromBool"
-        },
-        {
-          "line": 1395,
-          "expression": "e.eei.Finish"
-        },
-        {
-          "line": 1395,
-          "expression": "[]byte"
-        },
-        {
-          "line": 1395,
-          "expression": "getStringFromBool"
-        },
-        {
-          "line": 1396,
-          "expression": "e.eei.Finish"
-        },
-        {
-          "line": 1396,
-          "expression": "[]byte"
-        },
-        {
-          "line": 1396,
           "expression": "fmt.Sprintf"
         }
       ]
@@ -4678,91 +4678,91 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "getSpecialRoles",
       "receiver": "*esdt",
-      "start": 1401,
-      "end": 1439,
+      "start": 1399,
+      "end": 1437,
       "body_sha256": "2a002151f316b0fa8791cefe02262f4aba73d38404ea29e5d14f2e3e1982ab19",
       "calls": [
         {
-          "line": 1402,
+          "line": 1400,
           "expression": "args.CallValue.Cmp"
         },
         {
-          "line": 1403,
+          "line": 1401,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1406,
+          "line": 1404,
           "expression": "len"
         },
         {
-          "line": 1407,
+          "line": 1405,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1407,
+          "line": 1405,
           "expression": "vm.ErrInvalidNumOfArguments.Error"
         },
         {
-          "line": 1410,
+          "line": 1408,
           "expression": "e.eei.UseGas"
         },
         {
-          "line": 1412,
+          "line": 1410,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1412,
+          "line": 1410,
           "expression": "err.Error"
         },
         {
-          "line": 1416,
+          "line": 1414,
           "expression": "e.getExistingToken"
         },
         {
-          "line": 1418,
+          "line": 1416,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1418,
+          "line": 1416,
           "expression": "err.Error"
         },
         {
-          "line": 1424,
+          "line": 1422,
           "expression": "make"
         },
         {
-          "line": 1426,
+          "line": 1424,
           "expression": "append"
         },
         {
-          "line": 1426,
+          "line": 1424,
           "expression": "string"
         },
         {
-          "line": 1429,
+          "line": 1427,
           "expression": "strings.Join"
         },
         {
-          "line": 1431,
+          "line": 1429,
           "expression": "e.addressPubKeyConverter.Encode"
         },
         {
-          "line": 1432,
+          "line": 1430,
           "expression": "e.treatEncodeErrorForGetSpecialRoles"
         },
         {
-          "line": 1434,
+          "line": 1432,
           "expression": "fmt.Sprintf"
         },
         {
-          "line": 1435,
+          "line": 1433,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 1435,
+          "line": 1433,
           "expression": "[]byte"
         }
       ]
@@ -4772,23 +4772,23 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "basicOwnershipChecks",
       "receiver": "*esdt",
-      "start": 1483,
-      "end": 1494,
+      "start": 1481,
+      "end": 1492,
       "body_sha256": "db541928049ade61367d06f12bda264d0a53028df6d39607f3d04caa4898fc5d",
       "calls": [
         {
-          "line": 1484,
+          "line": 1482,
           "expression": "e.getTokenInfoAfterInputChecks"
         },
         {
-          "line": 1488,
+          "line": 1486,
           "expression": "bytes.Equal"
         },
         {
-          "line": 1489,
+          "line": 1487,
           "expression": "e.eei.AddReturnMessage"
         }
       ]
@@ -4798,55 +4798,55 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "transferOwnership",
       "receiver": "*esdt",
-      "start": 1496,
-      "end": 1529,
+      "start": 1494,
+      "end": 1527,
       "body_sha256": "ed0f47c3b4cf500f8c22b5cca79fc53bf0d77e8885b213b98f866f8cf4521dd8",
       "calls": [
         {
-          "line": 1497,
+          "line": 1495,
           "expression": "len"
         },
         {
-          "line": 1498,
+          "line": 1496,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1501,
+          "line": 1499,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1506,
+          "line": 1504,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1509,
+          "line": 1507,
           "expression": "e.isAddressValid"
         },
         {
-          "line": 1510,
+          "line": 1508,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 1513,
+          "expression": "e.saveToken"
+        },
+        {
+          "line": 1515,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 1515,
-          "expression": "e.saveToken"
-        },
-        {
-          "line": 1517,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 1517,
           "expression": "err.Error"
         },
         {
-          "line": 1522,
+          "line": 1520,
           "expression": "[]byte"
         },
         {
-          "line": 1526,
+          "line": 1524,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -4856,51 +4856,51 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "controlChanges",
       "receiver": "*esdt",
-      "start": 1531,
-      "end": 1557,
+      "start": 1529,
+      "end": 1555,
       "body_sha256": "657b926a6b96f2c2e3d6f8e634e992aeda561b29660817b83f357f80b205b262",
       "calls": [
         {
-          "line": 1532,
+          "line": 1530,
           "expression": "len"
         },
         {
-          "line": 1533,
+          "line": 1531,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1536,
+          "line": 1534,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1541,
+          "line": 1539,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 1543,
+          "expression": "e.upgradeProperties"
+        },
+        {
+          "line": 1545,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 1545,
-          "expression": "e.upgradeProperties"
-        },
-        {
-          "line": 1547,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 1547,
           "expression": "err.Error"
+        },
+        {
+          "line": 1548,
+          "expression": "e.saveToken"
         },
         {
           "line": 1550,
-          "expression": "e.saveToken"
-        },
-        {
-          "line": 1552,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1552,
+          "line": 1550,
           "expression": "err.Error"
         }
       ]
@@ -4910,71 +4910,71 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "changeToMultiShardCreate",
       "receiver": "*esdt",
-      "start": 1778,
-      "end": 1816,
+      "start": 1776,
+      "end": 1814,
       "body_sha256": "98d7b632912d018c80aca102c382a9afc1c88615a461df69da19769c791537ed",
       "calls": [
         {
-          "line": 1779,
+          "line": 1777,
           "expression": "len"
         },
         {
-          "line": 1780,
+          "line": 1778,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1783,
+          "line": 1781,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1788,
+          "line": 1786,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1792,
+          "line": 1790,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1796,
+          "line": 1794,
           "expression": "getFirstAddressWithGivenRole"
         },
         {
-          "line": 1796,
+          "line": 1794,
           "expression": "[]byte"
         },
         {
-          "line": 1798,
+          "line": 1796,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1798,
+          "line": 1796,
           "expression": "err.Error"
         },
         {
-          "line": 1803,
+          "line": 1801,
           "expression": "len"
         },
         {
-          "line": 1805,
+          "line": 1803,
           "expression": "[]byte"
         },
         {
-          "line": 1806,
+          "line": 1804,
           "expression": "e.sendRoleChangeData"
         },
         {
-          "line": 1809,
+          "line": 1807,
           "expression": "e.saveToken"
         },
         {
-          "line": 1811,
+          "line": 1809,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1811,
+          "line": 1809,
           "expression": "err.Error"
         }
       ]
@@ -4984,55 +4984,55 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "prepareAndSendRoleChangeData",
       "receiver": "*esdt",
-      "start": 1925,
-      "end": 1949,
+      "start": 1923,
+      "end": 1947,
       "body_sha256": "125dd945031c27daded164c74f5a663038fca2167757fb429bd516f241fae07a",
       "calls": [
         {
-          "line": 1933,
+          "line": 1931,
           "expression": "append"
         },
         {
-          "line": 1933,
+          "line": 1931,
           "expression": "[]byte"
         },
         {
-          "line": 1935,
+          "line": 1933,
           "expression": "e.sendRoleChangeData"
         },
         {
-          "line": 1937,
+          "line": 1935,
           "expression": "isDefinedRoleInArgs"
         },
         {
-          "line": 1937,
+          "line": 1935,
+          "expression": "[]byte"
+        },
+        {
+          "line": 1936,
+          "expression": "isDefinedRoleInArgs"
+        },
+        {
+          "line": 1936,
           "expression": "[]byte"
         },
         {
           "line": 1938,
-          "expression": "isDefinedRoleInArgs"
-        },
-        {
-          "line": 1938,
-          "expression": "[]byte"
-        },
-        {
-          "line": 1940,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 1941,
+          "line": 1939,
           "expression": "e.eei.SendGlobalSettingToAll"
         },
         {
-          "line": 1941,
+          "line": 1939,
           "expression": "[]byte"
         },
         {
-          "line": 1945,
+          "line": 1943,
           "expression": "e.sendNewTransferRoleAddressToSystemAccount"
         }
       ]
@@ -5042,39 +5042,39 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "setSpecialRole",
       "receiver": "*esdt",
-      "start": 1951,
-      "end": 1979,
+      "start": 1949,
+      "end": 1977,
       "body_sha256": "43bea112fd90c646acb1cc92ad304e6716857e8ac1212b3dcdff7b0b8dc9bb0e",
       "calls": [
         {
-          "line": 1952,
+          "line": 1950,
           "expression": "e.checkArgumentsForSpecialRoleChanges"
         },
         {
-          "line": 1957,
+          "line": 1955,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 1962,
+          "line": 1960,
           "expression": "e.setRolesForTokenAndAddress"
         },
         {
-          "line": 1967,
+          "line": 1965,
           "expression": "e.prepareAndSendRoleChangeData"
         },
         {
-          "line": 1972,
+          "line": 1970,
           "expression": "e.saveToken"
         },
         {
-          "line": 1974,
+          "line": 1972,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 1974,
+          "line": 1972,
           "expression": "err.Error"
         }
       ]
@@ -5084,127 +5084,127 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "unSetSpecialRole",
       "receiver": "*esdt",
-      "start": 2009,
-      "end": 2076,
+      "start": 2007,
+      "end": 2074,
       "body_sha256": "f8ad35eeff65a69c89776ae282e1718ebcbddd19c9eb05fa8e8394e0c11b16d5",
       "calls": [
         {
-          "line": 2010,
+          "line": 2008,
           "expression": "e.checkArgumentsForSpecialRoleChanges"
         },
         {
-          "line": 2015,
+          "line": 2013,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 2020,
+          "line": 2018,
           "expression": "isDefinedRoleInArgs"
         },
         {
-          "line": 2020,
+          "line": 2018,
           "expression": "[]byte"
         },
         {
-          "line": 2021,
+          "line": 2019,
           "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 2024,
+          "expression": "getRolesForAddress"
         },
         {
           "line": 2026,
-          "expression": "getRolesForAddress"
-        },
-        {
-          "line": 2028,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2033,
+          "line": 2031,
           "expression": "getRoleIndex"
         },
         {
-          "line": 2035,
+          "line": 2033,
           "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 2037,
+          "expression": "copy"
+        },
+        {
+          "line": 2038,
+          "expression": "len"
         },
         {
           "line": 2039,
-          "expression": "copy"
-        },
-        {
-          "line": 2040,
           "expression": "len"
         },
         {
-          "line": 2041,
-          "expression": "len"
-        },
-        {
-          "line": 2044,
+          "line": 2042,
           "expression": "e.sendRoleChangeData"
+        },
+        {
+          "line": 2043,
+          "expression": "len"
         },
         {
           "line": 2045,
-          "expression": "len"
-        },
-        {
-          "line": 2047,
           "expression": "bytes.Equal"
         },
         {
-          "line": 2048,
+          "line": 2046,
           "expression": "copy"
         },
         {
-          "line": 2049,
+          "line": 2047,
           "expression": "len"
         },
         {
-          "line": 2050,
+          "line": 2048,
           "expression": "len"
         },
         {
-          "line": 2057,
+          "line": 2055,
           "expression": "isDefinedRoleInArgs"
         },
         {
-          "line": 2057,
+          "line": 2055,
           "expression": "[]byte"
         },
         {
-          "line": 2058,
+          "line": 2056,
           "expression": "checkIfDefinedRoleExistsInArgsAndToken"
         },
         {
-          "line": 2058,
+          "line": 2056,
           "expression": "[]byte"
         },
         {
-          "line": 2061,
+          "line": 2059,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 2062,
+          "line": 2060,
           "expression": "e.eei.SendGlobalSettingToAll"
         },
         {
-          "line": 2062,
+          "line": 2060,
           "expression": "[]byte"
         },
         {
-          "line": 2066,
+          "line": 2064,
           "expression": "e.deleteTransferRoleAddressFromSystemAccount"
         },
         {
-          "line": 2069,
+          "line": 2067,
           "expression": "e.saveToken"
         },
         {
-          "line": 2071,
+          "line": 2069,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2071,
+          "line": 2069,
           "expression": "err.Error"
         }
       ]
@@ -5214,59 +5214,59 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "sendAllTransferRoleAddresses",
       "receiver": "*esdt",
-      "start": 2098,
-      "end": 2134,
+      "start": 2096,
+      "end": 2132,
       "body_sha256": "d407aa6c65048761fa19e65b4de64b1c29c8a5fa31a550bf5da4768a7a068d3a",
       "calls": [
         {
-          "line": 2099,
+          "line": 2097,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 2101,
+          "line": 2099,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2104,
+          "line": 2102,
           "expression": "len"
         },
         {
-          "line": 2105,
+          "line": 2103,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2109,
+          "line": 2107,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 2115,
+          "line": 2113,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 2118,
+          "line": 2116,
           "expression": "bytes.Equal"
         },
         {
-          "line": 2118,
+          "line": 2116,
           "expression": "[]byte"
         },
         {
-          "line": 2119,
+          "line": 2117,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 2127,
+          "line": 2125,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2131,
+          "line": 2129,
           "expression": "e.eei.SendGlobalSettingToAll"
         },
         {
-          "line": 2131,
+          "line": 2129,
           "expression": "[]byte"
         }
       ]
@@ -5276,115 +5276,115 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "transferNFTCreateRole",
       "receiver": "*esdt",
-      "start": 2163,
-      "end": 2224,
+      "start": 2161,
+      "end": 2222,
       "body_sha256": "56adc28b4d678545779c547167577118d4ec122ce18ff5ea61ce059303346b54",
       "calls": [
         {
-          "line": 2164,
+          "line": 2162,
           "expression": "e.checkArgumentsForSpecialRoleChanges"
         },
         {
-          "line": 2169,
+          "line": 2167,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 2175,
+          "line": 2173,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2179,
+          "line": 2177,
           "expression": "bytes.Equal"
         },
         {
-          "line": 2179,
+          "line": 2177,
           "expression": "[]byte"
         },
         {
-          "line": 2180,
+          "line": 2178,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2183,
+          "line": 2181,
           "expression": "len"
         },
         {
-          "line": 2183,
+          "line": 2181,
           "expression": "len"
         },
         {
-          "line": 2184,
+          "line": 2182,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2187,
+          "line": 2185,
           "expression": "bytes.Equal"
         },
         {
-          "line": 2188,
+          "line": 2186,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2193,
+          "line": 2191,
           "expression": "len"
         },
         {
-          "line": 2196,
+          "line": 2194,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2201,
+          "line": 2199,
           "expression": "e.deleteNFTCreateRole"
         },
         {
-          "line": 2207,
+          "line": 2205,
           "expression": "getRolesForAddress"
         },
         {
-          "line": 2208,
+          "line": 2206,
           "expression": "append"
         },
         {
-          "line": 2208,
+          "line": 2206,
           "expression": "[]byte"
         },
         {
-          "line": 2210,
+          "line": 2208,
           "expression": "append"
+        },
+        {
+          "line": 2211,
+          "expression": "e.saveToken"
         },
         {
           "line": 2213,
-          "expression": "e.saveToken"
-        },
-        {
-          "line": 2215,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2215,
+          "line": 2213,
           "expression": "err.Error"
         },
         {
-          "line": 2220,
+          "line": 2218,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 2220,
+          "line": 2218,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 2221,
+          "line": 2219,
           "expression": "e.eei.Transfer"
         },
         {
-          "line": 2221,
+          "line": 2219,
           "expression": "big.NewInt"
         },
         {
-          "line": 2221,
+          "line": 2219,
           "expression": "[]byte"
         }
       ]
@@ -5394,63 +5394,63 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "stopNFTCreateForever",
       "receiver": "*esdt",
-      "start": 2226,
-      "end": 2263,
+      "start": 2224,
+      "end": 2261,
       "body_sha256": "b7390d95df1e222b858641d1216fae83f59ddf43bc8c81c00f17866d781e487c",
       "calls": [
         {
-          "line": 2227,
+          "line": 2225,
           "expression": "len"
         },
         {
-          "line": 2228,
+          "line": 2226,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2232,
+          "line": 2230,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 2238,
+          "line": 2236,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2241,
+          "line": 2239,
           "expression": "bytes.Equal"
         },
         {
-          "line": 2241,
+          "line": 2239,
           "expression": "[]byte"
         },
         {
-          "line": 2242,
+          "line": 2240,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2246,
+          "line": 2244,
           "expression": "e.deleteNFTCreateRole"
         },
         {
-          "line": 2252,
+          "line": 2250,
           "expression": "e.saveToken"
         },
         {
-          "line": 2254,
+          "line": 2252,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2254,
+          "line": 2252,
           "expression": "err.Error"
         },
         {
-          "line": 2259,
+          "line": 2257,
           "expression": "e.sendRoleChangeData"
         },
         {
-          "line": 2259,
+          "line": 2257,
           "expression": "[]byte"
         }
       ]
@@ -5460,59 +5460,59 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "updateTokenID",
       "receiver": "*esdt",
-      "start": 2265,
-      "end": 2293,
+      "start": 2263,
+      "end": 2291,
       "body_sha256": "f214c825e593a2ed8c4d421346e59fffd4c2d4ed132410e322365398a069c1e4",
       "calls": [
         {
-          "line": 2266,
+          "line": 2264,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 2267,
+          "line": 2265,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2270,
+          "line": 2268,
           "expression": "len"
         },
         {
-          "line": 2271,
+          "line": 2269,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2274,
+          "line": 2272,
           "expression": "e.getTokenInfoAfterInputChecks"
         },
         {
-          "line": 2280,
+          "line": 2278,
           "expression": "bytes.Equal"
         },
         {
+          "line": 2278,
+          "expression": "[]byte"
+        },
+        {
+          "line": 2279,
+          "expression": "[]byte"
+        },
+        {
           "line": 2280,
-          "expression": "[]byte"
-        },
-        {
-          "line": 2281,
-          "expression": "[]byte"
-        },
-        {
-          "line": 2282,
           "expression": "e.saveToken"
         },
         {
-          "line": 2284,
+          "line": 2282,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2284,
+          "line": 2282,
           "expression": "err.Error"
         },
         {
-          "line": 2290,
+          "line": 2288,
           "expression": "e.sendTokenTypeToSystemAccounts"
         }
       ]
@@ -5522,15 +5522,15 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "registerDynamic",
       "receiver": "*esdt",
-      "start": 2367,
-      "end": 2370,
+      "start": 2365,
+      "end": 2368,
       "body_sha256": "3e25777b0c86678a47c12a2b4da66f60f5249e18d313822fbbf4f1c928a5ce1a",
       "calls": [
         {
-          "line": 2368,
+          "line": 2366,
           "expression": "e.createDynamicToken"
         }
       ]
@@ -5540,51 +5540,51 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "registerAndSetAllRolesDynamic",
       "receiver": "*esdt",
-      "start": 2372,
-      "end": 2401,
+      "start": 2370,
+      "end": 2399,
       "body_sha256": "478751781c81f7d93b4e383ba6b6685756d8f8ef5ff4043c9c60c28e644c96b6",
       "calls": [
         {
-          "line": 2373,
+          "line": 2371,
           "expression": "e.createDynamicToken"
         },
         {
-          "line": 2378,
+          "line": 2376,
           "expression": "e.getAllRolesForTokenType"
         },
         {
-          "line": 2378,
+          "line": 2376,
           "expression": "string"
         },
         {
-          "line": 2380,
+          "line": 2378,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2380,
+          "line": 2378,
           "expression": "err.Error"
         },
         {
-          "line": 2384,
+          "line": 2382,
           "expression": "e.setRolesForTokenAndAddress"
         },
         {
-          "line": 2389,
+          "line": 2387,
           "expression": "e.prepareAndSendRoleChangeData"
         },
         {
-          "line": 2394,
+          "line": 2392,
           "expression": "e.saveToken"
         },
         {
-          "line": 2396,
+          "line": 2394,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2396,
+          "line": 2394,
           "expression": "err.Error"
         }
       ]
@@ -5594,87 +5594,87 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "changeToDynamic",
       "receiver": "*esdt",
-      "start": 2422,
-      "end": 2466,
+      "start": 2420,
+      "end": 2464,
       "body_sha256": "a34e40df2e53c8d8fd69d33564954f8031b813d4b4bf7579101cc90d1bec1fba",
       "calls": [
         {
-          "line": 2423,
+          "line": 2421,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 2424,
+          "line": 2422,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2428,
+          "line": 2426,
           "expression": "e.basicOwnershipChecks"
         },
         {
-          "line": 2433,
+          "line": 2431,
           "expression": "isNotAllowed"
         },
         {
-          "line": 2434,
+          "line": 2432,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2434,
+          "line": 2432,
           "expression": "fmt.Sprintf"
         },
         {
-          "line": 2437,
+          "line": 2435,
           "expression": "isDynamicTokenType"
         },
         {
-          "line": 2438,
+          "line": 2436,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 2440,
+          "expression": "e.checkRolesAreCompatibleToChangeToDynamic"
+        },
+        {
+          "line": 2442,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 2442,
-          "expression": "e.checkRolesAreCompatibleToChangeToDynamic"
-        },
-        {
-          "line": 2444,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 2444,
           "expression": "err.Error"
         },
         {
-          "line": 2448,
+          "line": 2446,
           "expression": "append"
         },
         {
-          "line": 2448,
+          "line": 2446,
           "expression": "[]byte"
         },
         {
-          "line": 2450,
+          "line": 2448,
           "expression": "e.saveToken"
         },
         {
-          "line": 2452,
+          "line": 2450,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2452,
+          "line": 2450,
           "expression": "err.Error"
         },
         {
-          "line": 2457,
+          "line": 2455,
           "expression": "[]byte"
         },
         {
-          "line": 2461,
+          "line": 2459,
           "expression": "e.eei.AddLogEntry"
         },
         {
-          "line": 2463,
+          "line": 2461,
           "expression": "e.sendTokenTypeToSystemAccounts"
         }
       ]
@@ -5684,39 +5684,39 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "sendTokenTypeToSystemAccounts",
       "receiver": "*esdt",
-      "start": 2488,
-      "end": 2504,
+      "start": 2486,
+      "end": 2502,
       "body_sha256": "e2e502c0e58e1db251db051646e8eaf89df1495fc3aaa8ae25eb9949f2b40d41",
       "calls": [
         {
-          "line": 2489,
+          "line": 2487,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 2494,
+          "line": 2492,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 2494,
+          "line": 2492,
           "expression": "hex.EncodeToString"
         },
         {
-          "line": 2495,
+          "line": 2493,
           "expression": "e.eei.SendGlobalSettingToAll"
         },
         {
-          "line": 2495,
+          "line": 2493,
           "expression": "[]byte"
         },
         {
-          "line": 2498,
+          "line": 2496,
           "expression": "[]byte"
         },
         {
-          "line": 2503,
+          "line": 2501,
           "expression": "e.eei.AddLogEntry"
         }
       ]
@@ -5726,47 +5726,47 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "getAllAddressesAndRoles",
       "receiver": "*esdt",
-      "start": 2515,
-      "end": 2540,
+      "start": 2513,
+      "end": 2538,
       "body_sha256": "e53cbafd64a963b02381bfff39b2a668fe93b4650dbc25912c06b08b2d184899",
       "calls": [
         {
-          "line": 2516,
+          "line": 2514,
           "expression": "len"
         },
         {
-          "line": 2517,
+          "line": 2515,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2521,
+          "line": 2519,
           "expression": "args.CallValue.Cmp"
         },
         {
-          "line": 2522,
+          "line": 2520,
+          "expression": "e.eei.AddReturnMessage"
+        },
+        {
+          "line": 2524,
+          "expression": "e.getExistingToken"
+        },
+        {
+          "line": 2526,
           "expression": "e.eei.AddReturnMessage"
         },
         {
           "line": 2526,
-          "expression": "e.getExistingToken"
-        },
-        {
-          "line": 2528,
-          "expression": "e.eei.AddReturnMessage"
-        },
-        {
-          "line": 2528,
           "expression": "err.Error"
         },
         {
-          "line": 2533,
+          "line": 2531,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 2535,
+          "line": 2533,
           "expression": "e.eei.Finish"
         }
       ]
@@ -5776,27 +5776,27 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "saveToken",
       "receiver": "*esdt",
-      "start": 2621,
-      "end": 2633,
+      "start": 2619,
+      "end": 2631,
       "body_sha256": "464ce7e0b7fe83775c89c5d5d3afdedd223861b86cd337d8f5fec60732abacbe",
       "calls": [
         {
-          "line": 2622,
+          "line": 2620,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 2623,
+          "line": 2621,
           "expression": "e.saveTokenV1"
         },
         {
-          "line": 2626,
+          "line": 2624,
           "expression": "e.marshalizer.Marshal"
         },
         {
-          "line": 2631,
+          "line": 2629,
           "expression": "e.eei.SetStorage"
         }
       ]
@@ -5806,23 +5806,23 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "getExistingToken",
       "receiver": "*esdt",
-      "start": 2635,
-      "end": 2644,
+      "start": 2633,
+      "end": 2642,
       "body_sha256": "0a5ebaede1fa22996ee148cf4726267d294725b867dc323d5db8799df8f992be",
       "calls": [
         {
-          "line": 2636,
+          "line": 2634,
           "expression": "e.eei.GetStorage"
         },
         {
-          "line": 2637,
+          "line": 2635,
           "expression": "len"
         },
         {
-          "line": 2642,
+          "line": 2640,
           "expression": "e.marshalizer.Unmarshal"
         }
       ]
@@ -5832,23 +5832,23 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "saveESDTConfig",
       "receiver": "*esdt",
-      "start": 2671,
-      "end": 2679,
+      "start": 2669,
+      "end": 2677,
       "body_sha256": "80f15ec9e56ad0c277a7c83456451d9f5c30af019b132c134383593a94b2e48e",
       "calls": [
         {
-          "line": 2672,
+          "line": 2670,
           "expression": "e.marshalizer.Marshal"
         },
         {
-          "line": 2677,
+          "line": 2675,
           "expression": "e.eei.SetStorage"
         },
         {
-          "line": 2677,
+          "line": 2675,
           "expression": "[]byte"
         }
       ]
@@ -5858,71 +5858,71 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "getContractConfig",
       "receiver": "*esdt",
-      "start": 2704,
-      "end": 2722,
+      "start": 2702,
+      "end": 2720,
       "body_sha256": "eedae29369904a63ed251e693a0678827daf50419f4085fb4a8c07a197876352",
       "calls": [
         {
-          "line": 2705,
+          "line": 2703,
           "expression": "e.checkArgumentsForGeneralViewFunc"
         },
         {
-          "line": 2710,
+          "line": 2708,
           "expression": "e.getESDTConfig"
         },
         {
-          "line": 2712,
+          "line": 2710,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 2712,
+          "line": 2710,
           "expression": "err.Error"
+        },
+        {
+          "line": 2714,
+          "expression": "e.eei.Finish"
+        },
+        {
+          "line": 2715,
+          "expression": "e.eei.Finish"
+        },
+        {
+          "line": 2715,
+          "expression": "esdtConfig.BaseIssuingCost.Bytes"
         },
         {
           "line": 2716,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 2717,
-          "expression": "e.eei.Finish"
-        },
-        {
-          "line": 2717,
-          "expression": "esdtConfig.BaseIssuingCost.Bytes"
-        },
-        {
-          "line": 2718,
-          "expression": "e.eei.Finish"
-        },
-        {
-          "line": 2718,
+          "line": 2716,
           "expression": "big.NewInt(int64(esdtConfig.MinTokenNameLength)).Bytes"
         },
         {
-          "line": 2718,
+          "line": 2716,
           "expression": "big.NewInt"
         },
         {
-          "line": 2718,
+          "line": 2716,
           "expression": "int64"
         },
         {
-          "line": 2719,
+          "line": 2717,
           "expression": "e.eei.Finish"
         },
         {
-          "line": 2719,
+          "line": 2717,
           "expression": "big.NewInt(int64(esdtConfig.MaxTokenNameLength)).Bytes"
         },
         {
-          "line": 2719,
+          "line": 2717,
           "expression": "big.NewInt"
         },
         {
-          "line": 2719,
+          "line": 2717,
           "expression": "int64"
         }
       ]
@@ -8748,60 +8748,64 @@
       "repository": "mx-chain-go",
       "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "bf5e85a55acdcf9e60fca7c707d3c34c52ffe4886874c89a02100904bbe52b85",
+      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
       "function": "execute",
       "receiver": "*esdt",
-      "start": 160,
-      "end": 252,
+      "start": 158,
+      "end": 250,
       "body_sha256": "ce0714b158a4fef5b4779722b62c8cfb7c7b655309969275f2cd43434c5e95a1",
       "calls": [
         {
-          "line": 162,
+          "line": 160,
           "expression": "CheckIfNil"
         },
         {
-          "line": 167,
+          "line": 165,
           "expression": "e.init"
         },
         {
-          "line": 170,
+          "line": 168,
           "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 171,
+          "line": 169,
           "expression": "e.eei.AddReturnMessage"
         },
         {
-          "line": 177,
+          "line": 175,
           "expression": "e.issue"
         },
         {
-          "line": 179,
+          "line": 177,
           "expression": "e.registerSemiFungible"
         },
         {
-          "line": 181,
+          "line": 179,
           "expression": "e.registerNonFungible"
         },
         {
-          "line": 183,
+          "line": 181,
           "expression": "e.registerMetaESDT"
         },
         {
-          "line": 185,
+          "line": 183,
           "expression": "e.changeSFTToMetaESDT"
         },
         {
-          "line": 187,
+          "line": 185,
           "expression": "e.registerAndSetRoles"
         },
         {
-          "line": 189,
+          "line": 187,
           "expression": "e.burn"
         },
         {
-          "line": 191,
+          "line": 189,
           "expression": "e.mint"
+        },
+        {
+          "line": 191,
+          "expression": "e.toggleFreeze"
         },
         {
           "line": 193,
@@ -8809,11 +8813,11 @@
         },
         {
           "line": 195,
-          "expression": "e.toggleFreeze"
+          "expression": "e.wipe"
         },
         {
           "line": 197,
-          "expression": "e.wipe"
+          "expression": "e.togglePause"
         },
         {
           "line": 199,
@@ -8821,7 +8825,7 @@
         },
         {
           "line": 201,
-          "expression": "e.togglePause"
+          "expression": "e.toggleFreezeSingleNFT"
         },
         {
           "line": 203,
@@ -8829,94 +8833,90 @@
         },
         {
           "line": 205,
-          "expression": "e.toggleFreezeSingleNFT"
-        },
-        {
-          "line": 207,
           "expression": "e.wipeSingleNFT"
         },
         {
-          "line": 209,
+          "line": 207,
           "expression": "e.claim"
         },
         {
-          "line": 211,
+          "line": 209,
           "expression": "e.configChange"
         },
         {
-          "line": 213,
+          "line": 211,
           "expression": "e.controlChanges"
         },
         {
-          "line": 215,
+          "line": 213,
           "expression": "e.transferOwnership"
         },
         {
-          "line": 217,
+          "line": 215,
           "expression": "e.getTokenProperties"
         },
         {
-          "line": 219,
+          "line": 217,
           "expression": "e.getSpecialRoles"
         },
         {
-          "line": 221,
+          "line": 219,
           "expression": "e.setSpecialRole"
         },
         {
-          "line": 223,
+          "line": 221,
           "expression": "e.unSetSpecialRole"
         },
         {
-          "line": 225,
+          "line": 223,
           "expression": "e.transferNFTCreateRole"
         },
         {
-          "line": 227,
+          "line": 225,
           "expression": "e.stopNFTCreateForever"
         },
         {
-          "line": 229,
+          "line": 227,
           "expression": "e.getAllAddressesAndRoles"
         },
         {
-          "line": 231,
+          "line": 229,
           "expression": "e.getContractConfig"
         },
         {
-          "line": 233,
+          "line": 231,
           "expression": "e.changeToMultiShardCreate"
         },
         {
-          "line": 235,
+          "line": 233,
           "expression": "e.setBurnRoleGlobally"
         },
         {
-          "line": 237,
+          "line": 235,
           "expression": "e.unsetBurnRoleGlobally"
         },
         {
-          "line": 239,
+          "line": 237,
           "expression": "e.sendAllTransferRoleAddresses"
         },
         {
-          "line": 241,
+          "line": 239,
           "expression": "e.updateTokenID"
         },
         {
-          "line": 243,
+          "line": 241,
           "expression": "e.registerDynamic"
         },
         {
-          "line": 245,
+          "line": 243,
           "expression": "e.registerAndSetAllRolesDynamic"
         },
         {
-          "line": 247,
+          "line": 245,
           "expression": "e.changeToDynamic"
         },
         {
-          "line": 250,
+          "line": 248,
           "expression": "e.eei.AddReturnMessage"
         }
       ]
@@ -8925,16 +8925,16 @@
       "body_sha256": "379fe87da77ff81eeb6d7d4d8441aec7e4c36aef337928126b005467afc9cdb2",
       "calls": [
         {
-          "expression": "bytes.Equal",
-          "line": 20
+          "line": 20,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "host.executeDRWAESDTCall",
-          "line": 21
+          "line": 21,
+          "expression": "host.executeDRWAESDTCall"
         },
         {
-          "expression": "host.executeWithDRWAErrorCheck",
-          "line": 23
+          "line": 23,
+          "expression": "host.executeWithDRWAErrorCheck"
         }
       ],
       "end": 24,
@@ -8943,41 +8943,45 @@
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "21fca7b59d4d8b9d3b28be9b4aefd85d994e7acb77b727c713d8c031d4b8835a",
+      "source_sha256": "a8c0796ebd13627f551577185abd148b2365dc45778541d772938f0c8b436378",
       "start": 18,
       "repo_revision": "13d7061bd3d637cf2ef53d8332b057dabc25324b"
     },
     {
-      "body_sha256": "6f8cc9f507ffbdf2c002774468c572396ca3ca30749099ab7615308c2bac1f63",
+      "body_sha256": "b63c68d873fc9fee813b8b2646d62e595ccb40e2471ea3297494debd31733b48",
       "calls": [
         {
-          "expression": "host.mutDRWAClassifier.RLock",
-          "line": 27
+          "line": 28,
+          "expression": "execute"
         },
         {
-          "expression": "host.mutDRWAClassifier.RUnlock",
-          "line": 28
+          "line": 30,
+          "expression": "host.mutDRWAClassifier.RLock"
         },
         {
-          "expression": "host.drwaExecutionAvailabilityError",
-          "line": 29
+          "line": 31,
+          "expression": "host.mutDRWAClassifier.RUnlock"
         },
         {
-          "expression": "execute",
-          "line": 32
+          "line": 32,
+          "expression": "host.drwaExecutionAvailabilityError"
         },
         {
-          "expression": "host.drwaExecutionAvailabilityError",
-          "line": 35
+          "line": 35,
+          "expression": "execute"
+        },
+        {
+          "line": 38,
+          "expression": "host.drwaExecutionAvailabilityError"
         }
       ],
-      "end": 39,
+      "end": 42,
       "function": "executeWithDRWAErrorCheck",
       "receiver": "*vmContext",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "21fca7b59d4d8b9d3b28be9b4aefd85d994e7acb77b727c713d8c031d4b8835a",
+      "source_sha256": "a8c0796ebd13627f551577185abd148b2365dc45778541d772938f0c8b436378",
       "start": 26,
       "repo_revision": "13d7061bd3d637cf2ef53d8332b057dabc25324b"
     },
@@ -8985,46 +8989,46 @@
       "body_sha256": "e767ecd1bbd257787ac5fba9acf7ee3b944b71c87d310f35bfa1a1885fe6f8e7",
       "calls": [
         {
-          "expression": "host.executeWithDRWAErrorCheck",
-          "line": 43
+          "line": 46,
+          "expression": "host.executeWithDRWAErrorCheck"
         },
         {
-          "expression": "len",
-          "line": 44
+          "line": 47,
+          "expression": "len"
         },
         {
-          "expression": "drwaPublicTokenMutation",
-          "line": 44
+          "line": 47,
+          "expression": "drwaPublicTokenMutation"
         },
         {
-          "expression": "execute",
-          "line": 45
+          "line": 48,
+          "expression": "execute"
         },
         {
-          "expression": "host.drwaClassifier.WithTokenClassification",
-          "line": 48
+          "line": 51,
+          "expression": "host.drwaClassifier.WithTokenClassification"
         },
         {
-          "expression": "big.NewInt",
-          "line": 52
+          "line": 55,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "execute",
-          "line": 55
+          "line": 58,
+          "expression": "execute"
         },
         {
-          "expression": "host.retainDRWAExecutionError",
-          "line": 61
+          "line": 64,
+          "expression": "host.retainDRWAExecutionError"
         }
       ],
-      "end": 65,
+      "end": 68,
       "function": "executeDRWAESDTCall",
       "receiver": "*vmContext",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "21fca7b59d4d8b9d3b28be9b4aefd85d994e7acb77b727c713d8c031d4b8835a",
-      "start": 41,
+      "source_sha256": "a8c0796ebd13627f551577185abd148b2365dc45778541d772938f0c8b436378",
+      "start": 44,
       "repo_revision": "13d7061bd3d637cf2ef53d8332b057dabc25324b"
     }
   ],

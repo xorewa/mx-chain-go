@@ -24,6 +24,9 @@ func (host *vmContext) ExecuteDRWASystemCall(input *vmcommon.ContractCallInput,
 }
 
 func (host *vmContext) executeWithDRWAErrorCheck(execute func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {
+	if !host.drwaClassifierConfigured {
+		return execute()
+	}
 	host.mutDRWAClassifier.RLock()
 	defer host.mutDRWAClassifier.RUnlock()
 	if failure := host.drwaExecutionAvailabilityError(); failure != nil {
@@ -69,6 +72,9 @@ func (host *vmContext) executeDRWAESDTCall(input *vmcommon.ContractCallInput,
 // Observe that owner's existing status before native effects, then retain it in
 // the same latch. This never clears VM state or admits a replacement candidate.
 func (host *vmContext) DRWAExecutionError() error {
+	if !host.drwaClassifierConfigured {
+		return nil
+	}
 	host.mutDRWAClassifier.RLock()
 	defer host.mutDRWAClassifier.RUnlock()
 	failure := host.drwaExecutionError.Load()
