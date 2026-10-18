@@ -184,7 +184,7 @@ func (a *RegistrationAdmission) RetainBootstrapIntent(encoded, proof []byte) err
 				return nil, err
 			}
 			_, digest, id, err := records.identity(body)
-			if err != nil || !bytes.Equal(id, a.owner.id) || !bytes.Equal(digest, a.owner.digest) ||
+			if err != nil || epoch < a.enableEpoch || !bytes.Equal(id, a.owner.id) || !bytes.Equal(digest, a.owner.digest) ||
 				!bytes.Equal(body.networkDomain, a.domain) || at > body.expiry {
 				return nil, errInvalidRegistrationRecord
 			}
