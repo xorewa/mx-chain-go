@@ -120,6 +120,7 @@ func qualP17CheckRouteNode(raw []byte, expected qualP17RouteNode) error {
 
 func TestQualDRWAP17RouteSources(t *testing.T) {
 	fixture := qualP17Routes(t)
+	require.NoError(t, qualP17CheckRequiredRouteNodes(fixture.Nodes))
 	seen := make(map[string]bool)
 	for _, node := range fixture.Nodes {
 		key := node.Root + "/" + node.File + "/" + node.Receiver + "." + node.Function
@@ -228,4 +229,182 @@ func TestQualDRWAP17RouteDispatchTargets(t *testing.T) {
 	entries, err := qualP17Dispatch(raw)
 	require.NoError(t, err)
 	require.Len(t, expected, len(entries), "all direct inventory entries need route targets")
+}
+
+// RT-05 / Plan P17 L435/L576: this reviewed identity set is independent of
+// routes_01.json at execution. It freezes T10's selected classifier lifecycle,
+// native producer/receiver, account/save, SystemEI and loaded built-in boundaries,
+// including the three T41 public-call delegates identified by FA-01 D-14.
+// Updating body metadata cannot remove or substitute one of these obligations.
+// This bounded set is not complete dynamic reachability (SP2-25/SP2-68).
+func qualP17CheckRequiredRouteNodes(nodes []qualP17RouteNode) error {
+	required := strings.Fields(`
+node/process/drwa/nativeMetaContext.go/*nativeMetaContext.selectAnchor
+node/process/drwa/registryMaterialization.go/*registryMaterialization.prepare
+node/process/drwa/registryMaterialization.go/*registryMaterialization.classify
+node/process/drwa/registryProjectionLifecycle.go/*registryCandidate.stage
+node/process/drwa/registryProjectionLifecycle.go/*registryCandidate.classify
+node/process/drwa/registryProjectionLifecycle.go/*registryCandidate.commit
+node/process/drwa/registryProjectionLifecycle.go/*registryCandidate.abort
+node/process/drwa/registryProjectionLifecycle.go/*registryCandidate.recover
+node/process/drwa/registryRegistration.go/*RegistryRegistration.RegisterToken
+node/process/drwa/registryTransport.go/*registryTransport.reconstruct
+node/process/drwa/rollbackContainment.go/*RollbackContainment.Execute
+node/process/drwa/rollbackContainment.go/*RollbackContainment.Commit
+node/process/drwa/rollbackContainment.go/*RollbackContainment.Recover
+node/process/factory/metachain/vmContainerFactory.go/*vmContainerFactory.createSystemVMFactoryAndEEI
+node/process/factory/metachain/vmContainerFactory.go/*vmContainerFactory.finalizeSystemVMCreation
+node/process/smartContract/builtInFunctions/factory.go/.CreateBuiltInFunctionsFactory
+node/process/smartContract/builtInFunctions/factory.go/.GetAllowedAddress
+node/process/smartContract/hooks/blockChainHook.go/*BlockChainHookImpl.ProcessBuiltInFunction
+node/process/smartContract/hooks/blockChainHook.go/*BlockChainHookImpl.getUserAccounts
+node/process/smartContract/process.go/*scProcessor.prepareExecution
+node/process/smartContract/process.go/*scProcessor.doExecuteBuiltInFunction
+node/process/smartContract/process.go/*scProcessor.resolveBuiltInFunctions
+node/process/smartContract/process.go/*scProcessor.isSCExecutionAfterBuiltInFunc
+node/process/smartContract/process.go/.createBaseSCR
+node/process/smartContract/process.go/*scProcessor.preprocessOutTransferToSCR
+node/process/smartContract/process.go/*scProcessor.createSmartContractResults
+node/process/smartContract/processorV2/processV2.go/*scProcessor.prepareExecution
+node/process/smartContract/processorV2/processV2.go/*scProcessor.doExecuteBuiltInFunctionWithoutFailureProcessing
+node/process/smartContract/processorV2/processV2.go/*scProcessor.resolveBuiltInFunctions
+node/process/smartContract/processorV2/processV2.go/*scProcessor.isSameShardSCExecutionAfterBuiltInFunc
+node/process/smartContract/processorV2/processV2.go/.createBaseSCR
+node/process/smartContract/processorV2/processV2.go/*scProcessor.preprocessOutTransferToSCR
+node/process/smartContract/processorV2/processV2.go/*scProcessor.createSmartContractResults
+node/process/smartContract/scQueryService.go/*SCQueryService.executeScCall
+node/process/smartContract/scQueryService.go/*SCQueryService.recreateTrie
+node/process/smartContract/scQueryService.go/*SCQueryService.createVMCallInput
+node/process/transaction/interceptedTransaction.go/*InterceptedTransaction.CheckValidity
+node/process/unsigned/interceptedUnsignedTransaction.go/*InterceptedUnsignedTransaction.CheckValidity
+node/vm/factory/systemSCFactory.go/*systemSCFactory.createESDTContract
+node/vm/process/systemVM.go/*systemVM.RunSmartContractCall
+node/vm/systemSmartContracts/eei.go/*vmContext.SendGlobalSettingToAll
+node/vm/systemSmartContracts/eei.go/*vmContext.Transfer
+node/vm/systemSmartContracts/eei.go/*vmContext.createContractCallInput
+node/vm/systemSmartContracts/eei.go/*vmContext.transferBeforeInternalExec
+node/vm/systemSmartContracts/eei.go/*vmContext.ExecuteOnDestContext
+node/vm/systemSmartContracts/esdt.go/*esdt.Execute
+node/vm/systemSmartContracts/esdt.go/*esdt.init
+node/vm/systemSmartContracts/esdt.go/*esdt.issue
+node/vm/systemSmartContracts/esdt.go/*esdt.registerNonFungible
+node/vm/systemSmartContracts/esdt.go/*esdt.registerSemiFungible
+node/vm/systemSmartContracts/esdt.go/*esdt.registerMetaESDT
+node/vm/systemSmartContracts/esdt.go/*esdt.registerAndSetRoles
+node/vm/systemSmartContracts/esdt.go/*esdt.changeSFTToMetaESDT
+node/vm/systemSmartContracts/esdt.go/*esdt.burn
+node/vm/systemSmartContracts/esdt.go/*esdt.mint
+node/vm/systemSmartContracts/esdt.go/*esdt.toggleFreeze
+node/vm/systemSmartContracts/esdt.go/*esdt.wipe
+node/vm/systemSmartContracts/esdt.go/*esdt.toggleFreezeSingleNFT
+node/vm/systemSmartContracts/esdt.go/*esdt.wipeSingleNFT
+node/vm/systemSmartContracts/esdt.go/*esdt.togglePause
+node/vm/systemSmartContracts/esdt.go/*esdt.setBurnRoleGlobally
+node/vm/systemSmartContracts/esdt.go/*esdt.unsetBurnRoleGlobally
+node/vm/systemSmartContracts/esdt.go/*esdt.configChange
+node/vm/systemSmartContracts/esdt.go/*esdt.claim
+node/vm/systemSmartContracts/esdt.go/*esdt.getTokenProperties
+node/vm/systemSmartContracts/esdt.go/*esdt.getSpecialRoles
+node/vm/systemSmartContracts/esdt.go/*esdt.basicOwnershipChecks
+node/vm/systemSmartContracts/esdt.go/*esdt.transferOwnership
+node/vm/systemSmartContracts/esdt.go/*esdt.controlChanges
+node/vm/systemSmartContracts/esdt.go/*esdt.changeToMultiShardCreate
+node/vm/systemSmartContracts/esdt.go/*esdt.prepareAndSendRoleChangeData
+node/vm/systemSmartContracts/esdt.go/*esdt.setSpecialRole
+node/vm/systemSmartContracts/esdt.go/*esdt.unSetSpecialRole
+node/vm/systemSmartContracts/esdt.go/*esdt.sendAllTransferRoleAddresses
+node/vm/systemSmartContracts/esdt.go/*esdt.transferNFTCreateRole
+node/vm/systemSmartContracts/esdt.go/*esdt.stopNFTCreateForever
+node/vm/systemSmartContracts/esdt.go/*esdt.updateTokenID
+node/vm/systemSmartContracts/esdt.go/*esdt.registerDynamic
+node/vm/systemSmartContracts/esdt.go/*esdt.registerAndSetAllRolesDynamic
+node/vm/systemSmartContracts/esdt.go/*esdt.changeToDynamic
+node/vm/systemSmartContracts/esdt.go/*esdt.sendTokenTypeToSystemAccounts
+node/vm/systemSmartContracts/esdt.go/*esdt.getAllAddressesAndRoles
+node/vm/systemSmartContracts/esdt.go/*esdt.saveToken
+node/vm/systemSmartContracts/esdt.go/*esdt.getExistingToken
+node/vm/systemSmartContracts/esdt.go/*esdt.saveESDTConfig
+node/vm/systemSmartContracts/esdt.go/*esdt.getContractConfig
+builtin/builtInFunctions/changeOwnerAddress.go/*changeOwnerAddress.ProcessBuiltinFunction
+builtin/builtInFunctions/claimDeveloperRewards.go/*claimDeveloperRewards.ProcessBuiltinFunction
+builtin/builtInFunctions/deleteUserName.go/*deleteUserName.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtBurn.go/*esdtBurn.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtDeleteMetadata.go/*esdtDeleteMetaData.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtFreezeWipe.go/*esdtFreezeWipe.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtGlobalSettings.go/*esdtGlobalSettings.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtLocalBurn.go/*esdtLocalBurn.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtLocalMint.go/*esdtLocalMint.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtMetaDataRecreate.go/*esdtMetaDataRecreate.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtMetaDataUpdate.go/*esdtMetaDataUpdate.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtModifyCreator.go/*esdtModifyCreator.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtModifyRoyalties.go/*esdtModifyRoyalties.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtNFTAddQuantity.go/*esdtNFTAddQuantity.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtNFTAddUri.go/*esdtNFTAddUri.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtNFTBurn.go/*esdtNFTBurn.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtNFTCreate.go/*esdtNFTCreate.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtNFTCreateRoleTransfer.go/*esdtNFTCreateRoleTransfer.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtNFTTransfer.go/*esdtNFTTransfer.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtRoles.go/*esdtRoles.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtSetNewURIs.go/*esdtSetNewURIs.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtSetTokenType.go/*esdtSetTokenType.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtTransfer.go/*esdtTransfer.ProcessBuiltinFunction
+builtin/builtInFunctions/esdtTransferRole.go/*esdtTransferAddress.ProcessBuiltinFunction
+builtin/builtInFunctions/guardAccount.go/*guardAccountFunc.ProcessBuiltinFunction
+builtin/builtInFunctions/keyValueStorage.go/*saveKeyValueStorage.ProcessBuiltinFunction
+builtin/builtInFunctions/migrateDataTrie.go/*migrateDataTrie.ProcessBuiltinFunction
+builtin/builtInFunctions/multiESDTNFTTransfer.go/*esdtNFTMultiTransfer.ProcessBuiltinFunction
+builtin/builtInFunctions/saveUserName.go/*saveUserName.ProcessBuiltinFunction
+builtin/builtInFunctions/setGuardian.go/*setGuardian.ProcessBuiltinFunction
+builtin/builtInFunctions/unGuardAccount.go/*unGuardAccountFunc.ProcessBuiltinFunction
+builtin/builtInFunctions/updateNFTAttributes.go/*esdtNFTupdate.ProcessBuiltinFunction
+node/vm/systemSmartContracts/esdt.go/*esdt.execute
+node/vm/systemSmartContracts/drwaPublicCall.go/*vmContext.ExecuteDRWASystemCall
+node/vm/systemSmartContracts/drwaPublicCall.go/*vmContext.executeWithDRWAErrorCheck
+node/vm/systemSmartContracts/drwaPublicCall.go/*vmContext.executeDRWAESDTCall
+`)
+	actual := make(map[string]bool, len(nodes))
+	for _, node := range nodes {
+		key := node.Root + "/" + node.File + "/" + node.Receiver + "." + node.Function
+		if actual[key] {
+			return fmt.Errorf("duplicate required route node: %s", key)
+		}
+		actual[key] = true
+	}
+	for _, key := range required {
+		if !actual[key] {
+			return fmt.Errorf("missing required route node: %s", key)
+		}
+	}
+	if len(actual) != len(required) {
+		return fmt.Errorf("unreviewed route node: got %d, require %d", len(actual), len(required))
+	}
+	return nil
+}
+
+func TestQualDRWAP17RequiredRouteNodes(t *testing.T) {
+	nodes := qualP17Routes(t).Nodes
+	require.NoError(t, qualP17CheckRequiredRouteNodes(nodes))
+	// Each deletion is isolated; a same-count substitution must also be refused.
+	for i, node := range nodes {
+		t.Run("remove/"+node.Root+"/"+node.File+"/"+node.Receiver+"."+node.Function, func(t *testing.T) {
+			changed := append([]qualP17RouteNode(nil), nodes[:i]...)
+			changed = append(changed, nodes[i+1:]...)
+			require.ErrorContains(t, qualP17CheckRequiredRouteNodes(changed), "missing required route node")
+		})
+	}
+	t.Run("substitution", func(t *testing.T) {
+		changed := append([]qualP17RouteNode(nil), nodes...)
+		changed[0].Function += "__P17_UNCLASSIFIED"
+		require.ErrorContains(t, qualP17CheckRequiredRouteNodes(changed), "missing required route node")
+	})
+	t.Run("duplicate", func(t *testing.T) {
+		changed := append(append([]qualP17RouteNode(nil), nodes...), nodes[0])
+		require.ErrorContains(t, qualP17CheckRequiredRouteNodes(changed), "duplicate required route node")
+	})
+	t.Run("addition", func(t *testing.T) {
+		extra := nodes[0]
+		extra.Function += "__P17_UNCLASSIFIED"
+		changed := append(append([]qualP17RouteNode(nil), nodes...), extra)
+		require.ErrorContains(t, qualP17CheckRequiredRouteNodes(changed), "unreviewed route node")
+	})
 }

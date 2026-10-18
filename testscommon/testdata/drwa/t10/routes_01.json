@@ -8920,6 +8920,112 @@
           "expression": "e.eei.AddReturnMessage"
         }
       ]
+    },
+    {
+      "body_sha256": "379fe87da77ff81eeb6d7d4d8441aec7e4c36aef337928126b005467afc9cdb2",
+      "calls": [
+        {
+          "expression": "bytes.Equal",
+          "line": 20
+        },
+        {
+          "expression": "host.executeDRWAESDTCall",
+          "line": 21
+        },
+        {
+          "expression": "host.executeWithDRWAErrorCheck",
+          "line": 23
+        }
+      ],
+      "end": 24,
+      "function": "ExecuteDRWASystemCall",
+      "receiver": "*vmContext",
+      "repository": "mx-chain-go",
+      "root": "node",
+      "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
+      "source_sha256": "21fca7b59d4d8b9d3b28be9b4aefd85d994e7acb77b727c713d8c031d4b8835a",
+      "start": 18,
+      "repo_revision": "13d7061bd3d637cf2ef53d8332b057dabc25324b"
+    },
+    {
+      "body_sha256": "6f8cc9f507ffbdf2c002774468c572396ca3ca30749099ab7615308c2bac1f63",
+      "calls": [
+        {
+          "expression": "host.mutDRWAClassifier.RLock",
+          "line": 27
+        },
+        {
+          "expression": "host.mutDRWAClassifier.RUnlock",
+          "line": 28
+        },
+        {
+          "expression": "host.drwaExecutionAvailabilityError",
+          "line": 29
+        },
+        {
+          "expression": "execute",
+          "line": 32
+        },
+        {
+          "expression": "host.drwaExecutionAvailabilityError",
+          "line": 35
+        }
+      ],
+      "end": 39,
+      "function": "executeWithDRWAErrorCheck",
+      "receiver": "*vmContext",
+      "repository": "mx-chain-go",
+      "root": "node",
+      "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
+      "source_sha256": "21fca7b59d4d8b9d3b28be9b4aefd85d994e7acb77b727c713d8c031d4b8835a",
+      "start": 26,
+      "repo_revision": "13d7061bd3d637cf2ef53d8332b057dabc25324b"
+    },
+    {
+      "body_sha256": "e767ecd1bbd257787ac5fba9acf7ee3b944b71c87d310f35bfa1a1885fe6f8e7",
+      "calls": [
+        {
+          "expression": "host.executeWithDRWAErrorCheck",
+          "line": 43
+        },
+        {
+          "expression": "len",
+          "line": 44
+        },
+        {
+          "expression": "drwaPublicTokenMutation",
+          "line": 44
+        },
+        {
+          "expression": "execute",
+          "line": 45
+        },
+        {
+          "expression": "host.drwaClassifier.WithTokenClassification",
+          "line": 48
+        },
+        {
+          "expression": "big.NewInt",
+          "line": 52
+        },
+        {
+          "expression": "execute",
+          "line": 55
+        },
+        {
+          "expression": "host.retainDRWAExecutionError",
+          "line": 61
+        }
+      ],
+      "end": 65,
+      "function": "executeDRWAESDTCall",
+      "receiver": "*vmContext",
+      "repository": "mx-chain-go",
+      "root": "node",
+      "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
+      "source_sha256": "21fca7b59d4d8b9d3b28be9b4aefd85d994e7acb77b727c713d8c031d4b8835a",
+      "start": 41,
+      "repo_revision": "13d7061bd3d637cf2ef53d8332b057dabc25324b"
     }
   ],
   "system_routes": [
