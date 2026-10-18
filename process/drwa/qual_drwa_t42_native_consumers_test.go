@@ -391,6 +391,14 @@ func TestQualDRWAT42ConstructorSourceOwnership(t *testing.T) {
 	require.ErrorIs(t, err, errSourceGrant)
 	_, err = newSourceGrantRecords(f.store, f.owner, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096, 1, f.host, nil)
 	require.ErrorIs(t, err, errSourceGrant)
+
+	sf := qualScopedNew(t)
+	_, err = newScopedAdmissionRecords(sf.store, sf.boundary, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), []byte("fixture-domain"),
+		scopedAdmissionLimits{4096, 100, 1 << 20, 100}, sf.mandates, foreign)
+	require.ErrorIs(t, err, errScopedAdmission)
+	gf := qualGovernedActionNew(t)
+	_, err = newGovernedActionRecords(gf.s, gf.o, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096, []byte("n"), 4, 2, 2, gf.h, foreign)
+	require.ErrorIs(t, err, errGovernedActionRecord)
 	// Equal header coordinates and identical roots cannot confer account ownership.
 	require.NotSame(t, f.store, foreign.GetAccountsAdapter())
 }
@@ -514,4 +522,26 @@ func TestQualDRWAT42NativeConsumerReentry(t *testing.T) {
 		require.NoError(t, e)
 		require.Equal(t, root, after)
 	})
+}
+
+// Close is terminal even after the previous evaluation has released its gate.
+// This isolates the closed check from the overlap and outstanding-lease guards.
+func TestQualDRWAT42ClosedHookRejectsNewEvaluation(t *testing.T) {
+	for _, shard := range []uint32{1, core.MetachainShardId} {
+		t.Run(fmt.Sprint(shard), func(t *testing.T) {
+			hook, _ := qualT42Hook(t, qualRegistrationStore(t, 0), shard, true)
+			_, end := qualT42Install(t, hook, shard, 100)
+			end()
+			require.NoError(t, hook.Close())
+			install, nextEnd, err := hook.BeginDRWAHeaderEvaluation()
+			// Release any unexpectedly admitted operation before asserting, so the
+			// negative remains an assertion failure rather than a leaked lock.
+			if nextEnd != nil {
+				nextEnd()
+			}
+			require.ErrorIs(t, err, ErrInactiveHeaderTime)
+			require.Nil(t, install)
+			require.Nil(t, nextEnd)
+		})
+	}
 }

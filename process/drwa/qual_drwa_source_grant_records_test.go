@@ -111,7 +111,7 @@ type qualSourceGrantFixture struct {
 	store     *qualNativeStore
 	owner     *RollbackContainment
 	records   *sourceGrantRecords
-	clock     *EvaluatedHeaderTime
+	clock     *qualUnboundHeaderTime
 	context   *HeaderTimeContext
 	p         sourceGrantProjection
 	host      *qualSourceGrantHost

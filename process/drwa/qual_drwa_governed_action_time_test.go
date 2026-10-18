@@ -14,7 +14,7 @@ import (
 // T21 expected model was authored before execution. These synthetic windows
 // select no profile bounds and prove no GAS authority, canonical projection,
 // durable UNUSED closure, native header installation or destination outcome.
-func qualGovernedContext(t *testing.T, owner *EvaluatedHeaderTime, shard uint32, time uint64) *HeaderTimeContext {
+func qualGovernedContext(t *testing.T, owner *qualUnboundHeaderTime, shard uint32, time uint64) *HeaderTimeContext {
 	t.Helper()
 	if shard == core.MetachainShardId {
 		context, err := owner.Begin(&block.MetaBlockV3{Epoch: 10, TimestampMs: time})

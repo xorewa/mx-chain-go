@@ -34,8 +34,8 @@ type HeaderTimeSource interface {
 
 // EvaluatedHeaderTime owns operation contexts. The native hook uses BeginBound
 // after successful installation and supplies its exclusive lease/identity
-// checks. Begin alone is the unbound primitive; it is not native installation
-// or canonicality evidence and cannot impersonate another consumer's source.
+// checks. Unbound lifecycle convenience methods belong only to qualification
+// fixtures; production contexts require the native owner callbacks.
 type EvaluatedHeaderTime struct {
 	mut        sync.RWMutex
 	flags      common.EnableEpochsHandler
@@ -46,7 +46,7 @@ type EvaluatedHeaderTime struct {
 
 // HeaderTimeContext is an operation-owned capability, not a reusable cached
 // timestamp. Its header identity and coordinate are captured from the same
-// producer-owned native header. That producer must not mutate it during Begin.
+// producer-owned native header. That producer must not mutate it during BeginBound.
 // No mutable header or native installer alias is exposed by this component.
 type HeaderTimeContext struct {
 	owner      *EvaluatedHeaderTime
@@ -69,13 +69,6 @@ func NewEvaluatedHeaderTime(flags common.EnableEpochsHandler, marshaller marshal
 		return nil, nodeErrors.ErrNilHasher
 	}
 	return &EvaluatedHeaderTime{flags: flags, marshaller: marshaller, hasher: hasher}, nil
-}
-
-// Begin invalidates the previous operation BEFORE validation, including failed
-// attempts or repeated A -> B -> A header identities. No integer generation or
-// protocol field is allocated. Missing context is an error; valid zero is valid.
-func (p *EvaluatedHeaderTime) Begin(header data.HeaderHandler) (*HeaderTimeContext, error) {
-	return p.begin(header, nil, nil)
 }
 
 // BeginBound attaches the native owner's lease and validation to this operation.
@@ -113,15 +106,6 @@ func (p *EvaluatedHeaderTime) begin(header data.HeaderHandler,
 		shard: header.GetShardID(), timestamp: milliseconds, acquire: acquire, validate: validate}
 	p.current = context
 	return context, nil
-}
-
-// End cannot end a newer operation when an old capability is supplied.
-func (p *EvaluatedHeaderTime) End(context *HeaderTimeContext) {
-	p.mut.Lock()
-	defer p.mut.Unlock()
-	if context != nil && p.current == context {
-		p.current = nil
-	}
 }
 
 // Reset invalidates contexts on an owning-mode handoff or recovery. The native

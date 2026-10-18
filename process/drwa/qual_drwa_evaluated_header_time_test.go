@@ -19,13 +19,13 @@ import (
 // T05 unwired production construction. Fixture epoch 10 is not a selected DRWA
 // activation profile. These tests exercise the unbound primitive; native-hook
 // ownership and actual record dataflow are exercised by the T42 qualifiers.
-func qualHeaderTimeOwner(t *testing.T) *EvaluatedHeaderTime {
+func qualHeaderTimeOwner(t *testing.T) *qualUnboundHeaderTime {
 	t.Helper()
 	p, _ := qualHeaderTimeOwnerAndFlags(t)
 	return p
 }
 
-func qualHeaderTimeOwnerAndFlags(t *testing.T) (*EvaluatedHeaderTime, *enableEpochsHandlerMock.EnableEpochsHandlerStub) {
+func qualHeaderTimeOwnerAndFlags(t *testing.T) (*qualUnboundHeaderTime, *enableEpochsHandlerMock.EnableEpochsHandlerStub) {
 	t.Helper()
 	flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
 	flags.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool {
@@ -34,7 +34,7 @@ func qualHeaderTimeOwnerAndFlags(t *testing.T) (*EvaluatedHeaderTime, *enableEpo
 	flags.GetCurrentEpochCalled = func() uint32 { t.Fatal("notification epoch is not the evaluated header epoch"); return 0 }
 	p, err := NewEvaluatedHeaderTime(flags, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b())
 	require.NoError(t, err)
-	return p, flags
+	return &qualUnboundHeaderTime{EvaluatedHeaderTime: p}, flags
 }
 
 func TestQualDRWAProductionHeaderTime(t *testing.T) {
@@ -158,4 +158,26 @@ func TestQualDRWAProductionHeaderTimeConcurrentReset(t *testing.T) {
 	var missing *HeaderTimeContext
 	_, err = missing.Milliseconds()
 	require.ErrorIs(t, err, ErrInactiveHeaderTime)
+}
+
+// qualUnboundHeaderTime keeps the historical unbound primitive fixture out of
+// production. Native production ownership uses BeginBound and Reset instead.
+// The no-op callbacks are qualification-only, never native/canonical evidence.
+type qualUnboundHeaderTime struct {
+	*EvaluatedHeaderTime
+	mut sync.Mutex
+}
+
+func (p *qualUnboundHeaderTime) Begin(header data.HeaderHandler) (*HeaderTimeContext, error) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	return p.BeginBound(header, func() (func(), error) { return func() {}, nil }, func() error { return nil })
+}
+func (p *qualUnboundHeaderTime) End(context *HeaderTimeContext) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	current, err := p.EvaluatedHeaderTimeContext()
+	if err == nil && context != nil && current == context {
+		p.Reset()
+	}
 }

@@ -93,7 +93,7 @@ type qualScopedFixture struct {
 	store              *qualNativeStore
 	boundary           *RollbackContainment
 	records            *scopedAdmissionRecords
-	clock              *EvaluatedHeaderTime
+	clock              *qualUnboundHeaderTime
 	context            *HeaderTimeContext
 	mandates           *qualScopedMandates
 	d                  scopedAdmissionDecision

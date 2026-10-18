@@ -107,7 +107,7 @@ type qualGovernedActionFixture struct {
 	s *qualNativeStore
 	o *RollbackContainment
 	g *governedActionRecords
-	c *EvaluatedHeaderTime
+	c *qualUnboundHeaderTime
 	x *HeaderTimeContext
 	h *qualGovernedActionHost
 	p governedActionProposal
