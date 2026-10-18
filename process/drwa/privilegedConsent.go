@@ -148,8 +148,19 @@ func (c *PrivilegedConsentCandidate) ProcessBuiltinFunction(sender, _ vmcommon.U
 	if !hasNativeCode || len(codeAccount.GetCode()) != 0 {
 		return nil, ErrPrivilegedConsent
 	}
-	if err = checkPrivilegedConsentReference(c.accounts, c.references, s.Token, s.Program); err != nil {
+	// The admission reader is external to this owner. Keep executing reserved,
+	// but let a nested transaction acquire mut and reach ErrExecutionBusy.
+	// Reacquire even on panic before the outer deferred unlock runs.
+	err = func() error {
+		c.mut.Unlock()
+		defer c.mut.Lock()
+		return checkPrivilegedConsentReference(c.accounts, c.references, s.Token, s.Program)
+	}()
+	if err != nil {
 		return nil, err
+	}
+	if !c.executing || !bytes.Equal(input.CurrentTxHash, c.expectedHash) || c.pendingAccount != nil {
+		return nil, ErrPrivilegedConsent
 	}
 	record := encodeExperimentalConsent(s, sender.GetNonce(), c.epoch())
 	output := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: input.GasProvided - c.gas}
@@ -205,27 +216,32 @@ func (c *PrivilegedConsentCandidate) ExecuteNativeTransaction(tx *transaction.Tr
 			return nil, nil
 		}
 		c.mut.Lock()
-		defer c.mut.Unlock()
 		if c.pendingAccount == nil {
+			c.mut.Unlock()
 			return nil, ErrPrivilegedConsent
 		}
+		pendingAccount, pendingRecord, pendingOutput := c.pendingAccount, c.pendingRecord, c.pendingOutput
+		pendingToken, pendingProgram := c.pendingToken, c.pendingProgram
+		c.mut.Unlock()
+		// Pending state prevents further staging until this execution returns.
+		// No external account or reference call runs with the candidate lock held.
 		// Native execution can reload/refund the sender after builtin dispatch.
 		// Never save the earlier staged object over those completed native fields.
-		finalAccount, loadErr := c.accounts.GetExistingAccount(c.pendingAccount.AddressBytes())
+		finalAccount, loadErr := c.accounts.GetExistingAccount(pendingAccount.AddressBytes())
 		if loadErr != nil {
 			return nil, loadErr
 		}
 		current, ok := finalAccount.(state.UserAccountHandler)
-		if !ok || current.GetNonce() != c.pendingAccount.GetNonce() || len(current.GetCodeHash()) != 0 {
+		if !ok || current.GetNonce() != pendingAccount.GetNonce() || len(current.GetCodeHash()) != 0 {
 			return nil, ErrPrivilegedConsent
 		}
-		if referenceErr := checkPrivilegedConsentReference(c.accounts, c.references, c.pendingToken, c.pendingProgram); referenceErr != nil {
+		if referenceErr := checkPrivilegedConsentReference(c.accounts, c.references, pendingToken, pendingProgram); referenceErr != nil {
 			return nil, referenceErr
 		}
-		if saveErr := savePrivilegedConsent(c.accounts, current.AddressBytes(), c.pendingToken, c.pendingProgram, c.pendingRecord); saveErr != nil {
+		if saveErr := savePrivilegedConsent(c.accounts, current.AddressBytes(), pendingToken, pendingProgram, pendingRecord); saveErr != nil {
 			return nil, saveErr
 		}
-		return c.pendingOutput, nil
+		return pendingOutput, nil
 	})
 	if err != nil {
 		return vmcommon.ExecutionFailed, err

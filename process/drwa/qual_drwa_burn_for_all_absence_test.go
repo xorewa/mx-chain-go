@@ -82,6 +82,12 @@ func qualBurnFixtureFor(t *testing.T, auto bool, family, fault string, prior []b
 	if fault == "missing-association" {
 		delete(values, "ELRONDDRWA@registration@token@TOKEN-abcdef")
 	}
+	// Hostile source snapshot: valid registration proofs alone grant no
+	// classification authority. This is not a canonical registration outcome.
+	if fault == "unclassified-registration" {
+		values["ELRONDDRWA@registry@count"] = make([]byte, 8)
+		delete(values, "ELRONDDRWA@registry@member@TOKEN-abcdef")
+	}
 	for k, val := range values {
 		require.NoError(t, account.SaveKeyValue([]byte(k), val))
 	}
@@ -110,9 +116,16 @@ func qualBurnFixtureFor(t *testing.T, auto bool, family, fault string, prior []b
 		Intent: proof(append([]byte("ELRONDDRWA@registration@intent@"), intent...)), Activation: proof([]byte("ELRONDDRWA@registration@activation@TOKEN-abcdef")),
 		Profile: v.profile, Name: v.name, Ticker: v.ticker, Decimals: 6}
 	count := proof([]byte("ELRONDDRWA@registry@count"))
-	members := []BurnForAllMemberWitness{{TokenID: id, Proof: proof([]byte("ELRONDDRWA@registry@member@TOKEN-abcdef"))}}
+	var members []BurnForAllMemberWitness
+	if fault != "unclassified-registration" {
+		members = []BurnForAllMemberWitness{{TokenID: id, Proof: proof([]byte("ELRONDDRWA@registry@member@TOKEN-abcdef"))}}
+	}
 	budget := 0
-	for _, p := range []AccountItemWitness{count, members[0].Proof, w.Association, w.Intent, w.Activation} {
+	proofs := []AccountItemWitness{count, w.Association, w.Intent, w.Activation}
+	for _, member := range members {
+		proofs = append(proofs, member.Proof)
+	}
+	for _, p := range proofs {
 		for _, nodes := range [][][]byte{p.AccountProof, p.DataProof} {
 			for _, n := range nodes {
 				budget += len(n)
