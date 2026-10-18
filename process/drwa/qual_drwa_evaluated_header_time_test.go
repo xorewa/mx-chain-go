@@ -3,17 +3,17 @@ package drwa
 import (
 	"bytes"
 	"errors"
-	"sync"
-	"testing"
-
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/hashing/blake2b"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	"github.com/stretchr/testify/require"
+	"sync"
+	"testing"
 )
 
 // T05 unwired production construction. Fixture epoch 10 is not a selected DRWA
@@ -180,4 +180,16 @@ func (p *qualUnboundHeaderTime) End(context *HeaderTimeContext) {
 	if err == nil && context != nil && current == context {
 		p.Reset()
 	}
+}
+
+// Qualification-only unbound source. Native T42 consumer tests bind the actual
+// hook instead. This fixture is not canonical installation evidence.
+type qualHeaderTimeSource struct {
+	*qualUnboundHeaderTime
+	accounts state.AccountsAdapter
+}
+
+func (s *qualHeaderTimeSource) GetAccountsAdapter() state.AccountsAdapter { return s.accounts }
+func qualClockSource(clock *qualUnboundHeaderTime, accounts state.AccountsAdapter) HeaderTimeSource {
+	return &qualHeaderTimeSource{clock, accounts}
 }
