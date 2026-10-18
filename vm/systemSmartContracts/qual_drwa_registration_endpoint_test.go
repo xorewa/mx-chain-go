@@ -31,6 +31,23 @@ type qualEndpointTime struct {
 
 func (s *qualEndpointTime) GetAccountsAdapter() state.AccountsAdapter { return s.accounts }
 
+// Synthetic, qualification-only unbound time for the endpoint fixtures. Native
+// production ownership supplies real lease and validation callbacks instead.
+func qualEndpointClock(t *testing.T, timestampMs uint64) *drwa.EvaluatedHeaderTime {
+	t.Helper()
+	flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
+	flags.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool {
+		return flag != common.SupernovaFlag || epoch >= 10
+	}
+	clock, err := drwa.NewEvaluatedHeaderTime(flags, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b())
+	require.NoError(t, err)
+	_, err = clock.BeginBound(&block.MetaBlockV3{Epoch: 10, TimestampMs: timestampMs},
+		func() (func(), error) { return func() {}, nil }, func() error { return nil })
+	require.NoError(t, err)
+	t.Cleanup(clock.Reset)
+	return clock
+}
+
 type qualEndpointVerifier struct {
 	f     qualCommittedFixture
 	deny  string
@@ -51,15 +68,7 @@ func (v *qualEndpointVerifier) VerifyRegistration(p string, id, hash, body, crea
 func qualEndpointAdmission(t *testing.T, e *esdt, f *qualCommittedFixture, s *qualDRWARegistrationStore) (*drwa.RegistrationAdmission, *qualEndpointVerifier) {
 	t.Helper()
 	e.enableEpochsHandler.(*enableEpochsHandlerMock.EnableEpochsHandlerStub).AddActiveFlags(common.DynamicESDTFlag, common.MetaESDTSetFlag)
-	flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
-	flags.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool {
-		return flag != common.SupernovaFlag || epoch >= 10
-	}
-	clock, err := drwa.NewEvaluatedHeaderTime(flags, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b())
-	require.NoError(t, err)
-	context, err := clock.Begin(&block.MetaBlockV3{Epoch: 10, TimestampMs: 1})
-	require.NoError(t, err)
-	t.Cleanup(func() { clock.End(context) })
+	clock := qualEndpointClock(t, 1)
 	// Provision the fixture's existing global budget at a committed root,
 	// then construct the owner at those exact bytes. The prior fixture owner
 	// is not used after reconstruction; no actual deployment is asserted.

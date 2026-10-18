@@ -8,15 +8,12 @@ import (
 	"testing"
 
 	"github.com/multiversx/mx-chain-core-go/core"
-	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/hashing/blake2b"
 	"github.com/multiversx/mx-chain-core-go/marshal"
-	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/process/drwa"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/testscommon"
-	"github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/require"
 )
@@ -73,13 +70,7 @@ func qualT46Native(t *testing.T, family string) *qualT46NativeFixture {
 	f.owner, err = r.BindIntent(f.id, f.digest, request.manager, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096)
 	require.NoError(t, err)
 	f.boundary = b
-	flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
-	flags.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool { return flag != common.SupernovaFlag || epoch >= 10 }
-	clock, err := drwa.NewEvaluatedHeaderTime(flags, &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b())
-	require.NoError(t, err)
-	context, err := clock.Begin(&block.MetaBlockV3{Epoch: 10, TimestampMs: 100})
-	require.NoError(t, err)
-	t.Cleanup(func() { clock.End(context) })
+	clock := qualEndpointClock(t, 100)
 	native := bytes.Clone(qualNativeRegistrationValue(t, s, core.ESDTSCAddress, token))
 	subject := qualNativeIntentFrame([]byte("DRWA/BOOTSTRAP_CANCEL/candidate1"), []byte("n"), token, f.id, f.digest, f.intent, request.manager, native, []byte("NATIVE_BOOTSTRAP_STATE"), binary.BigEndian.AppendUint64(nil, 100), binary.BigEndian.AppendUint32(nil, 10))
 	v := &qualT46NativeVerifier{subject: subject}
