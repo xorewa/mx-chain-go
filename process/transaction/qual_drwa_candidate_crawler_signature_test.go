@@ -74,7 +74,7 @@ func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
 					cache, err := storageunit.NewCache(storageFactory.GetCacherFromConfig(cfg.WhiteListerVerifiedTxs))
 					require.NoError(t, err)
 					t.Cleanup(func() { cache.Clear(); require.NoError(t, cache.Close()) })
-					whiteList, err := interceptors.NewWhiteListDataVerifier(cache)
+					whiteList, err := interceptors.NewWhiteListDataVerifier(cache, 0)
 					require.NoError(t, err)
 					// Sampling is only an ephemeral fixture search, with no keys retained.
 					// It satisfies the real native v3 same-shard constraint without a
@@ -186,7 +186,7 @@ func TestQualDRWACandidateCrawlerTransactionSignature(t *testing.T) {
 							cache, err := storageunit.NewCache(storageFactory.GetCacherFromConfig(cfg.WhiteListerVerifiedTxs))
 							require.NoError(t, err)
 							t.Cleanup(func() { cache.Clear(); require.NoError(t, cache.Close()) })
-							whiteList, err := interceptors.NewWhiteListDataVerifier(cache)
+							whiteList, err := interceptors.NewWhiteListDataVerifier(cache, 0)
 							require.NoError(t, err)
 							inner := &dataTransaction.Transaction{
 								Nonce: 7, Value: big.NewInt(0), SndAddr: user.addr, RcvAddr: crawler,

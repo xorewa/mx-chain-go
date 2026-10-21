@@ -135,7 +135,7 @@ func TestQualDRWAScopedAdmissionNativeCreatorControl(t *testing.T) {
 				cache, err := storageunit.NewCache(storageFactory.GetCacherFromConfig(cfg.WhiteListerVerifiedTxs))
 				require.NoError(t, err)
 				t.Cleanup(func() { cache.Clear(); require.NoError(t, cache.Close()) })
-				whiteList, err := interceptors.NewWhiteListDataVerifier(cache)
+				whiteList, err := interceptors.NewWhiteListDataVerifier(cache, 0)
 				require.NoError(t, err)
 				inTx, err := nativeTransaction.NewInterceptedTransaction(encoded, proto, signMarshal, hasher,
 					keyGen, signer, converter, coordinator, fees, whiteList, smartContract.NewArgumentParser(),

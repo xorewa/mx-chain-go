@@ -45,7 +45,7 @@ func TestQualDRWADynamicMetadataLocus(t *testing.T) {
 				origin := []byte("12345678901234567890123456789012")
 				holder := []byte("12345678901234567890123456789014")
 				writer := []byte("12345678901234567890123456789016")
-				token := []byte("tokenId")
+				token := []byte(qualDRWAMetadataToken)
 				for _, address := range [][]byte{origin, holder, writer} {
 					require.Equal(t, ctx.ShardCoordinator.SelfId(), ctx.ShardCoordinator.ComputeId(address))
 					createAccWithBalance(t, ctx.Accounts, address, big.NewInt(100000000))
@@ -54,7 +54,7 @@ func TestQualDRWADynamicMetadataLocus(t *testing.T) {
 				utils.SetESDTRoles(t, ctx.Accounts, origin, token, [][]byte{[]byte(core.ESDTRoleNFTCreate)})
 				utils.SetESDTRoles(t, ctx.Accounts, writer, token, [][]byte{[]byte(operation.role)})
 				qualDRWAMetadataProcess(t, ctx, setTokenTypeTx(core.ESDTSCAddress, 100000, token, family))
-				qualDRWAMetadataProcess(t, ctx, createTokenTx(origin, origin, 100000, 1, GetDefaultMetaData()))
+				qualDRWAMetadataProcess(t, ctx, createTokenTx(origin, origin, 100000, 1, qualDRWAMetadataFixture()))
 				qualDRWAMetadataProcess(t, ctx, utils.CreateESDTNFTTransferTx(
 					getAccount(t, ctx, origin).GetNonce(), origin, holder, token, 1, big.NewInt(1), gasPrice, 1000000, ""))
 				before, err := ctx.BlockchainHook.GetESDTToken(holder, token, 1)
@@ -68,7 +68,7 @@ func TestQualDRWADynamicMetadataLocus(t *testing.T) {
 				require.Zero(t, writerBefore.Value.Sign())
 				require.Nil(t, writerBefore.TokenMetaData)
 
-				metadata := GetDefaultMetaData()
+				metadata := qualDRWAMetadataFixture()
 				metadata.Nonce = []byte("01")
 				metadata.Attributes = []byte(hex.EncodeToString([]byte("changed attributes")))
 				denied := operation.makeTx(holder, holder, 100000, metadata)
@@ -160,7 +160,7 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 			origin := []byte("12345678901234567890123456789010")
 			holder := []byte("12345678901234567890123456789011")
 			writer := []byte("12345678901234567890123456789014")
-			token := []byte("tokenId")
+			token := []byte(qualDRWAMetadataToken)
 			require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(origin))
 			require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(writer))
 			require.Equal(t, uint32(1), destination.ShardCoordinator.ComputeId(holder))
@@ -192,7 +192,7 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 			}
 			utils.SetESDTRoles(t, source.Accounts, origin, token, roles)
 			utils.SetESDTRoles(t, source.Accounts, writer, token, [][]byte{[]byte(core.ESDTRoleNFTUpdate)})
-			qualDRWAMetadataProcess(t, source, createTokenTx(origin, origin, 100000, quantity, GetDefaultMetaData()))
+			qualDRWAMetadataProcess(t, source, createTokenTx(origin, origin, 100000, quantity, qualDRWAMetadataFixture()))
 			produce := func() data.TransactionHandler {
 				t.Helper()
 				source.CleanIntermediateTransactions(t)
@@ -219,7 +219,7 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 				oldTransfer = produce()
 			}
 			require.NoError(t, source.BlockchainHook.(process.BlockChainHookHandler).SetCurrentHeader(&block.Header{Round: 7}))
-			metadata := GetDefaultMetaData()
+			metadata := qualDRWAMetadataFixture()
 			metadata.Nonce = []byte("01")
 			metadata.Attributes = []byte(hex.EncodeToString([]byte("changed attributes")))
 			update := esdtMetaDataUpdateTx(writer, writer, 100000, metadata)
@@ -262,4 +262,45 @@ func TestQualDRWADynamicMetadataCrossShardOrdering(t *testing.T) {
 			require.Zero(t, originFinal.Value.Sign())
 		})
 	}
+}
+
+// SP2-81: keep the upstream metadata fixture and use a valid native identifier.
+// Native validation is enabled in the v2.1.9 fixture; no role/metadata expectation changes.
+const qualDRWAMetadataToken = "TKN1-abcdef"
+
+func qualDRWAMetadataFixture() *MetaData {
+	metadata := GetDefaultMetaData()
+	metadata.TokenId = []byte(hex.EncodeToString([]byte(qualDRWAMetadataToken)))
+	return metadata
+}
+
+// The former positive-fixture identifier must remain rejected by native transfer.
+// This guards against disabling upstream validation to recover metadata tests.
+func TestQualDRWAMetadataInvalidIdentifier(t *testing.T) {
+	ctx, err := vm.CreatePreparedTxProcessorWithVMs(config.EnableEpochs{}, 1)
+	require.NoError(t, err)
+	t.Cleanup(ctx.Close)
+	origin := []byte("12345678901234567890123456789012")
+	holder := []byte("12345678901234567890123456789014")
+	token := []byte("tokenId")
+	for _, address := range [][]byte{origin, holder, core.ESDTSCAddress} {
+		createAccWithBalance(t, ctx.Accounts, address, big.NewInt(100000000))
+	}
+	utils.SetESDTRoles(t, ctx.Accounts, origin, token, [][]byte{[]byte(core.ESDTRoleNFTCreate)})
+	qualDRWAMetadataProcess(t, ctx, setTokenTypeTx(core.ESDTSCAddress, 100000, token, core.DynamicNFTESDT))
+	qualDRWAMetadataProcess(t, ctx, createTokenTx(origin, origin, 100000, 1, GetDefaultMetaData()))
+	before, err := ctx.BlockchainHook.GetESDTToken(origin, token, 1)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(1), before.Value)
+	tx := utils.CreateESDTNFTTransferTx(getAccount(t, ctx, origin).GetNonce(), origin, holder, token, 1, big.NewInt(1), gasPrice, 1000000, "")
+	code, transferErr := ctx.TxProcessor.ProcessTransaction(tx)
+	require.Equal(t, vmcommon.UserError, code)
+	require.ErrorIs(t, transferErr, process.ErrFailedTransaction)
+	require.ErrorContains(t, ctx.GetCompositeTestError(), "invalid tokenID")
+	after, err := ctx.BlockchainHook.GetESDTToken(origin, token, 1)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+	received, err := ctx.BlockchainHook.GetESDTToken(holder, token, 1)
+	require.NoError(t, err)
+	require.Zero(t, received.Value.Sign())
 }

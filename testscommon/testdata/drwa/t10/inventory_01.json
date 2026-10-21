@@ -8,7 +8,7 @@
   "qualification_credit": false,
   "rows": [
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -23,7 +23,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -38,7 +38,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -53,7 +53,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -68,7 +68,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -83,7 +83,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -98,7 +98,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -113,7 +113,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -128,7 +128,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -143,7 +143,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -158,7 +158,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -173,7 +173,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -188,7 +188,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -203,7 +203,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -218,7 +218,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -233,7 +233,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -248,7 +248,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -263,7 +263,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -278,7 +278,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -293,7 +293,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -308,7 +308,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -323,7 +323,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -338,7 +338,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -353,7 +353,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -368,7 +368,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -383,7 +383,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -398,7 +398,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -413,7 +413,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -428,7 +428,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -443,7 +443,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -458,7 +458,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -473,7 +473,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -488,7 +488,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -503,7 +503,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -518,7 +518,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -533,7 +533,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -548,7 +548,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -563,7 +563,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -578,7 +578,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -593,7 +593,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -608,7 +608,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -623,7 +623,7 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "9893aa9005d4f47741fa41f9b09db4ec8728d355",
+      "repo_revision": "fb57e055b2ff504afb727d0611d169ffd3508914",
       "repository": "mx-chain-vm-common-go",
       "source_file": "builtInFunctions/creator.go",
       "source_sha256": "d71716bb9591ed88083c91a6a005e9c4099532838603b93ac2314e8453ac934f",
@@ -638,10 +638,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 174,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"issue\"",
@@ -653,10 +653,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 176,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"issueSemiFungible\"",
@@ -668,10 +668,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 178,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"issueNonFungible\"",
@@ -683,10 +683,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 180,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"registerMetaESDT\"",
@@ -698,10 +698,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 182,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"changeSFTToMetaESDT\"",
@@ -713,10 +713,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 184,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"registerAndSetAllRoles\"",
@@ -728,10 +728,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 186,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "core.BuiltInFunctionESDTBurn",
@@ -743,10 +743,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 188,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"mint\"",
@@ -758,10 +758,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 190,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"freeze\"",
@@ -773,10 +773,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 192,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"unFreeze\"",
@@ -788,10 +788,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 194,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"wipe\"",
@@ -803,10 +803,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 196,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"pause\"",
@@ -818,10 +818,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 198,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"unPause\"",
@@ -833,10 +833,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 200,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"freezeSingleNFT\"",
@@ -848,10 +848,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 202,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"unFreezeSingleNFT\"",
@@ -863,10 +863,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 204,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"wipeSingleNFT\"",
@@ -878,10 +878,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 206,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"claim\"",
@@ -893,10 +893,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 208,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"configChange\"",
@@ -908,10 +908,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 210,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"controlChanges\"",
@@ -923,10 +923,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 212,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"transferOwnership\"",
@@ -938,10 +938,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 214,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"getTokenProperties\"",
@@ -953,10 +953,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 216,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"getSpecialRoles\"",
@@ -968,10 +968,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 218,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"setSpecialRole\"",
@@ -983,10 +983,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 220,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"unSetSpecialRole\"",
@@ -998,10 +998,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 222,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"transferNFTCreateRole\"",
@@ -1013,10 +1013,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 224,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"stopNFTCreate\"",
@@ -1028,10 +1028,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 226,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"getAllAddressesAndRoles\"",
@@ -1043,10 +1043,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 228,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"getContractConfig\"",
@@ -1058,10 +1058,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 230,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"changeToMultiShardCreate\"",
@@ -1073,10 +1073,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 232,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"setBurnRoleGlobally\"",
@@ -1088,10 +1088,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 234,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"unsetBurnRoleGlobally\"",
@@ -1103,10 +1103,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 236,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"sendAllTransferRoleAddresses\"",
@@ -1118,10 +1118,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 238,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"updateTokenID\"",
@@ -1133,10 +1133,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 240,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"registerDynamic\"",
@@ -1148,10 +1148,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 242,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"registerAndSetAllRolesDynamic\"",
@@ -1163,10 +1163,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 244,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "\"changeToDynamic\"",
@@ -1178,10 +1178,10 @@
       "scope": "Policy requirement only; no production enforcement or effect-order proof by this inventory test"
     },
     {
-      "repo_revision": "00b60a9f0e298c6f1cbc690aa143af16bb7b0a8f",
+      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
       "repository": "mx-chain-go",
       "source_file": "vm/systemSmartContracts/esdt.go",
-      "source_sha256": "875141f49e8af005e1893b7fa2d8594eaf65346105e846d0f8f97a29398d261a",
+      "source_sha256": "5ed943cb3b4cb62a0a300c4998466cc4db71bda8aa028e115cee12433d5204bf",
       "source_line": 164,
       "dispatch_or_registration_symbol": "(*esdt).execute",
       "dispatch_expression": "core.SCDeployInitFunctionName",

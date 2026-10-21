@@ -37,7 +37,7 @@ func TestQualDRWAMetadataFieldWrites(t *testing.T) {
 		{core.ESDTSetNewURIs, core.ESDTRoleSetNewURI, esdtSetNewUrisTx},
 		{core.BuiltInFunctionESDTNFTUpdateAttributes, core.ESDTRoleNFTUpdateAttributes,
 			func(sender, _ []byte, gas uint64, _ *MetaData) *transaction.Transaction {
-				return utils.CreateESDTNFTUpdateAttributesTx(0, sender, []byte("tokenId"), gasPrice, gas, []byte("changed attributes"))
+				return utils.CreateESDTNFTUpdateAttributesTx(0, sender, []byte(qualDRWAMetadataToken), gasPrice, gas, []byte("changed attributes"))
 			}},
 		{core.BuiltInFunctionESDTNFTAddURI, core.ESDTRoleNFTAddURI,
 			func(sender, receiver []byte, gas uint64, metadata *MetaData) *transaction.Transaction {
@@ -57,7 +57,7 @@ func TestQualDRWAMetadataFieldWrites(t *testing.T) {
 					require.NoError(t, ctx.BlockchainHook.(process.BlockChainHookHandler).SetCurrentHeader(&block.Header{Round: 7}))
 					origin := []byte("12345678901234567890123456789012")
 					writer := []byte("12345678901234567890123456789014")
-					token := []byte("tokenId")
+					token := []byte(qualDRWAMetadataToken)
 					for _, address := range [][]byte{origin, writer} {
 						require.Equal(t, ctx.ShardCoordinator.SelfId(), ctx.ShardCoordinator.ComputeId(address))
 						createAccWithBalance(t, ctx.Accounts, address, big.NewInt(100000000))
@@ -65,7 +65,7 @@ func TestQualDRWAMetadataFieldWrites(t *testing.T) {
 					createAccWithBalance(t, ctx.Accounts, core.ESDTSCAddress, big.NewInt(100000000))
 					utils.SetESDTRoles(t, ctx.Accounts, origin, token, [][]byte{[]byte(core.ESDTRoleNFTCreate)})
 					qualDRWAMetadataProcess(t, ctx, setTokenTypeTx(core.ESDTSCAddress, 100000, token, family))
-					qualDRWAMetadataProcess(t, ctx, createTokenTx(origin, origin, 100000, 1, GetDefaultMetaData()))
+					qualDRWAMetadataProcess(t, ctx, createTokenTx(origin, origin, 100000, 1, qualDRWAMetadataFixture()))
 					qualDRWAMetadataProcess(t, ctx, utils.CreateESDTNFTTransferTx(getAccount(t, ctx, origin).GetNonce(), origin, writer, token, 1, big.NewInt(1), gasPrice, 1000000, ""))
 
 					expected := &esdt.MetaData{Nonce: 1, Name: []byte("name"), Creator: origin, Royalties: 10,
@@ -74,7 +74,7 @@ func TestQualDRWAMetadataFieldWrites(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, expected, before.TokenMetaData)
 					require.Equal(t, big.NewInt(1), before.Value)
-					input := GetDefaultMetaData()
+					input := qualDRWAMetadataFixture()
 					input.Nonce = []byte("01")
 					input.Name = []byte(hex.EncodeToString([]byte("changed name")))
 					input.Royalties = []byte("14") // independent expected uint32(20)

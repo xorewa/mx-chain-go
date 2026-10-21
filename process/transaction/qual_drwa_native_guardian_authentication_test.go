@@ -153,7 +153,7 @@ func TestQualDRWANativeGuardianAuthentication(t *testing.T) {
 				cache, e := storageunit.NewCache(storageFactory.GetCacherFromConfig(cfg.WhiteListerVerifiedTxs))
 				require.NoError(t, e)
 				t.Cleanup(func() { cache.Clear(); require.NoError(t, cache.Close()) })
-				whiteList, e := interceptors.NewWhiteListDataVerifier(cache)
+				whiteList, e := interceptors.NewWhiteListDataVerifier(cache, 0)
 				require.NoError(t, e)
 				inTx, e := transaction.NewInterceptedTransaction(encoded, proto, signMarshal, hasher,
 					keyGen, signer, converter, coordinator, fees, whiteList, smartContract.NewArgumentParser(),

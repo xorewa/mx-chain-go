@@ -44,7 +44,7 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 					if err != nil {
 						panic(err) // literal fixture encoding only
 					}
-					return utils.CreateESDTNFTUpdateAttributesTx(0, sender, []byte("tokenId"), gasPrice, gas, attributes)
+					return utils.CreateESDTNFTUpdateAttributesTx(0, sender, []byte(qualDRWAMetadataToken), gasPrice, gas, attributes)
 				}},
 			{core.BuiltInFunctionESDTNFTAddURI, core.ESDTRoleNFTAddURI,
 				func(sender, receiver []byte, gas uint64, metadata *MetaData) *transaction.Transaction {
@@ -70,7 +70,7 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 					writer := []byte("12345678901234567890123456789014")
 					secondWriter := []byte("12345678901234567890123456789018")
 					positionWriter := operation.name == core.BuiltInFunctionESDTNFTUpdateAttributes || operation.name == core.BuiltInFunctionESDTNFTAddURI
-					token := []byte("tokenId")
+					token := []byte(qualDRWAMetadataToken)
 					require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(origin))
 					require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(writer))
 					require.Equal(t, uint32(0), source.ShardCoordinator.ComputeId(secondWriter))
@@ -96,7 +96,7 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 					utils.SetESDTRoles(t, source.Accounts, origin, token, originRoles)
 					utils.SetESDTRoles(t, source.Accounts, writer, token, [][]byte{[]byte(operation.role)})
 					utils.SetESDTRoles(t, source.Accounts, secondWriter, token, [][]byte{[]byte(operation.role)})
-					qualDRWAMetadataProcess(t, source, createTokenTx(origin, origin, 100000, 3, GetDefaultMetaData()))
+					qualDRWAMetadataProcess(t, source, createTokenTx(origin, origin, 100000, 3, qualDRWAMetadataFixture()))
 					produce := func() data.TransactionHandler {
 						t.Helper()
 						source.CleanIntermediateTransactions(t)
@@ -127,7 +127,7 @@ func TestQualDRWAMetadataCopyEqualRoundOrdering(t *testing.T) {
 					mutate := func(round uint64, label string) (*esdt.MetaData, *esdt.MetaDataVersion) {
 						t.Helper()
 						require.NoError(t, source.BlockchainHook.(process.BlockChainHookHandler).SetCurrentHeader(&block.Header{Round: round}))
-						input := GetDefaultMetaData()
+						input := qualDRWAMetadataFixture()
 						input.Nonce = []byte("01")
 						input.Attributes = []byte(hex.EncodeToString([]byte(label)))
 						input.Uris = [][]byte{[]byte(hex.EncodeToString([]byte(label + " URI 1"))), []byte(hex.EncodeToString([]byte(label + " URI 2"))), []byte(hex.EncodeToString([]byte(label + " URI 3")))}

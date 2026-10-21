@@ -88,7 +88,7 @@ func TestQualDRWACandidateCrawlerAPISimulationCache(t *testing.T) {
 						cache, err := storageunit.NewCache(storageFactory.GetCacherFromConfig(cfg.WhiteListerVerifiedTxs))
 						require.NoError(t, err)
 						t.Cleanup(func() { cache.Clear(); require.NoError(t, cache.Close()) })
-						verified, err := interceptors.NewWhiteListDataVerifier(cache)
+						verified, err := interceptors.NewWhiteListDataVerifier(cache, 0)
 						require.NoError(t, err)
 						coreComponents := getDefaultCoreComponents()
 						coreComponents.IntMarsh, coreComponents.TxMarsh = proto, signMarshal
