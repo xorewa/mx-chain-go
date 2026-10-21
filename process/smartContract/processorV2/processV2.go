@@ -717,9 +717,12 @@ func (sc *scProcessor) computeTotalConsumedFeeAndDevRwd(
 		if !sc.isSelfShard(outAcc.Address) {
 			sentGas := uint64(0)
 			for _, outTransfer := range outAcc.OutputTransfers {
-				sentGas, _ = core.SafeAddUint64(sentGas, outTransfer.GasLimit)
-				sentGas, _ = core.SafeAddUint64(sentGas, outTransfer.GasLocked)
+				sentGas, err = core.SafeAddUint64(sentGas, outTransfer.GasLimit)
+				log.LogIfError(err, "function", "computeTotalConsumedFeeAndDevRwd", "outTransfer.GasLimit", outTransfer.GasLimit)
+				sentGas, err = core.SafeAddUint64(sentGas, outTransfer.GasLocked)
+				log.LogIfError(err, "function", "computeTotalConsumedFeeAndDevRwd", "outTransfer.GasLocked", outTransfer.GasLocked)
 			}
+
 			displayConsumedGas := consumedGas
 			consumedGas, err = core.SafeSubUint64(consumedGas, sentGas)
 			log.LogIfError(err,
@@ -1282,7 +1285,11 @@ func (sc *scProcessor) prepareExecutionAfterBuiltInFunc(
 				GasLocked:            in.vmInput.GasLocked,
 				OriginalTxHash:       in.vmInput.OriginalTxHash,
 				CurrentTxHash:        in.vmInput.CurrentTxHash,
+				PrevTxHash:           in.vmInput.PrevTxHash,
 				ReturnCallAfterError: in.vmInput.ReturnCallAfterError,
+				TxGuardian:           in.vmInput.TxGuardian,
+				OriginalCallerAddr:   in.vmInput.OriginalCallerAddr,
+				RelayerAddr:          in.vmInput.RelayerAddr,
 			},
 			RecipientAddr:     in.parsedTransfer.RcvAddr,
 			Function:          in.parsedTransfer.CallFunction,
@@ -1343,7 +1350,11 @@ func (sc *scProcessor) createVMInputWithAsyncCallBackAfterBuiltIn(
 			GasLocked:            vmInput.GasLocked,
 			OriginalTxHash:       vmInput.OriginalTxHash,
 			CurrentTxHash:        vmInput.CurrentTxHash,
+			PrevTxHash:           vmInput.PrevTxHash,
 			ReturnCallAfterError: vmInput.ReturnCallAfterError,
+			TxGuardian:           vmInput.TxGuardian,
+			OriginalCallerAddr:   vmInput.OriginalCallerAddr,
+			RelayerAddr:          vmInput.RelayerAddr,
 		},
 		RecipientAddr:     vmInput.RecipientAddr,
 		Function:          "callBack",
@@ -1587,7 +1598,9 @@ func (sc *scProcessor) setEmptyRoothashOnErrorIfSaveKeyValue(tx data.Transaction
 
 	lenVal := len(args[1])
 	lenKeyVal := len(args[0]) + len(args[1])
+	sc.mutGasLock.RLock()
 	gasToUseForOneSave := sc.builtInGasCosts[function] + sc.persistPerByte*uint64(lenKeyVal) + sc.storePerByte*uint64(lenVal)
+	sc.mutGasLock.RUnlock()
 	if txGasProvided < gasToUseForOneSave {
 		return
 	}
@@ -2486,6 +2499,9 @@ func (sc *scProcessor) createSmartContractResults(
 
 	lenOutTransfers := len(outAcc.OutputTransfers)
 	if lenOutTransfers == 0 {
+		if sc.enableEpochsHandler.IsFlagEnabled(common.FixCorrectSmallIntAndGasLimitsFlag) {
+			return false, nil
+		}
 		return sc.createSCRIfNoOutputTransfer(vmOutput, vmInput.CallType, outAcc, tx, txHash, nextAvailableScrIndex)
 	}
 
@@ -2558,9 +2574,14 @@ func (sc *scProcessor) useLastTransferAsAsyncCallBackWhenNeeded(
 	result.CallType = vmData.AsynchronousCallBack
 	result.GasLimit, _ = core.SafeAddUint64(result.GasLimit, vmOutput.GasRemaining)
 
+	var returnData [][]byte
+	if sc.enableEpochsHandler.IsFlagEnabled(common.KeepReturnDataOnAsyncTransferCallbackFlag) {
+		returnData = vmOutput.ReturnData
+	}
+
 	var err error
 	asyncParams := contexts.CreateCallbackAsyncParams(hooks.NewVMCryptoHook(), vmInput.AsyncArguments)
-	dataBuilder, err := sc.prependAsyncParamsToData(asyncParams, outputTransfer.Data, int(vmOutput.ReturnCode))
+	dataBuilder, err := sc.prependAsyncParamsToData(asyncParams, outputTransfer.Data, int(vmOutput.ReturnCode), returnData)
 	if err != nil {
 		log.Debug("processed built in functions error (async params extraction)", "error", err.Error())
 		return false
@@ -2571,7 +2592,7 @@ func (sc *scProcessor) useLastTransferAsAsyncCallBackWhenNeeded(
 	return true
 }
 
-func (sc *scProcessor) prependAsyncParamsToData(asyncParams [][]byte, data []byte, returnCode int) (*txDataBuilder.TxDataBuilder, error) {
+func (sc *scProcessor) prependAsyncParamsToData(asyncParams [][]byte, data []byte, returnCode int, returnData ...[][]byte) (*txDataBuilder.TxDataBuilder, error) {
 	var args [][]byte
 	var err error
 
@@ -2596,6 +2617,12 @@ func (sc *scProcessor) prependAsyncParamsToData(asyncParams [][]byte, data []byt
 	}
 
 	callData.Int(returnCode)
+
+	if len(returnData) > 0 {
+		for _, retData := range returnData[0] {
+			callData.Bytes(retData)
+		}
+	}
 
 	for _, asyncParam := range asyncParams {
 		callData.Bytes(asyncParam)
@@ -2948,7 +2975,7 @@ func (sc *scProcessor) processSimpleSCR(
 	txHash []byte,
 	dstAcc state.UserAccountHandler,
 ) error {
-	if scResult.Value.Cmp(zero) <= 0 {
+	if scResult == nil || scResult.Value == nil || scResult.Value.Cmp(zero) <= 0 {
 		return nil
 	}
 
