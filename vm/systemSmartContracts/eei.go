@@ -45,7 +45,11 @@ type vmContext struct {
 	drwaClassifierConfigured bool
 	// The sole write acquisition is TryLock, so nested native reads cannot
 	// deadlock behind a handoff waiting for their own execution to finish.
-	mutDRWAClassifier  sync.RWMutex
+	mutDRWAClassifier sync.RWMutex
+	// Passive status readers serialize with replacement without preventing its
+	// execution-exclusion TryLock. Replacement takes this lock only after that
+	// TryLock succeeds, so reentrant native work still refuses without waiting.
+	mutDRWAStatus      sync.RWMutex
 	drwaExecutionError atomic.Pointer[error]
 }
 
