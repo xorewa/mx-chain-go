@@ -75,8 +75,8 @@ func (host *vmContext) DRWAExecutionError() error {
 	if !host.drwaClassifierConfigured {
 		return nil
 	}
-	host.mutDRWAClassifier.RLock()
-	defer host.mutDRWAClassifier.RUnlock()
+	host.mutDRWAStatus.RLock()
+	defer host.mutDRWAStatus.RUnlock()
 	failure := host.drwaExecutionError.Load()
 	if failure == nil {
 		if owner, exists := host.drwaClassifier.(interface{ DRWAExecutionHealthError() error }); exists {
@@ -115,6 +115,11 @@ func (host *vmContext) ReplaceDRWAClassifier(next vm.DRWATokenClassifier) error 
 		return vm.ErrDRWAExecution
 	}
 	defer host.mutDRWAClassifier.Unlock()
+	// Passive status is not native work. Wait for its observation to finish
+	// before checking the latch and changing owners; executing or reentrant
+	// native work has already been excluded by the nonblocking guard above.
+	host.mutDRWAStatus.Lock()
+	defer host.mutDRWAStatus.Unlock()
 	if failure := host.drwaExecutionError.Load(); failure != nil {
 		return *failure
 	}
