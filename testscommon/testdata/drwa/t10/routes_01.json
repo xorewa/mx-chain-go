@@ -2606,111 +2606,111 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "8b92e1e52679623553eb55b1f7d670515dd671b4a6f4b859470a7c5d657b7232",
+      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
       "function": "SendGlobalSettingToAll",
       "receiver": "*vmContext",
-      "start": 239,
-      "end": 263,
+      "start": 243,
+      "end": 267,
       "body_sha256": "42901a17746d92219e86ae194555082a4514b9a4960094b1a4c84acfc09dbfe7",
       "calls": [
         {
-          "line": 241,
+          "line": 245,
           "expression": "big.NewInt"
         },
         {
-          "line": 246,
+          "line": 250,
           "expression": "uint8"
         },
         {
-          "line": 246,
+          "line": 250,
           "expression": "uint8"
         },
         {
-          "line": 246,
+          "line": 250,
           "expression": "host.blockChainHook.NumberOfShards"
         },
         {
-          "line": 247,
+          "line": 251,
           "expression": "make"
         },
         {
-          "line": 247,
+          "line": 251,
           "expression": "len"
         },
         {
-          "line": 248,
+          "line": 252,
           "expression": "copy"
         },
         {
-          "line": 249,
+          "line": 253,
           "expression": "len"
         },
         {
-          "line": 251,
-          "expression": "string"
-        },
-        {
           "line": 255,
-          "expression": "host.getPersistedBalance"
-        },
-        {
-          "line": 256,
-          "expression": "big.NewInt"
+          "expression": "string"
         },
         {
           "line": 259,
-          "expression": "host.NextOutputTransferIndex"
+          "expression": "host.getPersistedBalance"
         },
         {
           "line": 260,
-          "expression": "append"
-        },
-        {
-          "line": 261,
-          "expression": "string"
-        }
-      ]
-    },
-    {
-      "root": "node",
-      "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
-      "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "8b92e1e52679623553eb55b1f7d670515dd671b4a6f4b859470a7c5d657b7232",
-      "function": "Transfer",
-      "receiver": "*vmContext",
-      "start": 302,
-      "end": 323,
-      "body_sha256": "6eab9bc0cbcc2e9a62a459dba653231ae244f7e7b511257478432436b9e1e840",
-      "calls": [
-        {
-          "line": 309,
-          "expression": "host.transferValueOnly"
-        },
-        {
-          "line": 310,
-          "expression": "host.getSenderDestination"
-        },
-        {
-          "line": 312,
-          "expression": "host.NextOutputTransferIndex"
-        },
-        {
-          "line": 313,
-          "expression": "big.NewInt(0).Set"
-        },
-        {
-          "line": 313,
           "expression": "big.NewInt"
         },
         {
-          "line": 319,
+          "line": 263,
+          "expression": "host.NextOutputTransferIndex"
+        },
+        {
+          "line": 264,
+          "expression": "append"
+        },
+        {
+          "line": 265,
+          "expression": "string"
+        }
+      ]
+    },
+    {
+      "root": "node",
+      "repository": "mx-chain-go",
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
+      "source_file": "vm/systemSmartContracts/eei.go",
+      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
+      "function": "Transfer",
+      "receiver": "*vmContext",
+      "start": 306,
+      "end": 327,
+      "body_sha256": "6eab9bc0cbcc2e9a62a459dba653231ae244f7e7b511257478432436b9e1e840",
+      "calls": [
+        {
+          "line": 313,
+          "expression": "host.transferValueOnly"
+        },
+        {
+          "line": 314,
+          "expression": "host.getSenderDestination"
+        },
+        {
+          "line": 316,
+          "expression": "host.NextOutputTransferIndex"
+        },
+        {
+          "line": 317,
+          "expression": "big.NewInt(0).Set"
+        },
+        {
+          "line": 317,
+          "expression": "big.NewInt"
+        },
+        {
+          "line": 323,
           "expression": "host.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 322,
+          "line": 326,
           "expression": "append"
         }
       ]
@@ -2718,25 +2718,25 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "8b92e1e52679623553eb55b1f7d670515dd671b4a6f4b859470a7c5d657b7232",
+      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
       "function": "createContractCallInput",
       "receiver": "*vmContext",
-      "start": 461,
-      "end": 473,
+      "start": 465,
+      "end": 477,
       "body_sha256": "ec50ed7e250c02cf47c52f6a0c10032febf914e74f6e13bf3eb128198f5daa38",
       "calls": [
         {
-          "line": 467,
+          "line": 471,
           "expression": "host.inputParser.ParseData"
         },
         {
-          "line": 467,
+          "line": 471,
           "expression": "string"
         },
         {
-          "line": 472,
+          "line": 476,
           "expression": "createDirectCallInput"
         }
       ]
@@ -2744,41 +2744,41 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "8b92e1e52679623553eb55b1f7d670515dd671b4a6f4b859470a7c5d657b7232",
+      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
       "function": "transferBeforeInternalExec",
       "receiver": "*vmContext",
-      "start": 494,
-      "end": 510,
+      "start": 498,
+      "end": 514,
       "body_sha256": "d59857e8acf48fff80ce5e976d344007f881e0b22aaa9def59e8b3d9bd2fee79",
       "calls": [
         {
-          "line": 495,
+          "line": 499,
           "expression": "host.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "line": 496,
+          "line": 500,
           "expression": "host.Transfer"
         },
         {
-          "line": 499,
+          "line": 503,
           "expression": "host.transferValueOnly"
         },
         {
-          "line": 502,
+          "line": 506,
           "expression": "[]byte"
         },
         {
-          "line": 504,
+          "line": 508,
           "expression": "callInput.CallValue.Bytes"
         },
         {
-          "line": 505,
+          "line": 509,
           "expression": "vmcommon.FormatLogDataForCall"
         },
         {
-          "line": 507,
+          "line": 511,
           "expression": "host.AddLogEntry"
         }
       ]
@@ -2786,29 +2786,29 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "8b92e1e52679623553eb55b1f7d670515dd671b4a6f4b859470a7c5d657b7232",
+      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
       "function": "ExecuteOnDestContext",
       "receiver": "*vmContext",
-      "start": 577,
-      "end": 589,
+      "start": 581,
+      "end": 593,
       "body_sha256": "1139bc3c6a0b15f67a5c7762cfbdb8cceff2557bab3f73ce19dbeb48c2fbb033",
       "calls": [
         {
-          "line": 578,
+          "line": 582,
           "expression": "check.IfNil"
         },
         {
-          "line": 582,
+          "line": 586,
           "expression": "host.createContractCallInput"
         },
         {
-          "line": 586,
+          "line": 590,
           "expression": "host.ExecuteDRWASystemCall"
         },
         {
-          "line": 587,
+          "line": 591,
           "expression": "host.executeOnDestContext"
         }
       ]
@@ -9067,9 +9067,9 @@
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "a8c0796ebd13627f551577185abd148b2365dc45778541d772938f0c8b436378",
+      "source_sha256": "28939472f8d533ee33a93862bae94089a06d027d7962d6f9b96445fa9fb10c0b",
       "start": 18,
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70"
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859"
     },
     {
       "body_sha256": "b63c68d873fc9fee813b8b2646d62e595ccb40e2471ea3297494debd31733b48",
@@ -9105,9 +9105,9 @@
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "a8c0796ebd13627f551577185abd148b2365dc45778541d772938f0c8b436378",
+      "source_sha256": "28939472f8d533ee33a93862bae94089a06d027d7962d6f9b96445fa9fb10c0b",
       "start": 26,
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70"
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859"
     },
     {
       "body_sha256": "e767ecd1bbd257787ac5fba9acf7ee3b944b71c87d310f35bfa1a1885fe6f8e7",
@@ -9151,9 +9151,9 @@
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "a8c0796ebd13627f551577185abd148b2365dc45778541d772938f0c8b436378",
+      "source_sha256": "28939472f8d533ee33a93862bae94089a06d027d7962d6f9b96445fa9fb10c0b",
       "start": 44,
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70"
+      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859"
     }
   ],
   "system_routes": [
