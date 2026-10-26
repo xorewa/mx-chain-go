@@ -145,3 +145,53 @@ func TestQualDRWAClassifierHandoffStatusWriterGuard(t *testing.T) {
 	require.Same(t, next, host.drwaClassifier)
 	require.NoError(t, host.DRWAExecutionError())
 }
+
+func TestQualDRWAClassifierActiveRefusalBeforePassiveReadRelease(t *testing.T) {
+	observing, finishObservation := make(chan struct{}), make(chan struct{})
+	var finishOnce sync.Once
+	finish := func() { finishOnce.Do(func() { close(finishObservation) }) }
+	old := &qualStatusHandoffClassifier{health: func() error {
+		close(observing)
+		<-finishObservation
+		return nil
+	}}
+	args := createDefaultEeiArgs()
+	args.DRWAClassifier = old
+	host, err := NewVMContext(args)
+	require.NoError(t, err)
+	observationResult := make(chan error, 1)
+	go func() { observationResult <- host.DRWAExecutionError() }()
+	defer func() {
+		finish()
+		require.NoError(t, <-observationResult)
+	}()
+	<-observing
+
+	// Hold the dependency used by executeWithDRWAErrorCheck for active native
+	// work. Replacement must reject it even while passive status is held open.
+	host.mutDRWAClassifier.RLock()
+	defer host.mutDRWAClassifier.RUnlock()
+	replacementResult := make(chan error, 1)
+	go func() { replacementResult <- host.ReplaceDRWAClassifier(&qualStatusHandoffClassifier{}) }()
+	blockedOnStatus := false
+observeReplacement:
+	for {
+		select {
+		case err = <-replacementResult:
+			break observeReplacement
+		default:
+			if qualStatusHandoffWriterWaiting() {
+				// Release the observation and join the mutant's writer before
+				// reporting its forbidden wait; no goroutine is left behind.
+				blockedOnStatus = true
+				finish()
+				err = <-replacementResult
+				break observeReplacement
+			}
+			runtime.Gosched()
+		}
+	}
+	require.False(t, blockedOnStatus, "active replacement must refuse before passive status release")
+	require.ErrorIs(t, err, vm.ErrDRWAExecution)
+	require.Same(t, old, host.drwaClassifier)
+}
