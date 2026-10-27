@@ -170,10 +170,12 @@ func TestQualDRWAClassifierActiveRefusalBeforePassiveReadRelease(t *testing.T) {
 	// Hold the dependency used by executeWithDRWAErrorCheck for active native
 	// work. Replacement must reject it even while passive status is held open.
 	host.mutDRWAClassifier.RLock()
-	defer host.mutDRWAClassifier.RUnlock()
+	var releaseActiveOnce sync.Once
+	releaseActive := func() { releaseActiveOnce.Do(host.mutDRWAClassifier.RUnlock) }
+	defer releaseActive()
 	replacementResult := make(chan error, 1)
 	go func() { replacementResult <- host.ReplaceDRWAClassifier(&qualStatusHandoffClassifier{}) }()
-	blockedOnStatus := false
+	blocked := false
 observeReplacement:
 	for {
 		select {
@@ -181,9 +183,10 @@ observeReplacement:
 			break observeReplacement
 		default:
 			if qualStatusHandoffWriterWaiting() {
-				// Release the observation and join the mutant's writer before
-				// reporting its forbidden wait; no goroutine is left behind.
-				blockedOnStatus = true
+				// The writer may wait on either mutex. Release both test-held
+				// dependencies before joining it and reporting the forbidden wait.
+				blocked = true
+				releaseActive()
 				finish()
 				err = <-replacementResult
 				break observeReplacement
@@ -191,7 +194,7 @@ observeReplacement:
 			runtime.Gosched()
 		}
 	}
-	require.False(t, blockedOnStatus, "active replacement must refuse before passive status release")
+	require.False(t, blocked, "active replacement must refuse before passive status release")
 	require.ErrorIs(t, err, vm.ErrDRWAExecution)
 	require.Same(t, old, host.drwaClassifier)
 }
