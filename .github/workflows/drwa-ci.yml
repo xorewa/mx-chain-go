@@ -21,7 +21,8 @@ env:
   GOPROXY: 'https://proxy.golang.org'
   # Sorted unique parent directories of non-test *.go files from:
   # git diff --name-only 06c383cf316ab391d60695a4eeb7c085fb40232b HEAD
-  # Inherited upstream-only packages outside this derived set are excluded.
+  # Exclude CI tooling under .github/ (tested explicitly), which go list ./... omits.
+  # Inherited upstream-only packages outside this derived product set are excluded.
   DRWA_PACKAGES: >-
     ./api/errors
     ./api/gin
@@ -108,6 +109,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: '1.26.2'
@@ -125,11 +127,29 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: '1.26.2'
           check-latest: false
           cache: false
+      - name: Reconcile explicit DRWA product package list
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, pathlib, subprocess
+          base = '06c383cf316ab391d60695a4eeb7c085fb40232b'
+          root = pathlib.Path.cwd()
+          directories = subprocess.check_output(['go', 'list', '-f', '{{.Dir}}', './...'], text=True).splitlines()
+          available = {'./' + pathlib.Path(p).relative_to(root).as_posix() for p in directories}
+          changed = subprocess.check_output(['git', 'diff', '--no-ext-diff', '--name-only', '-z', base, 'HEAD']).decode().split('\0')
+          expected = {'./' + pathlib.PurePosixPath(p).parent.as_posix() for p in changed if p.endswith('.go') and not p.endswith('_test.go')}
+          expected &= available
+          actual = set(os.environ['DRWA_PACKAGES'].split())
+          missing, excess = sorted(expected - actual), sorted(actual - expected)
+          print(json.dumps({'missing': missing, 'excess': excess, 'package_count': len(actual)}))
+          if missing or excess:
+              raise SystemExit(1)
+          PYCODE
       - name: DRWA vet
         run: go vet $DRWA_PACKAGES
 
@@ -229,17 +249,49 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version: '1.26.2'
           check-latest: false
           cache: false
-      - name: DRWA race
-        run: go test -race -json -count=1 $DRWA_PACKAGES > go-test-race.json
+      - name: Download pinned dependencies
+        run: go mod download
+      - name: Check coverage policy helper
+        env:
+          GOPROXY: 'off'
+        run: go test -race -json -count=1 ./.github/coverage > coverage-helper-tests.json
+      - name: DRWA race with atomic coverage
+        env:
+          GOPROXY: 'off'
+        # Only loopback exists in the test namespace; no public-network tests.
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          go test -race -json -count=1 -covermode=atomic
+          -coverprofile=coverage-${{ matrix.shard }}.out
+          $DRWA_PACKAGES > go-test-race.json
+      - name: Enforce hybrid diff coverage at 90 percent
+        if: always()
+        env:
+          GOPROXY: 'off'
+        # New functions: each whole function. Existing upstream functions: changed blocks.
+        # The helper also requires 90% of changed named functions to have been entered.
+        # Report lists every excluded changed line in this shard for review.
+        run: >-
+          go run ./.github/coverage
+          -base 06c383cf316ab391d60695a4eeb7c085fb40232b
+          -profile coverage-${{ matrix.shard }}.out
+          -packages "$DRWA_PACKAGES"
+          -output diff-coverage-${{ matrix.shard }}.json
       - name: Upload raw race test output
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: go-test-race-${{ matrix.shard }}-${{ github.sha }}
-          path: go-test-race.json
+          path: |
+            go-test-race.json
+            coverage-helper-tests.json
+            coverage-${{ matrix.shard }}.out
+            diff-coverage-${{ matrix.shard }}.json
           if-no-files-found: error
