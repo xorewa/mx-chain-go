@@ -257,41 +257,123 @@ jobs:
           cache: false
       - name: Download pinned dependencies
         run: go mod download
-      - name: Check coverage policy helper
+      - name: DRWA race — default plus owner-approved Wasmer2 diagnostic run
         env:
           GOPROXY: 'off'
-        run: go test -race -json -count=1 ./.github/coverage > coverage-helper-tests.json
-      - name: DRWA race with atomic coverage
-        env:
-          GOPROXY: 'off'
-        # Only loopback exists in the test namespace; no public-network tests.
+        # Retain default -race results. Only the five named Wasmer2 checkptr aborts
+        # are tolerated; all other failures and every checkptr=0 failure reject.
+        # No coverage profiles are collected by either race run.
         run: >-
           unshare --user --map-root-user --net -- bash -euc
           'ip link set lo up; exec "$@"' --
-          go test -race -json -count=1 -covermode=atomic
-          -coverprofile=coverage-${{ matrix.shard }}.out
-          $DRWA_PACKAGES > go-test-race.json
-      - name: Enforce hybrid diff coverage at 90 percent
-        if: always()
-        env:
-          GOPROXY: 'off'
-        # New functions: each whole function. Existing upstream functions: changed blocks.
-        # The helper also requires 90% of changed named functions to have been entered.
-        # Report lists every excluded changed line in this shard for review.
-        run: >-
-          go run ./.github/coverage
-          -base 06c383cf316ab391d60695a4eeb7c085fb40232b
-          -profile coverage-${{ matrix.shard }}.out
-          -packages "$DRWA_PACKAGES"
-          -output diff-coverage-${{ matrix.shard }}.json
-      - name: Upload raw race test output
+          python3 -B .github/ci/race.py --output race-results $DRWA_PACKAGES
+      - name: Upload both labelled race runs and exception classification
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: go-test-race-${{ matrix.shard }}-${{ github.sha }}
+          path: race-results/
+          if-no-files-found: error
+
+  coverage:
+    name: DRWA coverage
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: Download pinned dependencies
+        run: go mod download
+      - name: Check coverage and race policy helpers
+        env:
+          GOPROXY: 'off'
+        run: |
+          python3 -B -m unittest discover -s .github/ci -p 'test_*.py' -v
+          go test -json -count=1 ./.github/coverage > coverage-helper-tests.json
+      - name: DRWA coverage without race — all 74 packages
+        env:
+          GOPROXY: 'off'
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          go test -json -count=1 -covermode=atomic -coverprofile=coverage.out
+          $DRWA_PACKAGES > go-test-coverage.json
+      - name: Enforce hybrid diff coverage at 90 percent
+        if: always()
+        env:
+          GOPROXY: 'off'
+        # Only this job's NON-RACE profile feeds the blocking hybrid gate.
+        # Each changed DRWA-owned function >=90% statements; upstream changed
+        # blocks >=90%; changed function entries >=90%. No new exclusions.
+        run: >-
+          go run ./.github/coverage
+          -base 06c383cf316ab391d60695a4eeb7c085fb40232b
+          -profile coverage.out -packages "$DRWA_PACKAGES"
+          -output diff-coverage.json
+      - name: Upload coverage profile, raw tests and hybrid report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: drwa-coverage-${{ github.sha }}
           path: |
-            go-test-race.json
+            go-test-coverage.json
             coverage-helper-tests.json
-            coverage-${{ matrix.shard }}.out
-            diff-coverage-${{ matrix.shard }}.json
+            coverage.out
+            diff-coverage.json
+          if-no-files-found: error
+
+  branch-trial:
+    name: DRWA gobco branch coverage trial (non-blocking)
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: Build CI-only github.com/rillig/gobco v1.3.4 at approved commit
+        # No install into the product module; no go.mod/go.sum change.
+        run: |
+          git init "$RUNNER_TEMP/gobco-source"
+          git -C "$RUNNER_TEMP/gobco-source" fetch --depth=1 https://github.com/rillig/gobco.git 4c9ea04be46fdf4ee7d40f7bba782f83d0397731
+          git -C "$RUNNER_TEMP/gobco-source" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/gobco-source" rev-parse HEAD)" = 4c9ea04be46fdf4ee7d40f7bba782f83d0397731
+          cd "$RUNNER_TEMP/gobco-source"
+          go build -o "$RUNNER_TEMP/gobco" .
+          "$RUNNER_TEMP/gobco" -version
+      - name: Download pinned product dependencies
+        run: go mod download
+      - name: Trial branch coverage — each DRWA package, no threshold
+        env:
+          GOPROXY: 'off'
+        # v1.3.4 supports only one package per invocation; the runner retains
+        # failures/missing metrics as UNKNOWN and continues through all packages.
+        # -branch counts true/false whole controlling conditions, not MC/DC;
+        # select and unused functions without conditions are outside its metric.
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          python3 -B .github/ci/gobco.py --binary "$RUNNER_TEMP/gobco"
+          --output gobco-results $DRWA_PACKAGES
+      - name: Upload branch trial reports including tool failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: drwa-gobco-trial-${{ github.sha }}
+          path: gobco-results/
           if-no-files-found: error
