@@ -1,0 +1,246 @@
+name: DRWA CI
+
+on:
+  push:
+    branches:
+      - 'drwa/sp2/**'
+      - 'drwa/sp2-main'
+
+permissions:
+  contents: read
+
+env:
+  # The SP2 local toolchain is build/.toolchains/go1.26.2, with auto-switching off.
+  GOTOOLCHAIN: local
+  GOENV: 'off'
+  GOWORK: 'off'
+  GOFLAGS: '-mod=readonly'
+  GOMAXPROCS: '4'
+  CGO_ENABLED: '1'
+  # Download pinned dependencies through the Go proxy; never fall back to Git.
+  GOPROXY: 'https://proxy.golang.org'
+  # Sorted unique parent directories of non-test *.go files from:
+  # git diff --name-only 06c383cf316ab391d60695a4eeb7c085fb40232b HEAD
+  # Inherited upstream-only packages outside this derived set are excluded.
+  DRWA_PACKAGES: >-
+    ./api/errors
+    ./api/gin
+    ./api/groups
+    ./api/middleware
+    ./api/mock
+    ./api/shared
+    ./common
+    ./common/enablers
+    ./config
+    ./consensus
+    ./consensus/round
+    ./dataRetriever/blockchain
+    ./dataRetriever/resolvers
+    ./dblookupext
+    ./dblookupext/factory
+    ./debug/handler
+    ./epochStart/bootstrap
+    ./epochStart/shardchain
+    ./facade
+    ./facade/initial
+    ./factory/api
+    ./factory/core
+    ./factory/disabled
+    ./factory/mock
+    ./factory/processing
+    ./genesis/process
+    ./genesis/process/disabled
+    ./integrationTests
+    ./integrationTests/chainSimulator
+    ./integrationTests/chainSimulator/vm
+    ./integrationTests/mock
+    ./integrationTests/realcomponents
+    ./integrationTests/vm
+    ./node
+    ./node/chainSimulator
+    ./node/chainSimulator/components
+    ./node/metrics
+    ./node/mock
+    ./process
+    ./process/block
+    ./process/block/preprocess
+    ./process/coordinator
+    ./process/drwa
+    ./process/drwa/headertime
+    ./process/factory/metachain
+    ./process/interceptors
+    ./process/mock
+    ./process/peer
+    ./process/receipts
+    ./process/smartContract
+    ./process/smartContract/hooks
+    ./process/smartContract/hooks/counters
+    ./process/smartContract/processorV2
+    ./process/sync
+    ./process/sync/storageBootstrap
+    ./process/track
+    ./process/transactionEvaluator
+    ./state
+    ./state/trackableDataTrie
+    ./statusHandler
+    ./storage
+    ./storage/factory
+    ./storage/mock
+    ./storage/pruning
+    ./testscommon
+    ./testscommon/round
+    ./testscommon/trie
+    ./trie
+    ./trie/leavesRetriever
+    ./update/mock
+    ./vm
+    ./vm/factory
+    ./vm/process
+    ./vm/systemSmartContracts
+
+jobs:
+  build:
+    name: DRWA build
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: DRWA build
+        run: go build ./...
+
+  vet:
+    name: DRWA vet
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: DRWA vet
+        run: go vet $DRWA_PACKAGES
+
+  race:
+    name: DRWA race (${{ matrix.shard }})
+    # Local Go1.26.2 race sample: process/drwa, GOMAXPROCS=4, 43.84s.
+    # Estimate: 37 packages x 43.84s ~= 27min per shard, plus cold compile.
+    # Two parallel jobs leave headroom below about 60min; this is an estimate.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: a
+            packages: >-
+              ./api/errors
+              ./api/groups
+              ./api/mock
+              ./common
+              ./config
+              ./consensus/round
+              ./dataRetriever/resolvers
+              ./dblookupext/factory
+              ./epochStart/bootstrap
+              ./facade
+              ./factory/api
+              ./factory/disabled
+              ./factory/processing
+              ./genesis/process/disabled
+              ./integrationTests/chainSimulator
+              ./integrationTests/mock
+              ./integrationTests/vm
+              ./node/chainSimulator
+              ./node/metrics
+              ./process
+              ./process/block/preprocess
+              ./process/drwa
+              ./process/factory/metachain
+              ./process/mock
+              ./process/receipts
+              ./process/smartContract/hooks
+              ./process/smartContract/processorV2
+              ./process/sync/storageBootstrap
+              ./process/transactionEvaluator
+              ./state/trackableDataTrie
+              ./storage
+              ./storage/mock
+              ./testscommon
+              ./testscommon/trie
+              ./trie/leavesRetriever
+              ./vm
+              ./vm/process
+          - shard: b
+            packages: >-
+              ./api/gin
+              ./api/middleware
+              ./api/shared
+              ./common/enablers
+              ./consensus
+              ./dataRetriever/blockchain
+              ./dblookupext
+              ./debug/handler
+              ./epochStart/shardchain
+              ./facade/initial
+              ./factory/core
+              ./factory/mock
+              ./genesis/process
+              ./integrationTests
+              ./integrationTests/chainSimulator/vm
+              ./integrationTests/realcomponents
+              ./node
+              ./node/chainSimulator/components
+              ./node/mock
+              ./process/block
+              ./process/coordinator
+              ./process/drwa/headertime
+              ./process/interceptors
+              ./process/peer
+              ./process/smartContract
+              ./process/smartContract/hooks/counters
+              ./process/sync
+              ./process/track
+              ./state
+              ./statusHandler
+              ./storage/factory
+              ./storage/pruning
+              ./testscommon/round
+              ./trie
+              ./update/mock
+              ./vm/factory
+              ./vm/systemSmartContracts
+    env:
+      DRWA_PACKAGES: ${{ matrix.packages }}
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: DRWA race
+        run: go test -race -json -count=1 $DRWA_PACKAGES > go-test-race.json
+      - name: Upload raw race test output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: go-test-race-${{ matrix.shard }}-${{ github.sha }}
+          path: go-test-race.json
+          if-no-files-found: error
+
