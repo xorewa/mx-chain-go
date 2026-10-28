@@ -243,4 +243,3 @@ jobs:
           name: go-test-race-${{ matrix.shard }}-${{ github.sha }}
           path: go-test-race.json
           if-no-files-found: error
-
