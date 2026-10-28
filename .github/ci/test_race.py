@@ -5,11 +5,34 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from race import FATAL, HOOK, MODULE, classify
+from race import FATAL, HOOK, MODULE, classify, race_commands, execute
 
 
 class RacePolicyTests(unittest.TestCase):
+    def test_split_commands_preserve_each_exit_and_keep_failures(self):
+        commands = [["go", "test", "./process"], ["go", "test", "./node"]]
+        for codes, expected in [([0, 0], 0), ([1, 0], 1), ([0, 1], 1), ([2, 0], 2)]:
+            with tempfile.TemporaryDirectory() as folder:
+                with patch("race.subprocess.run", side_effect=[subprocess.CompletedProcess(c, e) for c, e in zip(commands, codes)]) as run:
+                    summary = execute(commands, pathlib.Path(folder), "fixture")
+                self.assertEqual(run.call_count, 2)
+                self.assertEqual(summary["exit"], expected)
+                self.assertEqual([r["exit"] for r in summary["commands"]], codes)
+                self.assertEqual([r["argv"] for r in summary["commands"]], commands)
+
+    def test_skip_is_exact_and_only_in_separate_node_commands(self):
+        for flags in [[], ["-gcflags=all=-d=checkptr=0"], ["-run=^$"]]:
+            commands = race_commands(["./factory/core", "./node", "./process"], flags)
+            self.assertEqual(len(commands), 2)
+            self.assertEqual(commands[0], ["go", "test", "-race", "-json", "-count=1", *flags,
+                                            "./factory/core", "./process"])
+            self.assertEqual(commands[1], ["go", "test", "-race", "-json", "-count=1", *flags,
+                                            "-skip=^TestWaitForSignal$", "./node"])
+        self.assertEqual(race_commands(["./process"], []),
+                         [["go", "test", "-race", "-json", "-count=1", "./process"]])
+
     def fixture(self, package="./node"):
         name = MODULE + package[2:]
         text = (FATAL + "\n\ngoroutine 19 gp=0xc00 m=0 mp=0x123 [running, locked to thread]:\n"
@@ -87,6 +110,8 @@ class RacePolicyTests(unittest.TestCase):
                 self.assertEqual(len(commands), 2)
                 self.assertNotIn("-gcflags=all=-d=checkptr=0", commands[0])
                 self.assertIn("-gcflags=all=-d=checkptr=0", commands[1])
+                for command in commands:
+                    self.assertIn("-skip=^TestWaitForSignal$", command)
                 self.assertTrue(all(not any("cover" in arg for arg in command) for command in commands))
                 summary = json.loads((target / "summary.json").read_text())
                 self.assertEqual(summary["default"]["exit"], 1)

@@ -67,11 +67,29 @@ def classify(raw, stderr, exit_code, packages):
     return {"default_exit": exit_code, "known_wasmer2_aborts": tolerated, "errors": errors}
 
 
-def execute(argv, output, stem):
+def race_commands(packages, flags):
+    base = ["go", "test", "-race", "-json", "-count=1", *flags]
+    if "./node" not in packages:
+        return [base + packages]
+    other = [p for p in packages if p != "./node"]
+    commands = [base + other] if other else []
+    # Owner-authorized known upstream test defect: skip only this test in node
+    # race runs. The normal coverage run retains TestWaitForSignal unchanged.
+    commands.append(base + ["-skip=^TestWaitForSignal$", "./node"])
+    return commands
+
+
+def execute(commands, output, stem):
     started = time.monotonic()
+    runs = []
     with (output / (stem + ".jsonl")).open("wb") as out, (output / (stem + ".stderr")).open("wb") as err:
-        result = subprocess.run(argv, stdout=out, stderr=err)
-    return {"argv": argv, "exit": result.returncode, "seconds": time.monotonic() - started}
+        for argv in commands:
+            begin = time.monotonic()
+            result = subprocess.run(argv, stdout=out, stderr=err)
+            runs.append({"argv": argv, "exit": result.returncode, "seconds": time.monotonic() - begin})
+    exit_code = next((r["exit"] for r in runs if r["exit"] not in (0, 1)),
+                     int(any(r["exit"] for r in runs)))
+    return {"commands": runs, "exit": exit_code, "seconds": time.monotonic() - started}
 
 
 def main():
@@ -85,18 +103,20 @@ def main():
     output = pathlib.Path(args.output)
     output.mkdir(parents=True, exist_ok=False)
     flags = ["-run=^$"] if args.smoke else []
-    default = execute(["go", "test", "-race", "-json", "-count=1", *flags, *args.packages], output, "default-race")
+    default = execute(race_commands(args.packages, flags), output, "default-race")
     policy = classify((output / "default-race.jsonl").read_text(),
                       (output / "default-race.stderr").read_text(), default["exit"], args.packages)
     adjusted_packages = [p for p in args.packages if p in KNOWN]
     adjusted = None
     if adjusted_packages:
         # Run even if the default run has an unrelated failure, retaining both results.
-        adjusted = execute(["go", "test", "-race", "-json", "-count=1",
-                            "-gcflags=all=-d=checkptr=0", *flags, *adjusted_packages],
+        adjusted = execute(race_commands(adjusted_packages, ["-gcflags=all=-d=checkptr=0", *flags]),
                            output, "race-checkptr-disabled")
     summary = {"default": default, "classification": policy,
                "checkptr_disabled_race": adjusted,
+               "race_only_skips": [{"package": "./node", "test": "^TestWaitForSignal$",
+                                    "reason": "owner-authorized known upstream test defect; normal coverage retains test"}]
+                                  if "./node" in args.packages else [],
                "scope": "owner's five-package exception; no default race credit for aborted tests"}
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2))

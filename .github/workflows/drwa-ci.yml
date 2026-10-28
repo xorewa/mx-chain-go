@@ -103,7 +103,7 @@ jobs:
   build:
     name: DRWA build
     if: github.repository == 'xorewa/mx-chain-go'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -121,7 +121,7 @@ jobs:
   vet:
     name: DRWA vet
     if: github.repository == 'xorewa/mx-chain-go'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -243,7 +243,7 @@ jobs:
     env:
       DRWA_PACKAGES: ${{ matrix.packages }}
     if: github.repository == 'xorewa/mx-chain-go'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -255,6 +255,10 @@ jobs:
           go-version: '1.26.2'
           check-latest: false
           cache: false
+      - name: Check test network namespace (infrastructure preflight)
+        id: isolation-preflight
+        # Fail distinctly before any tests if this hosted runner denies unshare.
+        run: python3 -B .github/ci/check_isolation.py
       - name: Download pinned dependencies
         run: go mod download
       - name: DRWA race — default plus owner-approved Wasmer2 diagnostic run
@@ -263,12 +267,14 @@ jobs:
         # Retain default -race results. Only the five named Wasmer2 checkptr aborts
         # are tolerated; all other failures and every checkptr=0 failure reject.
         # No coverage profiles are collected by either race run.
+        # Node alone skips ^TestWaitForSignal$ (known upstream test defect,
+        # owner-authorized); normal coverage retains it. No upstream file edit.
         run: >-
           unshare --user --map-root-user --net -- bash -euc
           'ip link set lo up; exec "$@"' --
           python3 -B .github/ci/race.py --output race-results $DRWA_PACKAGES
       - name: Upload both labelled race runs and exception classification
-        if: always()
+        if: always() && steps.isolation-preflight.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: go-test-race-${{ matrix.shard }}-${{ github.sha }}
@@ -278,7 +284,7 @@ jobs:
   coverage:
     name: DRWA coverage
     if: github.repository == 'xorewa/mx-chain-go'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -290,6 +296,10 @@ jobs:
           go-version: '1.26.2'
           check-latest: false
           cache: false
+      - name: Check test network namespace (infrastructure preflight)
+        id: isolation-preflight
+        # Fail distinctly before any tests if this hosted runner denies unshare.
+        run: python3 -B .github/ci/check_isolation.py
       - name: Download pinned dependencies
         run: go mod download
       - name: Check coverage and race policy helpers
@@ -307,7 +317,7 @@ jobs:
           go test -json -count=1 -covermode=atomic -coverprofile=coverage.out
           $DRWA_PACKAGES > go-test-coverage.json
       - name: Enforce hybrid diff coverage at 90 percent
-        if: always()
+        if: always() && steps.isolation-preflight.outcome == 'success'
         env:
           GOPROXY: 'off'
         # Only this job's NON-RACE profile feeds the blocking hybrid gate.
@@ -319,7 +329,7 @@ jobs:
           -profile coverage.out -packages "$DRWA_PACKAGES"
           -output diff-coverage.json
       - name: Upload coverage profile, raw tests and hybrid report
-        if: always()
+        if: always() && steps.isolation-preflight.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: drwa-coverage-${{ github.sha }}
@@ -333,7 +343,7 @@ jobs:
   branch-trial:
     name: DRWA gobco branch coverage trial (non-blocking)
     if: github.repository == 'xorewa/mx-chain-go'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     continue-on-error: true
     steps:
@@ -346,6 +356,10 @@ jobs:
           go-version: '1.26.2'
           check-latest: false
           cache: false
+      - name: Check test network namespace (infrastructure preflight)
+        id: isolation-preflight
+        # Fail distinctly before any tests if this hosted runner denies unshare.
+        run: python3 -B .github/ci/check_isolation.py
       - name: Build CI-only github.com/rillig/gobco v1.3.4 at approved commit
         # No install into the product module; no go.mod/go.sum change.
         run: |
@@ -371,7 +385,7 @@ jobs:
           python3 -B .github/ci/gobco.py --binary "$RUNNER_TEMP/gobco"
           --output gobco-results $DRWA_PACKAGES
       - name: Upload branch trial reports including tool failures
-        if: always()
+        if: always() && steps.isolation-preflight.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: drwa-gobco-trial-${{ github.sha }}
