@@ -89,6 +89,18 @@ func (c *RollbackContainment) checkAvailable() error {
 // publish or mutate it afterwards. Concurrent/reentrant entry is refused rather
 // than mixing candidate journals. Nested native work belongs inside operation.
 func (c *RollbackContainment) Execute(operation func() (*vmcommon.VMOutput, error)) (err error) {
+	if operation == nil {
+		return c.execute(nil)
+	}
+	return c.execute(func() ([]*vmcommon.VMOutput, error) {
+		output, err := operation()
+		return []*vmcommon.VMOutput{output}, err
+	})
+}
+
+// execute retains every native observation of one bounded import without
+// merging VM outputs or exposing a successful prefix before the whole import.
+func (c *RollbackContainment) execute(operation func() ([]*vmcommon.VMOutput, error)) (err error) {
 	c.mut.Lock()
 	if err = c.checkAvailable(); err != nil {
 		c.mut.Unlock()
@@ -114,12 +126,12 @@ func (c *RollbackContainment) Execute(operation func() (*vmcommon.VMOutput, erro
 			c.mut.Unlock()
 		}
 	}()
-	output, original := operation()
+	outputs, original := operation()
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	c.running = false
 	if original == nil {
-		c.outputs = append(c.outputs, output)
+		c.outputs = append(c.outputs, outputs...)
 		completed = true
 		return nil
 	}
@@ -151,12 +163,23 @@ func (c *RollbackContainment) Commit() ([][]byte, []*vmcommon.VMOutput, error) {
 	if err := c.checkAvailable(); err != nil {
 		return nil, nil, err
 	}
+	completed := false
+	defer func() {
+		if !completed {
+			// A native persistence panic may follow durable writes and journal
+			// clearing. Suppress observations and require root-based recovery;
+			// retrying this owner would repeat an ambiguous persistence step.
+			c.failure = ErrExecutionInterrupted
+			c.outputs = nil
+		}
+	}()
 	roots := make([][]byte, 0, len(c.stores))
 	for _, store := range c.stores {
 		root, err := store.Commit()
 		if err != nil {
 			c.failure = err
 			c.outputs = nil
+			completed = true
 			return nil, nil, err
 		}
 		roots = append(roots, bytes.Clone(root))
@@ -164,6 +187,7 @@ func (c *RollbackContainment) Commit() ([][]byte, []*vmcommon.VMOutput, error) {
 	c.closed = true
 	outputs := c.outputs
 	c.outputs = nil
+	completed = true
 	return roots, outputs, nil
 }
 
@@ -175,6 +199,29 @@ func (c *RollbackContainment) Commit() ([][]byte, []*vmcommon.VMOutput, error) {
 func (c *RollbackContainment) Recover() error {
 	c.mut.Lock()
 	defer c.mut.Unlock()
+	return c.recover()
+}
+
+// Abort discards an uncommitted consuming candidate, including a successful
+// bounded promotion and every dependent operation in this owner (Part A 6.1).
+// It reuses recovery at the retained native roots and closes the old context.
+// It cannot retract outputs already released by Commit; native committed-block
+// replacement remains the block processor's responsibility. A failed Abort
+// retains containment and permits only Recover from the retained roots.
+func (c *RollbackContainment) Abort() error {
+	c.mut.Lock()
+	defer c.mut.Unlock()
+	if err := c.checkAvailable(); err != nil {
+		return err
+	}
+	c.failure = ErrExecutionInterrupted
+	c.outputs = nil
+	return c.recover()
+}
+
+// recover runs with the owner's mutex held. Both failure recovery and healthy
+// candidate replacement require exactly the same native root reconstruction.
+func (c *RollbackContainment) recover() error {
 	if c.running {
 		return ErrExecutionBusy
 	}

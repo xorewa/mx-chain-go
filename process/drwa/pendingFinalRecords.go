@@ -171,19 +171,26 @@ func (r *pendingFinalRecords) check(c pendingFinalCandidate, encoded []byte, pro
 // record itself, including manufacturing an otherwise valid duplicate. Other
 // co-journaled state remains permitted under the existing exclusive owner.
 func (r *pendingFinalRecords) verifyState(c pendingFinalCandidate, verify func() error) error {
+	return r.verifyStates([]pendingFinalCandidate{c}, verify)
+}
+
+func (r *pendingFinalRecords) verifyStates(candidates []pendingFinalCandidate, verify func() error) error {
 	kinds := []string{"final", "pending", "item"}
-	fields := [][][]byte{{c.key}, {c.key}, {c.origin, c.key}}
-	keys := make([][]byte, len(kinds))
-	before := make([][]byte, len(kinds))
-	for i, kind := range kinds {
-		key, err := r.key(kind, fields[i]...)
-		if err != nil {
-			return err
-		}
-		keys[i] = key
-		before[i], err = r.read(key)
-		if err != nil {
-			return err
+	keys := make([][]byte, 0, len(candidates)*len(kinds))
+	before := make([][]byte, 0, cap(keys))
+	for _, c := range candidates {
+		fields := [][][]byte{{c.key}, {c.key}, {c.origin, c.key}}
+		for i, kind := range kinds {
+			key, err := r.key(kind, fields[i]...)
+			if err != nil {
+				return err
+			}
+			value, err := r.read(key)
+			if err != nil {
+				return err
+			}
+			keys = append(keys, key)
+			before = append(before, value)
 		}
 	}
 	if err := verify(); err != nil {
@@ -311,44 +318,129 @@ func (r *pendingFinalRecords) stage(candidate pendingFinalCandidate) error {
 // promote accepts one bounded item supplied by the qualified native importer,
 // never scans a registry. No actual native route calls this private prototype.
 func (r *pendingFinalRecords) promote(candidate pendingFinalCandidate, evidence []byte) error {
-	encoded, err := r.encode(candidate)
+	prepared, err := r.preparePromotion(candidate, evidence)
 	if err != nil {
 		return err
 	}
+	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+		return r.applyPromotion(prepared, func(verify func() error) error {
+			return r.verifyState(prepared.candidate, verify)
+		})
+	})
+}
+
+type pendingFinalPromotion struct {
+	candidate pendingFinalCandidate
+	evidence  []byte
+}
+
+type preparedFinalPromotion struct {
+	candidate pendingFinalCandidate
+	encoded   []byte
+	evidence  []byte
+}
+
+func (r *pendingFinalRecords) preparePromotion(candidate pendingFinalCandidate, evidence []byte) (preparedFinalPromotion, error) {
+	encoded, err := r.encode(candidate)
+	if err != nil {
+		return preparedFinalPromotion{}, err
+	}
 	if len(evidence) == 0 || len(evidence) > r.codec.maxBytes {
-		return errPendingFinal
+		return preparedFinalPromotion{}, errPendingFinal
 	}
 	f, err := r.codec.unframe(encoded, 5)
 	if err != nil {
-		return err
+		return preparedFinalPromotion{}, err
 	}
 	c := pendingFinalCandidate{key: bytes.Clone(f[0]), version: candidate.version,
 		predecessor: bytes.Clone(f[2]), body: bytes.Clone(f[3]), origin: bytes.Clone(f[4])}
-	evidence = bytes.Clone(evidence)
-	return r.boundary.Execute(func() (*vmcommon.VMOutput, error) {
-		if e := r.verifyState(c, func() error { return r.host.Canonical(bytes.Clone(encoded), bytes.Clone(evidence)) }); e != nil {
-			return nil, e
+	return preparedFinalPromotion{candidate: c, encoded: encoded, evidence: bytes.Clone(evidence)}, nil
+}
+
+// promoteResult consumes the COMPLETE ordered item commitments selected by the
+// qualified native finalized-result producer, not a requester or pool scan.
+// committedItems and both limits belong to that authenticated result/profile;
+// this private storage operation cannot establish their provenance. Every item
+// still requires the host's exact origin/result/root/item/M/B witness check.
+// One failed item rolls back the entire import and all its observations.
+func (r *pendingFinalRecords) promoteResult(items []pendingFinalPromotion, committedItems [][]byte,
+	maxItems, byteLimit int) error {
+	if maxItems <= 0 || byteLimit <= 0 || len(items) > maxItems || len(items) != len(committedItems) {
+		return errPendingFinal
+	}
+	prepared := make([]preparedFinalPromotion, 0, len(items))
+	candidates := make([]pendingFinalCandidate, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	remaining := byteLimit
+	for i, item := range items {
+		p, err := r.preparePromotion(item.candidate, item.evidence)
+		if err != nil {
+			return err
 		}
-		final, _, e := r.final(c.key)
-		if e != nil {
-			return nil, e
+		if len(p.encoded) > remaining {
+			return errPendingFinal
 		}
-		if bytes.Equal(final, encoded) {
-			return nil, r.check(c, encoded, true)
+		remaining -= len(p.encoded)
+		if len(p.evidence) > remaining || !bytes.Equal(r.codec.hasher.Compute(string(p.encoded)), committedItems[i]) {
+			return errPendingFinal
 		}
-		if e = r.check(c, encoded, false); e != nil {
-			return nil, e
+		remaining -= len(p.evidence)
+		if _, duplicate := seen[string(p.candidate.key)]; duplicate {
+			return errPendingFinal
 		}
-		output, e := r.host.Observe(bytes.Clone(encoded))
-		if e != nil {
-			return nil, e
+		if i > 0 && !bytes.Equal(p.candidate.origin, candidates[0].origin) {
+			return errPendingFinal
 		}
-		if output == nil || output.ReturnCode != vmcommon.Ok {
-			return nil, errPendingFinal
+		seen[string(p.candidate.key)] = struct{}{}
+		prepared = append(prepared, p)
+		candidates = append(candidates, p.candidate)
+	}
+	return r.boundary.execute(func() ([]*vmcommon.VMOutput, error) {
+		outputs := make([]*vmcommon.VMOutput, 0, len(prepared))
+		for _, p := range prepared {
+			output, err := r.applyPromotion(p, func(verify func() error) error {
+				return r.verifyStates(candidates, verify)
+			})
+			if err != nil {
+				return nil, err
+			}
+			if output != nil {
+				outputs = append(outputs, output)
+			}
 		}
-		if e = r.check(c, encoded, false); e != nil {
-			return nil, e
-		}
-		return output, r.save(c, encoded, true)
+		return outputs, nil
 	})
+}
+
+func (r *pendingFinalRecords) applyPromotion(p preparedFinalPromotion, verify func(func() error) error) (*vmcommon.VMOutput, error) {
+	c, encoded, evidence := p.candidate, p.encoded, p.evidence
+	if e := verify(func() error { return r.host.Canonical(bytes.Clone(encoded), bytes.Clone(evidence)) }); e != nil {
+		return nil, e
+	}
+	final, _, e := r.final(c.key)
+	if e != nil {
+		return nil, e
+	}
+	if bytes.Equal(final, encoded) {
+		return nil, r.check(c, encoded, true)
+	}
+	if e = r.check(c, encoded, false); e != nil {
+		return nil, e
+	}
+	var output *vmcommon.VMOutput
+	e = verify(func() error {
+		var err error
+		output, err = r.host.Observe(bytes.Clone(encoded))
+		return err
+	})
+	if e != nil {
+		return nil, e
+	}
+	if output == nil || output.ReturnCode != vmcommon.Ok {
+		return nil, errPendingFinal
+	}
+	if e = r.check(c, encoded, false); e != nil {
+		return nil, e
+	}
+	return output, r.save(c, encoded, true)
 }
