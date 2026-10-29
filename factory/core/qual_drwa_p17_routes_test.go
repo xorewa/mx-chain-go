@@ -252,6 +252,9 @@ node/process/drwa/registryTransport.go/*registryTransport.reconstruct
 node/process/drwa/rollbackContainment.go/*RollbackContainment.Execute
 node/process/drwa/rollbackContainment.go/*RollbackContainment.Commit
 node/process/drwa/rollbackContainment.go/*RollbackContainment.Recover
+node/process/drwa/rollbackContainment.go/*RollbackContainment.execute
+node/process/drwa/rollbackContainment.go/*RollbackContainment.recover
+node/process/drwa/rollbackContainment.go/*RollbackContainment.Abort
 node/process/factory/metachain/vmContainerFactory.go/*vmContainerFactory.createSystemVMFactoryAndEEI
 node/process/factory/metachain/vmContainerFactory.go/*vmContainerFactory.finalizeSystemVMCreation
 node/process/smartContract/builtInFunctions/factory.go/.CreateBuiltInFunctionsFactory

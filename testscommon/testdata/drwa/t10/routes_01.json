@@ -543,143 +543,75 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
+      "repo_revision": "df4c736f7c3554c644828402ae0ea5f315dab07b",
       "source_file": "process/drwa/rollbackContainment.go",
-      "source_sha256": "108b575ea5cffb25d672cc014d5614f4330fc0fcf04331988f313137693d8761",
+      "source_sha256": "98c31e5f8ed54e02597c344aa05afba6f2208a887c9d0108393e00acb9307eb7",
       "function": "Execute",
       "receiver": "*RollbackContainment",
       "start": 91,
-      "end": 140,
-      "body_sha256": "56f055436dff2dc74a2a2d027a9247df396d985903a81634c81594bb15b285b3",
+      "end": 99,
+      "body_sha256": "bcf0f974839da9b55ea2ca454b8a8c06765eb03d9219c97c784bad3764983cf5",
       "calls": [
         {
-          "line": 92,
-          "expression": "c.mut.Lock"
-        },
-        {
           "line": 93,
-          "expression": "c.checkAvailable"
+          "expression": "c.execute"
         },
         {
-          "line": 94,
-          "expression": "c.mut.Unlock"
+          "line": 95,
+          "expression": "c.execute"
         },
         {
-          "line": 98,
-          "expression": "c.mut.Unlock"
-        },
-        {
-          "line": 101,
-          "expression": "make"
-        },
-        {
-          "line": 101,
-          "expression": "len"
-        },
-        {
-          "line": 103,
-          "expression": "store.JournalLen"
-        },
-        {
-          "line": 106,
-          "expression": "c.mut.Unlock"
-        },
-        {
-          "line": 108,
-          "expression": "func() {\n\t\tif !completed {\n\t\t\tc.mut.Lock()\n\t\t\tc.failure = ErrExecutionInterrupted\n\t\t\tc.outputs = nil\n\t\t\tc.running = false\n\t\t\tc.mut.Unlock()\n\t\t}\n\t}"
-        },
-        {
-          "line": 110,
-          "expression": "c.mut.Lock"
-        },
-        {
-          "line": 114,
-          "expression": "c.mut.Unlock"
-        },
-        {
-          "line": 117,
+          "line": 96,
           "expression": "operation"
-        },
-        {
-          "line": 118,
-          "expression": "c.mut.Lock"
-        },
-        {
-          "line": 119,
-          "expression": "c.mut.Unlock"
-        },
-        {
-          "line": 122,
-          "expression": "append"
-        },
-        {
-          "line": 127,
-          "expression": "len"
-        },
-        {
-          "line": 128,
-          "expression": "c.stores[i].RevertToSnapshot"
-        },
-        {
-          "line": 129,
-          "expression": "append"
-        },
-        {
-          "line": 132,
-          "expression": "len"
-        },
-        {
-          "line": 136,
-          "expression": "errors.Join"
-        },
-        {
-          "line": 136,
-          "expression": "append"
         }
       ]
     },
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
+      "repo_revision": "df4c736f7c3554c644828402ae0ea5f315dab07b",
       "source_file": "process/drwa/rollbackContainment.go",
-      "source_sha256": "108b575ea5cffb25d672cc014d5614f4330fc0fcf04331988f313137693d8761",
+      "source_sha256": "98c31e5f8ed54e02597c344aa05afba6f2208a887c9d0108393e00acb9307eb7",
       "function": "Commit",
       "receiver": "*RollbackContainment",
-      "start": 148,
-      "end": 168,
-      "body_sha256": "287863e24c60f04b32769210e989caadcf30dfc6d07e02b8323e45e888eb8545",
+      "start": 160,
+      "end": 192,
+      "body_sha256": "f4aa78a9f590bf00af11364b25c1db1ac95798ec0ee75a22b6f07264c2d65e67",
       "calls": [
         {
-          "line": 149,
+          "line": 161,
           "expression": "c.mut.Lock"
         },
         {
-          "line": 150,
+          "line": 162,
           "expression": "c.mut.Unlock"
         },
         {
-          "line": 151,
+          "line": 163,
           "expression": "c.checkAvailable"
         },
         {
-          "line": 154,
+          "line": 167,
+          "expression": "func() {\n\t\tif !completed {\n\t\t\t// A native persistence panic may follow durable writes and journal\n\t\t\t// clearing. Suppress observations and require root-based recovery;\n\t\t\t// retrying this owner would repeat an ambiguous persistence step.\n\t\t\tc.failure = ErrExecutionInterrupted\n\t\t\tc.outputs = nil\n\t\t}\n\t}"
+        },
+        {
+          "line": 176,
           "expression": "make"
         },
         {
-          "line": 154,
+          "line": 176,
           "expression": "len"
         },
         {
-          "line": 156,
+          "line": 178,
           "expression": "store.Commit"
         },
         {
-          "line": 162,
+          "line": 185,
           "expression": "append"
         },
         {
-          "line": 162,
+          "line": 185,
           "expression": "bytes.Clone"
         }
       ]
@@ -687,50 +619,26 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "90a69bce6d14aa68471d2b0062a4595c866caf70",
+      "repo_revision": "df4c736f7c3554c644828402ae0ea5f315dab07b",
       "source_file": "process/drwa/rollbackContainment.go",
-      "source_sha256": "108b575ea5cffb25d672cc014d5614f4330fc0fcf04331988f313137693d8761",
+      "source_sha256": "98c31e5f8ed54e02597c344aa05afba6f2208a887c9d0108393e00acb9307eb7",
       "function": "Recover",
       "receiver": "*RollbackContainment",
-      "start": 175,
-      "end": 200,
-      "body_sha256": "a03f218ce69b40b6ac315cde0d1cc4f265c046835c4a20b5269b9d63913f8237",
+      "start": 199,
+      "end": 203,
+      "body_sha256": "883ce395b02c851f75d869129f0bdff62321649a66f54992cb2212ae92d1a22f",
       "calls": [
         {
-          "line": 176,
+          "line": 200,
           "expression": "c.mut.Lock"
         },
         {
-          "line": 177,
+          "line": 201,
           "expression": "c.mut.Unlock"
         },
         {
-          "line": 186,
-          "expression": "store.RecreateTrie"
-        },
-        {
-          "line": 186,
-          "expression": "holders.NewDefaultRootHashesHolder"
-        },
-        {
-          "line": 186,
-          "expression": "bytes.Clone"
-        },
-        {
-          "line": 187,
-          "expression": "append"
-        },
-        {
-          "line": 190,
-          "expression": "len"
-        },
-        {
-          "line": 191,
-          "expression": "errors.Join"
-        },
-        {
-          "line": 191,
-          "expression": "append"
+          "line": 202,
+          "expression": "c.recover"
         }
       ]
     },
@@ -9154,6 +9062,176 @@
       "source_sha256": "28939472f8d533ee33a93862bae94089a06d027d7962d6f9b96445fa9fb10c0b",
       "start": 44,
       "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859"
+    },
+    {
+      "root": "node",
+      "repository": "mx-chain-go",
+      "repo_revision": "df4c736f7c3554c644828402ae0ea5f315dab07b",
+      "source_file": "process/drwa/rollbackContainment.go",
+      "source_sha256": "98c31e5f8ed54e02597c344aa05afba6f2208a887c9d0108393e00acb9307eb7",
+      "function": "execute",
+      "receiver": "*RollbackContainment",
+      "start": 103,
+      "end": 152,
+      "body_sha256": "a15c96b8c5857b6e61b203c65e22587b66e162bf5785c826d33c9dae7ab42bdc",
+      "calls": [
+        {
+          "line": 104,
+          "expression": "c.mut.Lock"
+        },
+        {
+          "line": 105,
+          "expression": "c.checkAvailable"
+        },
+        {
+          "line": 106,
+          "expression": "c.mut.Unlock"
+        },
+        {
+          "line": 110,
+          "expression": "c.mut.Unlock"
+        },
+        {
+          "line": 113,
+          "expression": "make"
+        },
+        {
+          "line": 113,
+          "expression": "len"
+        },
+        {
+          "line": 115,
+          "expression": "store.JournalLen"
+        },
+        {
+          "line": 118,
+          "expression": "c.mut.Unlock"
+        },
+        {
+          "line": 120,
+          "expression": "func() {\n\t\tif !completed {\n\t\t\tc.mut.Lock()\n\t\t\tc.failure = ErrExecutionInterrupted\n\t\t\tc.outputs = nil\n\t\t\tc.running = false\n\t\t\tc.mut.Unlock()\n\t\t}\n\t}"
+        },
+        {
+          "line": 122,
+          "expression": "c.mut.Lock"
+        },
+        {
+          "line": 126,
+          "expression": "c.mut.Unlock"
+        },
+        {
+          "line": 129,
+          "expression": "operation"
+        },
+        {
+          "line": 130,
+          "expression": "c.mut.Lock"
+        },
+        {
+          "line": 131,
+          "expression": "c.mut.Unlock"
+        },
+        {
+          "line": 134,
+          "expression": "append"
+        },
+        {
+          "line": 139,
+          "expression": "len"
+        },
+        {
+          "line": 140,
+          "expression": "c.stores[i].RevertToSnapshot"
+        },
+        {
+          "line": 141,
+          "expression": "append"
+        },
+        {
+          "line": 144,
+          "expression": "len"
+        },
+        {
+          "line": 148,
+          "expression": "errors.Join"
+        },
+        {
+          "line": 148,
+          "expression": "append"
+        }
+      ]
+    },
+    {
+      "root": "node",
+      "repository": "mx-chain-go",
+      "repo_revision": "df4c736f7c3554c644828402ae0ea5f315dab07b",
+      "source_file": "process/drwa/rollbackContainment.go",
+      "source_sha256": "98c31e5f8ed54e02597c344aa05afba6f2208a887c9d0108393e00acb9307eb7",
+      "function": "recover",
+      "receiver": "*RollbackContainment",
+      "start": 224,
+      "end": 247,
+      "body_sha256": "34a934fe39422191c998956abdb101e99169d36f37cae7bdfad2b7a84c9460b0",
+      "calls": [
+        {
+          "line": 233,
+          "expression": "store.RecreateTrie"
+        },
+        {
+          "line": 233,
+          "expression": "holders.NewDefaultRootHashesHolder"
+        },
+        {
+          "line": 233,
+          "expression": "bytes.Clone"
+        },
+        {
+          "line": 234,
+          "expression": "append"
+        },
+        {
+          "line": 237,
+          "expression": "len"
+        },
+        {
+          "line": 238,
+          "expression": "errors.Join"
+        },
+        {
+          "line": 238,
+          "expression": "append"
+        }
+      ]
+    },
+    {
+      "root": "node",
+      "repository": "mx-chain-go",
+      "repo_revision": "df4c736f7c3554c644828402ae0ea5f315dab07b",
+      "source_file": "process/drwa/rollbackContainment.go",
+      "source_sha256": "98c31e5f8ed54e02597c344aa05afba6f2208a887c9d0108393e00acb9307eb7",
+      "function": "Abort",
+      "receiver": "*RollbackContainment",
+      "start": 211,
+      "end": 220,
+      "body_sha256": "cc459a5c7722015fdac266f07ca1771f2d9b0bd2c05c5e3c90cc4b3f118c49f9",
+      "calls": [
+        {
+          "line": 212,
+          "expression": "c.mut.Lock"
+        },
+        {
+          "line": 213,
+          "expression": "c.mut.Unlock"
+        },
+        {
+          "line": 214,
+          "expression": "c.checkAvailable"
+        },
+        {
+          "line": 219,
+          "expression": "c.recover"
+        }
+      ]
     }
   ],
   "system_routes": [
