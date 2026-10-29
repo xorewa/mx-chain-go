@@ -255,6 +255,8 @@ jobs:
           go-version: '1.26.2'
           check-latest: false
           cache: false
+      - name: Allow unprivileged user namespaces (hosted runner, this run only)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Check test network namespace (infrastructure preflight)
         id: isolation-preflight
         # Fail distinctly before any tests if this hosted runner denies unshare.
@@ -296,6 +298,8 @@ jobs:
           go-version: '1.26.2'
           check-latest: false
           cache: false
+      - name: Allow unprivileged user namespaces (hosted runner, this run only)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Check test network namespace (infrastructure preflight)
         id: isolation-preflight
         # Fail distinctly before any tests if this hosted runner denies unshare.
@@ -356,6 +360,8 @@ jobs:
           go-version: '1.26.2'
           check-latest: false
           cache: false
+      - name: Allow unprivileged user namespaces (hosted runner, this run only)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Check test network namespace (infrastructure preflight)
         id: isolation-preflight
         # Fail distinctly before any tests if this hosted runner denies unshare.
