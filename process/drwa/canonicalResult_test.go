@@ -2,6 +2,7 @@ package drwa
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/holders"
+	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/testscommon"
@@ -359,6 +361,65 @@ func TestCanonicalResultReader_Rejection(t *testing.T) {
 			require.Error(t, f.r.promoteCanonicalResult(native, f.bHash, f.consumer, f.producer, f.items, f.w, max, f.limit))
 			require.Equal(t, before, f.snapshot(t))
 			require.Empty(t, f.owner.outputs)
+		})
+	}
+}
+
+func TestCanonicalResultReader_ExcludedCarryingHeader(t *testing.T) {
+	for _, consumer := range []uint32{2, core.MetachainShardId} {
+		t.Run(fmt.Sprintf("consumer %d should reject an excluded carrying header without promotion", consumer), func(t *testing.T) {
+			f := newCanonicalTestFixture(t, 1, consumer)
+			h := &block.HeaderV3{}
+			require.NoError(t, f.r.codec.marshaller.Unmarshal(h, f.w.Account.Header))
+			hashH := f.hash(f.w.Account.Header)
+			// This synthetic checkpoint is an explicit unit input, not an
+			// admitted recovery mode. Only H's selected hash changes below.
+			cfg := &config.Config{
+				HardforkRoundExclusions: []config.HardforkRoundExclusionConfig{{StartRound: h.Round + 1, EndRound: h.Round + 1}},
+				HardforkRecoveryCheckpoint: config.HardforkRecoveryCheckpointConfig{
+					Enabled: true, Round: h.Round,
+					Headers: []config.HardforkRecoveryHeaderConfig{
+						{ShardID: f.producer, Hash: hex.EncodeToString(hashH)},
+						{ShardID: core.MetachainShardId, Hash: hex.EncodeToString(f.hash(f.encode(t, &block.MetaBlockV3{Round: h.Round})))},
+					},
+				},
+			}
+			selected, err := common.NewConfiguredRoundExclusionHandler(cfg)
+			require.NoError(t, err)
+			f.reader.exclusions = selected
+			before := f.snapshot(t)
+			// Warm the real account-proof cache using the otherwise valid
+			// witness. Cached proof availability cannot override exclusion.
+			value, err := f.read()
+			require.NoError(t, err)
+			require.Equal(t, f.expected, value)
+			require.Equal(t, before, f.snapshot(t))
+
+			competing := *h
+			competing.RandSeed = []byte("checkpoint-selected competing header")
+			cfg.HardforkRecoveryCheckpoint.Headers[0].Hash = hex.EncodeToString(f.hash(f.encode(t, &competing)))
+			excluded, err := common.NewConfiguredRoundExclusionHandler(cfg)
+			require.NoError(t, err)
+			require.False(t, excluded.IsRoundExcluded(h.Round), "rejection must require the header hash, not the round alone")
+			require.True(t, common.IsHeaderExcluded(excluded, h.Round, h.ShardID, hashH))
+			for i, m := range f.metas {
+				require.False(t, common.IsHeaderExcluded(excluded, m.Round, core.MetachainShardId, f.hash(f.w.MetaHeaders[i])), "meta pool guards must not mask the carrying-header guard")
+			}
+			f.reader.exclusions = excluded
+			require.ErrorIs(t, f.promoteCanonical(), ErrInvalidAccountWitness)
+			require.Equal(t, before, f.snapshot(t))
+			require.Empty(t, f.owner.outputs)
+			require.Zero(t, f.host.observed)
+			for _, item := range f.items {
+				value, digest, err := f.r.final(item.candidate.key)
+				require.NoError(t, err)
+				require.Empty(t, value)
+				require.Empty(t, digest)
+			}
+
+			f.reader.exclusions = selected
+			require.NoError(t, f.promoteCanonical(), "the same exact witness remains usable under its selected history")
+			require.Equal(t, len(f.items), f.host.observed)
 		})
 	}
 }
