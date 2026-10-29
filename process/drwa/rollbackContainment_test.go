@@ -57,9 +57,13 @@ func (s *qualNativeStore) SaveAccount(account vmcommon.AccountHandler) error {
 	return s.saveErr
 }
 
-func qualContainmentArgs(t *testing.T) (state.ArgsAccountsDB, *testscommon.MemDbMock) {
+func qualContainmentArgs(t *testing.T, backing ...*testscommon.MemDbMock) (state.ArgsAccountsDB, *testscommon.MemDbMock) {
 	t.Helper()
 	db := testscommon.NewMemDbMock()
+	require.LessOrEqual(t, len(backing), 1)
+	if len(backing) == 1 {
+		db = backing[0]
+	}
 	flags := enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
 	mar, hash := &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b()
 	storage := &storageManager.StorageManagerStub{

@@ -7,6 +7,7 @@ import (
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
+	"github.com/multiversx/mx-chain-core-go/data/batch"
 	"github.com/multiversx/mx-chain-core-go/hashing"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/state"
@@ -154,17 +155,63 @@ func (r *pendingFinalRecords) check(c pendingFinalCandidate, encoded []byte, pro
 	if err != nil {
 		return err
 	}
+	items, err := r.originItems(c.origin)
+	if err != nil {
+		return err
+	}
+	count := 0
+	for _, digest := range items {
+		if bytes.Equal(digest, r.codec.hasher.Compute(string(encoded))) {
+			count++
+		}
+	}
 	if promoted {
-		if !bytes.Equal(final, encoded) || len(pending) != 0 || len(item) != 0 {
+		if !bytes.Equal(final, encoded) || len(pending) != 0 || len(item) != 0 || count != 0 {
 			return errPendingFinal
 		}
 		return nil
 	}
-	if !bytes.Equal(digest, c.predecessor) || !bytes.Equal(pending, encoded) ||
+	if count != 1 || !bytes.Equal(digest, c.predecessor) || !bytes.Equal(pending, encoded) ||
 		!bytes.Equal(item, r.codec.hasher.Compute(string(encoded))) {
 		return errPendingFinal
 	}
 	return nil
+}
+
+// originItems is the bounded registered write set, not a scan or authority.
+// Its native Batch encoding is experimental, like the existing head records.
+func (r *pendingFinalRecords) originItems(origin []byte) ([][]byte, error) {
+	key, err := r.key("origin", origin)
+	if err != nil {
+		return nil, err
+	}
+	encoded, err := r.read(key)
+	if err != nil || len(encoded) == 0 {
+		return nil, err
+	}
+	return r.decodeOriginItems(encoded)
+}
+
+func (r *pendingFinalRecords) decodeOriginItems(encoded []byte) ([][]byte, error) {
+	if len(encoded) == 0 || len(encoded) > r.codec.maxBytes {
+		return nil, errPendingFinal
+	}
+	items := &batch.Batch{}
+	if err := r.codec.marshaller.Unmarshal(items, encoded); err != nil {
+		return nil, err
+	}
+	fields, err := r.codec.unframe(encoded, len(items.Data))
+	if err != nil || len(fields) == 0 {
+		return nil, errPendingFinal
+	}
+	seen := make(map[string]bool, len(fields))
+	for _, digest := range fields {
+		if len(digest) != r.codec.hasher.Size() || seen[string(digest)] {
+			return nil, errPendingFinal
+		}
+		seen[string(digest)] = true
+	}
+	return fields, nil
 }
 
 // A verifier authenticates the operation; it cannot stage or promote this
@@ -175,11 +222,11 @@ func (r *pendingFinalRecords) verifyState(c pendingFinalCandidate, verify func()
 }
 
 func (r *pendingFinalRecords) verifyStates(candidates []pendingFinalCandidate, verify func() error) error {
-	kinds := []string{"final", "pending", "item"}
+	kinds := []string{"final", "pending", "item", "origin"}
 	keys := make([][]byte, 0, len(candidates)*len(kinds))
 	before := make([][]byte, 0, cap(keys))
 	for _, c := range candidates {
-		fields := [][][]byte{{c.key}, {c.key}, {c.origin, c.key}}
+		fields := [][][]byte{{c.key}, {c.key}, {c.origin, c.key}, {c.origin}}
 		for i, kind := range kinds {
 			key, err := r.key(kind, fields[i]...)
 			if err != nil {
@@ -209,6 +256,37 @@ func (r *pendingFinalRecords) verifyStates(candidates []pendingFinalCandidate, v
 }
 
 func (r *pendingFinalRecords) save(c pendingFinalCandidate, encoded []byte, promote bool) error {
+	registered, err := r.originItems(c.origin)
+	if err != nil {
+		return err
+	}
+	digest := r.codec.hasher.Compute(string(encoded))
+	items := make([][]byte, 0, len(registered)+1)
+	found := false
+	for _, item := range registered {
+		if bytes.Equal(item, digest) {
+			found = true
+			continue
+		}
+		items = append(items, item)
+	}
+	if found != promote {
+		return errPendingFinal
+	}
+	if !promote {
+		items = append(items, digest)
+	}
+	var manifest []byte
+	if len(items) != 0 {
+		manifest, err = r.codec.frame(items...)
+		if err != nil {
+			return err
+		}
+	}
+	originKey, err := r.key("origin", c.origin)
+	if err != nil {
+		return err
+	}
 	pendingKey, err := r.key("pending", c.key)
 	if err != nil {
 		return err
@@ -231,6 +309,8 @@ func (r *pendingFinalRecords) save(c pendingFinalCandidate, encoded []byte, prom
 		keys = append(keys, finalKey)
 		values = [][]byte{nil, nil, encoded}
 	}
+	keys = append(keys, originKey)
+	values = append(values, manifest)
 	for i, key := range keys {
 		if err = a.SaveKeyValue(key, values[i]); err != nil {
 			return err
@@ -287,7 +367,12 @@ func (r *pendingFinalRecords) stage(candidate pendingFinalCandidate) error {
 			}
 			return nil, errPendingFinal
 		}
-		output, e := r.host.Initialize(bytes.Clone(encoded))
+		var output *vmcommon.VMOutput
+		e = r.verifyState(c, func() error {
+			var err error
+			output, err = r.host.Initialize(bytes.Clone(encoded))
+			return err
+		})
 		if e != nil {
 			return nil, e
 		}

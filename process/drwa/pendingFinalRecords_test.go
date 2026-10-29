@@ -57,7 +57,7 @@ func (h *pendingFinalTestHost) Observe(c []byte) (*vmcommon.VMOutput, error) {
 type pendingFinalTestStore struct {
 	*qualNativeStore
 	writes, writeFault, saveFault, saves int
-	panicWrite, panicCommit              bool
+	panicWrite, panicCommit, panicSave   bool
 }
 
 type pendingFinalTestAccount struct {
@@ -94,6 +94,9 @@ func (s *pendingFinalTestStore) SaveAccount(account vmcommon.AccountHandler) err
 	}
 	s.saves++
 	if s.saves == s.saveFault {
+		if s.panicSave {
+			panic("interrupted P13 account persistence")
+		}
 		return errors.New("P13 account persistence failed")
 	}
 	return nil
@@ -150,6 +153,9 @@ func newPendingFinalTestFixture(t *testing.T, count int, origins ...[]byte) *pen
 		f.budget += len(encoded) + len(f.items[i].evidence)
 		f.keys = append(f.keys, append([]byte(pendingFinalPrefix+"pending@"), frame(c.key)...), append([]byte(pendingFinalPrefix+"item@"), frame(c.origin, c.key)...), append([]byte(pendingFinalPrefix+"final@"), frame(c.key)...))
 		require.NoError(t, f.r.stage(c))
+	}
+	for _, item := range f.items {
+		f.keys = append(f.keys, append([]byte(pendingFinalPrefix+"origin@"), frame(item.candidate.origin)...))
 	}
 	_, _, err = f.owner.Commit()
 	require.NoError(t, err)
@@ -272,6 +278,14 @@ func TestPendingFinalRecords_PromoteResult(t *testing.T) {
 						require.NoError(t, a.(state.UserAccountHandler).SaveKeyValue(f.keys[target*3+2], f.encoded[target]))
 						require.NoError(t, a.(state.UserAccountHandler).SaveKeyValue(f.keys[target*3], nil))
 						require.NoError(t, a.(state.UserAccountHandler).SaveKeyValue(f.keys[target*3+1], nil))
+						// Forge the COMPLETE future promotion, including its
+						// shared origin manifest, to test the callback guard
+						// rather than an incomplete state rejected later.
+						manifest, e := f.r.codec.frame(f.commitments[1-target])
+						require.NoError(t, e)
+						originKey, e := f.r.key("origin", f.items[target].candidate.origin)
+						require.NoError(t, e)
+						require.NoError(t, a.(state.UserAccountHandler).SaveKeyValue(originKey, manifest))
 						require.NoError(t, f.s.SaveAccount(a))
 					}
 					return nil
@@ -286,7 +300,7 @@ func TestPendingFinalRecords_PromoteResult(t *testing.T) {
 
 func TestPendingFinalRecords_Persistence(t *testing.T) {
 	for _, interrupted := range []bool{false, true} {
-		for step := 1; step <= 6; step++ {
+		for step := 1; step <= 8; step++ {
 			t.Run(fmt.Sprintf("key write %d interrupted %t should restore exact pending state", step, interrupted), func(t *testing.T) {
 				f := newPendingFinalTestFixture(t, 2)
 				before := f.snapshot(t)
@@ -301,25 +315,33 @@ func TestPendingFinalRecords_Persistence(t *testing.T) {
 				require.Equal(t, before, f.snapshot(t))
 				require.Empty(t, f.owner.outputs)
 				f.s.writeFault = 0
-				root := before[0]
-				require.NoError(t, f.s.RecreateTrie(holders.NewDefaultRootHashesHolder(root)))
-				f.reopen(t)
+				f.coldRestartWithPruning(t, before)
 				require.NoError(t, f.promote())
 			})
 		}
 	}
-	for step := 1; step <= 2; step++ {
-		t.Run(fmt.Sprintf("account save %d should roll back the promoted prefix", step), func(t *testing.T) {
-			f := newPendingFinalTestFixture(t, 2)
-			before := f.snapshot(t)
-			f.s.saveFault = step
-			require.Error(t, f.promote())
-			require.Equal(t, before, f.snapshot(t))
-			require.Empty(t, f.owner.outputs)
-			f.s.saveFault = 0
-			require.NoError(t, f.promote())
-		})
+	for _, interrupted := range []bool{false, true} {
+		for step := 1; step <= 2; step++ {
+			t.Run(fmt.Sprintf("account save %d interrupted %t should roll back the promoted prefix", step, interrupted), func(t *testing.T) {
+				f := newPendingFinalTestFixture(t, 2)
+				before := f.snapshot(t)
+				f.s.saveFault, f.s.panicSave = step, interrupted
+				if interrupted {
+					require.Panics(t, func() { _ = f.promote() })
+					require.ErrorIs(t, f.promote(), ErrExecutionInterrupted)
+					require.NoError(t, f.owner.Recover())
+				} else {
+					require.Error(t, f.promote())
+				}
+				require.Equal(t, before, f.snapshot(t))
+				require.Empty(t, f.owner.outputs)
+				f.s.saveFault, f.s.panicSave = 0, false
+				f.coldRestartWithPruning(t, before)
+				require.NoError(t, f.promote())
+			})
+		}
 	}
+
 	t.Run("interrupted native commit should forbid retry and require retained root recovery", func(t *testing.T) {
 		f := newPendingFinalTestFixture(t, 2)
 		before := f.snapshot(t)
@@ -334,7 +356,7 @@ func TestPendingFinalRecords_Persistence(t *testing.T) {
 		f.s.panicCommit = false
 		require.NoError(t, f.owner.Recover())
 		require.Equal(t, before, f.snapshot(t))
-		f.reopen(t)
+		f.coldRestartWithPruning(t, before)
 		require.NoError(t, f.promote())
 	})
 	t.Run("pruned retained root should keep recovery unavailable until restored", func(t *testing.T) {
@@ -411,9 +433,14 @@ func TestRollbackContainment_Abort(t *testing.T) {
 type pendingFinalTestMarshalizer struct {
 	marshal.Marshalizer
 	encodeErr, decodeErr error
+	calls, faultAt       int
 }
 
 func (m *pendingFinalTestMarshalizer) Marshal(value interface{}) ([]byte, error) {
+	m.calls++
+	if m.calls == m.faultAt {
+		return nil, errors.New("codec boundary unavailable")
+	}
 	if m.encodeErr != nil {
 		return nil, m.encodeErr
 	}
@@ -421,6 +448,10 @@ func (m *pendingFinalTestMarshalizer) Marshal(value interface{}) ([]byte, error)
 }
 
 func (m *pendingFinalTestMarshalizer) Unmarshal(value interface{}, encoded []byte) error {
+	m.calls++
+	if m.calls == m.faultAt {
+		return errors.New("codec boundary unavailable")
+	}
 	if m.decodeErr != nil {
 		return m.decodeErr
 	}
@@ -456,4 +487,214 @@ func TestPendingFinalRecords_DependencyFailures(t *testing.T) {
 		require.False(t, called)
 		require.Equal(t, before, f.snapshot(t))
 	})
+}
+
+// Discard all AccountsDB/trie caches. A missing retained root must reject cold
+// reconstruction; restoring its exact native node permits only the old state.
+// This is memory-backed native restart/pruning evidence, not a physical crash.
+func (f *pendingFinalTestFixture) coldRestartWithPruning(t *testing.T, before [][]byte) {
+	t.Helper()
+	root := before[0]
+	node, err := f.s.backing.Get(root)
+	require.NoError(t, err)
+	require.NoError(t, f.s.backing.Remove(root))
+	fresh := func() state.AccountsAdapter {
+		args, _ := qualContainmentArgs(t, f.s.backing)
+		db, e := state.NewAccountsDB(args)
+		require.NoError(t, e)
+		return db
+	}
+	missing := fresh()
+	require.Error(t, missing.RecreateTrie(holders.NewDefaultRootHashesHolder(root)))
+	require.NoError(t, f.s.backing.Put(root, node))
+	restored := fresh()
+	require.NoError(t, restored.RecreateTrie(holders.NewDefaultRootHashesHolder(root)))
+	f.s.AccountsAdapter = restored
+	f.reopen(t)
+	require.Equal(t, before, f.snapshot(t))
+	require.Empty(t, f.owner.outputs)
+}
+
+func TestPendingFinalRecords_StagePersistence(t *testing.T) {
+	for _, interrupted := range []bool{false, true} {
+		for step := 1; step <= 4; step++ {
+			t.Run(fmt.Sprintf("stage step %d interrupted %t should recover identical state", step, interrupted), func(t *testing.T) {
+				f := newPendingFinalTestFixture(t, 0)
+				c := pendingFinalCandidate{key: []byte("new record"), body: []byte("new body"), origin: []byte("new origin")}
+				encoded, err := f.r.encode(c)
+				require.NoError(t, err)
+				f.host.expected[string(encoded)] = true
+				f.items = []pendingFinalPromotion{{candidate: c, evidence: []byte("unit-test witness")}}
+				for _, kind := range []string{"pending", "final"} {
+					k, e := f.r.key(kind, c.key)
+					require.NoError(t, e)
+					f.keys = append(f.keys, k)
+				}
+				k, err := f.r.key("item", c.origin, c.key)
+				require.NoError(t, err)
+				f.keys = append(f.keys, k)
+				k, err = f.r.key("origin", c.origin)
+				require.NoError(t, err)
+				f.keys = append(f.keys, k)
+				before := f.snapshot(t)
+				if step == 4 {
+					f.s.saveFault = 1
+					f.s.panicSave = interrupted
+				} else {
+					f.s.writeFault, f.s.panicWrite = step, interrupted
+				}
+				if interrupted {
+					require.Panics(t, func() { _ = f.r.stage(c) })
+					require.ErrorIs(t, f.r.stage(c), ErrExecutionInterrupted)
+					require.NoError(t, f.owner.Recover())
+				} else {
+					require.Error(t, f.r.stage(c))
+				}
+				require.Equal(t, before, f.snapshot(t))
+				require.Empty(t, f.owner.outputs)
+				f.s.writeFault, f.s.saveFault = 0, 0
+				f.s.panicSave = false
+				f.coldRestartWithPruning(t, before)
+				require.NoError(t, f.r.stage(c))
+				roots, outputs, err := f.owner.Commit()
+				require.NoError(t, err)
+				require.Len(t, outputs, 1)
+				after := f.snapshot(t)
+				require.Equal(t, roots[0], after[0])
+				f.coldRestartWithPruning(t, after)
+				require.NoError(t, f.r.stage(c))
+				require.Equal(t, []*vmcommon.VMOutput{nil}, f.owner.outputs, "native state-only output slot carries no observation")
+				require.Equal(t, after, f.snapshot(t))
+			})
+		}
+	}
+}
+
+func TestPendingFinalRecords_OriginManifest(t *testing.T) {
+	f := newPendingFinalTestFixture(t, 2)
+	before := f.snapshot(t)
+	mar := &marshal.GogoProtoMarshalizer{}
+	for _, name := range []string{"missing", "over bytes", "malformed", "empty", "wrong digest size", "duplicate", "unknown protobuf field"} {
+		t.Run(name+" should reject without state mutation", func(t *testing.T) {
+			raw, err := mar.Marshal(batch.New(f.commitments...))
+			require.NoError(t, err)
+			switch name {
+			case "missing":
+				raw = nil
+			case "over bytes":
+				raw = bytes.Repeat([]byte{0}, 4097)
+			case "malformed":
+				raw = []byte{0xff}
+			case "empty":
+				raw, err = mar.Marshal(batch.New())
+			case "wrong digest size":
+				raw, err = mar.Marshal(batch.New([]byte("short")))
+			case "duplicate":
+				raw, err = mar.Marshal(batch.New(f.commitments[0], f.commitments[0]))
+			case "unknown protobuf field":
+				raw = append(raw, 0xa0, 0x06, 0x01)
+			}
+			require.NoError(t, err)
+			_, err = f.r.decodeOriginItems(raw)
+			require.Error(t, err)
+			require.Equal(t, before, f.snapshot(t))
+		})
+	}
+}
+
+func FuzzPendingFinalRecords_DecodeOriginItems(f *testing.F) {
+	f.Add([]byte{0xff})
+	f.Add([]byte{})
+	mar := &marshal.GogoProtoMarshalizer{}
+	valid, err := mar.Marshal(batch.New(bytes.Repeat([]byte{1}, 32)))
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(valid)
+	f.Fuzz(func(t *testing.T, raw []byte) {
+		if len(raw) > 4097 {
+			return
+		}
+		x := newPendingFinalTestFixture(t, 1)
+		before := x.snapshot(t)
+		items, err := x.r.decodeOriginItems(raw)
+		if err == nil {
+			require.NotEmpty(t, items)
+			seen := make(map[string]bool)
+			for _, item := range items {
+				require.Len(t, item, 32)
+				require.False(t, seen[string(item)])
+				seen[string(item)] = true
+			}
+			encoded, e := mar.Marshal(batch.New(items...))
+			require.NoError(t, e)
+			require.Equal(t, raw, encoded)
+		}
+		require.Equal(t, before, x.snapshot(t))
+	})
+}
+
+func TestPendingFinalRecords_OrdinaryPath(t *testing.T) {
+	t.Run("native operation without a P13 import should preserve native state and output", func(t *testing.T) {
+		direct := newPendingFinalTestFixture(t, 0)
+		wrapped := newPendingFinalTestFixture(t, 0)
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 120))
+		directRoot, err := direct.s.Commit()
+		require.NoError(t, err)
+		observation := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("native result")}}
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return observation, qualContainmentBalance(wrapped.s.qualNativeStore, 120)
+		}))
+		roots, outputs, err := wrapped.owner.Commit()
+		require.NoError(t, err)
+		require.Equal(t, directRoot, roots[0])
+		require.Equal(t, []*vmcommon.VMOutput{observation}, outputs)
+		qualAssertContainmentBalance(t, direct.s.qualNativeStore, 120)
+		qualAssertContainmentBalance(t, wrapped.s.qualNativeStore, 120)
+	})
+}
+
+func TestPendingFinalRecords_CodecBoundaries(t *testing.T) {
+	for _, promote := range []bool{false, true} {
+		fixture := func(t *testing.T) (*pendingFinalTestFixture, func() error, *pendingFinalTestMarshalizer) {
+			f := newPendingFinalTestFixture(t, 2)
+			operation := f.promote
+			if !promote {
+				f = newPendingFinalTestFixture(t, 0)
+				c := pendingFinalCandidate{key: []byte("new record"), body: []byte("body"), origin: []byte("origin")}
+				raw, err := f.r.encode(c)
+				require.NoError(t, err)
+				f.host.expected[string(raw)] = true
+				for _, kind := range []string{"pending", "final"} {
+					k, e := f.r.key(kind, c.key)
+					require.NoError(t, e)
+					f.keys = append(f.keys, k)
+				}
+				k, err := f.r.key("item", c.origin, c.key)
+				require.NoError(t, err)
+				f.keys = append(f.keys, k)
+				k, err = f.r.key("origin", c.origin)
+				require.NoError(t, err)
+				f.keys = append(f.keys, k)
+				operation = func() error { return f.r.stage(c) }
+			}
+			mar := &pendingFinalTestMarshalizer{Marshalizer: f.r.codec.marshaller}
+			f.r.codec.marshaller = mar
+			return f, operation, mar
+		}
+		_, healthy, trace := fixture(t)
+		require.NoError(t, healthy())
+		boundaries := trace.calls
+		for step := 1; step <= boundaries; step++ {
+			t.Run(fmt.Sprintf("promote %t native codec boundary %d should retain exact state", promote, step), func(t *testing.T) {
+				f, operation, mar := fixture(t)
+				before := f.snapshot(t)
+				mar.faultAt = step
+				require.Error(t, operation())
+				mar.faultAt = 0
+				require.Equal(t, before, f.snapshot(t))
+				require.Empty(t, f.owner.outputs)
+			})
+		}
+	}
 }
