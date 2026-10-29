@@ -35,7 +35,9 @@ type function struct {
 	Name       string
 	Start, End token.Position
 	Blocks     []cover.ProfileBlock
+	Returns    []sourceStatement
 }
+type sourceStatement struct{ Start, End token.Position }
 type packageResult struct {
 	Package    string   `json:"package"`
 	Statements counts   `json:"statements"`
@@ -152,8 +154,9 @@ func excludedPackage(directory string) bool {
 }
 
 // A Go coverage block can represent several source statements. Only a singleton
-// block exactly on an approved defensive return may be removed; never round an
-// exception up to an enclosing block or function. Hash the complete UTF-8 line,
+// block containing the exact approved AST return may be removed. Go includes
+// surrounding braces in that block's positions. Never remove another counted
+// statement or an enclosing multi-statement block. Hash the complete UTF-8 line,
 // including indentation and excluding its newline.
 func applyLineExceptions(file string, source []byte, fs []function, blocks []cover.ProfileBlock,
 	entries []lineException) ([]cover.ProfileBlock, []exceptionResult) {
@@ -166,9 +169,16 @@ func applyLineExceptions(file string, source []byte, fs []function, blocks []cov
 		}
 		result := exceptionResult{lineException: entry}
 		validFunction := false
+		var targetReturn *sourceStatement
 		for _, f := range fs {
 			if f.Name == entry.Function && entry.Line >= f.Start.Line && entry.Line <= f.End.Line {
 				validFunction = true
+				for _, statement := range f.Returns {
+					if statement.Start.Line == entry.Line && statement.End.Line == entry.Line {
+						targetReturn = &statement
+						break
+					}
+				}
 			}
 		}
 		switch {
@@ -176,11 +186,15 @@ func applyLineExceptions(file string, source []byte, fs []function, blocks []cov
 			result.Error = "source line no longer exists"
 		case !validFunction:
 			result.Error = "source line is no longer in the listed function"
+		case targetReturn == nil:
+			result.Error = "listed line is not an AST return statement"
 		case fmt.Sprintf("%x", sha256.Sum256(lines[entry.Line-1])) != entry.SourceLineSHA256:
 			result.Error = "source line SHA-256 changed; exception stops applying"
 		default:
 			for i, b := range blocks {
-				if b.StartLine == entry.Line && b.EndLine == entry.Line && b.NumStmt == 1 {
+				if b.NumStmt == 1 &&
+					(b.StartLine < targetReturn.Start.Line || b.StartLine == targetReturn.Start.Line && b.StartCol <= targetReturn.Start.Column) &&
+					(b.EndLine > targetReturn.End.Line || b.EndLine == targetReturn.End.Line && b.EndCol >= targetReturn.End.Column) {
 					remove[i] = true
 					result.Applied = true
 					result.Removed = sum([]cover.ProfileBlock{b})
@@ -232,7 +246,14 @@ func functions(path string, src []byte) ([]function, error) {
 			}
 			name = b.String() + "." + name
 		}
-		result = append(result, function{Name: name, Start: fs.Position(fn.Pos()), End: fs.Position(fn.End())})
+		var returns []sourceStatement
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if statement, ok := n.(*ast.ReturnStmt); ok {
+				returns = append(returns, sourceStatement{fs.Position(statement.Pos()), fs.Position(statement.End())})
+			}
+			return true
+		})
+		result = append(result, function{Name: name, Start: fs.Position(fn.Pos()), End: fs.Position(fn.End()), Returns: returns})
 	}
 	return result, nil
 }

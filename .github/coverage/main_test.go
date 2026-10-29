@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -198,11 +197,21 @@ func TestApplyLineExceptions(t *testing.T) {
 	}
 	for _, entry := range entries {
 		t.Run(entry.File+fmt.Sprint(entry.Line)+" should remove only its exact defensive statement", func(t *testing.T) {
-			lines := make([]string, entry.Line+2)
+			lines := make([]string, entry.Line+3)
+			lines[0] = "package fixture"
+			lines[1] = "func " + entry.Function + "() (any,error) {"
+			lines[2] = "var err error"
+			lines[entry.Line-2] = "if err != nil {"
 			lines[entry.Line-1] = "\t\treturn nil, err"
+			lines[entry.Line] = "}"
+			lines[entry.Line+1] = "return nil,nil"
+			lines[entry.Line+2] = "}"
 			source := []byte(strings.Join(lines, "\n"))
-			fs := []function{{Name: entry.Function, Start: token.Position{Line: 1}, End: token.Position{Line: len(lines)}}}
-			blocks := []cover.ProfileBlock{{StartLine: 2, EndLine: 2, NumStmt: 9, Count: 1}, {StartLine: entry.Line, EndLine: entry.Line, NumStmt: 1, Count: 0}}
+			fs, err := functions(entry.File, source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			blocks := []cover.ProfileBlock{{StartLine: 2, EndLine: 2, NumStmt: 9, Count: 1}, {StartLine: entry.Line - 1, EndLine: entry.Line + 1, NumStmt: 1, Count: 0}}
 			kept, outcomes := applyLineExceptions(entry.File, source, fs, blocks, []lineException{entry})
 			if len(outcomes) != 1 || !outcomes[0].Applied || outcomes[0].Error != "" || outcomes[0].Removed != (counts{0, 1}) || sum(kept) != (counts{9, 9}) {
 				t.Fatalf("exact exception: %+v, blocks %+v", outcomes, kept)
@@ -223,21 +232,35 @@ func TestApplyLineExceptions_ChangedSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	entry := entries[0]
-	for _, mode := range []string{"changed text", "moved function", "multi-statement block"} {
+	for _, mode := range []string{"changed text", "moved function", "multi-statement block", "same text in a raw string"} {
 		t.Run(mode+" should stop the exception applying", func(t *testing.T) {
-			lines := make([]string, entry.Line+2)
+			lines := make([]string, entry.Line+3)
+			lines[0] = "package fixture"
+			lines[1] = "func " + entry.Function + "() (any,error) {"
+			lines[2] = "var err error"
+			lines[entry.Line-2] = "if err != nil {"
 			lines[entry.Line-1] = "\t\treturn nil, err"
-			fs := []function{{Name: entry.Function, Start: token.Position{Line: 1}, End: token.Position{Line: len(lines)}}}
-			blocks := []cover.ProfileBlock{{StartLine: entry.Line, EndLine: entry.Line, NumStmt: 1, Count: 0}}
+			lines[entry.Line] = "}"
+			lines[entry.Line+1] = "return nil,nil"
+			lines[entry.Line+2] = "}"
+			blocks := []cover.ProfileBlock{{StartLine: entry.Line - 1, EndLine: entry.Line + 1, NumStmt: 1, Count: 0}}
 			switch mode {
 			case "changed text":
 				lines[entry.Line-1] = "\t\treturn nil, otherError"
 			case "moved function":
-				fs[0].Name = "OtherConstructor"
+				lines[1] = "func OtherConstructor() (any,error) {"
 			case "multi-statement block":
 				blocks[0].NumStmt = 2
+			case "same text in a raw string":
+				lines[entry.Line-2] = "var message = `"
+				lines[entry.Line] = "`; _ = message"
 			}
-			kept, outcomes := applyLineExceptions(entry.File, []byte(strings.Join(lines, "\n")), fs, blocks, []lineException{entry})
+			source := []byte(strings.Join(lines, "\n"))
+			fs, err := functions(entry.File, source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			kept, outcomes := applyLineExceptions(entry.File, source, fs, blocks, []lineException{entry})
 			if len(outcomes) != 1 || outcomes[0].Applied || outcomes[0].Error == "" || sum(kept) != sum(blocks) {
 				t.Fatalf("stale exception applied: %+v, %+v", outcomes, kept)
 			}
@@ -355,22 +378,22 @@ func TestAnalyze_ChangedExceptionStopsGate(t *testing.T) {
 	lines[0] = "package drwa"
 	lines[1] = "func NewBurnForAllAbsence()(any,error){"
 	lines[2] = "var err error"
-	profile := "mode: atomic\nexample.com/exceptions/" + file + ":3.1,3.14 1 1\n"
 	for _, line := range []int{106, 110, 118, 124, 129} {
-		lines[line-2] = "if false {"
+		lines[line-2] = "if err != nil {"
 		lines[line-1] = "\t\treturn nil, err"
 		lines[line] = "}"
-		profile += fmt.Sprintf("example.com/exceptions/%s:%d.3,%d.18 1 1\n", file, line, line)
 	}
 	lines[130] = "return nil,nil"
 	lines[131] = "}"
-	profile += "example.com/exceptions/" + file + ":131.1,131.15 1 1\n"
 	write(file, strings.Join(lines, "\n")+"\n")
-	write("profile.out", profile)
+	write("process/drwa/burnForAllAbsence_test.go", "package drwa\nimport \"testing\"\nfunc TestNewBurnForAllAbsence(t *testing.T){if _,err:=NewBurnForAllAbsence();err!=nil{t.Fatal(err)}}\n")
 	run("git", "add", file)
 	run("git", "-c", "user.name=Codex", "-c", "user.email=contact@dharitri.org", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "SP1-COV-01: listed-line policy test fixture")
+	run("go", "test", "-count=1", "-covermode=atomic", "-coverprofile=profile.out", "./process/drwa")
 	result, err := analyze(base, base, "profile.out", "./process/drwa")
-	if err != nil || len(result.Errors) != 0 || result.DiffStatements != (counts{2, 2}) || len(result.LineExceptions) != 5 {
+	// A variable declaration, five conditions and the final return: seven
+	// ordinary statements, plus the five unexecuted defensive returns.
+	if err != nil || len(result.Errors) != 0 || result.DiffStatements != (counts{7, 7}) || len(result.LineExceptions) != 5 {
 		t.Fatalf("healthy listed-line policy: %+v %v", result, err)
 	}
 	for _, line := range result.NonInstrumented {
@@ -380,8 +403,8 @@ func TestAnalyze_ChangedExceptionStopsGate(t *testing.T) {
 			}
 		}
 	}
-	// Synthetic profile counters are deliberately all covered. The changed
-	// source must reject because the exception is stale, independently of ratios.
+	// Reusing the prior profile after changing a listed line must reject with
+	// the explicit stale-exception error, independently of any other gate error.
 	lines[105] = "\t\treturn nil, nil"
 	write(file, strings.Join(lines, "\n")+"\n")
 	result, err = analyze(base, base, "profile.out", "./process/drwa")
@@ -394,7 +417,7 @@ func TestAnalyze_ChangedExceptionStopsGate(t *testing.T) {
 			found = true
 		}
 	}
-	if !found || result.DiffStatements != (counts{3, 3}) {
+	if !found || result.DiffStatements != (counts{7, 8}) {
 		t.Fatalf("changed source did not stop the exception: %+v", result)
 	}
 }
