@@ -1,0 +1,80 @@
+[
+  {
+    "file": "process/drwa/burnForAllAbsence.go",
+    "function": "NewBurnForAllAbsence",
+    "line": 106,
+    "source_line_sha256": "1f0a6cfc2aab18c7249e3fae85e635f9851b553c1aa19a459c86e6bc2a252886",
+    "reason": "Owner-approved defensive return after prior validation supplies stable native accounts/marshal dependencies and nonnil callbacks; no inconsistent nil predicates used.",
+    "upstream": {
+      "repository": "https://github.com/multiversx/mx-chain-vm-common-go",
+      "commit": "fb57e055b2ff504afb727d0611d169ffd3508914",
+      "path": "builtInFunctions/esdtGlobalSettings.go",
+      "line": 41
+    }
+  },
+  {
+    "file": "process/drwa/burnForAllAbsence.go",
+    "function": "NewBurnForAllAbsence",
+    "line": 110,
+    "source_line_sha256": "1f0a6cfc2aab18c7249e3fae85e635f9851b553c1aa19a459c86e6bc2a252886",
+    "reason": "Owner-approved defensive return after prior validation supplies stable native accounts/marshal dependencies and nonnil callbacks; no inconsistent nil predicates used.",
+    "upstream": {
+      "repository": "https://github.com/multiversx/mx-chain-vm-common-go",
+      "commit": "fb57e055b2ff504afb727d0611d169ffd3508914",
+      "path": "builtInFunctions/esdtGlobalSettings.go",
+      "line": 41
+    }
+  },
+  {
+    "file": "process/drwa/burnForAllAbsence.go",
+    "function": "NewBurnForAllAbsence",
+    "line": 118,
+    "source_line_sha256": "1f0a6cfc2aab18c7249e3fae85e635f9851b553c1aa19a459c86e6bc2a252886",
+    "reason": "Owner-approved defensive return after prior validation supplies stable native accounts/marshal dependencies and nonnil callbacks; no inconsistent nil predicates used.",
+    "upstream": {
+      "repository": "https://github.com/multiversx/mx-chain-vm-common-go",
+      "commit": "fb57e055b2ff504afb727d0611d169ffd3508914",
+      "path": "builtInFunctions/esdtGlobalSettings.go",
+      "line": 41
+    }
+  },
+  {
+    "file": "process/drwa/burnForAllAbsence.go",
+    "function": "NewBurnForAllAbsence",
+    "line": 124,
+    "source_line_sha256": "1f0a6cfc2aab18c7249e3fae85e635f9851b553c1aa19a459c86e6bc2a252886",
+    "reason": "Owner-approved defensive return after prior validation supplies stable native accounts/marshal dependencies and nonnil callbacks; no inconsistent nil predicates used.",
+    "upstream": {
+      "repository": "https://github.com/multiversx/mx-chain-vm-common-go",
+      "commit": "fb57e055b2ff504afb727d0611d169ffd3508914",
+      "path": "builtInFunctions/esdtSetTokenType.go",
+      "line": 24
+    }
+  },
+  {
+    "file": "process/drwa/burnForAllAbsence.go",
+    "function": "NewBurnForAllAbsence",
+    "line": 129,
+    "source_line_sha256": "1f0a6cfc2aab18c7249e3fae85e635f9851b553c1aa19a459c86e6bc2a252886",
+    "reason": "Owner-approved defensive return after prior validation supplies stable native accounts/marshal dependencies and nonnil callbacks; no inconsistent nil predicates used.",
+    "upstream": {
+      "repository": "https://github.com/multiversx/mx-chain-vm-common-go",
+      "commit": "fb57e055b2ff504afb727d0611d169ffd3508914",
+      "path": "builtInFunctions/esdtSetTokenType.go",
+      "line": 24
+    }
+  },
+  {
+    "file": "process/drwa/resultAccountReader.go",
+    "function": "NewResultAccountReader",
+    "line": 71,
+    "source_line_sha256": "1f0a6cfc2aab18c7249e3fae85e635f9851b553c1aa19a459c86e6bc2a252886",
+    "reason": "Owner-approved defensive return: NewTrie already validates the shared native dependencies; NewDisabledStateAccessesCollector unconditionally returns a nonnil collector.",
+    "upstream": {
+      "repository": "https://github.com/multiversx/mx-chain-go",
+      "commit": "5123176d1fa9237e52df2680d4e8bbcdc3ceb11a",
+      "path": "state/factory/accountCreator.go",
+      "line": 33
+    }
+  }
+]
