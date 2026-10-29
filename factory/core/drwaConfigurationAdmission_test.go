@@ -1,15 +1,15 @@
 package core
 
 import (
-	"path/filepath"
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"path/filepath"
+	"strings"
+	"testing"
 )
 
-func TestSP1CoverageConfigurationLoadFailures(t *testing.T) {
+func TestLoadDRWAConfigurationCandidate(t *testing.T) {
 	for _, which := range []string{"epoch", "round", "economics", "ratings"} {
-		t.Run(which, func(t *testing.T) {
+		t.Run(strings.ReplaceAll(which, "/", " ")+" should preserve the expected result", func(t *testing.T) {
 			paths, overlay := qualDRWALoadedFiles(t)
 			missing := filepath.Join(t.TempDir(), "absent-native-config.toml")
 			switch which {

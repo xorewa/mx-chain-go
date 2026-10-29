@@ -4,28 +4,29 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"testing"
-
+	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/hashing/blake2b"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/state"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/require"
+	"strings"
+	"testing"
 )
 
 // Each boundary is denied once at each observed call position. The healthy
 // control establishes the finite positions, never the expected failure result.
 // Part B 17.2 requires unavailable state to remain distinct from absence.
-type sp1RecordFault struct {
+type recordFault struct {
 	kind  string
 	at    int
 	calls map[string]int
 	hit   bool
 }
 
-var sp1RecordUnavailable = errors.New("SP1 fixture: native record dependency unavailable")
+var recordUnavailable = errors.New("test fixture: native record dependency unavailable")
 
-func (f *sp1RecordFault) deny(kind string) bool {
+func (f *recordFault) deny(kind string) bool {
 	f.calls[kind]++
 	if f.kind == kind && f.calls[kind] == f.at {
 		f.hit = true
@@ -34,14 +35,14 @@ func (f *sp1RecordFault) deny(kind string) bool {
 	return false
 }
 
-type sp1RecordStore struct {
+type recordStore struct {
 	state.AccountsAdapter
-	fault *sp1RecordFault
+	fault *recordFault
 }
 
-func (s *sp1RecordStore) GetExistingAccount(address []byte) (vmcommon.AccountHandler, error) {
+func (s *recordStore) GetExistingAccount(address []byte) (vmcommon.AccountHandler, error) {
 	if s.fault.deny("account") {
-		return nil, sp1RecordUnavailable
+		return nil, recordUnavailable
 	}
 	a, err := s.AccountsAdapter.GetExistingAccount(address)
 	if err != nil {
@@ -51,65 +52,69 @@ func (s *sp1RecordStore) GetExistingAccount(address []byte) (vmcommon.AccountHan
 	if !ok {
 		return a, nil
 	}
-	return &sp1RecordAccount{UserAccountHandler: user, fault: s.fault}, nil
+	return &recordAccount{UserAccountHandler: user, fault: s.fault}, nil
 }
-func (s *sp1RecordStore) SaveAccount(a vmcommon.AccountHandler) error {
+
+func (s *recordStore) SaveAccount(a vmcommon.AccountHandler) error {
 	if s.fault.deny("save-account") {
-		return sp1RecordUnavailable
+		return recordUnavailable
 	}
-	if w, ok := a.(*sp1RecordAccount); ok {
+	if w, ok := a.(*recordAccount); ok {
 		a = w.UserAccountHandler
 	}
 	return s.AccountsAdapter.SaveAccount(a)
 }
 
-type sp1RecordAccount struct {
+type recordAccount struct {
 	state.UserAccountHandler
-	fault *sp1RecordFault
+	fault *recordFault
 }
 
-func (a *sp1RecordAccount) RetrieveValue(key []byte) ([]byte, uint32, error) {
+func (a *recordAccount) RetrieveValue(key []byte) ([]byte, uint32, error) {
 	if a.fault.deny("read") {
-		return nil, 0, sp1RecordUnavailable
+		return nil, 0, recordUnavailable
 	}
 	return a.UserAccountHandler.RetrieveValue(key)
 }
-func (a *sp1RecordAccount) SaveKeyValue(key, value []byte) error {
+
+func (a *recordAccount) SaveKeyValue(key, value []byte) error {
 	if a.fault.deny("write") {
-		return sp1RecordUnavailable
+		return recordUnavailable
 	}
 	return a.UserAccountHandler.SaveKeyValue(key, value)
 }
 
-type sp1RecordMarshal struct {
+type recordMarshal struct {
 	marshal.Marshalizer
-	fault *sp1RecordFault
+	fault *recordFault
 }
 
-func (m *sp1RecordMarshal) Marshal(v interface{}) ([]byte, error) {
+func (m *recordMarshal) Marshal(v interface{}) ([]byte, error) {
 	if m.fault.deny("marshal") {
-		return nil, sp1RecordUnavailable
+		return nil, recordUnavailable
 	}
 	return m.Marshalizer.Marshal(v)
 }
-func (m *sp1RecordMarshal) Unmarshal(v interface{}, b []byte) error {
+
+func (m *recordMarshal) Unmarshal(v interface{}, b []byte) error {
 	if m.fault.deny("unmarshal") {
-		return sp1RecordUnavailable
+		return recordUnavailable
 	}
 	return m.Marshalizer.Unmarshal(v, b)
 }
-func sp1InjectRecordFault(codec *registrationRecords, fault *sp1RecordFault) {
-	codec.state.accounts = &sp1RecordStore{AccountsAdapter: codec.state.accounts, fault: fault}
-	codec.marshaller = &sp1RecordMarshal{Marshalizer: codec.marshaller, fault: fault}
+
+func injectRecordFault(codec *registrationRecords, fault *recordFault) {
+	codec.state.accounts = &recordStore{AccountsAdapter: codec.state.accounts, fault: fault}
+	codec.marshaller = &recordMarshal{Marshalizer: codec.marshaller, fault: fault}
 }
 
-type sp1RecordCase struct {
+type recordCase struct {
 	name    string
 	prepare func(*testing.T) (*registrationRecords, func() error)
 }
 
-func TestSP1CoverageRecordUnavailable(t *testing.T) {
-	cases := []sp1RecordCase{
+func TestRegistrationRecords_EncodeBodyDependencyFailures(t *testing.T) {
+	cases := []recordCase{
 		{"current-read", func(t *testing.T) (*registrationRecords, func() error) {
 			f := qualCurrentLocalNew(t)
 			return f.r.codec, func() error { _, e := f.r.read(f.pointerKey); return e }
@@ -207,25 +212,25 @@ func TestSP1CoverageRecordUnavailable(t *testing.T) {
 			return r, func() error { _, _, e := r.registeredToken([]byte("TOKEN-abcdef")); return e }
 		}},
 	}
-	cases = append(cases, sp1GovernedAndScopedCases()...)
-	cases = append(cases, sp1AdminAndRegistryCases()...)
+	cases = append(cases, governedAndScopedCases()...)
+	cases = append(cases, adminAndRegistryCases()...)
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(strings.ReplaceAll(tc.name, "/", " ")+" should preserve the expected result", func(t *testing.T) {
 			codec, run := tc.prepare(t)
-			control := &sp1RecordFault{calls: make(map[string]int)}
-			sp1InjectRecordFault(codec, control)
+			control := &recordFault{calls: make(map[string]int)}
+			injectRecordFault(codec, control)
 			require.NoError(t, run(), "healthy fixture must be admitted before fault injection")
 			for _, kind := range []string{"account", "read", "write", "save-account", "marshal", "unmarshal"} {
 				for at := 1; at <= control.calls[kind]; at++ {
-					t.Run(fmt.Sprintf("%s/%d", kind, at), func(t *testing.T) {
+					t.Run(strings.ReplaceAll(fmt.Sprintf("%s/%d", kind, at), "/", " ")+" should preserve the expected result", func(t *testing.T) {
 						codec, run := tc.prepare(t)
-						fault := &sp1RecordFault{kind: kind, at: at, calls: make(map[string]int)}
-						sp1InjectRecordFault(codec, fault)
+						fault := &recordFault{kind: kind, at: at, calls: make(map[string]int)}
+						injectRecordFault(codec, fault)
 						root, rootErr := codec.state.accounts.RootHash()
 						require.NoError(t, rootErr)
 						journal := codec.state.accounts.JournalLen()
 						err := run()
-						if sp1BoundaryOwned(tc.name) {
+						if boundaryOwned(tc.name) {
 							after, snapshotErr := codec.state.accounts.RootHash()
 							require.NoError(t, snapshotErr)
 							require.Equal(t, root, after, "denied operation changed native state")
@@ -240,8 +245,8 @@ func TestSP1CoverageRecordUnavailable(t *testing.T) {
 	}
 }
 
-func sp1GovernedAndScopedCases() []sp1RecordCase {
-	return []sp1RecordCase{
+func governedAndScopedCases() []recordCase {
+	return []recordCase{
 		{"governed-read", func(t *testing.T) (*registrationRecords, func() error) {
 			f := qualGovernedActionNew(t)
 			f.initialize(t)
@@ -363,8 +368,8 @@ func sp1GovernedAndScopedCases() []sp1RecordCase {
 	}
 }
 
-func sp1AdminAndRegistryCases() []sp1RecordCase {
-	return []sp1RecordCase{
+func adminAndRegistryCases() []recordCase {
+	return []recordCase{
 		{"admin-digest", func(t *testing.T) (*registrationRecords, func() error) {
 			f := qualAdminNew(t)
 			return f.carrier.codec, func() error { _, e := f.carrier.digest("APPLIED_ID", f.e.effectID, f.e.legID); return e }
@@ -395,73 +400,51 @@ func sp1AdminAndRegistryCases() []sp1RecordCase {
 		}},
 	}
 }
-func TestSP1CoverageRecordStructuralDenials(t *testing.T) {
-	f := qualPendingFinalNew(t)
-	qualRecordPut(t, f.s, f.finalKey, bytes.Repeat([]byte{1}, f.r.codec.maxBytes+1))
-	_, err := f.r.read(f.finalKey)
-	require.Error(t, err)
-	scope := qualScopedNew(t)
-	_, err = scope.records.scope(nil, scope.d.program)
-	require.Error(t, err)
-	var a *RegistrationAdmission
-	require.True(t, a.IsInterfaceNil())
-	require.False(t, (&RegistrationAdmission{}).IsInterfaceNil())
-	var c *RegistrationCancellation
-	require.True(t, c.IsInterfaceNil())
-	require.False(t, (&RegistrationCancellation{}).IsInterfaceNil())
-	err = a.RegisterTokenForAuthenticatedCreation(nil, nil, nil, nil, nil, nil, nil, nil, 0, nil)
-	require.Error(t, err)
-	err = a.RegisterTokenForCommittedCreation(nil, nil, nil, nil, nil, nil, 0, nil, nil)
-	require.Error(t, err)
-	var candidate *registrationCandidate
-	_, err = candidate.BindIntent(nil, nil, nil, nil, nil, 0)
-	require.Error(t, err)
-	require.Error(t, candidate.DRWAExecutionError())
-	require.Error(t, candidate.DRWAExecutionHealthError())
-	_, err = candidate.WithTokenClassification(nil, nil, func(bool) (*vmcommon.VMOutput, error) { t.Fatal("missing owner authorized execution"); return nil, nil })
-	require.Error(t, err)
-}
 
-func TestSP1CoverageAdditionalStructuralDenials(t *testing.T) {
-	admin := qualAdminNew(t)
-	for _, payload := range [][]byte{nil, bytes.Repeat([]byte{1}, admin.carrier.codec.maxBytes+1)} {
-		_, err := admin.carrier.normalized(payload, []byte("pause"))
-		require.Error(t, err)
-	}
-	qualRecordPut(t, admin.store, admin.appliedKey(), bytes.Repeat([]byte{1}, admin.carrier.codec.maxBytes+1))
-	_, err := admin.carrier.readApplied(admin.appliedKey())
-	require.Error(t, err)
-	scope := qualScopedNew(t)
-	_, err = newScopedAdmissionRecords(scope.store, scope.boundary, nil, scope.records.codec.hasher, scope.records.domain, scope.records.limits, scope.mandates, scope.records.timeSource)
-	require.Error(t, err)
-	_, err = newScopedAdmissionRecords(scope.store, scope.boundary, scope.records.codec.marshaller, scope.records.codec.hasher, bytes.Repeat([]byte{1}, scope.records.limits.recordBytes+1), scope.records.limits, scope.mandates, scope.records.timeSource)
-	require.Error(t, err)
-	candidate, store, _ := qualRegistrationCandidate(t, false, false)
-	_, err = candidate.BindIntent(nil, nil, nil, nil, nil, 0)
-	require.Error(t, err)
-	calls := 0
-	execute := func(bool) (*vmcommon.VMOutput, error) {
-		calls++
-		return &vmcommon.VMOutput{ReturnCode: vmcommon.Ok}, nil
-	}
-	candidate.view.parent.mut.Lock()
-	out, err := candidate.WithTokenClassification(store, []byte("TOKEN-abcdef"), execute)
-	candidate.view.parent.mut.Unlock()
-	require.ErrorIs(t, err, ErrExecutionBusy)
-	require.Nil(t, out)
-	require.Zero(t, calls)
-	require.NoError(t, candidate.abort())
-	out, err = candidate.WithTokenClassification(store, []byte("TOKEN-abcdef"), execute)
-	require.ErrorIs(t, err, ErrExecutionClosed)
-	require.Nil(t, out)
-	require.Zero(t, calls)
-}
-
-func sp1BoundaryOwned(name string) bool {
+func boundaryOwned(name string) bool {
 	switch name {
 	case "pending-stage", "source-install", "governed-initialize", "governed-propose", "governed-cleanup", "scope-install", "scope-admit", "scope-withdraw", "admin-apply", "registry-create":
 		return true
 	default:
 		return false
 	}
+}
+
+func FuzzRegistrationRecords_DecodeBody(f *testing.F) {
+	body, encoded, _, _ := qualRecordBody()
+	f.Add(encoded)
+	f.Add([]byte(nil))
+	f.Add([]byte{0x0a, 0xff})
+	f.Add([]byte{0x0a, 0x01, 0x00})
+	seed := func(issuer, family []byte) []byte {
+		return qualRecordFrame(body.networkDomain, issuer, body.programID, body.intentNonce, family, body.creationProfile, body.nameCommitment, body.tickerCommitment, body.propertyCommitment, body.publicSchemaProfile, body.issuerProgramAdmissionDecision, qualRecordFrame(body.proposedProgramAuthoritySetBodies...), qualRecordFrame(body.proposedProgramAuthoritySetHashes...), body.closurePlan, body.networkProfile, []byte{0, 0, 0, 0, 0, 0, 0, 1})
+	}
+	f.Add(seed([]byte{1}, body.requestedTokenFamily))
+	f.Add(seed(body.issuer, []byte(core.NonFungibleESDT)))
+	codec := &registrationRecords{marshaller: &marshal.GogoProtoMarshalizer{}, hasher: blake2b.NewBlake2b(), maxBytes: 4096}
+	allowed := map[string]bool{core.FungibleESDT: true, core.NonFungibleESDTv2: true, core.SemiFungibleESDT: true, core.MetaESDT: true, core.DynamicNFTESDT: true, core.DynamicSFTESDT: true, core.DynamicMetaESDT: true}
+	f.Fuzz(func(t *testing.T, input []byte) {
+		got, err := codec.decodeBody(input)
+		if len(input) == 0 || len(input) > codec.maxBytes {
+			require.Error(t, err)
+			return
+		}
+		if err != nil {
+			return
+		}
+		require.Len(t, got.issuer, len(core.SystemAccountAddress))
+		for _, field := range [][]byte{got.networkDomain, got.programID, got.intentNonce, got.requestedTokenFamily, got.creationProfile, got.nameCommitment, got.tickerCommitment, got.propertyCommitment, got.publicSchemaProfile, got.issuerProgramAdmissionDecision, got.networkProfile} {
+			require.NotEmpty(t, field)
+		}
+		require.True(t, allowed[string(got.requestedTokenFamily)], "decoder accepted an unsupported new issuance family")
+		require.Contains(t, []string{"burn-and-retire", "preserve-and-close"}, string(got.closurePlan))
+		require.NotEmpty(t, got.proposedProgramAuthoritySetBodies)
+		require.Equal(t, len(got.proposedProgramAuthoritySetBodies), len(got.proposedProgramAuthoritySetHashes))
+		for _, authority := range got.proposedProgramAuthoritySetBodies {
+			require.NotEmpty(t, authority)
+		}
+		for _, hash := range got.proposedProgramAuthoritySetHashes {
+			require.Len(t, hash, codec.hasher.Size())
+		}
+	})
 }

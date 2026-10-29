@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"testing"
-
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	"github.com/stretchr/testify/require"
+	"strings"
+	"testing"
 )
 
 // Architecture Part A 2.6: domain separation and exact chain/metachain identity.
-func TestSP1CoverageNetworkDomain(t *testing.T) {
+func TestComputeDRWANetworkDomain(t *testing.T) {
 	chain := []byte("T")
 	genesis := bytes.Repeat([]byte{0x42}, 32)
 	hash := &testscommon.HasherStub{SizeCalled: func() int { return 32 }, ComputeCalled: func(s string) []byte {
@@ -36,7 +36,7 @@ func TestSP1CoverageNetworkDomain(t *testing.T) {
 		{"empty chain", nil, genesis, 32}, {"absent genesis", chain, nil, 32}, {"wrong hash width", chain, genesis[:31], 32},
 		{"zero width", chain, nil, 0}, {"negative width", chain, genesis, -1},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(strings.ReplaceAll(tc.name, "/", " ")+" should preserve the expected result", func(t *testing.T) {
 			h := &testscommon.HasherStub{SizeCalled: func() int { return tc.size }, ComputeCalled: func(string) []byte { t.Fatal("invalid input reached hashing"); return nil }}
 			out, e := common.ComputeDRWANetworkDomain(tc.chain, tc.genesis, h)
 			require.Error(t, e)

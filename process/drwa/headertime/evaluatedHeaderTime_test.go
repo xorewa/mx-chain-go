@@ -3,8 +3,6 @@ package headertime_test
 import (
 	"crypto/sha256"
 	"errors"
-	"testing"
-
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
@@ -16,9 +14,11 @@ import (
 	"github.com/multiversx/mx-chain-go/testscommon/marshallerMock"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/require"
+	"strings"
+	"testing"
 )
 
-func sp1Dependencies(t *testing.T) (*epochs.EnableEpochsHandlerStub, *marshallerMock.MarshalizerStub, *testscommon.HasherStub) {
+func dependencies(t *testing.T) (*epochs.EnableEpochsHandlerStub, *marshallerMock.MarshalizerStub, *testscommon.HasherStub) {
 	t.Helper()
 	flags := epochs.NewEnableEpochsHandlerStub()
 	flags.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool { return flag == common.SupernovaFlag && epoch >= 10 }
@@ -27,21 +27,24 @@ func sp1Dependencies(t *testing.T) (*epochs.EnableEpochsHandlerStub, *marshaller
 	hash := &testscommon.HasherStub{SizeCalled: func() int { return 32 }, ComputeCalled: func(s string) []byte { x := sha256.Sum256([]byte(s)); return x[:] }}
 	return flags, marsh, hash
 }
-func sp1Clock(t *testing.T) *ht.EvaluatedHeaderTime {
+
+func clock(t *testing.T) *ht.EvaluatedHeaderTime {
 	t.Helper()
-	f, m, h := sp1Dependencies(t)
+	f, m, h := dependencies(t)
 	p, err := ht.NewEvaluatedHeaderTime(f, m, h)
 	require.NoError(t, err)
 	return p
 }
-func sp1Begin(t *testing.T, p *ht.EvaluatedHeaderTime) *ht.HeaderTimeContext {
+
+func begin(t *testing.T, p *ht.EvaluatedHeaderTime) *ht.HeaderTimeContext {
 	t.Helper()
 	c, err := p.BeginBound(&block.HeaderV3{Epoch: 10, ShardID: 1, TimestampMs: 1234567}, func() (func(), error) { return func() {}, nil }, func() error { return nil })
 	require.NoError(t, err)
 	return c
 }
-func TestSP1CoverageHeaderTimeDependencies(t *testing.T) {
-	f, m, h := sp1Dependencies(t)
+
+func TestNewEvaluatedHeaderTime(t *testing.T) {
+	f, m, h := dependencies(t)
 	p, err := ht.NewEvaluatedHeaderTime(nil, m, h)
 	require.Nil(t, p)
 	require.ErrorIs(t, err, nodeErrors.ErrNilEnableEpochsHandler)
@@ -55,16 +58,16 @@ func TestSP1CoverageHeaderTimeDependencies(t *testing.T) {
 	require.True(t, absent.IsInterfaceNil())
 	_, err = absent.EvaluatedHeaderTimeContext()
 	require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
-	p = sp1Clock(t)
+	p = clock(t)
 	require.False(t, p.IsInterfaceNil())
 	_, err = p.EvaluatedHeaderTimeContext()
 	require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
 }
 
 // Architecture L550-568: the evaluated header supplies epoch, identity and raw ms.
-func TestSP1CoverageHeaderTimeCoordinate(t *testing.T) {
+func TestHeaderTimeContext_Milliseconds(t *testing.T) {
 	for _, header := range []data.HeaderHandler{&block.HeaderV3{Epoch: 10, ShardID: 1, TimestampMs: 1234567}, &block.MetaBlockV3{Epoch: 10, TimestampMs: 1234567}} {
-		p := sp1Clock(t)
+		p := clock(t)
 		acquired, released := 0, 0
 		c, err := p.BeginBound(header, func() (func(), error) { acquired++; return func() { released++ }, nil }, func() error { return nil })
 		require.NoError(t, err)
@@ -104,7 +107,8 @@ func TestSP1CoverageHeaderTimeCoordinate(t *testing.T) {
 		require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
 	}
 }
-func TestSP1CoverageHeaderTimeDeniedInstallation(t *testing.T) {
+
+func TestEvaluatedHeaderTime_BeginBound(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		header data.HeaderHandler
@@ -113,9 +117,9 @@ func TestSP1CoverageHeaderTimeDeniedInstallation(t *testing.T) {
 		{"nil", nil, common.ErrNilHeaderHandler}, {"legacy", &block.Header{Epoch: 10, TimeStamp: 1234}, ht.ErrUnavailableHeaderTime},
 		{"pre activation", &block.HeaderV3{Epoch: 9, TimestampMs: 1234567}, ht.ErrUnavailableHeaderTime},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			p := sp1Clock(t)
-			old := sp1Begin(t, p)
+		t.Run(strings.ReplaceAll(tc.name, "/", " ")+" should preserve the expected result", func(t *testing.T) {
+			p := clock(t)
+			old := begin(t, p)
 			c, err := p.BeginBound(tc.header, func() (func(), error) { return func() {}, nil }, func() error { return nil })
 			require.Nil(t, c)
 			require.ErrorIs(t, err, tc.want)
@@ -123,7 +127,7 @@ func TestSP1CoverageHeaderTimeDeniedInstallation(t *testing.T) {
 			require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
 		})
 	}
-	f, m, h := sp1Dependencies(t)
+	f, m, h := dependencies(t)
 	sentinel := errors.New("marshal unavailable")
 	m.MarshalCalled = func(interface{}) ([]byte, error) { return nil, sentinel }
 	p, err := ht.NewEvaluatedHeaderTime(f, m, h)
@@ -131,8 +135,8 @@ func TestSP1CoverageHeaderTimeDeniedInstallation(t *testing.T) {
 	_, err = p.BeginBound(&block.HeaderV3{Epoch: 10}, func() (func(), error) { return func() {}, nil }, func() error { return nil })
 	require.ErrorIs(t, err, sentinel)
 	for _, missingAcquire := range []bool{true, false} {
-		p := sp1Clock(t)
-		old := sp1Begin(t, p)
+		p := clock(t)
+		old := begin(t, p)
 		acquire := func() (func(), error) { return func() {}, nil }
 		validate := func() error { return nil }
 		if missingAcquire {
@@ -146,10 +150,11 @@ func TestSP1CoverageHeaderTimeDeniedInstallation(t *testing.T) {
 		require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
 	}
 }
-func TestSP1CoverageHeaderTimeLeaseFailure(t *testing.T) {
+
+func TestHeaderTimeContext_Lease(t *testing.T) {
 	for _, failure := range []string{"acquire", "validate", "activation", "replacement"} {
-		t.Run(failure, func(t *testing.T) {
-			f, m, h := sp1Dependencies(t)
+		t.Run(strings.ReplaceAll(failure, "/", " ")+" should preserve the expected result", func(t *testing.T) {
+			f, m, h := dependencies(t)
 			p, err := ht.NewEvaluatedHeaderTime(f, m, h)
 			require.NoError(t, err)
 			sentinel := errors.New("native lease failure")
@@ -174,7 +179,7 @@ func TestSP1CoverageHeaderTimeLeaseFailure(t *testing.T) {
 				want = ht.ErrUnavailableHeaderTime
 			}
 			if failure == "replacement" {
-				sp1Begin(t, p)
+				begin(t, p)
 				want = ht.ErrInactiveHeaderTime
 			}
 			ms, epoch, release, err := c.Lease()
@@ -190,12 +195,13 @@ func TestSP1CoverageHeaderTimeLeaseFailure(t *testing.T) {
 		})
 	}
 }
-func TestSP1CoverageWithHeaderTime(t *testing.T) {
+
+func TestWithHeaderTime(t *testing.T) {
 	sentinel := errors.New("execution failed")
 	for _, mode := range []string{"nil source", "nil context", "empty source", "different context", "acquire", "execute error", "reset", "success"} {
-		t.Run(mode, func(t *testing.T) {
-			p := sp1Clock(t)
-			c := sp1Begin(t, p)
+		t.Run(strings.ReplaceAll(mode, "/", " ")+" should preserve the expected result", func(t *testing.T) {
+			p := clock(t)
+			c := begin(t, p)
 			var source ht.HeaderTimeSource = p
 			expected := ht.ErrInactiveHeaderTime
 			switch mode {
@@ -206,7 +212,7 @@ func TestSP1CoverageWithHeaderTime(t *testing.T) {
 			case "empty source":
 				p.Reset()
 			case "different context":
-				sp1Begin(t, p)
+				begin(t, p)
 			case "acquire":
 				var err error
 				c, err = p.BeginBound(&block.HeaderV3{Epoch: 10, TimestampMs: 1234567}, func() (func(), error) { return nil, sentinel }, func() error { return nil })

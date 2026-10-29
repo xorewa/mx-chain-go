@@ -2,8 +2,6 @@ package hooks
 
 import (
 	"errors"
-	"testing"
-
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/hashing/blake2b"
@@ -13,11 +11,13 @@ import (
 	epochs "github.com/multiversx/mx-chain-go/testscommon/enableEpochsHandlerMock"
 	"github.com/multiversx/mx-chain-go/testscommon/marshallerMock"
 	"github.com/stretchr/testify/require"
+	"strings"
+	"testing"
 )
 
 // Internal unit setup isolates the native owner's validation, without claiming
 // successful real installation, canonical lineage or factory admission.
-func sp1HeaderOperation(t *testing.T) (*BlockChainHookImpl, *evaluatedHeaderOperation, *ht.HeaderTimeContext) {
+func headerOperation(t *testing.T) (*BlockChainHookImpl, *evaluatedHeaderOperation, *ht.HeaderTimeContext) {
 	t.Helper()
 	flags := epochs.NewEnableEpochsHandlerStub()
 	flags.IsFlagEnabledInEpochCalled = func(flag core.EnableEpochFlag, epoch uint32) bool { return flag == common.SupernovaFlag && epoch >= 10 }
@@ -37,10 +37,11 @@ func sp1HeaderOperation(t *testing.T) (*BlockChainHookImpl, *evaluatedHeaderOper
 	require.NoError(t, op.validateLocked(context))
 	return bh, op, context
 }
-func TestSP1CoverageHookHeaderValidation(t *testing.T) {
+
+func TestEvaluatedHeaderOperation_ValidateLocked(t *testing.T) {
 	for _, mode := range []string{"disabled", "time error", "nil header", "nil marshaller", "nil hasher", "nil flags", "legacy header", "lost activation", "marshal error", "changed timestamp"} {
-		t.Run(mode, func(t *testing.T) {
-			bh, op, context := sp1HeaderOperation(t)
+		t.Run(strings.ReplaceAll(mode, "/", " ")+" should preserve the expected result", func(t *testing.T) {
+			bh, op, context := headerOperation(t)
 			sentinel := errors.New("native time/hash dependency unavailable")
 			switch mode {
 			case "disabled":
@@ -75,7 +76,8 @@ func TestSP1CoverageHookHeaderValidation(t *testing.T) {
 		})
 	}
 }
-func TestSP1CoverageHookEvaluationAdmission(t *testing.T) {
+
+func TestBlockChainHookImpl_BeginDRWAHeaderEvaluation(t *testing.T) {
 	var absent *BlockChainHookImpl
 	install, end, err := absent.BeginDRWAHeaderEvaluation()
 	require.ErrorIs(t, err, ht.ErrUnavailableHeaderTime)
@@ -90,7 +92,7 @@ func TestSP1CoverageHookEvaluationAdmission(t *testing.T) {
 	require.Nil(t, ordinary.drwaTime)
 	require.Error(t, ordinary.initializeEvaluatedHeaderTime(blake2b.NewBlake2b()))
 	require.Nil(t, ordinary.drwaTime)
-	bh, op, _ := sp1HeaderOperation(t)
+	bh, op, _ := headerOperation(t)
 	_, _, err = bh.BeginDRWAHeaderEvaluation()
 	require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
 	op.end()
@@ -104,8 +106,9 @@ func TestSP1CoverageHookEvaluationAdmission(t *testing.T) {
 	require.NotNil(t, install)
 	end()
 }
-func TestSP1CoverageHookOutstandingLease(t *testing.T) {
-	bh, op, context := sp1HeaderOperation(t)
+
+func TestBlockChainHookImpl_BeginDRWAHeaderEvaluationWithOutstandingLease(t *testing.T) {
+	bh, op, context := headerOperation(t)
 	_, _, release, err := context.Lease()
 	require.NoError(t, err)
 	defer release()
