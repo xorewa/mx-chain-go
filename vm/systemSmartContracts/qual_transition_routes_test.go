@@ -257,6 +257,41 @@ func TestQualTransitionR05Roles(t *testing.T) {
 func TestQualTransitionR06Conversion(t *testing.T) {
 	qualTransitionConversionActivation(t)
 	for _, fix := range []bool{false, true} {
+		for _, dynamic := range []bool{false, true} {
+			for _, family := range []string{core.FungibleESDT, core.NonFungibleESDT, core.NonFungibleESDTv2, core.MetaESDT} {
+				t.Run(fmt.Sprintf("non SFT %s fix %t dynamic %t should reject without storage log or fanout", family, fix, dynamic), func(t *testing.T) {
+					e, host, flags := qualTransitionContract(t, fix)
+					owner := bytes.Repeat([]byte{1}, 32)
+					id, _, err := e.createNewToken(owner, []byte("TokenName"), []byte("TOKEN"), big.NewInt(0), 0, nil, []byte(family))
+					require.NoError(t, err)
+					before := bytes.Clone(host.GetStorage(id))
+					qualTransitionReset(host)
+					mar := &qualTransitionMarshalFault{Marshalizer: e.marshalizer}
+					e.marshalizer = mar
+					if dynamic {
+						flags.AddActiveFlags(common.DynamicESDTFlag)
+					}
+					storageBefore := make(map[string]map[string][]byte, len(host.storageUpdate))
+					for address, values := range host.storageUpdate {
+						storageBefore[address] = make(map[string][]byte, len(values))
+						for key, value := range values {
+							storageBefore[address][key] = bytes.Clone(value)
+						}
+					}
+					in := qualTransitionInput("changeSFTToMetaESDT", [][]byte{id, {18}}, false)
+					require.Equal(t, vmcommon.UserError, e.Execute(in))
+					require.Equal(t, "change can happen to semi fungible tokens only", host.returnMessage)
+					require.Zero(t, mar.tokenWrites, "rejection must precede any token save")
+					require.Equal(t, before, host.GetStorage(id))
+					require.Equal(t, storageBefore, host.storageUpdate)
+					require.Equal(t, uint64(993), host.gasRemaining)
+					require.Equal(t, uint32(1), host.GetCrtTransferIndex())
+					qualTransitionNoOutput(t, host)
+				})
+			}
+		}
+	}
+	for _, fix := range []bool{false, true} {
 		for _, width := range []uint{0, 32, 64} {
 			for _, regulated := range []bool{false, true} {
 				t.Run(fmt.Sprintf("fix %t width %d regulated %t should enforce conversion before effects", fix, width, regulated), func(t *testing.T) {
