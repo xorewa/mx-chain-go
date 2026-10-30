@@ -22,6 +22,11 @@ def main():
     for number, package in enumerate(args.packages):
         if not package.startswith("./"):
             parser.error("./ package path required")
+        if "mock" in package.split("/"):
+            results.append({"package": package, "exit": None, "branches": None,
+                            "status": "excluded by policy: test helper (path element mock)"})
+            print(json.dumps(results[-1]), flush=True)
+            continue
         target = output / str(number)
         target.mkdir()
         # gobco copies/instruments the module, one package per invocation.
@@ -45,7 +50,7 @@ def main():
         print(json.dumps(results[-1]), flush=True)
     (output / "summary.json").write_text(json.dumps(results, indent=2) + "\n")
     # Missing measurements remain visible as trial failure, never counted as zero/100%.
-    return int(any(r["exit"] != 0 or r["branches"] is None for r in results))
+    return int(any(r["exit"] != 0 or r["branches"] is None for r in results if r["exit"] is not None))
 
 
 if __name__ == "__main__":
