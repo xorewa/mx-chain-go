@@ -157,6 +157,7 @@ func TestRegistrationRecords_EncodeBodyDependencyFailures(t *testing.T) {
 		}},
 		{"pending-save", func(t *testing.T) (*registrationRecords, func() error) {
 			f := qualPendingFinalNew(t)
+			require.NoError(t, f.r.stage(f.c))
 			return f.r.codec, func() error { return f.r.save(f.c, f.encoded, true) }
 		}},
 		{"pending-stage", func(t *testing.T) (*registrationRecords, func() error) {
