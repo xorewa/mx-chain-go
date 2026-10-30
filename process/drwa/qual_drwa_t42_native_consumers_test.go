@@ -14,6 +14,7 @@ import (
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process/mock"
 	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
+	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/testscommon"
 	dataMock "github.com/multiversx/mx-chain-go/testscommon/dataRetriever"
@@ -28,7 +29,7 @@ import (
 // Numeric values are experimental T05/T18/T42 fixtures, never an admitted
 // profile. Existing semantic/proof hosts remain synthetic: these cases prove
 // native time dataflow, not lawful G3, funding, canonicality or network finality.
-func qualT42Hook(t *testing.T, accounts state.AccountsAdapter, shard uint32, configured bool) (*hooks.BlockChainHookImpl, *testscommon.EpochStartTriggerStub) {
+func qualT42Hook(t *testing.T, accounts state.AccountsAdapter, shard uint32, configured bool, coordinators ...sharding.Coordinator) (*hooks.BlockChainHookImpl, *testscommon.EpochStartTriggerStub) {
 	t.Helper()
 	pool := dataMock.NewPoolsHolderMock()
 	t.Cleanup(func() { require.NoError(t, pool.Close()) })
@@ -42,11 +43,16 @@ func qualT42Hook(t *testing.T, accounts state.AccountsAdapter, shard uint32, con
 	flags.GetCurrentEpochCalled = func() uint32 { return 77 }
 	coordinator := testscommon.NewMultiShardsCoordinatorMock(3)
 	coordinator.CurrentShard = shard
+	var selectedCoordinator sharding.Coordinator = coordinator
+	if len(coordinators) > 0 {
+		require.Len(t, coordinators, 1)
+		selectedCoordinator = coordinators[0]
+	}
 	trigger := &testscommon.EpochStartTriggerStub{}
 	args := hooks.ArgBlockChainHook{
 		Accounts: accounts, PubkeyConv: testscommon.NewPubkeyConverterMock(32),
 		StorageService: &storageMock.ChainStorerStub{}, BlockChain: &testscommon.ChainHandlerStub{},
-		ShardCoordinator: coordinator, Marshalizer: &marshal.GogoProtoMarshalizer{},
+		ShardCoordinator: selectedCoordinator, Marshalizer: &marshal.GogoProtoMarshalizer{},
 		Uint64Converter:   &mock.Uint64ByteSliceConverterMock{},
 		BuiltInFunctions:  builtInFunctions.NewBuiltInFunctionContainer(),
 		NFTStorageHandler: &testscommon.SimpleNFTStorageHandlerStub{}, GlobalSettingsHandler: &testscommon.ESDTGlobalSettingsHandlerStub{},
