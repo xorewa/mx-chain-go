@@ -21,7 +21,7 @@ import (
 
 // Native transfer only; authenticated regulated returns/refunds remain SP2-25/68/42.
 func TestQualTransitionR18TransferNative(t *testing.T) {
-	for _, mode := range []string{"ordinary", "callback", "follow-on", "nonpayable", "limited", "system", "metachain", "late save"} {
+	for _, mode := range []string{"ordinary", "wide value", "callback", "follow-on", "nonpayable", "limited", "system", "metachain", "late save"} {
 		t.Run(mode+" should compose native balances output and gas", func(t *testing.T) {
 			store := &qualTransitionReceiverSaveFault{qualNativeStore: qualRegistrationStore(t, 0)}
 			marshaller := &marshal.GogoProtoMarshalizer{}
@@ -74,6 +74,9 @@ func TestQualTransitionR18TransferNative(t *testing.T) {
 			require.NoError(t, function.SetPayableChecker(payable))
 			require.NoError(t, hook.GetBuiltinFunctionsContainer().Add(core.BuiltInFunctionESDTTransfer, function))
 			input := &vmcommon.ContractCallInput{VMInput: vmcommon.VMInput{CallerAddr: bytes.Clone(sender), CallValue: big.NewInt(0), GasProvided: 1000, GasLocked: 11, Arguments: [][]byte{tokenID, {2}}}, RecipientAddr: bytes.Clone(destination), Function: core.BuiltInFunctionESDTTransfer}
+			if mode == "wide value" {
+				input.Arguments[1] = bytes.Repeat([]byte{1}, core.MaxLenForESDTIssueMint+1)
+			}
 			if mode == "callback" {
 				input.CallerAddr = bytes.Repeat([]byte{2}, 32)
 				require.Equal(t, uint32(2), coordinator.ComputeId(input.CallerAddr))
@@ -90,11 +93,11 @@ func TestQualTransitionR18TransferNative(t *testing.T) {
 				input.RecipientAddr = bytes.Clone(core.ESDTSCAddress)
 				require.Equal(t, uint32(core.MetachainShardId), coordinator.ComputeId(input.RecipientAddr))
 			}
-			if mode == "limited" || mode == "system" || mode == "metachain" {
+			if mode == "limited" || mode == "wide value" || mode == "system" || mode == "metachain" {
 				account, e := store.GetExistingAccount(sender)
 				require.NoError(t, e)
 				var receiver vmcommon.UserAccountHandler
-				if mode == "limited" {
+				if mode == "limited" || mode == "wide value" {
 					destinationAccount, loadErr := store.GetExistingAccount(destination)
 					require.NoError(t, loadErr)
 					receiver = destinationAccount.(vmcommon.UserAccountHandler)
@@ -104,6 +107,9 @@ func TestQualTransitionR18TransferNative(t *testing.T) {
 				expected := builtInFunctions.ErrInvalidRcvAddr
 				if mode == "limited" {
 					expected = builtInFunctions.ErrActionNotAllowed
+				}
+				if mode == "wide value" {
+					expected = builtInFunctions.ErrInvalidArguments
 				}
 				require.ErrorIs(t, e, expected)
 				actual, _, e := account.(state.UserAccountHandler).RetrieveValue(key)
