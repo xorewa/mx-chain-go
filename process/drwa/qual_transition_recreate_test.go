@@ -21,14 +21,19 @@ import (
 )
 
 // Native metadata only; classification, public denial and distribution remain SP2-25/68/40.
-func TestQualTransitionR10RecreateNative(t *testing.T) { qualTransitionMetadataNative(t, false) }
+func TestQualTransitionR10RecreateNative(t *testing.T) { qualTransitionMetadataNative(t, "recreate") }
 
-func qualTransitionMetadataNative(t *testing.T, update bool) {
+func qualTransitionMetadataNative(t *testing.T, operation string) {
+	update, modify := operation == "update", operation == "royalties"
 	name, role := core.ESDTMetaDataRecreate, core.ESDTRoleNFTRecreate
 	modes := []string{"valid", "wide32", "wide80", "role", "inactive", "nonce", "gas", "late save"}
 	if update {
 		name, role = core.ESDTMetaDataUpdate, core.ESDTRoleNFTUpdate
 		modes = append(modes, "name only", "royalties only", "hash only", "attributes only", "uris only", "empty")
+	}
+	if modify {
+		name, role = core.ESDTModifyRoyalties, core.ESDTRoleModifyRoyalties
+		modes = append(modes, "zero", "maximum", "above")
 	}
 	for _, family := range []core.ESDTType{core.DynamicNFT, core.DynamicSFT} {
 		for _, mode := range modes {
@@ -51,6 +56,10 @@ func qualTransitionMetadataNative(t *testing.T, update bool) {
 					native, nativeErr := builtInFunctions.NewESDTMetaDataUpdateFunc(7, vmcommon.BaseOperationCost{StorePerByte: 1}, store, settings, storage, roles, flags, marshaller)
 					require.NoError(t, nativeErr)
 					function, bindHook = native, native.SetBlockchainHook
+				} else if modify {
+					native, nativeErr := builtInFunctions.NewESDTModifyRoyaltiesFunc(7, store, settings, storage, roles, flags, marshaller)
+					require.NoError(t, nativeErr)
+					function, bindHook = native, native.SetBlockchainHook
 				} else {
 					native, nativeErr := builtInFunctions.NewESDTMetaDataRecreateFunc(7, vmcommon.BaseOperationCost{StorePerByte: 1}, store, settings, storage, roles, flags, marshaller)
 					require.NoError(t, nativeErr)
@@ -63,7 +72,7 @@ func qualTransitionMetadataNative(t *testing.T, update bool) {
 				require.NoError(t, settings.SetTokenType(base, uint32(family)))
 				oldMetadata := &esdt.MetaData{Nonce: 1, Name: []byte("old")}
 				old := &esdt.ESDigitalToken{Value: big.NewInt(5), Type: uint32(family), Properties: []byte{0, 0}, TokenMetaData: oldMetadata}
-				if update {
+				if update || modify {
 					oldMetadata.Creator, oldMetadata.Royalties = []byte("old creator"), 25
 					oldMetadata.Hash, oldMetadata.Attributes, oldMetadata.URIs = []byte("old hash"), []byte("old attributes"), [][]byte{[]byte("old uri")}
 					old.Reserved, err = marshaller.Marshal(&esdt.MetaDataVersion{Name: 3, Creator: 3, Royalties: 3, Hash: 3, URIs: 3, Attributes: 3})
@@ -91,6 +100,14 @@ func qualTransitionMetadataNative(t *testing.T, update bool) {
 				require.NoError(t, bindHook(hook))
 				require.NoError(t, hook.GetBuiltinFunctionsContainer().Add(name, function))
 				royalties := big.NewInt(500)
+				switch mode {
+				case "zero":
+					royalties.SetInt64(0)
+				case "maximum":
+					royalties.SetInt64(10000)
+				case "above":
+					royalties.SetInt64(10001)
+				}
 				if mode == "wide32" {
 					royalties.Add(royalties, new(big.Int).Lsh(big.NewInt(1), 32))
 				}
@@ -108,6 +125,9 @@ func qualTransitionMetadataNative(t *testing.T, update bool) {
 						}
 					}
 				}
+				if modify {
+					args = [][]byte{tokenID, {1}, royalties.Bytes()}
+				}
 				if mode == "nonce" {
 					args[1] = nil
 				}
@@ -123,7 +143,7 @@ func qualTransitionMetadataNative(t *testing.T, update bool) {
 				out, err := hook.ProcessBuiltInFunction(input)
 				store.fault = nil
 				want := prior
-				success := mode == "valid" || update && (mode == "name only" || mode == "royalties only" || mode == "hash only" || mode == "attributes only" || mode == "uris only" || mode == "empty")
+				success := mode == "valid" || modify && (mode == "zero" || mode == "maximum") || update && (mode == "name only" || mode == "royalties only" || mode == "hash only" || mode == "attributes only" || mode == "uris only" || mode == "empty")
 				if success {
 					require.NoError(t, err)
 					version := &esdt.MetaDataVersion{Name: 17, Creator: 17, Royalties: 17, Hash: 17, URIs: 17, Attributes: 17}
@@ -153,6 +173,11 @@ func qualTransitionMetadataNative(t *testing.T, update bool) {
 							version.URIs = 3
 						}
 						expected.Reserved, marshalErr = marshaller.Marshal(version)
+						require.NoError(t, marshalErr)
+					}
+					if modify {
+						expected.TokenMetaData = &esdt.MetaData{Nonce: 1, Name: []byte("old"), Creator: []byte("old creator"), Royalties: uint32(royalties.Uint64()), Hash: []byte("old hash"), Attributes: []byte("old attributes"), URIs: [][]byte{[]byte("old uri")}}
+						expected.Reserved, marshalErr = marshaller.Marshal(&esdt.MetaDataVersion{Name: 3, Creator: 3, Royalties: 17, Hash: 3, URIs: 3, Attributes: 3})
 						require.NoError(t, marshalErr)
 					}
 					want, marshalErr = marshaller.Marshal(expected)
@@ -185,7 +210,12 @@ func qualTransitionMetadataNative(t *testing.T, update bool) {
 					if difference < 0 {
 						difference = 0
 					}
-					require.Equal(t, &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: gas - 7 - uint64(difference), Logs: []*vmcommon.LogEntry{{Identifier: []byte(name), Address: qualContainmentAddress, Topics: [][]byte{tokenID, {1}, {}, want}}}}, out)
+					topics := [][]byte{tokenID, {1}, {}, want}
+					if modify {
+						difference = 0
+						topics = [][]byte{tokenID, {1}, {}, royalties.Bytes()}
+					}
+					require.Equal(t, &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: gas - 7 - uint64(difference), Logs: []*vmcommon.LogEntry{{Identifier: []byte(name), Address: qualContainmentAddress, Topics: topics}}}, out)
 				} else {
 					require.Nil(t, out)
 					expectedError := builtInFunctions.ErrInvalidArguments
