@@ -1525,3 +1525,8 @@ func (sp *shardProcessor) CancelPruneForDismissedExecutionResults(batches []exec
 func (mp *metaProcessor) CancelPruneForDismissedExecutionResults(batches []executionTrack.DismissedBatch) {
 	mp.cancelPruneForDismissedExecutionResults(batches)
 }
+
+// DRWAExecutionErrorForTest exposes only the private status read to external unit tests.
+func DRWAExecutionErrorForTest(container process.VirtualMachinesContainer) error {
+	return (&baseProcessor{vmContainer: container}).drwaExecutionError()
+}

@@ -3,6 +3,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -33,12 +35,15 @@ type function struct {
 	Name       string
 	Start, End token.Position
 	Blocks     []cover.ProfileBlock
+	Returns    []sourceStatement
 }
+type sourceStatement struct{ Start, End token.Position }
 type packageResult struct {
 	Package    string   `json:"package"`
 	Statements counts   `json:"statements"`
 	Functions  counts   `json:"functions"`
 	Missing    []string `json:"missing_profiles,omitempty"`
+	Excluded   bool     `json:"excluded,omitempty"`
 }
 type changedFunction struct {
 	File       string `json:"file"`
@@ -66,6 +71,149 @@ type report struct {
 	NonInstrumented    []exclusion       `json:"non_instrumented_lines"`
 	Errors             []string          `json:"errors"`
 	Policy             string            `json:"policy"`
+	ExcludedFiles      []excludedFile    `json:"excluded_helper_files"`
+	LineExceptions     []exceptionResult `json:"line_exceptions"`
+}
+
+type upstreamTrace struct {
+	Repository string `json:"repository"`
+	Commit     string `json:"commit"`
+	Path       string `json:"path"`
+	Line       int    `json:"line"`
+}
+type lineException struct {
+	File             string        `json:"file"`
+	Function         string        `json:"function"`
+	Line             int           `json:"line"`
+	SourceLineSHA256 string        `json:"source_line_sha256"`
+	Reason           string        `json:"reason"`
+	Upstream         upstreamTrace `json:"upstream"`
+}
+type exceptionResult struct {
+	lineException
+	Applied bool   `json:"applied"`
+	Removed counts `json:"removed_statements"`
+	Error   string `json:"error,omitempty"`
+}
+type excludedFile struct {
+	File               string `json:"file"`
+	Reason             string `json:"reason"`
+	Statements         counts `json:"removed_package_statements"`
+	Functions          counts `json:"removed_package_function_entries"`
+	DiffStatements     counts `json:"removed_diff_statements"`
+	UpstreamStatements counts `json:"removed_upstream_changed_block_statements"`
+	DiffFunctions      counts `json:"removed_diff_function_entries"`
+	MissingProfile     bool   `json:"missing_profile,omitempty"`
+}
+
+//go:embed exceptions.json
+var exceptionJSON []byte
+
+func loadLineExceptions() ([]lineException, error) {
+	var entries []lineException
+	if err := json.Unmarshal(exceptionJSON, &entries); err != nil {
+		return nil, err
+	}
+	allowed := map[string]bool{
+		"process/drwa/burnForAllAbsence.go:NewBurnForAllAbsence:106":    true,
+		"process/drwa/burnForAllAbsence.go:NewBurnForAllAbsence:110":    true,
+		"process/drwa/burnForAllAbsence.go:NewBurnForAllAbsence:118":    true,
+		"process/drwa/burnForAllAbsence.go:NewBurnForAllAbsence:124":    true,
+		"process/drwa/burnForAllAbsence.go:NewBurnForAllAbsence:129":    true,
+		"process/drwa/resultAccountReader.go:NewResultAccountReader:71": true,
+	}
+	if len(entries) != len(allowed) {
+		return nil, fmt.Errorf("expected exactly six owner-approved line exceptions")
+	}
+	for _, entry := range entries {
+		key := fmt.Sprintf("%s:%s:%d", entry.File, entry.Function, entry.Line)
+		if !allowed[key] {
+			return nil, fmt.Errorf("unapproved or duplicate line exception: %s", key)
+		}
+		delete(allowed, key)
+		if !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(entry.SourceLineSHA256) || entry.Reason == "" ||
+			entry.Upstream.Repository == "" || !regexp.MustCompile(`^[a-f0-9]{40}$`).MatchString(entry.Upstream.Commit) ||
+			entry.Upstream.Path == "" || entry.Upstream.Line < 1 {
+			return nil, fmt.Errorf("incomplete line exception: %s", key)
+		}
+	}
+	return entries, nil
+}
+
+func excludedPackage(directory string) bool {
+	parts := strings.Split(filepath.ToSlash(directory), "/")
+	if parts[0] == "integrationTests" || parts[0] == "testscommon" {
+		return true
+	}
+	for _, part := range parts {
+		if part == "mock" {
+			return true
+		}
+	}
+	return false
+}
+
+// A Go coverage block can represent several source statements. Only a singleton
+// block containing the exact approved AST return may be removed. Go includes
+// surrounding braces in that block's positions. Never remove another counted
+// statement or an enclosing multi-statement block. Hash the complete UTF-8 line,
+// including indentation and excluding its newline.
+func applyLineExceptions(file string, source []byte, fs []function, blocks []cover.ProfileBlock,
+	entries []lineException) ([]cover.ProfileBlock, []exceptionResult) {
+	lines := bytes.Split(source, []byte{'\n'})
+	remove := make(map[int]bool)
+	var results []exceptionResult
+	for _, entry := range entries {
+		if entry.File != file {
+			continue
+		}
+		result := exceptionResult{lineException: entry}
+		validFunction := false
+		var targetReturn *sourceStatement
+		for _, f := range fs {
+			if f.Name == entry.Function && entry.Line >= f.Start.Line && entry.Line <= f.End.Line {
+				validFunction = true
+				for _, statement := range f.Returns {
+					if statement.Start.Line == entry.Line && statement.End.Line == entry.Line {
+						targetReturn = &statement
+						break
+					}
+				}
+			}
+		}
+		switch {
+		case entry.Line < 1 || entry.Line > len(lines):
+			result.Error = "source line no longer exists"
+		case !validFunction:
+			result.Error = "source line is no longer in the listed function"
+		case targetReturn == nil:
+			result.Error = "listed line is not an AST return statement"
+		case fmt.Sprintf("%x", sha256.Sum256(lines[entry.Line-1])) != entry.SourceLineSHA256:
+			result.Error = "source line SHA-256 changed; exception stops applying"
+		default:
+			for i, b := range blocks {
+				if b.NumStmt == 1 &&
+					(b.StartLine < targetReturn.Start.Line || b.StartLine == targetReturn.Start.Line && b.StartCol <= targetReturn.Start.Column) &&
+					(b.EndLine > targetReturn.End.Line || b.EndLine == targetReturn.End.Line && b.EndCol >= targetReturn.End.Column) {
+					remove[i] = true
+					result.Applied = true
+					result.Removed = sum([]cover.ProfileBlock{b})
+					break
+				}
+			}
+			if !result.Applied {
+				result.Error = "listed line is not an exact singleton profile block"
+			}
+		}
+		results = append(results, result)
+	}
+	kept := make([]cover.ProfileBlock, 0, len(blocks))
+	for i, b := range blocks {
+		if !remove[i] {
+			kept = append(kept, b)
+		}
+	}
+	return kept, results
 }
 
 func command(args ...string) ([]byte, error) {
@@ -98,7 +246,14 @@ func functions(path string, src []byte) ([]function, error) {
 			}
 			name = b.String() + "." + name
 		}
-		result = append(result, function{Name: name, Start: fs.Position(fn.Pos()), End: fs.Position(fn.End())})
+		var returns []sourceStatement
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if statement, ok := n.(*ast.ReturnStmt); ok {
+				returns = append(returns, sourceStatement{fs.Position(statement.Pos()), fs.Position(statement.End())})
+			}
+			return true
+		})
+		result = append(result, function{Name: name, Start: fs.Position(fn.Pos()), End: fs.Position(fn.End()), Returns: returns})
 	}
 	return result, nil
 }
@@ -223,6 +378,10 @@ func analyze(base, upstream, profile, packages string) (report, error) {
 		return r, e
 	}
 	r.Upstream = upstream
+	exceptions, e := loadLineExceptions()
+	if e != nil {
+		return r, e
+	}
 	raw, e := os.ReadFile(profile)
 	if e != nil {
 		return r, e
@@ -279,7 +438,8 @@ func analyze(base, upstream, profile, packages string) (report, error) {
 			return r, e
 		}
 		selectedDirs[filepath.ToSlash(relDir)] = true
-		pr := packageResult{Package: p.ImportPath}
+		helperPackage := excludedPackage(filepath.ToSlash(relDir))
+		pr := packageResult{Package: p.ImportPath, Excluded: helperPackage}
 		for _, name := range append(p.GoFiles, p.CgoFiles...) {
 			file := filepath.Join(p.Dir, name)
 			rel, e := filepath.Rel(root, file)
@@ -316,14 +476,30 @@ func analyze(base, upstream, profile, packages string) (report, error) {
 						return true
 					})
 				}
-				if hasBody {
+				if hasBody && !helperPackage {
 					pr.Missing = append(pr.Missing, rel)
 					r.Errors = append(r.Errors, "missing profile: "+rel)
 				}
 			}
-			c := sum(blocks)
-			pr.Statements.Total += c.Total
-			pr.Statements.Covered += c.Covered
+			exceptionLines := map[int]bool{}
+			removed := excludedFile{File: rel, Reason: "owner policy: test-helper or exact mock path element", Statements: sum(blocks), MissingProfile: prof == nil}
+			if !helperPackage {
+				var outcomes []exceptionResult
+				blocks, outcomes = applyLineExceptions(rel, src, fs, blocks, exceptions)
+				for _, outcome := range outcomes {
+					r.LineExceptions = append(r.LineExceptions, outcome)
+					if outcome.Error != "" {
+						r.Errors = append(r.Errors, fmt.Sprintf("line exception no longer applies: %s:%d: %s", rel, outcome.Line, outcome.Error))
+					}
+					if outcome.Applied {
+						exceptionLines[outcome.Line] = true
+						r.Exclusions = append(r.Exclusions, exclusion{rel, outcome.Line, outcome.Reason, "head"})
+					}
+				}
+				c := sum(blocks)
+				pr.Statements.Total += c.Total
+				pr.Statements.Covered += c.Covered
+			}
 			lines, e := changedLines(base, rel)
 			if e != nil {
 				return r, e
@@ -348,9 +524,15 @@ func analyze(base, upstream, profile, packages string) (report, error) {
 						fs[i].Blocks = append(fs[i].Blocks, b)
 					}
 				}
-				pr.Functions.Total++
+				removed.Functions.Total++
 				if entered(fs[i].Blocks) {
-					pr.Functions.Covered++
+					removed.Functions.Covered++
+				}
+				if !helperPackage {
+					pr.Functions.Total++
+					if entered(fs[i].Blocks) {
+						pr.Functions.Covered++
+					}
 				}
 				if !touches(lines, fs[i].Start.Line, fs[i].End.Line) {
 					continue
@@ -362,15 +544,25 @@ func analyze(base, upstream, profile, packages string) (report, error) {
 				selected := selectedBlocks(fs[i], old[fs[i].Name], lines)
 				cf.Statements = sum(selected)
 				if cf.Policy == "changed_blocks" {
-					r.UpstreamStatements.Total += cf.Statements.Total
-					r.UpstreamStatements.Covered += cf.Statements.Covered
+					removed.UpstreamStatements.Total += cf.Statements.Total
+					removed.UpstreamStatements.Covered += cf.Statements.Covered
+					if !helperPackage {
+						r.UpstreamStatements.Total += cf.Statements.Total
+						r.UpstreamStatements.Covered += cf.Statements.Covered
+					}
 				}
-				r.Changed = append(r.Changed, cf)
-				r.DiffFunctions.Total++
+				removed.DiffFunctions.Total++
 				if cf.Entered {
-					r.DiffFunctions.Covered++
+					removed.DiffFunctions.Covered++
 				}
-				if cf.Policy == "whole_function" && !cf.Statements.sufficient() {
+				if !helperPackage {
+					r.Changed = append(r.Changed, cf)
+					r.DiffFunctions.Total++
+					if cf.Entered {
+						r.DiffFunctions.Covered++
+					}
+				}
+				if !helperPackage && cf.Policy == "whole_function" && !cf.Statements.sufficient() {
 					r.Errors = append(r.Errors, "new function below 90% statements: "+rel+":"+cf.Name)
 				}
 			}
@@ -383,11 +575,24 @@ func analyze(base, upstream, profile, packages string) (report, error) {
 					}
 				}
 				if selected {
-					r.DiffStatements.Total += b.NumStmt
+					removed.DiffStatements.Total += b.NumStmt
 					if b.Count > 0 {
-						r.DiffStatements.Covered += b.NumStmt
+						removed.DiffStatements.Covered += b.NumStmt
+					}
+					if !helperPackage {
+						r.DiffStatements.Total += b.NumStmt
+						if b.Count > 0 {
+							r.DiffStatements.Covered += b.NumStmt
+						}
 					}
 				}
+			}
+			if helperPackage {
+				r.ExcludedFiles = append(r.ExcludedFiles, removed)
+				for line := range lines {
+					r.Exclusions = append(r.Exclusions, exclusion{rel, line, removed.Reason, "head"})
+				}
+				continue
 			}
 			uncovered := map[int]string{}
 			for _, f := range fs {
@@ -415,6 +620,9 @@ func analyze(base, upstream, profile, packages string) (report, error) {
 				r.Uncovered = append(r.Uncovered, exclusion{rel, line, reason, "head"})
 			}
 			for line := range lines {
+				if exceptionLines[line] {
+					continue
+				}
 				inBlock := false
 				for _, b := range blocks {
 					if line >= b.StartLine && line <= b.EndLine {

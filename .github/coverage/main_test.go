@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,7 +34,7 @@ func TestEndToEndHybridGateAndNoIgnoreRules(t *testing.T) {
 	run("git", "add", "go.mod", "f.go")
 	commit := func() {
 		t.Helper()
-		run("git", "-c", "user.name=Codex", "-c", "user.email=codex@localhost", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "CI gate fixture")
+		run("git", "-c", "user.name=Codex", "-c", "user.email=contact@dharitri.org", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "SP1-COV-01: CI gate fixture")
 	}
 	commit()
 	base := strings.TrimSpace(run("git", "rev-parse", "HEAD"))
@@ -135,5 +137,287 @@ func TestFunctionIdentityAndGoProfileSemantics(t *testing.T) {
 	}
 	if _, e = cover.ParseProfilesFromReader(strings.NewReader("mode: atomic\nmalformed\n")); e == nil {
 		t.Fatal("malformed profile accepted")
+	}
+}
+
+func TestExcludedPackage(t *testing.T) {
+	for _, tc := range []struct {
+		path string
+		want bool
+	}{
+		{"integrationTests", true}, {"integrationTests/vm", true}, {"testscommon", true}, {"testscommon/trie", true},
+		{"mock", true}, {"api/mock", true}, {"production/mock/deep", true},
+		{"mockable", false}, {"api/mocks", false}, {"integrationTestsExtra", false}, {"testscommonExtra", false},
+		{"production/integrationTests", false}, {"production/testscommon", false}, {"process/drwa", false},
+	} {
+		t.Run(tc.path+" should use only exact owner-selected boundaries", func(t *testing.T) {
+			if got := excludedPackage(tc.path); got != tc.want {
+				t.Fatalf("excludedPackage(%q)=%v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadLineExceptions_RejectsOtherLines(t *testing.T) {
+	original := append([]byte(nil), exceptionJSON...)
+	t.Cleanup(func() { exceptionJSON = original })
+	for _, mode := range []string{"other function", "other line", "duplicate entry"} {
+		t.Run(mode+" should reject the manifest", func(t *testing.T) {
+			var entries []lineException
+			if err := json.Unmarshal(original, &entries); err != nil {
+				t.Fatal(err)
+			}
+			switch mode {
+			case "other function":
+				entries[0].Function = "OtherConstructor"
+			case "other line":
+				entries[0].Line--
+			case "duplicate entry":
+				entries[1] = entries[0]
+			}
+			var err error
+			exceptionJSON, err = json.Marshal(entries)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = loadLineExceptions(); err == nil {
+				t.Fatal("an unapproved or duplicate exception was accepted")
+			}
+		})
+	}
+}
+
+func TestApplyLineExceptions(t *testing.T) {
+	entries, err := loadLineExceptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 6 {
+		t.Fatalf("exception count %d", len(entries))
+	}
+	for _, entry := range entries {
+		t.Run(entry.File+fmt.Sprint(entry.Line)+" should remove only its exact defensive statement", func(t *testing.T) {
+			lines := make([]string, entry.Line+3)
+			lines[0] = "package fixture"
+			lines[1] = "func " + entry.Function + "() (any,error) {"
+			lines[2] = "var err error"
+			lines[entry.Line-2] = "if err != nil {"
+			lines[entry.Line-1] = "\t\treturn nil, err"
+			lines[entry.Line] = "}"
+			lines[entry.Line+1] = "return nil,nil"
+			lines[entry.Line+2] = "}"
+			source := []byte(strings.Join(lines, "\n"))
+			fs, err := functions(entry.File, source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			blocks := []cover.ProfileBlock{{StartLine: 2, EndLine: 2, NumStmt: 9, Count: 1}, {StartLine: entry.Line - 1, EndLine: entry.Line + 1, NumStmt: 1, Count: 0}}
+			kept, outcomes := applyLineExceptions(entry.File, source, fs, blocks, []lineException{entry})
+			if len(outcomes) != 1 || !outcomes[0].Applied || outcomes[0].Error != "" || outcomes[0].Removed != (counts{0, 1}) || sum(kept) != (counts{9, 9}) {
+				t.Fatalf("exact exception: %+v, blocks %+v", outcomes, kept)
+			}
+			// Another statement on a neighboring line must remain counted.
+			adjacent := append(append([]cover.ProfileBlock(nil), blocks...), cover.ProfileBlock{StartLine: entry.Line + 1, EndLine: entry.Line + 1, NumStmt: 1, Count: 0})
+			kept, _ = applyLineExceptions(entry.File, source, fs, adjacent, []lineException{entry})
+			if sum(kept) != (counts{9, 10}) {
+				t.Fatalf("neighbor statement excluded: %+v", kept)
+			}
+		})
+	}
+}
+
+func TestApplyLineExceptions_ChangedSource(t *testing.T) {
+	entries, err := loadLineExceptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := entries[0]
+	for _, mode := range []string{"changed text", "moved function", "multi-statement block", "same text in a raw string"} {
+		t.Run(mode+" should stop the exception applying", func(t *testing.T) {
+			lines := make([]string, entry.Line+3)
+			lines[0] = "package fixture"
+			lines[1] = "func " + entry.Function + "() (any,error) {"
+			lines[2] = "var err error"
+			lines[entry.Line-2] = "if err != nil {"
+			lines[entry.Line-1] = "\t\treturn nil, err"
+			lines[entry.Line] = "}"
+			lines[entry.Line+1] = "return nil,nil"
+			lines[entry.Line+2] = "}"
+			blocks := []cover.ProfileBlock{{StartLine: entry.Line - 1, EndLine: entry.Line + 1, NumStmt: 1, Count: 0}}
+			switch mode {
+			case "changed text":
+				lines[entry.Line-1] = "\t\treturn nil, otherError"
+			case "moved function":
+				lines[1] = "func OtherConstructor() (any,error) {"
+			case "multi-statement block":
+				blocks[0].NumStmt = 2
+			case "same text in a raw string":
+				lines[entry.Line-2] = "var message = `"
+				lines[entry.Line] = "`; _ = message"
+			}
+			source := []byte(strings.Join(lines, "\n"))
+			fs, err := functions(entry.File, source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			kept, outcomes := applyLineExceptions(entry.File, source, fs, blocks, []lineException{entry})
+			if len(outcomes) != 1 || outcomes[0].Applied || outcomes[0].Error == "" || sum(kept) != sum(blocks) {
+				t.Fatalf("stale exception applied: %+v, %+v", outcomes, kept)
+			}
+		})
+	}
+}
+
+func TestAnalyze_HelperExclusion(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	write := func(path, text string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func(args ...string) string {
+		t.Helper()
+		b, err := command(args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	commit := func() {
+		run("git", "add", ".")
+		run("git", "-c", "user.name=Codex", "-c", "user.email=contact@dharitri.org", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "SP1-COV-01: coverage policy test fixture")
+	}
+	write("go.mod", "module example.com/policy\n\ngo 1.26\n")
+	write("f.go", "package policy\nfunc Existing()int{return 0}\n")
+	run("git", "init", "-q")
+	commit()
+	base := strings.TrimSpace(run("git", "rev-parse", "HEAD"))
+	write("f.go", "package policy\nfunc Existing()int{return 1}\n")
+	write("f_test.go", "package policy\nimport \"testing\"\nfunc TestExisting(t *testing.T){if Existing()!=1{t.Fatal(\"native result\")}}\n")
+	helpers := []string{"mock", "integrationTests", "testscommon", "production/mock"}
+	ordinary := []string{"mockable", "production/integrationTests"}
+	for _, path := range append(append([]string(nil), helpers...), ordinary...) {
+		write(path+"/f.go", "package fixture\nfunc Added()int{return 7}\n")
+	}
+	commit()
+	packages := "./ ./mock ./integrationTests ./testscommon ./production/mock ./mockable ./production/integrationTests"
+	args := []string{"go", "test", "-count=1", "-covermode=atomic", "-coverprofile=partial.out"}
+	args = append(args, strings.Fields(packages)...)
+	run(args...)
+	result, err := analyze(base, base, "partial.out", packages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DiffStatements != (counts{1, 3}) || result.UpstreamStatements != (counts{1, 1}) || result.DiffFunctions != (counts{1, 3}) {
+		t.Fatalf("non-excluded package or helper affected gate counts: %+v %+v %+v", result.DiffStatements, result.UpstreamStatements, result.DiffFunctions)
+	}
+	if len(result.Errors) == 0 {
+		t.Fatal("ordinary uncovered functions bypassed gate")
+	}
+	if len(result.ExcludedFiles) != len(helpers) {
+		t.Fatalf("excluded files %+v", result.ExcludedFiles)
+	}
+	removed := 0
+	for _, file := range result.ExcludedFiles {
+		if file.Statements != (counts{0, 1}) || file.DiffStatements != (counts{0, 1}) || file.DiffFunctions != (counts{0, 1}) || file.MissingProfile {
+			t.Fatalf("removed metrics %+v", file)
+		}
+		removed += file.DiffStatements.Total
+	}
+	if removed != 4 {
+		t.Fatalf("removed statements %d", removed)
+	}
+	// All ordinary code now exercised: helper zero counters must not block the
+	// healthy gate, and similarly named ordinary packages must still contribute.
+	for _, path := range ordinary {
+		write(path+"/f_test.go", "package fixture\nimport \"testing\"\nfunc TestAdded(t *testing.T){if Added()!=7{t.Fatal(\"native result\")}}\n")
+	}
+	args = []string{"go", "test", "-count=1", "-covermode=atomic", "-coverprofile=full.out"}
+	args = append(args, strings.Fields(packages)...)
+	run(args...)
+	result, err = analyze(base, base, "full.out", packages)
+	if err != nil || len(result.Errors) != 0 || result.DiffStatements != (counts{3, 3}) || result.DiffFunctions != (counts{3, 3}) {
+		t.Fatalf("healthy helper-exclusion fixture: %+v, %v", result, err)
+	}
+}
+
+func TestAnalyze_ChangedExceptionStopsGate(t *testing.T) {
+	t.Chdir(t.TempDir())
+	write := func(path, text string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func(args ...string) string {
+		t.Helper()
+		b, err := command(args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	commit := func() {
+		run("git", "add", "go.mod")
+		run("git", "-c", "user.name=Codex", "-c", "user.email=contact@dharitri.org", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "SP1-COV-01: exact-line policy test fixture")
+	}
+	write("go.mod", "module example.com/exceptions\n\ngo 1.26\n")
+	run("git", "init", "-q")
+	commit()
+	base := strings.TrimSpace(run("git", "rev-parse", "HEAD"))
+	file := "process/drwa/burnForAllAbsence.go"
+	lines := make([]string, 132)
+	lines[0] = "package drwa"
+	lines[1] = "func NewBurnForAllAbsence()(any,error){"
+	lines[2] = "var err error"
+	for _, line := range []int{106, 110, 118, 124, 129} {
+		lines[line-2] = "if err != nil {"
+		lines[line-1] = "\t\treturn nil, err"
+		lines[line] = "}"
+	}
+	lines[130] = "return nil,nil"
+	lines[131] = "}"
+	write(file, strings.Join(lines, "\n")+"\n")
+	write("process/drwa/burnForAllAbsence_test.go", "package drwa\nimport \"testing\"\nfunc TestNewBurnForAllAbsence(t *testing.T){if _,err:=NewBurnForAllAbsence();err!=nil{t.Fatal(err)}}\n")
+	run("git", "add", file)
+	run("git", "-c", "user.name=Codex", "-c", "user.email=contact@dharitri.org", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "SP1-COV-01: listed-line policy test fixture")
+	run("go", "test", "-count=1", "-covermode=atomic", "-coverprofile=profile.out", "./process/drwa")
+	result, err := analyze(base, base, "profile.out", "./process/drwa")
+	// A variable declaration, five conditions and the final return: seven
+	// ordinary statements, plus the five unexecuted defensive returns.
+	if err != nil || len(result.Errors) != 0 || result.DiffStatements != (counts{7, 7}) || len(result.LineExceptions) != 5 {
+		t.Fatalf("healthy listed-line policy: %+v %v", result, err)
+	}
+	for _, line := range result.NonInstrumented {
+		for _, entry := range result.LineExceptions {
+			if entry.Applied && line.File == entry.File && line.Line == entry.Line {
+				t.Fatal("an explicitly excluded instrumented line was reported as non-instrumented")
+			}
+		}
+	}
+	// Reusing the prior profile after changing a listed line must reject with
+	// the explicit stale-exception error, independently of any other gate error.
+	lines[105] = "\t\treturn nil, nil"
+	write(file, strings.Join(lines, "\n")+"\n")
+	result, err = analyze(base, base, "profile.out", "./process/drwa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, message := range result.Errors {
+		if strings.Contains(message, "line exception no longer applies") {
+			found = true
+		}
+	}
+	if !found || result.DiffStatements != (counts{7, 8}) {
+		t.Fatalf("changed source did not stop the exception: %+v", result)
 	}
 }
