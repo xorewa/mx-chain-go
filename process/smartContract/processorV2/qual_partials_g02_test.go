@@ -24,7 +24,7 @@ import (
 // direct/indirect upgrade outputs; it does not execute guest WASM or earn native
 // compilation/cache/factory credit. Values are experimental local fixtures.
 func TestQualPartialsG02NodeUpgrade(t *testing.T) {
-	for _, mode := range []string{"healthy", "vm_failure", "late_failure", "owner_denial"} {
+	for _, mode := range []string{"healthy", "vm_failure", "late_failure", "owner_denial", "direct_non_upgradeable", "nested_non_upgradeable"} {
 		t.Run(mode, func(t *testing.T) {
 			db := qualPartialsR01Accounts(t)
 			owner := bytes.Repeat([]byte{7}, 32)
@@ -33,12 +33,20 @@ func TestQualPartialsG02NodeUpgrade(t *testing.T) {
 			second[8], second[31] = 5, 2
 			oldMeta := (&vmcommon.CodeMetadata{Upgradeable: true}).ToBytes()
 			newMeta := (&vmcommon.CodeMetadata{Upgradeable: true, Readable: true}).ToBytes()
+			// Experimental immutability fixtures: the direct permission guard and
+			// the nested output guard must both honor stored code metadata.
+			storedMeta := func(i int) []byte {
+				if (mode == "direct_non_upgradeable" && i == 0) || (mode == "nested_non_upgradeable" && i == 1) {
+					return (&vmcommon.CodeMetadata{}).ToBytes()
+				}
+				return oldMeta
+			}
 			for i, addr := range [][]byte{first, second} {
 				a, e := db.LoadAccount(addr)
 				require.NoError(t, e)
 				u := a.(state.UserAccountHandler)
 				u.SetCode([]byte("old"))
-				u.SetCodeMetadata(oldMeta)
+				u.SetCodeMetadata(storedMeta(i))
 				if i == 0 {
 					u.SetOwnerAddress(owner)
 				} else {
@@ -95,18 +103,18 @@ func TestQualPartialsG02NodeUpgrade(t *testing.T) {
 			want := vmcommon.Ok
 			if mode == "late_failure" {
 				want = vmcommon.ExecutionFailed
-			} else if mode != "healthy" {
+			} else if mode != "healthy" && mode != "nested_non_upgradeable" {
 				want = vmcommon.UserError
 			}
 			require.Equal(t, want, rc, "native upgrade terminal code")
-			if mode == "owner_denial" {
+			if mode == "owner_denial" || mode == "direct_non_upgradeable" {
 				require.Zero(t, calls, "owner guard precedes VM")
 			} else {
 				require.Equal(t, 1, calls)
 			}
 			after, e := db.Commit()
 			require.NoError(t, e)
-			if mode != "healthy" {
+			if mode != "healthy" && mode != "nested_non_upgradeable" {
 				require.Equal(t, before, after, "failed upgrade restores code/storage root")
 			}
 			require.NoError(t, db.RecreateTrie(holders.NewDefaultRootHashesHolder(after)))
@@ -114,10 +122,12 @@ func TestQualPartialsG02NodeUpgrade(t *testing.T) {
 				a, e := db.GetExistingAccount(addr)
 				require.NoError(t, e)
 				u := a.(state.UserAccountHandler)
-				code, meta, value, nonce := []byte("old"), oldMeta, []byte("before"), uint64(4)
-				if mode == "healthy" {
-					code = []byte{"a"[0] + byte(i)}
-					meta = newMeta
+				code, meta, value, nonce := []byte("old"), storedMeta(i), []byte("before"), uint64(4)
+				if mode == "healthy" || mode == "nested_non_upgradeable" {
+					if mode != "nested_non_upgradeable" || i == 0 {
+						code = []byte{"a"[0] + byte(i)}
+						meta = newMeta
+					}
 					value = []byte("after")
 					nonce = 5
 				}
