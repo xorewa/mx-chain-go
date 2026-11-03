@@ -102,7 +102,7 @@ func qualG20Event(t *testing.T, name string) qualG20EventFixture {
 		var fn interface {
 			SetPayableChecker(vmcommon.PayableChecker) error
 		}
-		native, e := builtInFunctions.NewESDTTransferFunc(7, mar, global, &mock.ShardCoordinatorStub{}, roles, flags)
+		native, e := builtInFunctions.NewESDTTransferFunc(7, mar, global, &mock.ShardCoordinatorStub{SameShardCalled: func(_, _ []byte) bool { return true }}, roles, flags)
 		err = e
 		f.fn = native
 		fn = native
@@ -111,7 +111,7 @@ func qualG20Event(t *testing.T, name string) qualG20EventFixture {
 		}
 		f.input.RecipientAddr = bytes.Repeat([]byte{2}, 32)
 	case core.BuiltInFunctionESDTNFTTransfer:
-		native, e := builtInFunctions.NewESDTNFTTransferFunc(7, mar, global, accounts, &mock.ShardCoordinatorStub{}, vmcommon.BaseOperationCost{}, roles, storage, flags)
+		native, e := builtInFunctions.NewESDTNFTTransferFunc(7, mar, global, accounts, &mock.ShardCoordinatorStub{SameShardCalled: func(_, _ []byte) bool { return true }}, vmcommon.BaseOperationCost{}, roles, storage, flags)
 		err = e
 		f.fn = native
 		if err == nil {
@@ -119,7 +119,7 @@ func qualG20Event(t *testing.T, name string) qualG20EventFixture {
 		}
 		f.input.Arguments = [][]byte{token, {1}, {2}, bytes.Repeat([]byte{2}, 32)}
 	case core.BuiltInFunctionMultiESDTNFTTransfer:
-		native, e := builtInFunctions.NewESDTNFTMultiTransferFunc(7, mar, global, accounts, &mock.ShardCoordinatorStub{}, vmcommon.BaseOperationCost{}, flags, roles, storage)
+		native, e := builtInFunctions.NewESDTNFTMultiTransferFunc(7, mar, global, accounts, &mock.ShardCoordinatorStub{SameShardCalled: func(_, _ []byte) bool { return true }}, vmcommon.BaseOperationCost{}, flags, roles, storage)
 		err = e
 		f.fn = native
 		if err == nil {
@@ -176,7 +176,7 @@ func qualG20Event(t *testing.T, name string) qualG20EventFixture {
 	case core.BuiltInFunctionESDTNFTCreateRoleTransfer:
 		other := mock.NewUserAccount(bytes.Repeat([]byte{2}, 32))
 		accounts.LoadAccountCalled = func([]byte) (vmcommon.AccountHandler, error) { return other, nil }
-		f.fn, err = builtInFunctions.NewESDTNFTCreateRoleTransfer(mar, accounts, &mock.ShardCoordinatorStub{})
+		f.fn, err = builtInFunctions.NewESDTNFTCreateRoleTransfer(mar, accounts, &mock.ShardCoordinatorStub{SameShardCalled: func(_, _ []byte) bool { return true }})
 		f.sender = nil
 		f.input.CallerAddr = core.ESDTSCAddress
 		f.input.Arguments = [][]byte{token, other.AddressBytes()}
