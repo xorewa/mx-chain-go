@@ -619,10 +619,22 @@ func TestQualConvergenceIdentityReadErrorsAndObservations(t *testing.T) {
 }
 
 func TestQualConvergenceIdentityFamilyAndPhaseIsolation(t *testing.T) {
-	for _, pair := range [][2]int{{5, 10}, {0, 5}} {
-		t.Run(fmt.Sprint(pair)+" should isolate equal action and target across family or phase", func(t *testing.T) {
-			vectors := convergenceVectors(t)
-			a, b := qualIdentityNew(t, vectors[pair[0]]), qualIdentityNew(t, vectors[pair[1]])
+	vectors := convergenceVectors(t)
+	find := func(family, phase string) convergenceVector {
+		for _, v := range vectors {
+			if v.Family == family && v.Phase == phase {
+				return v
+			}
+		}
+		t.Fatalf("missing independent vector for %s/%s", family, phase)
+		return convergenceVector{}
+	}
+	for _, pair := range [][2]convergenceVector{
+		{find("CEB_CURRENTIZATION", "CLOSURE_ACK"), find("requalification continuation/cancellation", "CLOSURE_ACK")},
+		{find("CEB_CURRENTIZATION", "CLOSURE_ACK"), find("CEB_CURRENTIZATION", "PREPARED_ACK")},
+	} {
+		t.Run(pair[0].Family+"/"+pair[0].Phase+"/"+pair[1].Family+"/"+pair[1].Phase+" should isolate equal action and target", func(t *testing.T) {
+			a, b := qualIdentityNew(t, pair[0]), qualIdentityNew(t, pair[1])
 			for _, key := range [][]byte{b.identity.owner, b.identity.prior, b.identity.permission, b.identity.fence, b.identity.meta} {
 				qualRecordPut(t, a.store, key, b.identity.read(key))
 			}
@@ -648,6 +660,66 @@ func TestQualConvergenceIdentityFamilyAndPhaseIsolation(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, []byte{1}, aObserved.bitmap)
 			require.Equal(t, []byte{2}, bObserved.bitmap)
+		})
+	}
+}
+
+func TestQualConvergenceIdentityLegacyRepresentation(t *testing.T) {
+	var explicit convergenceTransition
+	for _, v := range convergenceFixtureVectors(t) {
+		if v.Family == "CEB_CURRENTIZATION" && v.Phase == "CURRENT_ACK" {
+			explicit = v.transition(t)
+		}
+	}
+	require.NotNil(t, explicit.context, "the retained explicit legacy-pair refusal vector must exist")
+	for _, stage := range []string{"absent", "partial", "full", "terminal"} {
+		t.Run(stage+" should refuse an explicit alias without touching legacy progress", func(t *testing.T) {
+			f := qualConvergenceNew(t, 3)
+			alias := f.tr
+			alias.context = explicit.context
+			if stage != "absent" {
+				f.create(t)
+				require.NoError(t, f.ack(0))
+			}
+			if stage == "full" || stage == "terminal" {
+				require.NoError(t, f.ack(1))
+				require.NoError(t, f.ack(2))
+			}
+			if stage == "terminal" {
+				require.NoError(t, f.records.complete(f.tr))
+			}
+			before, err := f.store.RootHash()
+			require.NoError(t, err)
+			before = bytes.Clone(before)
+			progress := bytes.Clone(qualRegistryValue(t, f.store, string(f.key)))
+			parent := bytes.Clone(qualRegistryValue(t, f.store, qualConvergenceParent))
+			calls := []int{f.host.verifyCalls, f.host.admissionCalls, f.host.ackCalls, f.host.completeCalls, f.host.parentCalls}
+			journal, outputs := f.store.JournalLen(), len(f.owner.outputs)
+			require.ErrorIs(t, f.records.create(alias), errConvergence)
+			require.ErrorIs(t, f.records.acknowledge(alias, 0, f.local[0], []byte("synthetic-S-R-H-M-B-proof")), errConvergence)
+			require.ErrorIs(t, f.records.complete(alias), errConvergence)
+			binding, observed, err := f.records.observe(alias)
+			require.ErrorIs(t, err, errConvergence)
+			require.Nil(t, binding)
+			require.Nil(t, observed)
+			after, err := f.store.RootHash()
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			require.Equal(t, progress, qualRegistryValue(t, f.store, string(f.key)))
+			require.Equal(t, parent, qualRegistryValue(t, f.store, qualConvergenceParent))
+			require.Equal(t, journal, f.store.JournalLen())
+			require.Equal(t, outputs, len(f.owner.outputs))
+			require.Equal(t, calls, []int{f.host.verifyCalls, f.host.admissionCalls, f.host.ackCalls, f.host.completeCalls, f.host.parentCalls}, "refusal precedes authentication/admission/effect callbacks")
+			if stage == "absent" {
+				f.create(t)
+			}
+			for _, shard := range f.tr.shards {
+				require.NoError(t, f.ack(shard))
+			}
+			require.NoError(t, f.records.complete(f.tr))
+			require.NoError(t, f.records.complete(f.tr))
+			f.assert(t, "COMPLETE", 0, 1, 2)
+			require.Equal(t, 1, f.host.completeCalls)
 		})
 	}
 }

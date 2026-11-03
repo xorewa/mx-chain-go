@@ -26,7 +26,7 @@ type convergenceVector struct {
 	States                                      map[string]struct{ Value, Commitment string }
 }
 
-func convergenceVectors(t *testing.T) []convergenceVector {
+func convergenceFixtureVectors(t *testing.T) []convergenceVector {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/convergence_identity_vectors.json")
 	require.NoError(t, err)
@@ -39,6 +39,25 @@ func convergenceVectors(t *testing.T) []convergenceVector {
 	require.True(t, fixture.Synthetic)
 	require.Len(t, fixture.Vectors, 12)
 	return fixture.Vectors
+}
+
+// The unchanged fixture retains the experimental explicit legacy-pair row as
+// a refusal vector. Every admitted explicit-context row is still checked
+// against its independent bytes; legacy currentization keeps its nil context.
+func convergenceVectors(t *testing.T) []convergenceVector {
+	t.Helper()
+	var admitted []convergenceVector
+	rejected := 0
+	for _, v := range convergenceFixtureVectors(t) {
+		if v.Family == "CEB_CURRENTIZATION" && v.Phase == "CURRENT_ACK" {
+			rejected++
+			continue
+		}
+		admitted = append(admitted, v)
+	}
+	require.Equal(t, 1, rejected, "exactly one retained legacy-pair refusal vector")
+	require.Len(t, admitted, 11)
+	return admitted
 }
 
 func convergenceHex(t *testing.T, value string) []byte {
@@ -105,6 +124,27 @@ func TestConvergenceRecords_Encode(t *testing.T) {
 			require.Nil(t, progress)
 		})
 	}
+}
+
+func TestConvergenceRecords_EncodeLegacyPair(t *testing.T) {
+	t.Run("explicit legacy pair should be refused while nil context stays admitted", func(t *testing.T) {
+		r := convergenceEncodingRecords()
+		found := 0
+		for _, v := range convergenceFixtureVectors(t) {
+			if v.Family != "CEB_CURRENTIZATION" || v.Phase != "CURRENT_ACK" {
+				continue
+			}
+			found++
+			explicit := v.transition(t)
+			_, _, err := r.encode(explicit)
+			require.ErrorIs(t, err, errConvergence)
+			legacy := explicit
+			legacy.context = nil
+			_, _, err = r.encode(legacy)
+			require.NoError(t, err)
+		}
+		require.Equal(t, 1, found)
+	})
 }
 
 func TestConvergenceRecords_Value(t *testing.T) {

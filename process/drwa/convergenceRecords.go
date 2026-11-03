@@ -34,6 +34,7 @@ type convergenceTransition struct {
 // lineage. predecessor is the exact durable prerequisite receipt commitment.
 // No family or phase value is allocated here. A nil context retains ONLY the
 // existing CEB_CURRENTIZATION/CURRENT_ACK representation; an explicit context
+// cannot name that pair. Every other pair requires an explicit context, which
 // never defaults a missing coordinate to that family or phase.
 type convergencePhaseContext struct {
 	family, phase, lineage, predecessor []byte
@@ -123,6 +124,9 @@ func (r *convergenceRecords) encode(t convergenceTransition) (key, binding []byt
 	if t.context != nil {
 		c := t.context
 		if len(c.family) == 0 || len(c.phase) == 0 || len(c.lineage) == 0 || len(c.predecessor) != r.codec.hasher.Size() {
+			return nil, nil, errConvergence
+		}
+		if bytes.Equal(c.family, family) && bytes.Equal(c.phase, phase) {
 			return nil, nil, errConvergence
 		}
 		family, phase = c.family, c.phase
