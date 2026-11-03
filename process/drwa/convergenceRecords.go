@@ -14,9 +14,9 @@ import (
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
 
-// EXPERIMENTAL physical representation of the existing ConvergenceState. Only
-// the GAS-backed CEB-currentization G3 construction is covered. No allocated
-// release prefix/codec, additional action nonce or production importer.
+// EXPERIMENTAL physical representation of the existing ConvergenceState.
+// GAS-backed phase contexts reuse the owning action and immutable digest.
+// No allocated release prefix/codec, additional nonce or production importer.
 const convergencePrefix = core.ProtectedKeyPrefix + "DRWA@convergence@"
 
 var errConvergence = errors.New("invalid DRWA convergence construction")
@@ -25,6 +25,18 @@ type convergenceTransition struct {
 	action, digest, token, target, dependencies, requiredSet []byte
 	version                                                  uint64
 	shards                                                   []uint32
+	context                                                  *convergencePhaseContext
+}
+
+// convergencePhaseContext is DRWA's experimental containing context, not a
+// wire field or a new identity. The native owner resolves every byte against
+// its canonical family/phase, original source/outcome and lawful successor
+// lineage. predecessor is the exact durable prerequisite receipt commitment.
+// No family or phase value is allocated here. A nil context retains ONLY the
+// existing CEB_CURRENTIZATION/CURRENT_ACK representation; an explicit context
+// never defaults a missing coordinate to that family or phase.
+type convergencePhaseContext struct {
+	family, phase, lineage, predecessor []byte
 }
 
 // convergenceHost belongs to the exclusive native metachain GAS/phase owner.
@@ -34,7 +46,13 @@ type convergenceTransition struct {
 // authenticated S/result/root/H/M/B relation under the qualified route predicate;
 // its returned producer is independent of the payload's claimed shard. It also
 // proves exact local application and every required dependency, not presence.
-// Admission reserves retained capacity AND prepaid full fan-out/ACK/parent work.
+// Admission positively authenticates canonical phase creation and non-reuse,
+// co-journals its durable creation receipt, and reserves retained capacity AND
+// prepaid full fan-out/ACK/parent work. Missing progress is not that evidence;
+// after compaction/loss the retained owner receipt must prevent recreation.
+// The immutable lineage binds original source/outcome and any lawful successor;
+// parent checks include metachain's OWN required evidence, separately from the
+// execution-shard bitmap. These obligations have no permissive default host.
 // Complete and VerifyParent operate on that SAME parent's durable phase receipt
 // within the same T04 stores. Actual G3/funding/ACK producers remain unwired gates.
 type convergenceHost interface {
@@ -101,12 +119,26 @@ func (r *convergenceRecords) encode(t convergenceTransition) (key, binding []byt
 		return nil, nil, errConvergence
 	}
 	family, phase := []byte("CEB_CURRENTIZATION"), []byte("CURRENT_ACK")
-	binding, err = r.codec.frame(family, t.action, t.digest, phase, t.token,
-		binary.BigEndian.AppendUint64(nil, t.version), t.target, t.dependencies, t.requiredSet, set)
+	var extra [][]byte
+	if t.context != nil {
+		c := t.context
+		if len(c.family) == 0 || len(c.phase) == 0 || len(c.lineage) == 0 || len(c.predecessor) != r.codec.hasher.Size() {
+			return nil, nil, errConvergence
+		}
+		family, phase = c.family, c.phase
+		extra = [][]byte{c.lineage, c.predecessor}
+	}
+	fields := [][]byte{family, t.action, t.digest, phase, t.token,
+		binary.BigEndian.AppendUint64(nil, t.version), t.target, t.dependencies, t.requiredSet, set}
+	binding, err = r.codec.frame(append(fields, extra...)...)
 	if err != nil {
 		return nil, nil, err
 	}
-	identity, err := r.codec.frame(family, t.action, phase)
+	identityFields := [][]byte{family, t.action, phase}
+	if t.context != nil {
+		identityFields = append(identityFields, t.context.lineage)
+	}
+	identity, err := r.codec.frame(identityFields...)
 	return append([]byte(convergencePrefix), identity...), binding, err
 }
 
@@ -317,16 +349,52 @@ func (r *convergenceRecords) acknowledge(t convergenceTransition, shard uint32, 
 		if e != nil {
 			return nil, e
 		}
+		credited := p.bitmap[index/8]&(1<<uint(index%8)) != 0
+		if credited && !bytes.Equal(p.acks[index], r.codec.hasher.Compute(string(ack))) {
+			return nil, errConvergence
+		}
 		if p.status == "COMPLETE" {
 			return nil, r.verifyParent(key, binding, count, p)
 		}
-		if p.bitmap[index/8]&(1<<uint(index%8)) != 0 {
+		if credited {
 			return nil, nil // authenticate before recognizing the existing credit
 		}
 		p.bitmap[index/8] |= 1 << uint(index%8)
 		p.acks[index] = r.codec.hasher.Compute(string(ack))
 		return nil, r.save(key, binding, p)
 	})
+}
+
+// observe reauthenticates the same canonical owner/context used by state and
+// ACK matching. No API/indexer label or current target hash substitutes for a
+// retained phase. Completed observations also require the durable parent.
+// Returned progress is detached; it is not lifecycle or finality permission.
+func (r *convergenceRecords) observe(t convergenceTransition) (binding []byte, progress *convergenceProgress, err error) {
+	key, encoded, err := r.encode(t)
+	if err != nil {
+		return nil, nil, err
+	}
+	count := len(t.shards)
+	err = r.boundary.execute(func() ([]*vmcommon.VMOutput, error) {
+		if e := r.verifyState(key, func() error { return r.host.VerifyTransition(bytes.Clone(encoded)) }); e != nil {
+			return nil, e
+		}
+		p, e := r.load(key, encoded, count)
+		if e != nil {
+			return nil, e
+		}
+		if p.status == "COMPLETE" {
+			if e = r.verifyParent(key, encoded, count, p); e != nil {
+				return nil, e
+			}
+		}
+		binding, progress = bytes.Clone(encoded), p
+		return nil, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return binding, progress, nil
 }
 
 func (r *convergenceRecords) complete(t convergenceTransition) error {

@@ -173,6 +173,19 @@ func TestQualDRWAConvergenceSingleAck(t *testing.T) {
 	require.Empty(t, qualRegistryValue(t, f.store, qualConvergenceParent))
 }
 
+func TestQualConvergenceConflictingReceipt(t *testing.T) {
+	t.Run("same identity with conflicting applied bytes should deny", func(t *testing.T) {
+		f := qualConvergenceNew(t, 3)
+		f.create(t)
+		require.NoError(t, f.ack(0))
+		before := qualRegistryValue(t, f.store, string(f.key))
+		local := bytes.Repeat([]byte{88}, 32)
+		f.host.acks[string(qualRecordFrame(f.binding, []byte{0, 0, 0, 0}, local))] = 0
+		require.ErrorIs(t, f.records.acknowledge(f.tr, 0, local, []byte("synthetic-S-R-H-M-B-proof")), errConvergence)
+		require.Equal(t, before, qualRegistryValue(t, f.store, string(f.key)))
+	})
+}
+
 func TestQualDRWAConvergenceCanonicalReemission(t *testing.T) {
 	f := qualConvergenceNew(t, 3)
 	f.create(t)
@@ -181,10 +194,11 @@ func TestQualDRWAConvergenceCanonicalReemission(t *testing.T) {
 	journal := f.store.JournalLen()
 	local := bytes.Repeat([]byte{88}, 32)
 	f.host.acks[string(qualRecordFrame(f.binding, []byte{0, 0, 0, 0}, local))] = 0
-	require.NoError(t, f.records.acknowledge(f.tr, 0, local, []byte("synthetic-S-R-H-M-B-proof")))
+	require.ErrorIs(t, f.records.acknowledge(f.tr, 0, local, []byte("synthetic-S-R-H-M-B-proof")), errConvergence)
 	require.Equal(t, before, qualRegistryValue(t, f.store, string(f.key)), "first receipt is retained")
 	require.Equal(t, journal, f.store.JournalLen())
-	require.Equal(t, 2, f.host.ackCalls, "re-emission is independently authenticated")
+	require.Equal(t, 2, f.host.ackCalls, "conflicting duplicate is authenticated before rejection")
+	require.NoError(t, f.ack(0), "same canonical applied contribution remains idempotent")
 	// A host callback mutating the original caller buffer cannot alter the
 	// encoded binding already retained by the construction before that callback.
 	f.host.hooks["ack"] = func() { f.tr.action[0] ^= 1 }
