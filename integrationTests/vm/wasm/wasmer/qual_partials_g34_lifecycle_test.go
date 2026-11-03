@@ -2,6 +2,7 @@ package wasmer
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"os"
@@ -128,5 +129,34 @@ func TestQualPartialsG34NativeDeleteJournalRollback(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte("original"), value)
 	}
+
 	require.Equal(t, 2, accounts.removed)
+	// Repeat invalid native upgrades in the same journal owner after the failed
+	// deletes. No successful guest invocation is needed to check denial effects.
+	for attempt := 0; attempt < 2; attempt++ {
+		accounts.reverts = nil
+		tx := nodevm.CreateTx(owner, target, uint64(attempt+2), big.NewInt(7), 1, 10000000,
+			vmhost.UpgradeFunctionName+"@"+hex.EncodeToString([]byte("not WebAssembly"))+"@"+hex.EncodeToString(metadata))
+		sender, err := accounts.LoadAccount(owner)
+		require.NoError(t, err)
+		destination, err := accounts.LoadAccount(target)
+		require.NoError(t, err)
+		result, err := processors.SCProc.ExecuteSmartContractTransaction(tx, sender.(state.UserAccountHandler), destination.(state.UserAccountHandler))
+		t.Logf("invalid upgrade attempt=%d result=%s reverts=%v", attempt, result.String(), accounts.reverts)
+		require.NoError(t, err)
+		require.Equal(t, vmcommon.UserError, result)
+		require.Equal(t, 2, accounts.removed)
+		require.Len(t, accounts.reverts, 1)
+		restored, err := accounts.GetExistingAccount(target)
+		require.NoError(t, err)
+		actual := restored.(state.UserAccountHandler)
+		require.Equal(t, originalHash, actual.GetCodeHash())
+		require.Equal(t, codeA, accounts.GetCode(actual.GetCodeHash()))
+		require.Equal(t, metadata, actual.GetCodeMetadata())
+		require.Equal(t, owner, actual.GetOwnerAddress())
+		require.Equal(t, big.NewInt(17), actual.GetBalance())
+		value, _, err := actual.RetrieveValue([]byte("witness"))
+		require.NoError(t, err)
+		require.Equal(t, []byte("original"), value)
+	}
 }
