@@ -7,6 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: LRU cache capacity 10, synthetic transaction key and invalid cache-type
+// marker. Register: XV-SP2-81B3C-SWEEP-NODE-NODE-QUAL-G31-WHITELIST; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualG31VerifiedWhitelistConstruction(t *testing.T) {
 	cfg := &config.Config{WhiteListerVerifiedTxs: config.CacheConfig{Type: "LRU", Capacity: 10}}
 	verifier, err := createWhiteListerVerifiedTxs(cfg)

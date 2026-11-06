@@ -18,6 +18,13 @@ import (
 	"testing"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: address fill byte 7, balance 1000, value increments 250/7, mutation 1,
+// shard count 3, gas 1000000, token/name/ticker/metadata markers and decimal-width probes. Register:
+// XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-PARTIALS-G25; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualPartialsG25ClassifierConstruction(t *testing.T) {
 	args := createDefaultEeiArgs()
 	host, err := NewVMContext(args)

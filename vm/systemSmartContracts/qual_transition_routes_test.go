@@ -36,6 +36,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, gas cost 7/budget 1000, creation value 1000,
+// address/metadata/storage/hash markers, initial balances 100+shard, mutation 999, decimals 18 and supply 7.
+// Register: XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-TRANSITION-ROUTES; owner replaces or
+// confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Native route effects are joined to the local output consumer and account journal.
 // Distributed execution, fee economics and finality remain separate obligations.
 func qualTransitionContract(t *testing.T, fix bool) (*esdt, *vmContext, *enableEpochsHandlerMock.EnableEpochsHandlerStub) {

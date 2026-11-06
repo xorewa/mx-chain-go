@@ -15,6 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: owner bytes, resume2-seed, fixed digest byte ab, token/name/ticker,
+// decimals 18, supply 7, gas 1000 and price 9. Register:
+// XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-PARTIALS-R03; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Explicit expected definition fields and a fixed input digest make neither
 // the native output nor the producer's saved bytes the expected-value oracle.
 func qualPartialsCreationComposition(t *testing.T, method string) {

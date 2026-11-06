@@ -12,6 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: address fill byte 7, initial balance 1000, output delta 25, mutation value
+// 3 and code/owner markers. Register:
+// XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-G31-PERSISTED-BALANCE; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualG31DeployOutputPersistedBalance(t *testing.T) {
 	address := bytes.Repeat([]byte{7}, 32)
 	persisted, err := accounts.NewUserAccount(address, &trie.DataTrieTrackerStub{}, &trie.TrieLeafParserStub{})

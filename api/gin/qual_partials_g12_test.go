@@ -10,6 +10,12 @@ import (
 	"testing"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: antiflood capacities 100, reset interval 3600, trie concurrency 1 and
+// synthetic address 00. Register: XV-SP2-81B3C-SWEEP-NODE-API-GIN-QUAL-PARTIALS-G12; owner replaces or
+// confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualPartialsG12ActualAdmissionAssembly(t *testing.T) {
 	for _, antiflood := range []bool{false, true} {
 		t.Run(fmt.Sprintf("antiflood_%t", antiflood), func(t *testing.T) {

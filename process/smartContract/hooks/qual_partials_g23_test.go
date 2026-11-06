@@ -16,6 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: sender/destination/witness bytes 1/2/3, balances 100,
+// key/before/checkpoint/after markers, unit balance deltas, output gas 17, refund 2 and callback/log
+// payloads. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-HOOKS-QUAL-PARTIALS-G23; owner replaces
+// or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Fault injection delegates every journal operation to the real AccountsDB.
 // A SaveAccount fault is reported after the native write, requiring rollback
 // of that partial operation. It does not model a failed native rollback.

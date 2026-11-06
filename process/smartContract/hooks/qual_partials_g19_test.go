@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, token ID/nonce, legacy name and liquidity increments 10/99.
+// Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-HOOKS-QUAL-PARTIALS-G19; owner replaces or
+// confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Real storage helper, with the serialized legacy nil value entering through
 // the same account-data interface used by the ordinary liquidity path.
 func TestQualPartialsG19NilLiquidity(t *testing.T) {

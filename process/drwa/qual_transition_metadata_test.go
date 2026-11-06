@@ -18,6 +18,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: hook shard 1, token IDs, nonces 1/2, prior/unrelated storage markers and
+// injected bad token payload. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-METADATA; owner
+// replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Native crawler and owning hook only. Classification and public bypass denial
 // remain restricted to SP2-25/SP2-68, with metadata composition at SP2-40.
 func TestQualTransitionR08MetadataNative(t *testing.T) {

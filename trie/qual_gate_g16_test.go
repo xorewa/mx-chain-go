@@ -19,6 +19,11 @@ import (
 	"github.com/multiversx/mx-chain-go/trie"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: account/key/value witnesses and invalid trie version 99. Register:
+// XV-SP2-81B3C-SWEEP-NODE-TRIE-QUAL-GATE-G16; owner replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualGateG16MigrationRecreation(t *testing.T) {
 	store, codec, hasher, _, depth := getDefaultTrieParameters()
 	t.Cleanup(func() { require.NoError(t, store.Close()) })

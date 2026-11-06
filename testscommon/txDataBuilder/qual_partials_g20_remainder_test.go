@@ -16,6 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: gas failure coordinate 7, synthetic malformed payloads, alternate address
+// bytes and two-shard layout. Register:
+// XV-SP2-81B3C-SWEEP-NODE-TESTSCOMMON-TXDATABUILDER-QUAL-PARTIALS-G20-REMAINDER; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 type qualG20AccountFault struct {
 	vmcommon.UserAccountHandler
 	read, write error

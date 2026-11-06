@@ -19,6 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, hook shard 1, builtin gas 7, byte-store cost 1, gas 1000,
+// prior nonce 4, quantities 0/1/3, royalties 500 and metadata/sentinel payloads. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-NFT-CREATE; owner replaces or confirms before testnet
+// admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Native creation only; regulated entry restrictions remain SP2-25/68.
 func TestQualTransitionR14NFTCreateNative(t *testing.T) {
 	for _, mode := range []string{"single", "multiple", "zero", "wide32", "wide80", "above", "role", "exec", "late save"} {

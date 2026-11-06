@@ -24,6 +24,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: trie depth 5, account identity bytes 1/2/3, initial nonce 4, output nonces
+// 5/3, balances 100 and key/before/checkpoint/after/hash markers. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-PROCESSORV2-QUAL-PARTIALS-R01; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Reuse the native in-memory account fixture shape; this test assigns no
 // bootstrap/account-factory credit. The consumer and rollback owner are real.
 func qualPartialsR01Accounts(t *testing.T) state.AccountsAdapter {

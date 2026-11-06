@@ -19,6 +19,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, hook shard 1, token ID, nonce 1, metadata labels and token
+// quantities 5/12. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-FREEZE-WIPE; owner
+// replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 type qualTransitionReceiverSaveFault struct {
 	*qualNativeStore
 	fault error

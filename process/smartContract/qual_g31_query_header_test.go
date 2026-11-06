@@ -8,6 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: current/executed/header hash markers and mock executed nonce 7. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-QUAL-G31-QUERY-HEADER; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualG31QueryRootHeaderSelection(t *testing.T) {
 	var typedNil *testscommon.HeaderHandlerStub
 	for _, tc := range []struct {

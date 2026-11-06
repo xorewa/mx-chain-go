@@ -20,6 +20,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, hook shard 1, round 17, builtin gas 7, byte-store cost 1,
+// gas 1000, token ID, nonce 1, quantity 5, prior royalties 25, selected royalties 500, version 3 and old/new
+// metadata payloads. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-RECREATE; owner replaces
+// or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Native metadata only; classification, public denial and distribution remain SP2-25/68/40.
 func TestQualTransitionR10RecreateNative(t *testing.T) { qualTransitionMetadataNative(t, "recreate") }
 

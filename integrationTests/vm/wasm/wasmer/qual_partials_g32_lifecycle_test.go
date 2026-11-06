@@ -26,6 +26,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: synthetic owner/target, balances 1000000000000 and 17, witness storage,
+// call value 7, gas price 1 and budgets 1000000/10000000. Register:
+// XV-SP2-81B3C-SWEEP-NODE-INTEGRATIONTESTS-VM-WASM-WASMER-QUAL-PARTIALS-G32-LIFECYCLE; owner replaces or
+// confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // The error is injected after the real DB has journalled and saved upgraded
 // code. Only the owning SC processor performs rollback; the test never restores
 // an account or snapshot. This is an in-process fixture, not network admission.

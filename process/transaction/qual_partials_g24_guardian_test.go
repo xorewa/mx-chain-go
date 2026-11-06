@@ -18,6 +18,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: guardian identity bytes 1/2/3/7/9, activation epochs 3/5/10, observation
+// epochs 2/3/5/9/10/11 and guardian delay 2. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-TRANSACTION-QUAL-PARTIALS-G24-GUARDIAN; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Real account metadata and real guardian selection/decoding. The data tracker
 // supplies explicit serialized account bytes; no trie/factory credit is claimed.
 func TestQualPartialsG24ActiveGuardianSelection(t *testing.T) {

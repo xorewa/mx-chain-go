@@ -13,6 +13,13 @@ import (
 	"testing"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: synthetic account bytes 1/2, code/compiled-code/hash witnesses and
+// replacement/deployment markers. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-HOOKS-QUAL-PARTIALS-G32; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // G32.02: actual VM code-hash/output contexts select the actual hook cache.
 // The account dependency and unused executor are mocks. This is neither a
 // guest upgrade nor owning-journal rollback, and supplies no G32.03 credit.

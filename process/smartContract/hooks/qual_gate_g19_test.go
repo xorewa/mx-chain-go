@@ -15,6 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: user-address fill byte 7, shard count 3, token ID/nonce, quantities
+// 500/10, property bytes 1/2/3 and old/new names. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-HOOKS-QUAL-GATE-G19; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualGateG19MetadataStorageComposition(t *testing.T) {
 	for _, active := range []bool{false, true} {
 		t.Run(map[bool]string{false: "legacy", true: "fixed"}[active], func(t *testing.T) {

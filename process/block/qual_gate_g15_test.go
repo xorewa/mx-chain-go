@@ -20,6 +20,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: execution epoch 17, synthetic header/miniblock/receipt/transaction cache
+// keys and injected failure marker. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-BLOCK-QUAL-GATE-G15; owner
+// replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // qualG15Fixture enters the real base-processor and receipts-repository routes.
 // Storer boundaries record ordered writes; pruning's real persisters are tested
 // separately. No recorder models publication decisions or implements guards.

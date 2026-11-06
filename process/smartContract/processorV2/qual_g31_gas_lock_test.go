@@ -11,6 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: zero per-byte/builtin costs, key/value/extra parser payloads, synthetic
+// address and one-second/100ms waits. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-PROCESSORV2-QUAL-G31-GAS-LOCK; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualG31GasCostReadWaitsForWriter(t *testing.T) {
 	entered := make(chan struct{})
 	args := createMockSmartContractProcessorArguments()

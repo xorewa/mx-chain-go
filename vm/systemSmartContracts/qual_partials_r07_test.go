@@ -13,6 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: owner/caller bytes, token/name/ticker, gas 1000, price 9 and three-shard
+// fanout. Register: XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-PARTIALS-R07; owner replaces or
+// confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualPartialsR07UpdateComposition(t *testing.T) {
 	f := qualPartialsNewSystemMachine(t)
 	f.flags.AddActiveFlags(common.DynamicESDTFlag)

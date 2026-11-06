@@ -35,6 +35,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: gas schedule entries 1, shard count 3, resume2-hash/token/name/ticker
+// witnesses, unit balance fault, owner/caller bytes, gas 1000 and price 9. Register:
+// XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-PARTIALS-R02; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 type qualPartialsSystemMachine struct {
 	contract *esdt
 	host     *vmContext

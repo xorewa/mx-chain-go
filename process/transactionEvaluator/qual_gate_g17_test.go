@@ -17,6 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: cached account/simulation/root markers, injected failure, header nonce 17
+// and transaction nonce 3. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-TRANSACTIONEVALUATOR-QUAL-GATE-G17;
+// owner replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualGateG17EvaluatorSimulatorCleanup(t *testing.T) {
 	for _, stage := range []string{"success", "header", "processor", "intermediate"} {
 		t.Run(stage, func(t *testing.T) {

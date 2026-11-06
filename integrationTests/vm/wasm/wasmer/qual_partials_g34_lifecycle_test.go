@@ -26,6 +26,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: synthetic owner/target, balances 1000000000000 and 17, witness storage,
+// call value 7, gas price 1, gas 10000000 and two-attempt repetition. Register:
+// XV-SP2-81B3C-SWEEP-NODE-INTEGRATIONTESTS-VM-WASM-WASMER-QUAL-PARTIALS-G34-LIFECYCLE; owner replaces or
+// confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Inject a failure only after the owning AccountsDB has actually removed the
 // account. Rollback is delegated to the node processor, never performed here.
 type qualG34Journal struct {

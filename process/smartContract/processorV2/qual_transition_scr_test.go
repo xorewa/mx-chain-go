@@ -29,6 +29,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: trie depth 5, account identities, gas price 9, transfer index 17, value 3,
+// gas 41/5, balances 100, nonces 2/3 and storage/code/hash/payload markers. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-PROCESSORV2-QUAL-TRANSITION-SCR; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Local output consumer and journal checks are separate from network/finality.
 func TestQualTransitionR01SCR(t *testing.T) {
 	qualTransitionR01Persistence(t)

@@ -17,6 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: synthetic pooled transaction nonce 1; fixed hash buffers 32/33 are
+// valid/invalid boundary inputs. Register: XV-SP2-81B3C-SWEEP-NODE-DATARETRIEVER-RESOLVERS-QUAL-GATE-G13;
+// owner replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualGateG13RejectBeforeLookupAndSend(t *testing.T) {
 	marshalizer := &mock.MarshalizerMock{}
 	badArray, err := marshalizer.Marshal(&batch.Batch{Data: [][]byte{make([]byte, 32), make([]byte, 33)}})

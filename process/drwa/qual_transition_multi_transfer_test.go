@@ -22,6 +22,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, shard/address coordinates 1/2, builtin gas 7, budgets
+// 1000/11, token IDs, nonce 1, quantities 1/2/3/5/6/12, follow/arg payload and malformed-count cases.
+// Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-MULTI-TRANSFER; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 type qualTransitionMultiFixture struct {
 	store       *qualTransitionReceiverSaveFault
 	hook        *hooks.BlockChainHookImpl

@@ -19,6 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: three-shard layout with shard 1, synthetic destination and token ID,
+// balances 5/1, transfer 2, builtin gas 7, budgets 1000/11 and follow/arg payload. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-TRANSFER; owner replaces or confirms before testnet
+// admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Native transfer only; authenticated regulated returns/refunds remain SP2-25/68/42.
 func TestQualTransitionR18TransferNative(t *testing.T) {
 	for _, mode := range []string{"ordinary", "wide value", "callback", "follow-on", "nonpayable", "limited", "system", "metachain", "late save"} {

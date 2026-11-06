@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: final/partial/header hash markers, shard IDs 1/2, transaction counts 3/4
+// and zero initial fees. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-BLOCK-QUAL-G31-MINIBLOCKS; owner replaces
+// or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 type qualG31ShardHeader struct {
 	*block.Header
 	minis []data.MiniBlockHeaderHandler

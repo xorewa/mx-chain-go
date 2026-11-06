@@ -12,6 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: caller/user/contract bytes, stake value 1000, epoch 20, fund
+// epochs/values, unbond period 10 and gas budget 1000000. Register:
+// XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-GATE-G18; owner replaces or confirms before testnet
+// admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualGateG18StakeWidthDenialState(t *testing.T) {
 	require.False(t, isNumArgsCorrectToStake([][]byte{new(big.Int).Lsh(big.NewInt(1), 63).Bytes()}), "node count must be bounded before arity multiplication")
 	args := createMockArgumentsForValidatorSCWithRealAddresses()

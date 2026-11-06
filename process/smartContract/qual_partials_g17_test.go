@@ -13,6 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: current/executed nonces 1000/11/12, poison nonce 77, mutation nonce 99,
+// root/hash markers and 1000-iteration stress loop. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-QUAL-PARTIALS-G17; owner replaces or confirms before testnet
+// admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualPartialsG17QueryUsesAtomicExecutedSnapshot(t *testing.T) {
 	chain, err := blockchain.NewBlockChain(&statusHandler.AppStatusHandlerStub{})
 	require.NoError(t, err)

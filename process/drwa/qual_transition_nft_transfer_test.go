@@ -19,6 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, hook shard 1, builtin gas 7, gas 1000, destination bytes,
+// token ID, nonce 1, quantities 1/2/5 and metadata name. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-NFT-TRANSFER; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Native hook composition only. Regulated entry/return restrictions: SP2-25/68/42.
 func TestQualTransitionR15NFTTransferNative(t *testing.T) {
 	for _, dynamic := range []bool{false, true} {

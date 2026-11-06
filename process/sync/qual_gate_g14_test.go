@@ -13,6 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: current-round negative/valid cases, initial detector coordinates, header
+// nonce 1 and bitmap/hash witnesses. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-SYNC-QUAL-GATE-G14; owner
+// replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualGateG14RoundBounds(t *testing.T) {
 	for _, c := range []struct {
 		name        string

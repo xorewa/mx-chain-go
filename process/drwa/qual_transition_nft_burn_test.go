@@ -19,6 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: shard count 3, hook shard 1, builtin gas 7, gas 1000, token ID, nonce 1,
+// token quantities 1/2/5/6/12 and metadata name. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-DRWA-QUAL-TRANSITION-NFT-BURN; owner replaces or confirms before testnet
+// admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Native burn accounting only; full transfer/classification restrictions remain SP2-25/68/42.
 func TestQualTransitionR13NFTBurnNative(t *testing.T) {
 	for _, mode := range []string{"partial", "all", "zero", "excess", "role", "exec", "nonce", "liquidity", "late save"} {

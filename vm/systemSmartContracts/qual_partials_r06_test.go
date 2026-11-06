@@ -13,6 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: owner bytes, token/name/ticker, decimals 18, gas 1000, price 9 and
+// three-shard fanout. Register: XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-PARTIALS-R06; owner
+// replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualPartialsR06ConversionComposition(t *testing.T) {
 	for _, mode := range []string{"valid", "non-SFT", "wide32", "wide64"} {
 		t.Run(mode, func(t *testing.T) {

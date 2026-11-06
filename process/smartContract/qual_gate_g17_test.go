@@ -12,6 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: query gas budget 100, remaining gas 101/100/99/0, move gas 7 and increment
+// endpoint marker. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-QUAL-GATE-G17; owner replaces or
+// confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func TestQualGateG17QueryGasBoundaries(t *testing.T) {
 	for _, tc := range []struct {
 		name                      string

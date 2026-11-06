@@ -13,6 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: synthetic sender/receiver/guardian/relayer/original identities, hash
+// markers, route payloads, gas price 3, budget 1000000, transfer quantity 7 and mock output/transfer gas
+// 19/17. Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-PROCESSORV2-QUAL-PARTIALS-G24-FOLLOWON;
+// owner replaces or confirms before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Distinct SCR hashes and original/current callers detect substitutions which
 // a direct transaction's equal original/current/previous hashes cannot expose.
 func TestQualPartialsG24FollowOnIdentities(t *testing.T) {

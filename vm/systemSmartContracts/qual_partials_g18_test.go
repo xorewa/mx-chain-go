@@ -13,6 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: synthetic addresses/sentinel/proposal markers, gas 1000000, call-value
+// cases -1/1/0, reward checkpoint 10 and proposal nonce 42/end epoch 10. Register:
+// XV-SP2-81B3C-SWEEP-NODE-VM-SYSTEMSMARTCONTRACTS-QUAL-PARTIALS-G18; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 func qualG18Snapshot(t *testing.T, e *vmContext) []byte {
 	t.Helper()
 	b, err := json.Marshal([]interface{}{e.storageUpdate, e.logs, e.outputAccounts})

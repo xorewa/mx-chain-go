@@ -19,6 +19,13 @@ import (
 	"time"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: activation epoch 10, rounds 21/22, timestamps 111/222, synthetic duration
+// 100+r, identifier fill byte a and account fill byte 1. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-HOOKS-QUAL-PARTIALS-G25; owner replaces or confirms before
+// testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // Join the native round-duration reader to the retained evaluated-header owner.
 // Epoch, round and timestamp coordinates are synthetic, not an admitted profile.
 func TestQualPartialsG25HeaderConsumerComposition(t *testing.T) {

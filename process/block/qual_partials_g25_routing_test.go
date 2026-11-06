@@ -11,6 +11,12 @@ import (
 	"testing"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: to-me/to-other/header markers, shard IDs 0/1/2 and transaction counts 2/3.
+// Register: XV-SP2-81B3C-SWEEP-NODE-PROCESS-BLOCK-QUAL-PARTIALS-G25-ROUTING; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 type qualG25Header struct {
 	*block.Header
 	reads int

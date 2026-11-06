@@ -14,6 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// R7 source label for producer-selected fixture inputs bound throughout this file:
+// Experimental R7 fixture inputs: address fill byte 7, shard count 3, token ID/nonce, gas 1000000, metadata
+// markers, quantities 1/37, royalties 10/50, builtin and per-byte costs 1. Register:
+// XV-SP2-81B3C-SWEEP-NODE-PROCESS-SMARTCONTRACT-HOOKS-QUAL-PARTIALS-G19-CALLERS; owner replaces or confirms
+// before testnet admission.
+// Native constants, structural indices/counters and derived assertions retain their source-defined meaning.
+
 // These ordinary-call compositions use the real shared storage implementation.
 // Mock account maps expose serialized effects; they do not model node rollback.
 func TestQualPartialsG19CallerStorageComposition(t *testing.T) {
