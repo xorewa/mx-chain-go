@@ -20,6 +20,9 @@ import (
 // FixRelayedBaseCostFlag is disabled and ComputeMoveBalanceFee when enabled.
 // Gas 5, processing price 7, move fee 11 and balance 100 are experimental
 // discriminators, not network parameters. The expected fees are 35 and 11.
+// GasLimit 100, GasPrice 1, zero Value, and the sender/original-transaction
+// markers are experimental fixture inputs too. R7 register rows
+// XV-SP2-81B3C-U0067-* require owner confirmation before testnet admission.
 func TestQualU0067RelayedMoveBalanceBaseFeeGuard(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

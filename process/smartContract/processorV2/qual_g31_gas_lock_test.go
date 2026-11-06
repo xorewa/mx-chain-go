@@ -28,7 +28,11 @@ func TestQualG31GasCostReadWaitsForWriter(t *testing.T) {
 	tx := &smartContractResult.SmartContractResult{SndAddr: address, RcvAddr: address}
 	sc.mutGasLock.Lock()
 	locked := true
-	t.Cleanup(func() { if locked { sc.mutGasLock.Unlock() } })
+	t.Cleanup(func() {
+		if locked {
+			sc.mutGasLock.Unlock()
+		}
+	})
 	done := make(chan struct{})
 	go func() { sc.setEmptyRoothashOnErrorIfSaveKeyValue(tx, account); close(done) }()
 	select {

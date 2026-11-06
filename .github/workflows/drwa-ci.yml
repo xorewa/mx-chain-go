@@ -19,10 +19,10 @@ env:
   CGO_ENABLED: '1'
   # Download pinned dependencies through the Go proxy; never fall back to Git.
   GOPROXY: 'https://proxy.golang.org'
-  # Sorted unique parent directories of non-test *.go files from:
+  # Sorted union of all qual_*_test.go package directories and non-test *.go changes from:
   # git diff --name-only 06c383cf316ab391d60695a4eeb7c085fb40232b HEAD
   # Exclude CI tooling under .github/ (tested explicitly), which go list ./... omits.
-  # Inherited upstream-only packages outside this derived product set are excluded.
+  # Qualification packages are included even when they add no production Go file.
   DRWA_PACKAGES: >-
     ./api/errors
     ./api/gin
@@ -30,6 +30,7 @@ env:
     ./api/middleware
     ./api/mock
     ./api/shared
+    ./cmd/node
     ./common
     ./common/enablers
     ./config
@@ -56,30 +57,39 @@ env:
     ./integrationTests/chainSimulator/vm
     ./integrationTests/mock
     ./integrationTests/realcomponents
+    ./integrationTests/state/stateTrie
     ./integrationTests/vm
+    ./integrationTests/vm/txsFee
+    ./integrationTests/vm/wasm/wasmer
     ./node
     ./node/chainSimulator
     ./node/chainSimulator/components
+    ./node/external/transactionAPI
     ./node/metrics
     ./node/mock
     ./process
+    ./process/asyncExecution
     ./process/block
     ./process/block/preprocess
     ./process/coordinator
     ./process/drwa
     ./process/drwa/headertime
     ./process/factory/metachain
+    ./process/factory/shard
     ./process/interceptors
     ./process/mock
     ./process/peer
     ./process/receipts
     ./process/smartContract
+    ./process/smartContract/builtInFunctions
     ./process/smartContract/hooks
     ./process/smartContract/hooks/counters
+    ./process/smartContract/processProxy
     ./process/smartContract/processorV2
     ./process/sync
     ./process/sync/storageBootstrap
     ./process/track
+    ./process/transaction
     ./process/transactionEvaluator
     ./state
     ./state/trackableDataTrie
@@ -91,6 +101,7 @@ env:
     ./testscommon
     ./testscommon/round
     ./testscommon/trie
+    ./testscommon/txDataBuilder
     ./trie
     ./trie/leavesRetriever
     ./update/mock
@@ -143,6 +154,8 @@ jobs:
           available = {'./' + pathlib.Path(p).relative_to(root).as_posix() for p in directories}
           changed = subprocess.check_output(['git', 'diff', '--no-ext-diff', '--name-only', '-z', base, 'HEAD']).decode().split('\0')
           expected = {'./' + pathlib.PurePosixPath(p).parent.as_posix() for p in changed if p.endswith('.go') and not p.endswith('_test.go')}
+          qualifiers = subprocess.check_output(['git', 'ls-files', '-z', '--', '**/qual_*_test.go']).decode().split('\0')
+          expected |= {'./' + pathlib.PurePosixPath(p).parent.as_posix() for p in qualifiers if p}
           expected &= available
           actual = set(os.environ['DRWA_PACKAGES'].split())
           missing, excess = sorted(expected - actual), sorted(actual - expected)
@@ -155,9 +168,8 @@ jobs:
 
   race:
     name: DRWA race (${{ matrix.shard }})
-    # Local Go1.26.2 race sample: process/drwa, GOMAXPROCS=4, 43.84s.
-    # Estimate: 37 packages x 43.84s ~= 27min per shard, plus cold compile.
-    # Two parallel jobs leave headroom below about 60min; this is an estimate.
+    # Newly selected native Wasmer2 packages txsFee and wasm/wasmer remain excluded
+    # under the owner 2026-11-06 restriction; race.py and KNOWN are unchanged.
     strategy:
       fail-fast: false
       matrix:
@@ -167,6 +179,7 @@ jobs:
               ./api/errors
               ./api/groups
               ./api/mock
+              ./cmd/node
               ./common
               ./config
               ./consensus/round
@@ -182,14 +195,17 @@ jobs:
               ./integrationTests/mock
               ./integrationTests/vm
               ./node/chainSimulator
+              ./node/external/transactionAPI
               ./node/metrics
               ./process
               ./process/block/preprocess
               ./process/drwa
               ./process/factory/metachain
+              ./process/factory/shard
               ./process/mock
               ./process/receipts
               ./process/smartContract/hooks
+              ./process/smartContract/processProxy
               ./process/smartContract/processorV2
               ./process/sync/storageBootstrap
               ./process/transactionEvaluator
@@ -198,6 +214,7 @@ jobs:
               ./storage/mock
               ./testscommon
               ./testscommon/trie
+              ./testscommon/txDataBuilder
               ./trie/leavesRetriever
               ./vm
               ./vm/process
@@ -219,18 +236,22 @@ jobs:
               ./integrationTests
               ./integrationTests/chainSimulator/vm
               ./integrationTests/realcomponents
+              ./integrationTests/state/stateTrie
               ./node
               ./node/chainSimulator/components
               ./node/mock
+              ./process/asyncExecution
               ./process/block
               ./process/coordinator
               ./process/drwa/headertime
               ./process/interceptors
               ./process/peer
               ./process/smartContract
+              ./process/smartContract/builtInFunctions
               ./process/smartContract/hooks/counters
               ./process/sync
               ./process/track
+              ./process/transaction
               ./state
               ./statusHandler
               ./storage/factory
@@ -312,7 +333,7 @@ jobs:
         run: |
           python3 -B -m unittest discover -s .github/ci -p 'test_*.py' -v
           go test -json -count=1 ./.github/coverage > coverage-helper-tests.json
-      - name: DRWA coverage without race — all 74 packages
+      - name: DRWA coverage without race — all selected packages
         env:
           GOPROXY: 'off'
         run: >-
