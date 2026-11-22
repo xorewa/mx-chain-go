@@ -108,6 +108,7 @@ type epochStartBootstrap struct {
 	mainMessenger              p2p.Messenger
 	fullArchiveMessenger       p2p.Messenger
 	generalConfig              config.Config
+	protectedChildren          state.ProtectedChildResolver
 	prefsConfig                config.PreferencesConfig
 	flagsConfig                config.ContextFlagsConfig
 	economicsData              process.EconomicsDataHandler
@@ -210,6 +211,7 @@ type ArgsEpochStartBootstrap struct {
 	NodesCoordinatorRegistryFactory nodesCoordinator.NodesCoordinatorRegistryFactory
 	EnableEpochsHandler             common.EnableEpochsHandler
 	InterceptedDataVerifierFactory  process.InterceptedDataVerifierFactory
+	ProtectedChildren               state.ProtectedChildResolver
 }
 
 type dataToSync struct {
@@ -265,6 +267,7 @@ func NewEpochStartBootstrap(args ArgsEpochStartBootstrap) (*epochStartBootstrap,
 		enableEpochsHandler:             args.EnableEpochsHandler,
 		epochStartConfigsHandler:        args.CoreComponentsHolder.CommonConfigsHandler(),
 		interceptedDataVerifierFactory:  args.InterceptedDataVerifierFactory,
+		protectedChildren:               args.ProtectedChildren,
 	}
 
 	if epochStartProvider.prefsConfig.FullArchive {
@@ -1892,6 +1895,7 @@ func (e *epochStartBootstrap) syncUserAccountsState(rootHash []byte) error {
 		ShardId:                e.shardCoordinator.SelfId(),
 		Throttler:              thr,
 		AddressPubKeyConverter: e.coreComponentsHolder.AddressPubKeyConverter(),
+		ProtectedChildren:      e.protectedChildren,
 	}
 	accountsDBSyncer, err := syncer.NewUserAccountsSyncer(argsUserAccountsSyncer)
 	if err != nil {

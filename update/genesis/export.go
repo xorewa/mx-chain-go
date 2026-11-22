@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/errChan"
+	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/sharding/nodesCoordinator"
@@ -40,6 +42,7 @@ type ArgsNewStateExporter struct {
 	AddressPubKeyConverter   core.PubkeyConverter
 	ValidatorPubKeyConverter core.PubkeyConverter
 	GenesisNodesSetupHandler update.GenesisNodesSetupHandler
+	ProtectedChildren        state.ProtectedChildResolver
 }
 
 type stateExport struct {
@@ -52,6 +55,7 @@ type stateExport struct {
 	addressPubKeyConverter   core.PubkeyConverter
 	validatorPubKeyConverter core.PubkeyConverter
 	genesisNodesSetupHandler update.GenesisNodesSetupHandler
+	protectedChildren        state.ProtectedChildResolver
 }
 
 var log = logger.GetOrCreate("update/genesis")
@@ -96,6 +100,7 @@ func NewStateExporter(args ArgsNewStateExporter) (*stateExport, error) {
 		addressPubKeyConverter:   args.AddressPubKeyConverter,
 		validatorPubKeyConverter: args.ValidatorPubKeyConverter,
 		genesisNodesSetupHandler: args.GenesisNodesSetupHandler,
+		protectedChildren:        args.ProtectedChildren,
 	}
 
 	return se, nil
@@ -202,6 +207,11 @@ func (se *stateExport) exportAllTries() error {
 	if err != nil {
 		return err
 	}
+	if se.protectedChildren != nil {
+		if err = se.checkProtectedExport(toExportTries); err != nil {
+			return err
+		}
+	}
 
 	log.Debug("Starting export for tries", "len", len(toExportTries))
 	for key, trie := range toExportTries {
@@ -211,6 +221,56 @@ func (se *stateExport) exportAllTries() error {
 		}
 	}
 
+	return nil
+}
+
+func (se *stateExport) checkProtectedExport(tries map[string]common.Trie) error {
+	checkedAccountCheckpoint := false
+	for key, main := range tries {
+		kind, shard, err := GetTrieTypeAndShId(TrieIdentifier + atSep + key)
+		if err != nil {
+			return err
+		}
+		if kind != UserAccount {
+			continue
+		}
+		if check.IfNil(main) {
+			return fmt.Errorf("protected account checkpoint absent from export")
+		}
+		checkedAccountCheckpoint = true
+		root, err := main.RootHash()
+		if err != nil {
+			return err
+		}
+		refs, err := se.protectedChildren(holders.NewDefaultRootHashesHolder(root))
+		if err != nil {
+			return err
+		}
+		for _, ref := range refs {
+			if err = ref.Verify(); err != nil {
+				return err
+			}
+			child := ref.RootHash()
+			if common.IsEmptyTrie(child) {
+				continue
+			}
+			id := AddRootHashToIdentifier(CreateTrieIdentifier(shard, DataTrie), string(child))
+			physical, ok := tries[id]
+			if !ok || check.IfNil(physical) || !ref.IsForStorage(physical.GetStorageManager()) {
+				return fmt.Errorf("required protected child absent from export")
+			}
+			actual, errRoot := physical.RootHash()
+			if errRoot != nil {
+				return errRoot
+			}
+			if !bytes.Equal(actual, child) {
+				return fmt.Errorf("protected child export root mismatch")
+			}
+		}
+	}
+	if !checkedAccountCheckpoint {
+		return fmt.Errorf("protected account checkpoint absent from export")
+	}
 	return nil
 }
 

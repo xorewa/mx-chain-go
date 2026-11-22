@@ -11,6 +11,7 @@ import (
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/disabled"
 	"github.com/multiversx/mx-chain-go/sharding"
+	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/state/syncer"
 	"github.com/multiversx/mx-chain-go/storage"
 	"github.com/multiversx/mx-chain-go/trie"
@@ -36,6 +37,7 @@ type ArgsNewAccountsDBSyncersContainerFactory struct {
 	CheckNodesOnDisk          bool
 	AddressPubKeyConverter    core.PubkeyConverter
 	EnableEpochsHandler       common.EnableEpochsHandler
+	ProtectedChildren         state.ProtectedChildResolver
 }
 
 type accountDBSyncersContainerFactory struct {
@@ -54,6 +56,7 @@ type accountDBSyncersContainerFactory struct {
 	checkNodesOnDisk          bool
 	addressPubKeyConverter    core.PubkeyConverter
 	enableEpochsHandler       common.EnableEpochsHandler
+	protectedChildren         state.ProtectedChildResolver
 }
 
 // NewAccountsDBSContainerFactory creates a factory for trie syncers container
@@ -108,6 +111,7 @@ func NewAccountsDBSContainerFactory(args ArgsNewAccountsDBSyncersContainerFactor
 		checkNodesOnDisk:          args.CheckNodesOnDisk,
 		addressPubKeyConverter:    args.AddressPubKeyConverter,
 		enableEpochsHandler:       args.EnableEpochsHandler,
+		protectedChildren:         args.ProtectedChildren,
 	}
 
 	return t, nil
@@ -162,6 +166,7 @@ func (a *accountDBSyncersContainerFactory) createUserAccountsSyncer(shardId uint
 		ShardId:                shardId,
 		Throttler:              thr,
 		AddressPubKeyConverter: a.addressPubKeyConverter,
+		ProtectedChildren:      a.protectedChildren,
 	}
 	accountSyncer, err := syncer.NewUserAccountsSyncer(args)
 	if err != nil {

@@ -214,7 +214,11 @@ func (spm *storagePruningManager) removeFromDb(
 		log.Debug("trieStorageManager.removeFromDb", sw.GetMeasurements()...)
 	}()
 
+	protected, _ := handler.(interface{ KeepProtectedTrieNode(string) bool })
 	for key := range hashes {
+		if protected != nil && protected.KeepProtectedTrieNode(key) {
+			continue
+		}
 		shouldKeepHash, errShouldKeep := spm.dbEvictionWaitingList.ShouldKeepHash(key, identifier)
 		if errShouldKeep != nil {
 			return errShouldKeep

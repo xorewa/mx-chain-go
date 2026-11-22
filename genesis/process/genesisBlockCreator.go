@@ -49,6 +49,9 @@ type genesisBlockCreator struct {
 
 // NewGenesisBlockCreator creates a new genesis block creator instance able to create genesis blocks on all initial shards
 func NewGenesisBlockCreator(arg ArgsGenesisBlockCreator) (*genesisBlockCreator, error) {
+	if err := checkDRWAOriginalGenesis(arg); err != nil {
+		return nil, err
+	}
 	err := checkArgumentsForBlockCreator(arg)
 	if err != nil {
 		return nil, fmt.Errorf("%w while creating NewGenesisBlockCreator", err)
@@ -443,6 +446,7 @@ func (gbc *genesisBlockCreator) computeDNSAddresses(
 		BlockChain:               gbc.arg.Data.Blockchain(),
 		ShardCoordinator:         gbc.arg.ShardCoordinator,
 		Marshalizer:              gbc.arg.Core.InternalMarshalizer(),
+		Hasher:                   gbc.arg.Core.Hasher(),
 		Uint64Converter:          gbc.arg.Core.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncs,
 		NFTStorageHandler:        &disabled.SimpleNFTStorage{},
@@ -499,6 +503,9 @@ func (gbc *genesisBlockCreator) getNewArgForShard(shardID uint32) (ArgsGenesisBl
 
 	if isCurrentShard {
 		newArgument.Data = newArgument.Data.Clone().(dataComponentsHandler)
+		if shardID == core.MetachainShardId && newArgument.DRWAMinimumGenesis != nil {
+			newArgument.drwaGenesisAccounts = newArgument.Accounts
+		}
 		return newArgument, nil
 	}
 
@@ -528,6 +535,9 @@ func (gbc *genesisBlockCreator) getNewArgForShard(shardID uint32) (ArgsGenesisBl
 	// for genesis we can reuse the same account adapter for proposal as first proposal needs to happen after genesis block execution
 	// and the proposal won't use the genesis block creator
 	newArgument.AccountsProposal = newArgument.Accounts
+	if shardID == core.MetachainShardId && newArgument.DRWAMinimumGenesis != nil {
+		newArgument.drwaGenesisAccounts = newArgument.Accounts
+	}
 
 	newArgument.ShardCoordinator, err = sharding.NewMultiShardCoordinator(
 		newArgument.ShardCoordinator.NumberOfShards(),

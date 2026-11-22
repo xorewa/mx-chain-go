@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -91,22 +93,152 @@ type AccountsDB struct {
 	addressConverter       core.PubkeyConverter
 	pruningEnabled         bool
 
+	protectedChildRoot     ProtectedChildRoot
+	protectedCheckpoints   *ProtectedChildCheckpoints
+	protectedChildren      map[protectedChildKey]*stagedProtectedChild
+	protectedCommitFailure error
+
 	stackDebug []byte
 }
 
 var log = logger.GetOrCreate("state")
 
+var errProtectedChild = errors.New("invalid protected child trie")
+
+// ProtectedChildRoot is supplied by the native owner for its admitted protected
+// record format. It must reject unowned locators and missing/uninitialized
+// records. The root it returns belongs to the same native storage and profile.
+type ProtectedChildRoot func(address, key, record []byte) ([]byte, error)
+
+// ProtectedChildLocator carries the record bytes authenticated by the native
+// owner for this exact account-state checkpoint. No new encoding is persisted.
+type ProtectedChildLocator struct {
+	Address, Key, Record []byte
+}
+
+// ProtectedChildCheckpoints is supplied by the native canonical/retention
+// owner. An epoch or a current root alone cannot supply these locators or the
+// last-use checkpoint set. The limits are explicit owner inputs.
+type ProtectedChildCheckpoints struct {
+	Locate   func(common.RootHashHolder) ([]ProtectedChildLocator, error)
+	Retained func() ([]common.RootHashHolder, error)
+	// ReadNode is the configured native trie decoder using the supplied
+	// authenticated reader. Factory assembly binds the existing native decoder.
+	ReadNode       func([]byte, common.TrieStorageInteractor) ([]common.TrieNodeData, error)
+	MaxLocators    int
+	MaxCheckpoints int
+	MaxBytes       uint64
+}
+
+// ProtectedChildResolver resolves protected children from the supplied native
+// checkpoint. A nil resolver is the unconfigured ordinary path.
+type ProtectedChildResolver func(common.RootHashHolder) ([]ProtectedChildReference, error)
+
+// ProtectedChildReference retains the native store view of a checked locator.
+// Resolution authenticates the record location; Verify checks the node bytes.
+type ProtectedChildReference struct {
+	root     []byte
+	view     common.Trie
+	readNode func([]byte, common.TrieStorageInteractor) ([]common.TrieNodeData, error)
+	hasher   hashing.Hasher
+	maxBytes uint64
+}
+
+// RootHash returns the exact child root without exposing the resolver's bytes.
+func (ref ProtectedChildReference) RootHash() []byte {
+	return bytes.Clone(ref.root)
+}
+
+// IsForStorage binds a reference to the native store a consumer will use.
+func (ref ProtectedChildReference) IsForStorage(store common.StorageManager) bool {
+	if check.IfNil(ref.view) || check.IfNil(store) {
+		return false
+	}
+	referenceStore := ref.view.GetStorageManager().GetBaseTrieStorageManager()
+	return !check.IfNil(referenceStore) && referenceStore == store.GetBaseTrieStorageManager()
+}
+
+// Verify checks availability and the content hash of every native child node.
+func (ref ProtectedChildReference) Verify() error {
+	budget := ref.maxBytes
+	return ref.collectNodes(make(common.ModifiedHashes), &budget)
+}
+
+func (ref ProtectedChildReference) collectNodes(seen common.ModifiedHashes, budget *uint64) error {
+	if check.IfNil(ref.view) || check.IfNil(ref.hasher) || ref.readNode == nil || len(ref.root) != ref.hasher.Size() {
+		return errProtectedChild
+	}
+	if common.IsEmptyTrie(ref.root) {
+		return nil
+	}
+	reader := &verifiedProtectedTrieStorage{TrieStorageInteractor: ref.view.GetStorageManager(), hasher: ref.hasher, budget: budget}
+	stack := [][]byte{ref.root}
+	for len(stack) != 0 {
+		last := len(stack) - 1
+		hash := stack[last]
+		stack = stack[:last]
+		if _, exists := seen[string(hash)]; exists {
+			continue
+		}
+		nodes, err := ref.readNode(hash, reader)
+		if err != nil {
+			return err
+		}
+		seen[string(hash)] = struct{}{}
+		for _, node := range nodes {
+			if !node.IsLeaf() {
+				stack = append(stack, node.GetData())
+			}
+		}
+	}
+	return nil
+}
+
+type verifiedProtectedTrieStorage struct {
+	common.TrieStorageInteractor
+	hasher hashing.Hasher
+	budget *uint64
+}
+
+// Get authenticates the exact buffer passed to the existing native node decoder.
+func (reader *verifiedProtectedTrieStorage) Get(hash []byte) ([]byte, error) {
+	if len(hash) != reader.hasher.Size() || *reader.budget == 0 {
+		return nil, errProtectedChild
+	}
+	raw, err := reader.TrieStorageInteractor.Get(hash)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 || uint64(len(raw)) > *reader.budget || !bytes.Equal(reader.hasher.Compute(string(raw)), hash) {
+		return nil, errProtectedChild
+	}
+	*reader.budget -= uint64(len(raw))
+	return raw, nil
+}
+
+type protectedChildKey struct {
+	address, record string
+}
+
+type stagedProtectedChild struct {
+	trie   DataTrie
+	root   []byte
+	record []byte
+}
+
 // ArgsAccountsDB is the arguments DTO for the AccountsDB instance
 type ArgsAccountsDB struct {
-	Trie                   common.Trie
-	Hasher                 hashing.Hasher
-	Marshaller             marshal.Marshalizer
-	AccountFactory         AccountFactory
-	StoragePruningManager  StoragePruningManager
-	AddressConverter       core.PubkeyConverter
-	SnapshotsManager       SnapshotsManager
-	StateAccessesCollector StateAccessesCollector
-	PruningEnabled         bool
+	Trie                      common.Trie
+	Hasher                    hashing.Hasher
+	Marshaller                marshal.Marshalizer
+	AccountFactory            AccountFactory
+	StoragePruningManager     StoragePruningManager
+	AddressConverter          core.PubkeyConverter
+	SnapshotsManager          SnapshotsManager
+	StateAccessesCollector    StateAccessesCollector
+	PruningEnabled            bool
+	ProtectedChildRoot        ProtectedChildRoot
+	ProtectedChildCheckpoints *ProtectedChildCheckpoints
 }
 
 // NewAccountsDB creates a new account manager
@@ -116,7 +248,24 @@ func NewAccountsDB(args ArgsAccountsDB) (*AccountsDB, error) {
 		return nil, err
 	}
 
-	return createAccountsDb(args), nil
+	db := createAccountsDb(args)
+	if supplied := args.ProtectedChildCheckpoints; supplied != nil {
+		if args.ProtectedChildRoot == nil || supplied.Locate == nil || supplied.Retained == nil || supplied.ReadNode == nil ||
+			supplied.MaxLocators <= 0 || supplied.MaxCheckpoints <= 0 || supplied.MaxBytes == 0 {
+			return nil, errProtectedChild
+		}
+		checkpoints := *supplied
+		db.protectedCheckpoints = &checkpoints
+		if manager, ok := args.SnapshotsManager.(*snapshotsManager); ok {
+			manager.mutex.Lock()
+			defer manager.mutex.Unlock()
+			if manager.protectedChildren != nil {
+				return nil, errProtectedChild
+			}
+			manager.protectedChildren = db.ProtectedChildResolver()
+		}
+	}
+	return db, nil
 }
 
 func createAccountsDb(args ArgsAccountsDB) *AccountsDB {
@@ -137,6 +286,7 @@ func createAccountsDb(args ArgsAccountsDB) *AccountsDB {
 		snapshotsManger:        args.SnapshotsManager,
 		stateAccessesCollector: args.StateAccessesCollector,
 		pruningEnabled:         args.PruningEnabled,
+		protectedChildRoot:     args.ProtectedChildRoot,
 	}
 }
 
@@ -257,6 +407,13 @@ func (adb *AccountsDB) SaveAccount(account vmcommon.AccountHandler) error {
 	adb.mutOp.Lock()
 	defer adb.mutOp.Unlock()
 
+	return adb.saveAccount(account)
+}
+
+func (adb *AccountsDB) saveAccount(account vmcommon.AccountHandler) error {
+	if adb.protectedCommitFailure != nil {
+		return adb.protectedCommitFailure
+	}
 	oldAccount, err := adb.getAccount(account.AddressBytes(), adb.mainTrie)
 	if err != nil {
 		return err
@@ -508,6 +665,10 @@ func (adb *AccountsDB) loadDataTrieConcurrentSafe(accountHandler baseAccountHand
 	adb.mutOp.Lock()
 	defer adb.mutOp.Unlock()
 
+	return adb.loadDataTrie(accountHandler, mainTrie)
+}
+
+func (adb *AccountsDB) loadDataTrie(accountHandler baseAccountHandler, mainTrie common.Trie) error {
 	dataTrie := adb.dataTries.Get(accountHandler.AddressBytes())
 	if dataTrie != nil {
 		accountHandler.SetDataTrie(dataTrie)
@@ -527,6 +688,298 @@ func (adb *AccountsDB) loadDataTrieConcurrentSafe(accountHandler baseAccountHand
 	accountHandler.SetDataTrie(dataTrie)
 	adb.dataTries.Put(accountHandler.AddressBytes(), dataTrie)
 	return nil
+}
+
+// StageProtectedChildTrie saves the next protected record and enlists its child
+// in this AccountsDB's journal. The original operation owner supplies the exact
+// predecessor and the already validated, bounded raw leaf updates. Any error
+// requires that owner to undo its operation before continuing.
+func (adb *AccountsDB) StageProtectedChildTrie(address, key, predecessor, successor []byte, updates []core.TrieData) error {
+	adb.mutOp.Lock()
+	defer adb.mutOp.Unlock()
+
+	if adb.protectedCommitFailure != nil {
+		return adb.protectedCommitFailure
+	}
+	if len(successor) == 0 || len(updates) == 0 {
+		return errProtectedChild
+	}
+	previousRoot, err := adb.protectedPredecessorRoot(address, key, predecessor)
+	if err != nil {
+		return err
+	}
+	nextRoot, err := adb.decodeProtectedChildRoot(address, key, successor)
+	if err != nil {
+		return err
+	}
+	_, err = adb.stageProtectedChildTrie(address, key, predecessor, previousRoot,
+		func(DataTrie) ([]core.TrieData, error) { return updates, nil },
+		func(actualRoot []byte) ([]byte, error) {
+			if !bytes.Equal(actualRoot, nextRoot) {
+				return nil, errProtectedChild
+			}
+			return successor, nil
+		})
+	return err
+}
+
+// StageDerivedProtectedChildTrie reads and updates one initialized protected
+// child, including the original owner's uncommitted state. The owning operation
+// supplies its admitted, bounded touched keys and pure derivation and record
+// encoding functions. They receive detached bytes, never a store or trie.
+// Any error requires the original operation to undo its effects.
+func (adb *AccountsDB) StageDerivedProtectedChildTrie(address, key, predecessor []byte, keys [][]byte,
+	derive func([]core.TrieData) ([]core.TrieData, error), encode func([]byte) ([]byte, error)) ([]byte, error) {
+	adb.mutOp.Lock()
+	defer adb.mutOp.Unlock()
+
+	previousRoot, err := adb.protectedPredecessorRoot(address, key, predecessor)
+	if err != nil {
+		return nil, err
+	}
+	if derive == nil || encode == nil {
+		return nil, errProtectedChild
+	}
+	owned, err := protectedChildKeys(keys)
+	if err != nil {
+		return nil, err
+	}
+	return adb.stageProtectedChildTrie(address, key, predecessor, previousRoot,
+		func(child DataTrie) ([]core.TrieData, error) {
+			current, err := readProtectedChildLeaves(child, owned)
+			if err != nil {
+				return nil, err
+			}
+			updates, err := derive(current)
+			if err != nil {
+				return nil, err
+			}
+			if len(updates) != len(owned) {
+				return nil, errProtectedChild
+			}
+			for i, update := range updates {
+				if !bytes.Equal(update.Key, owned[i]) {
+					return nil, errProtectedChild
+				}
+			}
+			return updates, nil
+		},
+		func(actualRoot []byte) ([]byte, error) {
+			successor, err := encode(bytes.Clone(actualRoot))
+			if err != nil {
+				return nil, err
+			}
+			if len(successor) == 0 {
+				return nil, errProtectedChild
+			}
+			nextRoot, err := adb.decodeProtectedChildRoot(address, key, successor)
+			if err != nil {
+				return nil, err
+			}
+			if !bytes.Equal(actualRoot, nextRoot) {
+				return nil, errProtectedChild
+			}
+			return successor, nil
+		})
+}
+
+// ReadProtectedChildLeaves reads the original owner's admitted, bounded keys
+// against the exact current outer record, including earlier uncommitted stages.
+// It returns detached values and native leaf versions in input order. A missing
+// leaf has an empty value, while an unavailable child returns an error.
+func (adb *AccountsDB) ReadProtectedChildLeaves(address, key, predecessor []byte, keys [][]byte) ([]core.TrieData, error) {
+	adb.mutOp.Lock()
+	defer adb.mutOp.Unlock()
+
+	root, err := adb.protectedPredecessorRoot(address, key, predecessor)
+	if err != nil {
+		return nil, err
+	}
+	owned, err := protectedChildKeys(keys)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = adb.protectedChildPredecessorAccount(address, key, predecessor); err != nil {
+		return nil, err
+	}
+	staged := adb.protectedChildren[protectedChildKey{string(address), string(key)}]
+	if staged == nil && !common.IsEmptyTrie(root) {
+		// Native Recreate attaches the requested hash to the decoded node.
+		// Check the stored node bytes before relying on that hash.
+		raw, readErr := adb.mainTrie.GetSerializedNode(root)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if !bytes.Equal(adb.hasher.Compute(string(raw)), root) {
+			return nil, errProtectedChild
+		}
+	}
+	child, err := adb.protectedChildForUpdate(staged, root, predecessor)
+	if err != nil {
+		return nil, err
+	}
+	return readProtectedChildLeaves(child, owned)
+}
+
+func protectedChildKeys(keys [][]byte) ([][]byte, error) {
+	if len(keys) == 0 {
+		return nil, errProtectedChild
+	}
+	owned := make([][]byte, len(keys))
+	seen := make(map[string]struct{}, len(keys))
+	for i, key := range keys {
+		if _, exists := seen[string(key)]; exists || len(key) == 0 {
+			return nil, errProtectedChild
+		}
+		seen[string(key)] = struct{}{}
+		owned[i] = bytes.Clone(key)
+	}
+	return owned, nil
+}
+
+func readProtectedChildLeaves(child DataTrie, keys [][]byte) ([]core.TrieData, error) {
+	current := make([]core.TrieData, len(keys))
+	for i, key := range keys {
+		value, _, version, err := child.GetWithVersion(key)
+		if err != nil {
+			return nil, err
+		}
+		current[i] = core.TrieData{Key: bytes.Clone(key), Value: bytes.Clone(value), Version: core.TrieNodeVersion(version)}
+	}
+	return current, nil
+}
+
+func (adb *AccountsDB) protectedPredecessorRoot(address, key, predecessor []byte) ([]byte, error) {
+	if adb.protectedCommitFailure != nil {
+		return nil, adb.protectedCommitFailure
+	}
+	if adb.protectedChildRoot == nil || len(address) == 0 || !bytes.HasPrefix(key, []byte(core.ProtectedKeyPrefix)) || len(predecessor) == 0 {
+		return nil, errProtectedChild
+	}
+	return adb.decodeProtectedChildRoot(address, key, predecessor)
+}
+
+// stageProtectedChildTrie runs with mutOp held and uses the account journal
+// shared by both protected children and the debit/credit that owns them.
+func (adb *AccountsDB) stageProtectedChildTrie(address, key, predecessor, previousRoot []byte,
+	prepare func(DataTrie) ([]core.TrieData, error), encode func([]byte) ([]byte, error)) ([]byte, error) {
+	account, err := adb.protectedChildPredecessorAccount(address, key, predecessor)
+	if err != nil {
+		return nil, err
+	}
+	locator := protectedChildKey{string(address), string(key)}
+	previous := adb.protectedChildren[locator]
+	child, err := adb.protectedChildForUpdate(previous, previousRoot, predecessor)
+	if err != nil {
+		return nil, err
+	}
+	updates, err := prepare(child)
+	if err != nil {
+		return nil, err
+	}
+	entry := &journalEntryProtectedChild{owner: adb, key: locator, previous: previous, child: child, root: previousRoot}
+	adb.journalize(entry)
+	for _, update := range updates {
+		value, _, version, readErr := child.GetWithVersion(update.Key)
+		if readErr != nil {
+			return nil, readErr
+		}
+		entry.undo = append(entry.undo, core.TrieData{
+			Key: bytes.Clone(update.Key), Value: bytes.Clone(value), Version: core.TrieNodeVersion(version),
+		})
+		if err = child.UpdateWithVersion(bytes.Clone(update.Key), bytes.Clone(update.Value), update.Version); err != nil {
+			return nil, err
+		}
+	}
+	actualRoot, err := child.RootHash()
+	if err != nil {
+		return nil, err
+	}
+	successor, err := encode(actualRoot)
+	if err != nil {
+		return nil, err
+	}
+	if adb.protectedChildren == nil {
+		adb.protectedChildren = make(map[protectedChildKey]*stagedProtectedChild)
+	}
+	adb.protectedChildren[locator] = &stagedProtectedChild{trie: child, root: bytes.Clone(actualRoot), record: bytes.Clone(successor)}
+	if err = account.SaveKeyValue(bytes.Clone(key), bytes.Clone(successor)); err != nil {
+		return nil, err
+	}
+	if err = adb.saveAccount(account); err != nil {
+		return nil, err
+	}
+	return bytes.Clone(successor), nil
+}
+
+func (adb *AccountsDB) decodeProtectedChildRoot(address, key, value []byte) ([]byte, error) {
+	root, err := adb.protectedChildRoot(bytes.Clone(address), bytes.Clone(key), bytes.Clone(value))
+	if err != nil {
+		return nil, err
+	}
+	if len(root) != adb.hasher.Size() {
+		return nil, errProtectedChild
+	}
+	return bytes.Clone(root), nil
+}
+
+func (adb *AccountsDB) protectedChildAccount(address []byte) (UserAccountHandler, error) {
+	account, err := adb.getAccount(address, adb.mainTrie)
+	if err != nil {
+		return nil, err
+	}
+	user, ok := account.(UserAccountHandler)
+	if !ok || check.IfNil(user) {
+		return nil, errProtectedChild
+	}
+	base, ok := account.(baseAccountHandler)
+	if !ok || check.IfNil(base) {
+		return nil, errProtectedChild
+	}
+	if err = adb.loadDataTrie(base, adb.mainTrie); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (adb *AccountsDB) protectedChildPredecessorAccount(address, key, predecessor []byte) (UserAccountHandler, error) {
+	account, err := adb.protectedChildAccount(address)
+	if err != nil {
+		return nil, err
+	}
+	stored, _, err := account.RetrieveValue(key)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(stored, predecessor) {
+		return nil, errProtectedChild
+	}
+	return account, nil
+}
+
+func (adb *AccountsDB) protectedChildForUpdate(previous *stagedProtectedChild, root, record []byte) (DataTrie, error) {
+	if previous != nil {
+		if !bytes.Equal(previous.root, root) || !bytes.Equal(previous.record, record) {
+			return nil, errProtectedChild
+		}
+		actual, err := previous.trie.RootHash()
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(actual, root) {
+			return nil, errProtectedChild
+		}
+		return previous.trie, nil
+	}
+	tr, err := adb.mainTrie.Recreate(holders.NewDefaultRootHashesHolder(root))
+	if err != nil {
+		return nil, err
+	}
+	child, ok := tr.(DataTrie)
+	if !ok || check.IfNil(child) {
+		return nil, errProtectedChild
+	}
+	return child, nil
 }
 
 // saveDataTrie is used to save the data trie (not committing it) and to recompute the new Root value
@@ -857,6 +1310,9 @@ func (adb *AccountsDB) RevertToSnapshot(snapshot int) error {
 		adb.mutOp.Unlock()
 	}()
 
+	if adb.protectedCommitFailure != nil {
+		return adb.protectedCommitFailure
+	}
 	if snapshot > len(adb.entries) || snapshot < 0 {
 		return ErrSnapshotValueOutOfBounds
 	}
@@ -936,8 +1392,21 @@ func (adb *AccountsDB) Commit() ([]byte, error) {
 	return adb.commit()
 }
 
-func (adb *AccountsDB) commit() ([]byte, error) {
+func (adb *AccountsDB) commit() (_ []byte, result error) {
 	log.Trace("accountsDB.Commit started")
+	if adb.protectedCommitFailure != nil {
+		return nil, adb.protectedCommitFailure
+	}
+	if len(adb.protectedChildren) != 0 {
+		defer func() {
+			if result != nil {
+				adb.protectedCommitFailure = result
+			}
+		}()
+		if err := adb.commitProtectedChildren(); err != nil {
+			return nil, err
+		}
+	}
 	adb.entries = make([]JournalEntry, 0)
 
 	oldHashes := make(common.ModifiedHashes)
@@ -978,12 +1447,50 @@ func (adb *AccountsDB) commit() ([]byte, error) {
 
 	adb.lastRootHash = newRoot
 	adb.obsoleteDataTrieHashes = make(map[string][][]byte)
+	adb.protectedChildren = nil
 
 	log.Trace("accountsDB.Commit ended", "root hash", newRoot)
 
 	adb.printTrieStorageStatistics()
 
 	return newRoot, nil
+}
+
+func (adb *AccountsDB) commitProtectedChildren() error {
+	keys := make([]protectedChildKey, 0, len(adb.protectedChildren))
+	for key := range adb.protectedChildren {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].address != keys[j].address {
+			return keys[i].address < keys[j].address
+		}
+		return keys[i].record < keys[j].record
+	})
+	for _, key := range keys {
+		child := adb.protectedChildren[key]
+		account, err := adb.protectedChildAccount([]byte(key.address))
+		if err != nil {
+			return err
+		}
+		record, _, err := account.RetrieveValue([]byte(key.record))
+		if err != nil {
+			return err
+		}
+		root, err := child.trie.RootHash()
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(record, child.record) || !bytes.Equal(root, child.root) {
+			return errProtectedChild
+		}
+	}
+	for _, key := range keys {
+		if err := adb.protectedChildren[key].trie.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (adb *AccountsDB) markForEviction(
@@ -1084,16 +1591,24 @@ func (adb *AccountsDB) recreateTrie(options common.RootHashHolder) error {
 	}
 
 	adb.mainTrie = newTrie
+	adb.protectedChildren = nil
+	adb.protectedCommitFailure = nil
 	return nil
 }
 
 func (adb *AccountsDB) recreateTrieIfNeeded(options common.RootHashHolder) error {
+	var mustRecover bool
+	if adb.protectedChildRoot != nil {
+		adb.mutOp.RLock()
+		mustRecover = adb.protectedCommitFailure != nil
+		adb.mutOp.RUnlock()
+	}
 	currentRootHash, err := adb.getMainTrie().RootHash()
-	if err != nil {
+	if err != nil && !mustRecover {
 		return err
 	}
 
-	if bytes.Equal(currentRootHash, options.GetRootHash()) {
+	if !mustRecover && bytes.Equal(currentRootHash, options.GetRootHash()) {
 		log.Trace("accountsDB.RecreateTrieIfNeeded - no need to recreate", "root hash", currentRootHash)
 		return nil
 	}
@@ -1153,7 +1668,100 @@ func (adb *AccountsDB) RecreateAllTries(rootHash []byte) (map[string]common.Trie
 		return nil, err
 	}
 
+	if resolve := adb.ProtectedChildResolver(); resolve != nil {
+		children, resolveErr := resolve(holders.NewDefaultRootHashesHolder(rootHash))
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		for _, child := range children {
+			if err = child.Verify(); err != nil {
+				return nil, err
+			}
+			if common.IsEmptyTrie(child.root) {
+				continue
+			}
+			childTrie, reopenErr := child.view.Recreate(holders.NewDefaultRootHashesHolder(child.root))
+			if reopenErr != nil {
+				return nil, reopenErr
+			}
+			allTries[string(child.root)] = childTrie
+		}
+	}
 	return allTries, nil
+}
+
+// ProtectedChildResolver returns the resolver configured on this physical
+// AccountsDB. In particular, it does not derive a locator from an epoch.
+func (adb *AccountsDB) ProtectedChildResolver() ProtectedChildResolver {
+	if adb.protectedCheckpoints == nil {
+		return nil
+	}
+	return func(checkpoint common.RootHashHolder) ([]ProtectedChildReference, error) {
+		return adb.resolveProtectedChildren(adb.getMainTrie(), checkpoint)
+	}
+}
+
+func (adb *AccountsDB) resolveProtectedChildren(main common.Trie, checkpoint common.RootHashHolder) ([]ProtectedChildReference, error) {
+	if check.IfNil(checkpoint) || len(checkpoint.GetRootHash()) != adb.hasher.Size() {
+		return nil, errProtectedChild
+	}
+	locators, err := adb.protectedCheckpoints.Locate(holders.NewRootHashHolder(bytes.Clone(checkpoint.GetRootHash()), checkpoint.GetEpoch()))
+	if err != nil {
+		return nil, err
+	}
+	if len(locators) > adb.protectedCheckpoints.MaxLocators {
+		return nil, errProtectedChild
+	}
+	if len(locators) == 0 {
+		return nil, nil
+	}
+	view, err := main.Recreate(checkpoint)
+	if err != nil {
+		return nil, err
+	}
+	refs := make([]ProtectedChildReference, 0, len(locators))
+	for _, locator := range locators {
+		root, resolveErr := adb.resolveProtectedChild(view, locator)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		refs = append(refs, ProtectedChildReference{root: root, view: view, readNode: adb.protectedCheckpoints.ReadNode,
+			hasher: adb.hasher, maxBytes: adb.protectedCheckpoints.MaxBytes})
+	}
+	return refs, nil
+}
+
+func (adb *AccountsDB) resolveProtectedChild(view common.Trie, locator ProtectedChildLocator) ([]byte, error) {
+	if len(locator.Address) == 0 || len(locator.Record) == 0 || !bytes.HasPrefix(locator.Key, []byte(core.ProtectedKeyPrefix)) {
+		return nil, errProtectedChild
+	}
+	accountBytes, _, err := view.Get(locator.Address)
+	if err != nil {
+		return nil, err
+	}
+	if len(accountBytes) == 0 {
+		return nil, errProtectedChild
+	}
+	account, skip, err := getUserAccountFromBytes(adb.accountFactory, adb.marshaller, locator.Address, accountBytes)
+	if err != nil {
+		return nil, err
+	}
+	if skip || common.IsEmptyTrie(account.GetRootHash()) {
+		return nil, errProtectedChild
+	}
+	dataTrie, err := view.Recreate(holders.NewDefaultRootHashesHolder(account.GetRootHash()))
+	if err != nil {
+		return nil, err
+	}
+	account.SetDataTrie(dataTrie)
+	record, _, err := account.RetrieveValue(locator.Key)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(record, locator.Record) {
+		return nil, errProtectedChild
+	}
+	return adb.decodeProtectedChildRoot(locator.Address, locator.Key, record)
 }
 
 func getUserAccountFromBytes(accountFactory AccountFactory, marshaller marshal.Marshalizer, address []byte, accountBytes []byte) (UserAccountHandler, bool, error) {
@@ -1235,7 +1843,59 @@ func (adb *AccountsDB) PruneTrie(rootHash []byte, identifier TriePruningIdentifi
 	adb.mutOp.Lock()
 	defer adb.mutOp.Unlock()
 
+	if adb.protectedCheckpoints != nil {
+		nodes, err := adb.retainedProtectedNodes()
+		if err != nil {
+			log.Error("protected child retention unavailable", "error", err)
+			return
+		}
+		handler = protectedPruningHandler{PruningHandler: handler, keep: nodes}
+	}
 	adb.storagePruningManager.PruneTrie(rootHash, identifier, adb.mainTrie.GetStorageManager(), handler)
+}
+
+type protectedPruningHandler struct {
+	PruningHandler
+	keep common.ModifiedHashes
+}
+
+func (handler protectedPruningHandler) KeepProtectedTrieNode(hash string) bool {
+	_, keep := handler.keep[hash]
+	return keep
+}
+
+func (adb *AccountsDB) retainedProtectedNodes() (common.ModifiedHashes, error) {
+	retention := adb.protectedCheckpoints
+	checkpoints, err := retention.Retained()
+	if err != nil {
+		return nil, err
+	}
+	if len(checkpoints) == 0 || len(checkpoints) > retention.MaxCheckpoints {
+		return nil, errProtectedChild
+	}
+	required := make(common.ModifiedHashes)
+	budget := retention.MaxBytes
+	hasCurrent := false
+	for _, checkpoint := range checkpoints {
+		refs, resolveErr := adb.resolveProtectedChildren(adb.mainTrie, checkpoint)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		hasCurrent = hasCurrent || bytes.Equal(adb.lastRootHash, checkpoint.GetRootHash())
+		for _, ref := range refs {
+			nodes := make(common.ModifiedHashes)
+			if err = ref.collectNodes(nodes, &budget); err != nil {
+				return nil, err
+			}
+			for hash := range nodes {
+				required[hash] = struct{}{}
+			}
+		}
+	}
+	if !hasCurrent {
+		return nil, errProtectedChild
+	}
+	return required, nil
 }
 
 // CancelPrune clears the trie's evictionWaitingList

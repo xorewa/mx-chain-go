@@ -1,7 +1,7 @@
 source "$MULTIVERSXTESTNETSCRIPTSDIR/include/terminal.sh"
 
 startValidators() {
-  setTerminalSession "multiversx-nodes"
+  setTerminalSession "multiversx-nodes" || return
   setTerminalLayout "tiled"
   setWorkdirForNextCommands "$TESTNETDIR/node"
   if [[ $MULTI_KEY_NODES -eq 1 ]]; then
@@ -32,7 +32,7 @@ iterateOverValidators() {
   for SHARD in $(seq 0 1 $max_shard_id); do
     for _ in $(seq $SHARD_VALIDATORCOUNT); do
       if [ $VALIDATOR_INDEX -ne $SKIP_VALIDATOR_IDX ]; then
-        $callback $SHARD $VALIDATOR_INDEX
+        $callback $SHARD $VALIDATOR_INDEX || return
         sleep 0.5
       fi
       (( VALIDATOR_INDEX++ ))
@@ -43,7 +43,7 @@ iterateOverValidators() {
   SHARD="metachain"
   for _ in $(seq $META_VALIDATORCOUNT); do
     if [ $VALIDATOR_INDEX -ne $SKIP_VALIDATOR_IDX ]; then
-      $callback $SHARD $VALIDATOR_INDEX
+      $callback $SHARD $VALIDATOR_INDEX || return
       sleep 0.5
     fi
      (( VALIDATOR_INDEX++ ))
@@ -58,7 +58,7 @@ iterateOverValidatorsMultiKey() {
   (( max_shard_id=$SHARDCOUNT - 1 ))
   for SHARD in $(seq 0 1 $max_shard_id); do
     if [ $VALIDATOR_INDEX -ne $SKIP_VALIDATOR_IDX ]; then
-      $callback $SHARD $VALIDATOR_INDEX
+      $callback $SHARD $VALIDATOR_INDEX || return
       sleep 0.5
     fi
     (( VALIDATOR_INDEX++ ))
@@ -67,7 +67,7 @@ iterateOverValidatorsMultiKey() {
   # Start Metachain Validator
   SHARD="metachain"
   if [ $VALIDATOR_INDEX -ne $SKIP_VALIDATOR_IDX ]; then
-    $callback $SHARD $VALIDATOR_INDEX
+    $callback $SHARD $VALIDATOR_INDEX || return
     sleep 0.5
   fi
    (( VALIDATOR_INDEX++ ))
@@ -85,9 +85,9 @@ startSingleValidator() {
   local startCommand=""
   if [ "$NODE_WATCHER" -eq 1 ]; then
     setWorkdirForNextCommands "$TESTNETDIR/node_working_dirs/$DIR_NAME$VALIDATOR_INDEX"
-    startCommand="$(assembleCommand_startValidatorNodeWithWatcher $VALIDATOR_INDEX $DIR_NAME $SHARD)"
+    startCommand="$(assembleCommand_startValidatorNodeWithWatcher $VALIDATOR_INDEX $DIR_NAME $SHARD)" || return
   else
-    startCommand="$(assembleCommand_startValidatorNode $VALIDATOR_INDEX $DIR_NAME $SHARD)"
+    startCommand="$(assembleCommand_startValidatorNode $VALIDATOR_INDEX $DIR_NAME $SHARD)" || return
   fi
   runCommandInTerminal "$startCommand"
 }
@@ -135,7 +135,8 @@ assembleCommand_startValidatorNodeWithWatcher() {
 
   local source_command="source $MULTIVERSXTESTNETSCRIPTSDIR/include/watcher.sh"
   local watcher_command="node-start-with-watcher $VALIDATOR_INDEX $PORT &"
-  local node_command=$(assembleCommand_startValidatorNode $VALIDATOR_INDEX $DIR_NAME $SHARD)
+  local node_command
+  node_command=$(assembleCommand_startValidatorNode $VALIDATOR_INDEX $DIR_NAME $SHARD) || return
   mkdir -p $WORKING_DIR
   echo "$node_command" > $WORKING_DIR/node-command
   echo "$PORT" > $WORKING_DIR/node-port
@@ -152,10 +153,19 @@ assembleCommand_startValidatorNode() {
   (( KEY_INDEX=$VALIDATOR_INDEX ))
   WORKING_DIR=$TESTNETDIR/node_working_dirs/$DIR_NAME$VALIDATOR_INDEX
 
+  local quoted_working_dir rest_host="localhost"
+  printf -v quoted_working_dir '%q' "$WORKING_DIR"
+  if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+    rest_host="127.0.0.1"
+  fi
+  local drwaConfigArgs="-config ./config/config_validator.toml"
+  if [[ -n ${NATIVE_DRWA_STARTUP_RECORD:-} || -n ${NATIVE_DRWA_OVERLAY:-} ]]; then
+    drwaConfigArgs=$(assembleNativeDRWAStartupConfigArgs validator) || return
+  fi
   local node_command="./node \
-        -port $PORT --profile-mode -log-save -log-level $LOGLEVEL --log-logger-name --log-correlation --use-health-service -rest-api-interface localhost:$RESTAPIPORT \
+        -port $PORT --profile-mode -log-save -log-level $LOGLEVEL --log-logger-name --log-correlation --use-health-service -rest-api-interface $rest_host:$RESTAPIPORT \
         -sk-index $KEY_INDEX \
-        -working-directory $WORKING_DIR -config ./config/config_validator.toml"
+        -working-directory $quoted_working_dir $drwaConfigArgs"
 
   if [[ $MULTI_KEY_NODES -eq 1 ]]; then
       node_command="$node_command --destination-shard-as-observer $SHARD"
@@ -166,5 +176,5 @@ assembleCommand_startValidatorNode() {
     node_command="nice -n $NODE_NICENESS $node_command"
   fi
 
-  echo $node_command
+  printf '%s\n' "$node_command"
 }

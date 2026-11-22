@@ -28,6 +28,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/block/processedMb"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/trie"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 const (
@@ -154,6 +155,9 @@ func (mp *metaProcessor) ProcessBlock(
 	bodyHandler data.BodyHandler,
 	haveTime func() time.Duration,
 ) error {
+	if err := mp.drwaExecutionError(); err != nil {
+		return err
+	}
 	if haveTime == nil {
 		return process.ErrNilHaveTimeHandler
 	}
@@ -787,6 +791,9 @@ func (mp *metaProcessor) CreateBlock(
 	initialHdr data.HeaderHandler,
 	haveTime func() bool,
 ) (data.HeaderHandler, data.BodyHandler, error) {
+	if err := mp.drwaExecutionError(); err != nil {
+		return nil, nil, err
+	}
 	if check.IfNil(initialHdr) {
 		return nil, nil, process.ErrNilBlockHeader
 	}
@@ -1097,6 +1104,9 @@ func (mp *metaProcessor) createMiniBlocks(
 	}
 
 	mbsToMe, numTxs, numShardHeaders, err := mp.createAndProcessCrossMiniBlocksDstMe(haveTime, gasProcessingPolicy)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessCrossMiniBlocksDstMe", "error", err.Error())
 	}
@@ -1116,7 +1126,10 @@ func (mp *metaProcessor) createMiniBlocks(
 		return nil, err
 	}
 
-	mbsFromMe := mp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	mbsFromMe, err := mp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	if err != nil {
+		return nil, err
+	}
 	if len(mbsFromMe) > 0 {
 		miniBlocks = append(miniBlocks, mbsFromMe...)
 
@@ -1307,6 +1320,9 @@ func (mp *metaProcessor) CommitBlock(
 	headerHandler data.HeaderHandler,
 	bodyHandler data.BodyHandler,
 ) error {
+	if err := mp.drwaExecutionError(); err != nil {
+		return err
+	}
 	commitEntryTime := time.Now()
 	err := checkForNils(headerHandler, bodyHandler)
 	if err != nil {

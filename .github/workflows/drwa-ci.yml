@@ -1,0 +1,444 @@
+name: DRWA CI
+
+on:
+  push:
+    branches:
+      - 'drwa/sp2/**'
+      - 'drwa/sp2-main'
+
+permissions:
+  contents: read
+
+env:
+  # The SP2 local toolchain is build/.toolchains/go1.26.2, with auto-switching off.
+  GOTOOLCHAIN: local
+  GOENV: 'off'
+  GOWORK: 'off'
+  GOFLAGS: '-mod=readonly'
+  GOMAXPROCS: '4'
+  CGO_ENABLED: '1'
+  # Download pinned dependencies through the Go proxy; never fall back to Git.
+  GOPROXY: 'https://proxy.golang.org'
+  # Sorted union of all qual_*_test.go package directories and non-test *.go changes from:
+  # git diff --name-only 06c383cf316ab391d60695a4eeb7c085fb40232b HEAD
+  # Exclude CI tooling under .github/ (tested explicitly), which go list ./... omits.
+  # Qualification packages are included even when they add no production Go file.
+  DRWA_PACKAGES: >-
+    ./api/errors
+    ./api/gin
+    ./api/groups
+    ./api/middleware
+    ./api/mock
+    ./api/shared
+    ./cmd/node
+    ./common
+    ./common/enablers
+    ./config
+    ./consensus
+    ./consensus/round
+    ./dataRetriever/blockchain
+    ./dataRetriever/resolvers
+    ./dataRetriever/txpool
+    ./dblookupext
+    ./dblookupext/factory
+    ./debug/handler
+    ./epochStart/bootstrap
+    ./epochStart/shardchain
+    ./facade
+    ./facade/initial
+    ./factory/api
+    ./factory/consensus
+    ./factory/core
+    ./factory/disabled
+    ./factory/mock
+    ./factory/processing
+    ./factory/state
+    ./genesis/parsing
+    ./genesis/process
+    ./genesis/process/disabled
+    ./integrationTests
+    ./integrationTests/chainSimulator
+    ./integrationTests/chainSimulator/vm
+    ./integrationTests/mock
+    ./integrationTests/realcomponents
+    ./integrationTests/state/stateTrie
+    ./integrationTests/vm
+    ./integrationTests/vm/txsFee
+    ./integrationTests/vm/wasm/wasmer
+    ./node
+    ./node/chainSimulator
+    ./node/chainSimulator/components
+    ./node/external/transactionAPI
+    ./node/metrics
+    ./node/mock
+    ./process
+    ./process/asyncExecution
+    ./process/block
+    ./process/block/preprocess
+    ./process/coordinator
+    ./process/drwa
+    ./process/drwa/headertime
+    ./process/factory/metachain
+    ./process/factory/shard
+    ./process/interceptors
+    ./process/interceptors/processor
+    ./process/mock
+    ./process/peer
+    ./process/receipts
+    ./process/smartContract
+    ./process/smartContract/builtInFunctions
+    ./process/smartContract/hooks
+    ./process/smartContract/hooks/counters
+    ./process/smartContract/processProxy
+    ./process/smartContract/processorV2
+    ./process/smartContract/scrCommon
+    ./process/sync
+    ./process/sync/storageBootstrap
+    ./process/track
+    ./process/transaction
+    ./process/transactionEvaluator
+    ./state
+    ./state/storagePruningManager
+    ./state/syncer
+    ./state/trackableDataTrie
+    ./statusHandler
+    ./storage
+    ./storage/factory
+    ./storage/mock
+    ./storage/pruning
+    ./testscommon
+    ./testscommon/round
+    ./testscommon/trie
+    ./testscommon/txDataBuilder
+    ./trie
+    ./trie/leavesRetriever
+    ./txcache
+    ./update/factory
+    ./update/genesis
+    ./update/mock
+    ./update/sync
+    ./vm
+    ./vm/factory
+    ./vm/process
+    ./vm/systemSmartContracts
+
+jobs:
+  build:
+    name: DRWA build
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: DRWA build
+        run: go build ./...
+
+  vet:
+    name: DRWA vet
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: Reconcile explicit DRWA product package list
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, pathlib, subprocess
+          base = '06c383cf316ab391d60695a4eeb7c085fb40232b'
+          root = pathlib.Path.cwd()
+          directories = subprocess.check_output(['go', 'list', '-f', '{{.Dir}}', './...'], text=True).splitlines()
+          available = {'./' + pathlib.Path(p).relative_to(root).as_posix() for p in directories}
+          changed = subprocess.check_output(['git', 'diff', '--no-ext-diff', '--name-only', '-z', base, 'HEAD']).decode().split('\0')
+          expected = {'./' + pathlib.PurePosixPath(p).parent.as_posix() for p in changed if p.endswith('.go') and not p.endswith('_test.go')}
+          qualifiers = subprocess.check_output(['git', 'ls-files', '-z', '--', '**/qual_*_test.go']).decode().split('\0')
+          expected |= {'./' + pathlib.PurePosixPath(p).parent.as_posix() for p in qualifiers if p}
+          expected &= available
+          actual = set(os.environ['DRWA_PACKAGES'].split())
+          missing, excess = sorted(expected - actual), sorted(actual - expected)
+          print(json.dumps({'missing': missing, 'excess': excess, 'package_count': len(actual)}))
+          if missing or excess:
+              raise SystemExit(1)
+          PYCODE
+      - name: DRWA vet
+        run: go vet $DRWA_PACKAGES
+
+  race:
+    name: DRWA race (${{ matrix.shard }})
+    # Newly selected native Wasmer2 packages txsFee and wasm/wasmer remain excluded
+    # under the owner 2026-11-06 restriction; race.py and KNOWN are unchanged.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: a
+            packages: >-
+              ./api/errors
+              ./api/groups
+              ./api/mock
+              ./cmd/node
+              ./common
+              ./config
+              ./consensus/round
+              ./dataRetriever/resolvers
+              ./dblookupext/factory
+              ./epochStart/bootstrap
+              ./facade
+              ./factory/api
+              ./factory/consensus
+              ./factory/disabled
+              ./factory/processing
+              ./genesis/parsing
+              ./genesis/process/disabled
+              ./integrationTests/chainSimulator
+              ./integrationTests/mock
+              ./integrationTests/vm
+              ./node/chainSimulator
+              ./node/external/transactionAPI
+              ./node/metrics
+              ./process
+              ./process/block/preprocess
+              ./process/drwa
+              ./process/factory/metachain
+              ./process/factory/shard
+              ./process/mock
+              ./process/receipts
+              ./process/smartContract/hooks
+              ./process/smartContract/processProxy
+              ./process/smartContract/processorV2
+              ./process/smartContract/scrCommon
+              ./process/sync/storageBootstrap
+              ./process/transactionEvaluator
+              ./state/syncer
+              ./state/trackableDataTrie
+              ./storage
+              ./storage/mock
+              ./testscommon
+              ./testscommon/trie
+              ./testscommon/txDataBuilder
+              ./trie/leavesRetriever
+              ./update/factory
+              ./update/sync
+              ./vm
+              ./vm/process
+          - shard: b
+            packages: >-
+              ./api/gin
+              ./api/middleware
+              ./api/shared
+              ./common/enablers
+              ./consensus
+              ./dataRetriever/blockchain
+              ./dataRetriever/txpool
+              ./dblookupext
+              ./debug/handler
+              ./epochStart/shardchain
+              ./facade/initial
+              ./factory/core
+              ./factory/mock
+              ./factory/state
+              ./genesis/process
+              ./integrationTests
+              ./integrationTests/chainSimulator/vm
+              ./integrationTests/realcomponents
+              ./integrationTests/state/stateTrie
+              ./node
+              ./node/chainSimulator/components
+              ./node/mock
+              ./process/asyncExecution
+              ./process/block
+              ./process/coordinator
+              ./process/drwa/headertime
+              ./process/interceptors
+              ./process/interceptors/processor
+              ./process/peer
+              ./process/smartContract
+              ./process/smartContract/builtInFunctions
+              ./process/smartContract/hooks/counters
+              ./process/sync
+              ./process/track
+              ./process/transaction
+              ./state
+              ./state/storagePruningManager
+              ./statusHandler
+              ./storage/factory
+              ./storage/pruning
+              ./testscommon/round
+              ./trie
+              ./txcache
+              ./update/genesis
+              ./update/mock
+              ./vm/factory
+              ./vm/systemSmartContracts
+    env:
+      DRWA_PACKAGES: ${{ matrix.packages }}
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: Allow unprivileged user namespaces (hosted runner, this run only)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Check test network namespace (infrastructure preflight)
+        id: isolation-preflight
+        # Fail distinctly before any tests if this hosted runner denies unshare.
+        run: python3 -B .github/ci/check_isolation.py
+      - name: Download pinned dependencies
+        run: go mod download
+      - name: DRWA race — default plus owner-approved Wasmer2 diagnostic run
+        env:
+          GOPROXY: 'off'
+        # Retain default -race results. Only the five named Wasmer2 checkptr aborts
+        # are tolerated; all other failures and every checkptr=0 failure reject.
+        # No coverage profiles are collected by either race run.
+        # Node alone skips ^TestWaitForSignal$ (known upstream test defect,
+        # owner-authorized); normal coverage retains it. No upstream file edit.
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          python3 -B .github/ci/race.py --output race-results $DRWA_PACKAGES
+      - name: Upload both labelled race runs and exception classification
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: go-test-race-${{ matrix.shard }}-${{ github.sha }}
+          path: race-results/
+          if-no-files-found: error
+
+  coverage:
+    name: DRWA coverage
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: Allow unprivileged user namespaces (hosted runner, this run only)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Check test network namespace (infrastructure preflight)
+        id: isolation-preflight
+        # Fail distinctly before any tests if this hosted runner denies unshare.
+        run: python3 -B .github/ci/check_isolation.py
+      - name: Download pinned dependencies
+        run: go mod download
+      - name: Check coverage and race policy helpers
+        env:
+          GOPROXY: 'off'
+        run: |
+          python3 -B -m unittest discover -s .github/ci -p 'test_*.py' -v
+          go test -json -count=1 ./.github/coverage > coverage-helper-tests.json
+      - name: DRWA coverage without race — all selected packages
+        env:
+          GOPROXY: 'off'
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          go test -json -count=1 -covermode=atomic -coverprofile=coverage.out
+          $DRWA_PACKAGES > go-test-coverage.json
+      - name: Enforce hybrid diff coverage at 90 percent
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        env:
+          GOPROXY: 'off'
+        # Only this job's NON-RACE profile feeds the blocking hybrid gate.
+        # Each changed DRWA-owned function >=90% statements; upstream changed
+        # blocks >=90%; changed function entries >=90%. No new exclusions.
+        run: >-
+          go run ./.github/coverage
+          -base 06c383cf316ab391d60695a4eeb7c085fb40232b
+          -profile coverage.out -packages "$DRWA_PACKAGES"
+          -output diff-coverage.json
+      - name: Upload coverage profile, raw tests and hybrid report
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: drwa-coverage-${{ github.sha }}
+          path: |
+            go-test-coverage.json
+            coverage-helper-tests.json
+            coverage.out
+            diff-coverage.json
+          if-no-files-found: error
+
+  branch-trial:
+    name: DRWA gobco branch coverage trial (non-blocking)
+    if: github.repository == 'xorewa/mx-chain-go'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: Allow unprivileged user namespaces (hosted runner, this run only)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Check test network namespace (infrastructure preflight)
+        id: isolation-preflight
+        # Fail distinctly before any tests if this hosted runner denies unshare.
+        run: python3 -B .github/ci/check_isolation.py
+      - name: Build CI-only github.com/rillig/gobco v1.3.4 at approved commit
+        # No install into the product module; no go.mod/go.sum change.
+        run: |
+          git init "$RUNNER_TEMP/gobco-source"
+          git -C "$RUNNER_TEMP/gobco-source" fetch --depth=1 https://github.com/rillig/gobco.git 4c9ea04be46fdf4ee7d40f7bba782f83d0397731
+          git -C "$RUNNER_TEMP/gobco-source" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/gobco-source" rev-parse HEAD)" = 4c9ea04be46fdf4ee7d40f7bba782f83d0397731
+          cd "$RUNNER_TEMP/gobco-source"
+          go build -o "$RUNNER_TEMP/gobco" .
+          "$RUNNER_TEMP/gobco" -version
+      - name: Download pinned product dependencies
+        run: go mod download
+      - name: Trial branch coverage — each DRWA package, no threshold
+        env:
+          GOPROXY: 'off'
+        # v1.3.4 supports only one package per invocation; the runner retains
+        # failures/missing metrics as UNKNOWN and continues through all packages.
+        # -branch counts true/false whole controlling conditions, not MC/DC;
+        # select and unused functions without conditions are outside its metric.
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          python3 -B .github/ci/gobco.py --binary "$RUNNER_TEMP/gobco"
+          --output gobco-results $DRWA_PACKAGES
+      - name: Upload branch trial reports including tool failures
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: drwa-gobco-trial-${{ github.sha }}
+          path: gobco-results/
+          if-no-files-found: error

@@ -17,6 +17,7 @@ import (
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/config/overridableConfig"
 	"github.com/multiversx/mx-chain-go/node"
+	"github.com/multiversx/mx-chain-go/process/drwa"
 	// test point 1 for custom profiler
 )
 
@@ -90,13 +91,19 @@ func main() {
 }
 
 func startNodeRunner(c *cli.Context, log logger.Logger, baseVersion string, version string) error {
-	flagsConfig := getFlagsConfig(c, log)
-
-	fileLogging, errLogger := attachFileLogger(log, flagsConfig)
-	if errLogger != nil {
-		return errLogger
+	startup, err := readDRWAStartupRecord(c.GlobalString(drwaStartupRecord.Name))
+	if err != nil {
+		return err
+	}
+	// No configured persisted checkpoint is admitted. Keep the parsed
+	// record distinct from ordinary startup before opening even a log file.
+	if startup != nil && startup.Mode == "persisted" {
+		return drwa.ErrDeploymentIdentity
 	}
 
+	flagsConfig := getFlagsConfig(c, log)
+
+	original := startup != nil && startup.Mode == "original"
 	cfgs, errCfg := readConfigs(c, log)
 	if errCfg != nil {
 		return errCfg
@@ -107,18 +114,29 @@ func startNodeRunner(c *cli.Context, log logger.Logger, baseVersion string, vers
 		return errCfgOverride
 	}
 
-	if !check.IfNil(fileLogging) {
-		timeLogLifeSpan := time.Second * time.Duration(cfgs.GeneralConfig.Logs.LogFileLifeSpanInSec)
-		sizeLogLifeSpanInMB := uint64(cfgs.GeneralConfig.Logs.LogFileLifeSpanInMB)
-
-		err := fileLogging.ChangeFileLifeSpan(timeLogLifeSpan, sizeLogLifeSpanInMB)
+	var fileLogging factory.FileLoggingHandler
+	if !original {
+		// The native main config can select persisted identity without a
+		// startup record. Refuse it before opening the logger or any provider.
+		if err = node.ValidateDRWAStartupMode(cfgs); err != nil {
+			return err
+		}
+		fileLogging, err = attachFileLogger(log, flagsConfig)
 		if err != nil {
 			return err
 		}
 	}
 
-	err := applyFlags(c, cfgs, flagsConfig, log)
+	if err = configureLogLifetime(fileLogging, cfgs); err != nil {
+		return err
+	}
+
+	err = applyFlags(c, cfgs, flagsConfig, log)
 	if err != nil {
+		return err
+	}
+
+	if err = bindDRWAStartupRecord(cfgs, startup); err != nil {
 		return err
 	}
 
@@ -143,23 +161,56 @@ func startNodeRunner(c *cli.Context, log logger.Logger, baseVersion string, vers
 		return errRunner
 	}
 
+	if original {
+		// NewNodeRunner acquires the process-bound original grant before
+		// the configured CLI can open any file logger or start the runner.
+		fileLogging, err = attachFileLogger(log, flagsConfig)
+		if err != nil {
+			return err
+		}
+		if err = configureLogLifetime(fileLogging, cfgs); err != nil {
+			if !check.IfNil(fileLogging) {
+				log.LogIfError(fileLogging.Close())
+			}
+			return err
+		}
+	}
+
 	err = nodeRunner.Start()
 	if err != nil {
 		log.Error(err.Error())
 	}
 
 	if !check.IfNil(fileLogging) {
-		err = fileLogging.Close()
-		log.LogIfError(err)
+		if original {
+			closeErr := fileLogging.Close()
+			log.LogIfError(closeErr)
+			if err == nil {
+				err = closeErr
+			}
+		} else {
+			err = fileLogging.Close()
+			log.LogIfError(err)
+		}
 	}
 
 	return err
+}
+
+func configureLogLifetime(fileLogging factory.FileLoggingHandler, cfgs *config.Configs) error {
+	if check.IfNil(fileLogging) {
+		return nil
+	}
+	timeLogLifeSpan := time.Second * time.Duration(cfgs.GeneralConfig.Logs.LogFileLifeSpanInSec)
+	sizeLogLifeSpanInMB := uint64(cfgs.GeneralConfig.Logs.LogFileLifeSpanInMB)
+	return fileLogging.ChangeFileLifeSpan(timeLogLifeSpan, sizeLogLifeSpanInMB)
 }
 
 func readConfigs(ctx *cli.Context, log logger.Logger) (*config.Configs, error) {
 	log.Trace("reading Configs")
 
 	configurationPaths := &config.ConfigurationPathsHolder{}
+	configurationPaths.DRWA = ctx.GlobalString(drwaConfigurationFile.Name)
 
 	configurationPaths.MainConfig = ctx.GlobalString(configurationFile.Name)
 	generalConfig, err := common.LoadMainConfig(configurationPaths.MainConfig)

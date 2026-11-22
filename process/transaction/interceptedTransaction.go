@@ -24,6 +24,10 @@ var _ process.InterceptedData = (*InterceptedTransaction)(nil)
 
 // InterceptedTransaction holds and manages a transaction based struct with extended functionality
 type InterceptedTransaction struct {
+	// Private native validation observation; never a current execution permit.
+	nativeOriginalHash     string
+	nativeCryptoValidated  bool
+	nativeValidatedInner   *transaction.Transaction
 	tx                     *transaction.Transaction
 	protoMarshalizer       marshal.Marshalizer
 	signMarshalizer        marshal.Marshalizer
@@ -198,11 +202,14 @@ func createRelayedV2(relayedTx *transaction.Transaction, args [][]byte) (*transa
 func (inTx *InterceptedTransaction) CheckValidity() error {
 	err := inTx.integrity(inTx.tx)
 	if err != nil {
+		inTx.nativeCryptoValidated = false
 		return err
 	}
 
 	whiteListedVerified := inTx.whiteListerVerifiedTxs.IsWhiteListed(inTx)
 	if !whiteListedVerified {
+		inTx.nativeCryptoValidated = false
+		inTx.nativeValidatedInner = nil
 		err = inTx.verifySig(inTx.tx)
 		if err != nil {
 			return err
@@ -229,6 +236,7 @@ func (inTx *InterceptedTransaction) CheckValidity() error {
 		}
 
 		inTx.whiteListerVerifiedTxs.Add([][]byte{inTx.Hash()})
+		inTx.nativeCryptoValidated = true
 	}
 
 	return nil
@@ -377,11 +385,13 @@ func (inTx *InterceptedTransaction) verifyUserTx(userTx *transaction.Transaction
 		return fmt.Errorf("inner transaction: %w", err)
 	}
 
+	inTx.nativeValidatedInner = userTx
 	return nil
 }
 
 func (inTx *InterceptedTransaction) processFields(txBuff []byte) error {
 	inTx.hash = inTx.hasher.Compute(string(txBuff))
+	inTx.nativeOriginalHash = string(inTx.hash)
 
 	inTx.sndShard = inTx.coordinator.ComputeId(inTx.tx.SndAddr)
 	emptyAddr := make([]byte, len(inTx.tx.RcvAddr))

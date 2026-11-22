@@ -31,6 +31,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/track"
 	"github.com/multiversx/mx-chain-go/sharding"
 	nodesCoord "github.com/multiversx/mx-chain-go/sharding/nodesCoordinator"
+	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/state/syncer"
 	"github.com/multiversx/mx-chain-go/trie/statistics"
 	"github.com/multiversx/mx-chain-go/update"
@@ -623,6 +624,9 @@ func (ccf *consensusComponentsFactory) createUserAccountsSyncer() (process.Accou
 		ShardId:                   ccf.processComponents.ShardCoordinator().SelfId(),
 		Throttler:                 thr,
 		AddressPubKeyConverter:    ccf.coreComponents.AddressPubKeyConverter(),
+	}
+	if owning, ok := ccf.stateComponents.AccountsAdapter().(*state.AccountsDB); ok && owning != nil {
+		argsUserAccountsSyncer.ProtectedChildren = owning.ProtectedChildResolver()
 	}
 	return syncer.NewUserAccountsSyncer(argsUserAccountsSyncer)
 }

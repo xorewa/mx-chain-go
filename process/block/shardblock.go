@@ -30,6 +30,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/track"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/storage"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 var _ process.BlockProcessor = (*shardProcessor)(nil)
@@ -113,6 +114,9 @@ func (sp *shardProcessor) ProcessBlock(
 	bodyHandler data.BodyHandler,
 	haveTime func() time.Duration,
 ) error {
+	if err := sp.drwaExecutionError(); err != nil {
+		return err
+	}
 	if haveTime == nil {
 		return process.ErrNilHaveTimeHandler
 	}
@@ -1085,6 +1089,9 @@ func (sp *shardProcessor) CreateBlock(
 	initialHdr data.HeaderHandler,
 	haveTime func() bool,
 ) (data.HeaderHandler, data.BodyHandler, error) {
+	if err := sp.drwaExecutionError(); err != nil {
+		return nil, nil, err
+	}
 	if check.IfNil(initialHdr) {
 		return nil, nil, process.ErrNilBlockHeader
 	}
@@ -1197,6 +1204,9 @@ func (sp *shardProcessor) CommitBlock(
 	headerHandler data.HeaderHandler,
 	bodyHandler data.BodyHandler,
 ) error {
+	if err := sp.drwaExecutionError(); err != nil {
+		return err
+	}
 	commitEntryTime := time.Now()
 	err := checkForNils(headerHandler, bodyHandler)
 	if err != nil {
@@ -2884,6 +2894,9 @@ func (sp *shardProcessor) createMiniBlocks(haveTime func() bool, randomness []by
 	)
 	elapsedTime := time.Since(startTime)
 	log.Debug("elapsed time to create mbs to me", "time", elapsedTime)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessCrossMiniBlocksDstMe", "error", err.Error())
 	}
@@ -2930,7 +2943,10 @@ func (sp *shardProcessor) createMiniBlocks(haveTime func() bool, randomness []by
 
 	startTime = time.Now()
 
-	mbsFromMe := sp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	mbsFromMe, err := sp.txCoordinator.CreateMbsAndProcessTransactionsFromMe(haveTime, randomness)
+	if err != nil {
+		return nil, nil, err
+	}
 	elapsedTime = time.Since(startTime)
 	log.Debug("elapsed time to create mbs from me", "time", elapsedTime)
 

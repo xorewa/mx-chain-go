@@ -155,6 +155,45 @@ type journalEntryDataTrieUpdates struct {
 	account     baseAccountHandler
 }
 
+// journalEntryProtectedChild lives in the account journal, so a later
+// operation on the same staged child restores the earlier operation's root.
+type journalEntryProtectedChild struct {
+	owner    *AccountsDB
+	key      protectedChildKey
+	previous *stagedProtectedChild
+	child    DataTrie
+	root     []byte
+	undo     []core.TrieData
+}
+
+func (entry *journalEntryProtectedChild) Revert() (vmcommon.AccountHandler, error) {
+	if entry.previous == nil {
+		delete(entry.owner.protectedChildren, entry.key)
+		return nil, nil
+	}
+	for i := len(entry.undo) - 1; i >= 0; i-- {
+		update := entry.undo[i]
+		if err := entry.child.UpdateWithVersion(update.Key, update.Value, update.Version); err != nil {
+			entry.owner.protectedCommitFailure = err
+			return nil, err
+		}
+	}
+	root, err := entry.child.RootHash()
+	if err == nil && !bytes.Equal(root, entry.root) {
+		err = errProtectedChild
+	}
+	if err != nil {
+		entry.owner.protectedCommitFailure = err
+		return nil, err
+	}
+	entry.owner.protectedChildren[entry.key] = entry.previous
+	return nil, nil
+}
+
+func (entry *journalEntryProtectedChild) IsInterfaceNil() bool {
+	return entry == nil
+}
+
 // NewJournalEntryDataTrieUpdates outputs a new JournalEntryDataTrieUpdates implementation used to revert an account's data trie
 func NewJournalEntryDataTrieUpdates(trieUpdates []core.TrieData, account baseAccountHandler) (*journalEntryDataTrieUpdates, error) {
 	if check.IfNil(account) {

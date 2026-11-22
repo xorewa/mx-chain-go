@@ -7,28 +7,41 @@
 
 export MULTIVERSXTESTNETSCRIPTSDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-source "$MULTIVERSXTESTNETSCRIPTSDIR/variables.sh"
-source "$MULTIVERSXTESTNETSCRIPTSDIR/include/config.sh"
-source "$MULTIVERSXTESTNETSCRIPTSDIR/include/build.sh"
+source "$MULTIVERSXTESTNETSCRIPTSDIR/variables.sh" || exit $?
+source "$MULTIVERSXTESTNETSCRIPTSDIR/include/config.sh" || exit $?
+source "$MULTIVERSXTESTNETSCRIPTSDIR/include/build.sh" || exit $?
 
-prepareFolders
+if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+  validateNativeLocalnetOptions || exit $?
+fi
 
-buildConfigGenerator
+prepareFolders || exit $?
 
-generateConfig
+buildConfigGenerator || exit $?
 
-copyConfig
+copyNodeConfig || exit $?
 
-copySeednodeConfig
-updateSeednodeConfig
+if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+  (
+    cd "$TESTNETDIR/node/config" || exit
+    updateChainParameters config_observer.toml || exit
+    updateChainParameters config_validator.toml
+  ) || exit $?
+fi
 
-copyNodeConfig
-updateNodeConfig
+generateConfig || exit $?
+
+copyConfig || exit $?
+
+copySeednodeConfig || exit $?
+updateSeednodeConfig || exit $?
+
+updateNodeConfig || exit $?
 
 if [ $USE_PROXY -eq 1 ]; then
-  prepareFolders_Proxy
-  copyProxyConfig
-  updateProxyConfig
+  prepareFolders_Proxy || exit $?
+  copyProxyConfig || exit $?
+  updateProxyConfig || exit $?
 fi
 
 if [ $USE_TXGEN -eq 1 ]; then

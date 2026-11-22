@@ -54,17 +54,18 @@ const (
 var zero = big.NewInt(0)
 
 type scProcessor struct {
-	accounts           state.AccountsAdapter
-	blockChainHook     process.BlockChainHookHandler
-	pubkeyConv         core.PubkeyConverter
-	hasher             hashing.Hasher
-	marshalizer        marshal.Marshalizer
-	shardCoordinator   sharding.Coordinator
-	vmContainer        process.VirtualMachinesContainer
-	argsParser         process.ArgumentsParser
-	esdtTransferParser vmcommon.ESDTTransferParser
-	builtInFunctions   vmcommon.BuiltInFunctionContainer
-	wasmVMChangeLocker common.Locker
+	drwaAccountDeletionGuard vm.DRWAAccountDeletionGuard
+	accounts                 state.AccountsAdapter
+	blockChainHook           process.BlockChainHookHandler
+	pubkeyConv               core.PubkeyConverter
+	hasher                   hashing.Hasher
+	marshalizer              marshal.Marshalizer
+	shardCoordinator         sharding.Coordinator
+	vmContainer              process.VirtualMachinesContainer
+	argsParser               process.ArgumentsParser
+	esdtTransferParser       vmcommon.ESDTTransferParser
+	builtInFunctions         vmcommon.BuiltInFunctionContainer
+	wasmVMChangeLocker       common.Locker
 
 	enableRoundsHandler common.EnableRoundsHandler
 	enableEpochsHandler common.EnableEpochsHandler
@@ -89,27 +90,28 @@ type scProcessor struct {
 
 // ArgsNewSmartContractProcessor defines the arguments needed for new smart contract processor
 type ArgsNewSmartContractProcessor struct {
-	VmContainer         process.VirtualMachinesContainer
-	ArgsParser          process.ArgumentsParser
-	Hasher              hashing.Hasher
-	Marshalizer         marshal.Marshalizer
-	AccountsDB          state.AccountsAdapter
-	BlockChainHook      process.BlockChainHookHandler
-	BuiltInFunctions    vmcommon.BuiltInFunctionContainer
-	PubkeyConv          core.PubkeyConverter
-	ShardCoordinator    sharding.Coordinator
-	ScrForwarder        process.IntermediateTransactionHandler
-	TxFeeHandler        process.TransactionFeeHandler
-	EconomicsFee        process.FeeHandler
-	TxTypeHandler       process.TxTypeHandler
-	GasHandler          process.GasHandler
-	GasSchedule         core.GasScheduleNotifier
-	TxLogsProcessor     process.TransactionLogProcessor
-	EnableEpochsHandler common.EnableEpochsHandler
-	BadTxForwarder      process.IntermediateTransactionHandler
-	VMOutputCacher      storage.Cacher
-	WasmVMChangeLocker  common.Locker
-	IsGenesisProcessing bool
+	DRWAAccountDeletionGuard vm.DRWAAccountDeletionGuard
+	VmContainer              process.VirtualMachinesContainer
+	ArgsParser               process.ArgumentsParser
+	Hasher                   hashing.Hasher
+	Marshalizer              marshal.Marshalizer
+	AccountsDB               state.AccountsAdapter
+	BlockChainHook           process.BlockChainHookHandler
+	BuiltInFunctions         vmcommon.BuiltInFunctionContainer
+	PubkeyConv               core.PubkeyConverter
+	ShardCoordinator         sharding.Coordinator
+	ScrForwarder             process.IntermediateTransactionHandler
+	TxFeeHandler             process.TransactionFeeHandler
+	EconomicsFee             process.FeeHandler
+	TxTypeHandler            process.TxTypeHandler
+	GasHandler               process.GasHandler
+	GasSchedule              core.GasScheduleNotifier
+	TxLogsProcessor          process.TransactionLogProcessor
+	EnableEpochsHandler      common.EnableEpochsHandler
+	BadTxForwarder           process.IntermediateTransactionHandler
+	VMOutputCacher           storage.Cacher
+	WasmVMChangeLocker       common.Locker
+	IsGenesisProcessing      bool
 }
 
 // NewSmartContractProcessor creates a smart contract processor that creates and interprets VM data
@@ -205,31 +207,32 @@ func NewSmartContractProcessor(args scrCommon.ArgsNewSmartContractProcessor) (*s
 	builtInFuncCost := args.GasSchedule.LatestGasSchedule()[common.BuiltInCost]
 	baseOperationCost := args.GasSchedule.LatestGasSchedule()[common.BaseOperationCost]
 	sc := &scProcessor{
-		vmContainer:         args.VmContainer,
-		argsParser:          args.ArgsParser,
-		hasher:              args.Hasher,
-		marshalizer:         args.Marshalizer,
-		accounts:            args.AccountsDB,
-		blockChainHook:      args.BlockChainHook,
-		pubkeyConv:          args.PubkeyConv,
-		shardCoordinator:    args.ShardCoordinator,
-		scrForwarder:        args.ScrForwarder,
-		txFeeHandler:        args.TxFeeHandler,
-		economicsFee:        args.EconomicsFee,
-		txTypeHandler:       args.TxTypeHandler,
-		gasHandler:          args.GasHandler,
-		builtInGasCosts:     builtInFuncCost,
-		txLogsProcessor:     args.TxLogsProcessor,
-		enableRoundsHandler: args.EnableRoundsHandler,
-		enableEpochsHandler: args.EnableEpochsHandler,
-		badTxForwarder:      args.BadTxForwarder,
-		builtInFunctions:    args.BuiltInFunctions,
-		isGenesisProcessing: args.IsGenesisProcessing,
-		wasmVMChangeLocker:  args.WasmVMChangeLocker,
-		vmOutputCacher:      args.VMOutputCacher,
-		storePerByte:        baseOperationCost["StorePerByte"],
-		persistPerByte:      baseOperationCost["PersistPerByte"],
-		executableCheckers:  scrCommon.CreateExecutableCheckersMap(args.BuiltInFunctions),
+		vmContainer:              args.VmContainer,
+		argsParser:               args.ArgsParser,
+		hasher:                   args.Hasher,
+		marshalizer:              args.Marshalizer,
+		drwaAccountDeletionGuard: args.DRWAAccountDeletionGuard,
+		accounts:                 args.AccountsDB,
+		blockChainHook:           args.BlockChainHook,
+		pubkeyConv:               args.PubkeyConv,
+		shardCoordinator:         args.ShardCoordinator,
+		scrForwarder:             args.ScrForwarder,
+		txFeeHandler:             args.TxFeeHandler,
+		economicsFee:             args.EconomicsFee,
+		txTypeHandler:            args.TxTypeHandler,
+		gasHandler:               args.GasHandler,
+		builtInGasCosts:          builtInFuncCost,
+		txLogsProcessor:          args.TxLogsProcessor,
+		enableRoundsHandler:      args.EnableRoundsHandler,
+		enableEpochsHandler:      args.EnableEpochsHandler,
+		badTxForwarder:           args.BadTxForwarder,
+		builtInFunctions:         args.BuiltInFunctions,
+		isGenesisProcessing:      args.IsGenesisProcessing,
+		wasmVMChangeLocker:       args.WasmVMChangeLocker,
+		vmOutputCacher:           args.VMOutputCacher,
+		storePerByte:             baseOperationCost["StorePerByte"],
+		persistPerByte:           baseOperationCost["PersistPerByte"],
+		executableCheckers:       scrCommon.CreateExecutableCheckersMap(args.BuiltInFunctions),
 	}
 
 	sc.esdtTransferParser, err = parsers.NewESDTTransferParser(args.Marshalizer)
@@ -282,13 +285,54 @@ func (sc *scProcessor) ExecuteSmartContractTransaction(
 	tx data.TransactionHandler,
 	acntSnd, acntDst state.UserAccountHandler,
 ) (vmcommon.ReturnCode, error) {
+	return sc.executeSmartContractTransaction(tx, acntSnd, acntDst, nil)
+}
+
+// ExecuteSmartContractTransactionWithDRWA is a local native-owner adaptation,
+// not a public endpoint. The physical VM source must authenticate the operation
+// before payment, save, gas, journal or output effects. No source means denial.
+func (sc *scProcessor) ExecuteSmartContractTransactionWithDRWA(tx data.TransactionHandler,
+	acntSnd, acntDst state.UserAccountHandler, validation any) (vmcommon.ReturnCode, error) {
+	return sc.WithDRWANativeTransaction(tx, validation, func(execute vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error) {
+		if execute == nil {
+			return sc.ExecuteSmartContractTransaction(tx, acntSnd, acntDst)
+		}
+		return execute(tx, acntSnd, acntDst)
+	})
+}
+
+// WithDRWANativeTransaction retains the selected SC/physical VM through the
+// original native transaction. It constructs no authentication source or journal.
+func (sc *scProcessor) WithDRWANativeTransaction(tx data.TransactionHandler, validation any,
+	execute func(vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error)) (vmcommon.ReturnCode, error) {
+	if execute == nil {
+		return vmcommon.ExecutionFailed, vm.ErrDRWAExecution
+	}
+	return scrCommon.WithDRWANativeCall(sc.vmContainer, sc.wasmVMChangeLocker, sc.accounts, tx, validation,
+		func(call *scrCommon.DRWANativeCall) (vmcommon.ReturnCode, error) {
+			if call == nil {
+				return execute(nil)
+			}
+			return execute(func(actual data.TransactionHandler, sender, destination state.UserAccountHandler) (vmcommon.ReturnCode, error) {
+				if call != nil {
+					if err := call.Begin(actual, sc.accounts, sender, destination); err != nil {
+						return vmcommon.ExecutionFailed, err
+					}
+				}
+				return sc.executeSmartContractTransaction(actual, sender, destination, call)
+			})
+		})
+}
+
+func (sc *scProcessor) executeSmartContractTransaction(tx data.TransactionHandler,
+	acntSnd, acntDst state.UserAccountHandler, native *scrCommon.DRWANativeCall) (vmcommon.ReturnCode, error) {
 	if check.IfNil(tx) {
 		return 0, process.ErrNilTransaction
 	}
 
 	sw := core.NewStopWatch()
 	sw.Start("execute")
-	returnCode, err := sc.doExecuteSmartContractTransaction(tx, acntSnd, acntDst)
+	returnCode, err := sc.doExecuteSmartContractTransaction(tx, acntSnd, acntDst, native)
 	sw.Stop("execute")
 	duration := sw.GetMeasurement("execute")
 
@@ -348,15 +392,22 @@ func (sc *scProcessor) prepareExecution(
 func (sc *scProcessor) doExecuteSmartContractTransaction(
 	tx data.TransactionHandler,
 	acntSnd, acntDst state.UserAccountHandler,
+	native ...*scrCommon.DRWANativeCall,
 ) (vmcommon.ReturnCode, error) {
 	returnCode, vmInput, txHash, err := sc.prepareExecution(tx, acntSnd, acntDst, false)
 	if err != nil || returnCode != vmcommon.Ok {
 		return returnCode, err
 	}
 
+	if len(native) != 0 && native[0] != nil {
+		if err := native[0].Bind(vmInput); err != nil {
+			return vmcommon.ExecutionFailed, err
+		}
+	}
+
 	snapshot := sc.accounts.JournalLen()
 
-	vmOutput, err := sc.executeSmartContractCall(vmInput, tx, txHash, snapshot, acntSnd, acntDst, nil)
+	vmOutput, err := sc.executeSmartContractCall(vmInput, tx, txHash, snapshot, acntSnd, acntDst, nil, native...)
 	if err != nil {
 		return returnCode, err
 	}
@@ -390,17 +441,25 @@ func (sc *scProcessor) executeSmartContractCall(
 	snapshot int,
 	acntSnd, acntDst state.UserAccountHandler,
 	prevVmOutput *vmcommon.VMOutput,
+	native ...*scrCommon.DRWANativeCall,
 ) (*vmcommon.VMOutput, error) {
 	if check.IfNil(acntDst) {
 		return nil, process.ErrNilSCDestAccount
 	}
 
-	sc.wasmVMChangeLocker.RLock()
+	ordinary := len(native) == 0 || native[0] == nil
+	if ordinary {
+		sc.wasmVMChangeLocker.RLock()
+	}
 
 	userErrorVmOutput := &vmcommon.VMOutput{
 		ReturnCode: vmcommon.UserError,
 	}
-	vmExec, _, err := scrCommon.FindVMByScAddress(sc.vmContainer, vmInput.RecipientAddr)
+	var vmExec vmcommon.VMExecutionHandler
+	var err error
+	if ordinary {
+		vmExec, _, err = scrCommon.FindVMByScAddress(sc.vmContainer, vmInput.RecipientAddr)
+	}
 	if err != nil {
 		sc.wasmVMChangeLocker.RUnlock()
 		returnMessage := "cannot get vm from address"
@@ -412,11 +471,14 @@ func (sc *scProcessor) executeSmartContractCall(
 	defer sc.printBlockchainHookCounters(tx)
 
 	var vmOutput *vmcommon.VMOutput
-	vmOutput, err = vmExec.RunSmartContractCall(vmInput)
-
-	sc.wasmVMChangeLocker.RUnlock()
+	if ordinary {
+		vmOutput, err = vmExec.RunSmartContractCall(vmInput)
+		sc.wasmVMChangeLocker.RUnlock()
+	} else {
+		vmOutput, err = native[0].Run(vmInput)
+	}
 	if err != nil {
-		if core.IsGetNodeFromDBError(err) {
+		if errors.Is(err, vm.ErrDRWAExecution) || core.IsGetNodeFromDBError(err) {
 			return nil, err
 		}
 		log.Debug("run smart contract call error", "error", err.Error())
@@ -1118,6 +1180,9 @@ func (sc *scProcessor) resolveBuiltInFunctions(
 
 	vmOutput, err := sc.blockChainHook.ProcessBuiltInFunction(vmInput)
 	if err != nil {
+		if errors.Is(err, vm.ErrDRWAExecution) {
+			return nil, err
+		}
 		vmOutput = &vmcommon.VMOutput{
 			ReturnCode:    vmcommon.UserError,
 			ReturnMessage: err.Error(),
@@ -1770,7 +1835,7 @@ func (sc *scProcessor) doDeploySmartContract(
 	sc.wasmVMChangeLocker.RUnlock()
 	if err != nil {
 		log.Debug("VM error", "error", err.Error())
-		if core.IsGetNodeFromDBError(err) {
+		if errors.Is(err, vm.ErrDRWAExecution) || core.IsGetNodeFromDBError(err) {
 			return vmcommon.ExecutionFailed, err
 		}
 		return vmcommon.UserError, sc.ProcessIfError(acntSnd, txHash, tx, err.Error(), []byte(""), snapshot, vmInput.GasLocked)
@@ -2729,6 +2794,24 @@ func (sc *scProcessor) updateSmartContractCode(
 
 // delete accounts - only suicide by current SC or another SC called by current SC - protected by VM
 func (sc *scProcessor) deleteAccounts(deletedAccounts [][]byte) error {
+	if sc.drwaAccountDeletionGuard == nil {
+		return sc.deleteAccountsNative(deletedAccounts, false)
+	}
+	// Freeze the selected batch before its owning view dependency. This is not
+	// a second journal; all effects remain under the original native SC snapshot.
+	frozen := make([][]byte, len(deletedAccounts))
+	for i, address := range deletedAccounts {
+		frozen[i] = bytes.Clone(address)
+	}
+	return sc.drwaAccountDeletionGuard.WithDRWAAccountDeletion(sc.accounts, frozen, func() error {
+		if vm.DRWADeletionTargetsProtectedAccount(frozen) {
+			return process.ErrNotAllowedToWriteUnderProtectedKey
+		}
+		return sc.deleteAccountsNative(frozen, true)
+	})
+}
+
+func (sc *scProcessor) deleteAccountsNative(deletedAccounts [][]byte, protect bool) error {
 	for _, value := range deletedAccounts {
 		acc, err := sc.getAccountFromAddress(value)
 		if err != nil {
@@ -2740,6 +2823,14 @@ func (sc *scProcessor) deleteAccounts(deletedAccounts [][]byte) error {
 			continue
 		}
 
+		if protect {
+			if vm.DRWADeletionTargetsProtectedAccount([][]byte{acc.AddressBytes()}) {
+				return process.ErrNotAllowedToWriteUnderProtectedKey
+			}
+			if !bytes.Equal(acc.AddressBytes(), value) {
+				return vm.ErrDRWAExecution
+			}
+		}
 		err = sc.accounts.RemoveAccount(acc.AddressBytes())
 		if err != nil {
 			return err

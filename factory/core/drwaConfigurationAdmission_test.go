@@ -1,0 +1,34 @@
+package core
+
+import (
+	"github.com/stretchr/testify/require"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestLoadDRWAConfigurationCandidate(t *testing.T) {
+	for _, which := range []string{"epoch", "round", "economics", "ratings"} {
+		t.Run(strings.ReplaceAll(which, "/", " ")+" should preserve the expected result", func(t *testing.T) {
+			paths, overlay := qualDRWALoadedFiles(t)
+			missing := filepath.Join(t.TempDir(), "absent-native-config.toml")
+			switch which {
+			case "epoch":
+				paths.Epoch = missing
+			case "round":
+				paths.RoundActivation = missing
+			case "economics":
+				paths.Economics = missing
+			case "ratings":
+				paths.Ratings = missing
+			}
+			candidate, err := LoadDRWAConfigurationCandidate(paths, overlay, DRWAConfigurationSupport{RelayedV3: true, RegisterMetaESDTPath: true})
+			require.Error(t, err)
+			require.Nil(t, candidate)
+		})
+	}
+	var absent *DRWAConfigurationCandidate
+	epochs, rounds := absent.ActivationInventory()
+	require.Nil(t, epochs)
+	require.Nil(t, rounds)
+}

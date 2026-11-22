@@ -14,6 +14,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/hashing"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	"github.com/multiversx/mx-chain-go/errors"
@@ -22,6 +23,7 @@ import (
 	"github.com/multiversx/mx-chain-go/state/factory"
 	"github.com/multiversx/mx-chain-go/state/storagePruningManager/disabled"
 	"github.com/multiversx/mx-chain-go/trie"
+	"github.com/multiversx/mx-chain-go/trie/keyBuilder"
 	"github.com/multiversx/mx-chain-go/update"
 )
 
@@ -31,14 +33,19 @@ const maxTrieLevelInMemory = uint(5)
 
 // ArgsNewStateImport is the arguments structure to create a new state importer
 type ArgsNewStateImport struct {
-	Hasher              hashing.Hasher
-	Marshalizer         marshal.Marshalizer
-	ShardID             uint32
-	StorageConfig       config.StorageConfig
-	TrieStorageManagers map[string]common.StorageManager
-	HardforkStorer      update.HardforkStorer
-	AddressConverter    core.PubkeyConverter
-	EnableEpochsHandler common.EnableEpochsHandler
+	Hasher               hashing.Hasher
+	Marshalizer          marshal.Marshalizer
+	ShardID              uint32
+	StorageConfig        config.StorageConfig
+	TrieStorageManagers  map[string]common.StorageManager
+	HardforkStorer       update.HardforkStorer
+	AddressConverter     core.PubkeyConverter
+	EnableEpochsHandler  common.EnableEpochsHandler
+	ProtectedChildRoot   state.ProtectedChildRoot
+	ProtectedCheckpoints *state.ProtectedChildCheckpoints
+	// ExpectedProtectedRoots names the externally authenticated source state
+	// checkpoint for each shard whose imported records must be verified.
+	ExpectedProtectedRoots map[uint32][]byte
 }
 
 type stateImport struct {
@@ -52,13 +59,17 @@ type stateImport struct {
 	validatorDB                  state.AccountsDBImporter
 	hardforkStorer               update.HardforkStorer
 
-	hasher              hashing.Hasher
-	marshalizer         marshal.Marshalizer
-	shardID             uint32
-	storageConfig       config.StorageConfig
-	trieStorageManagers map[string]common.StorageManager
-	addressConverter    core.PubkeyConverter
-	enableEpochsHandler common.EnableEpochsHandler
+	hasher               hashing.Hasher
+	marshalizer          marshal.Marshalizer
+	shardID              uint32
+	storageConfig        config.StorageConfig
+	trieStorageManagers  map[string]common.StorageManager
+	addressConverter     core.PubkeyConverter
+	enableEpochsHandler  common.EnableEpochsHandler
+	protectedChildRoot   state.ProtectedChildRoot
+	protectedCheckpoints *state.ProtectedChildCheckpoints
+	protectedRoots       map[uint32][]byte
+	protectedImportReady bool
 }
 
 // NewStateImport creates an importer which reads all the files for a new start
@@ -99,6 +110,24 @@ func NewStateImport(args ArgsNewStateImport) (*stateImport, error) {
 		addressConverter:             args.AddressConverter,
 		enableEpochsHandler:          args.EnableEpochsHandler,
 	}
+	if args.ProtectedChildRoot != nil || args.ProtectedCheckpoints != nil || args.ExpectedProtectedRoots != nil {
+		if args.ProtectedChildRoot == nil || args.ProtectedCheckpoints == nil || len(args.ExpectedProtectedRoots) == 0 {
+			return nil, fmt.Errorf("%w missing protected import inputs", update.ErrImportingData)
+		}
+		selectors := *args.ProtectedCheckpoints
+		selectors.ReadNode = func(hash []byte, db common.TrieStorageInteractor) ([]common.TrieNodeData, error) {
+			return trie.GetNodeDataFromHash(hash, keyBuilder.NewKeyBuilder(), db, args.Marshalizer, args.Hasher)
+		}
+		st.protectedChildRoot = args.ProtectedChildRoot
+		st.protectedCheckpoints = &selectors
+		st.protectedRoots = make(map[uint32][]byte, len(args.ExpectedProtectedRoots))
+		for shard, root := range args.ExpectedProtectedRoots {
+			if len(root) != args.Hasher.Size() {
+				return nil, fmt.Errorf("%w invalid expected protected checkpoint", update.ErrImportingData)
+			}
+			st.protectedRoots[shard] = bytes.Clone(root)
+		}
+	}
 
 	return st, nil
 }
@@ -106,6 +135,7 @@ func NewStateImport(args ArgsNewStateImport) (*stateImport, error) {
 // ImportAll imports all the relevant files for the new genesis
 func (si *stateImport) ImportAll() error {
 	var errFound error
+	si.protectedImportReady = false
 
 	si.hardforkStorer.RangeKeys(func(identifier string, keys [][]byte) bool {
 		var err error
@@ -138,8 +168,56 @@ func (si *stateImport) ImportAll() error {
 	if errFound != nil {
 		return errFound
 	}
+	if err == nil && si.protectedRoots != nil {
+		if err = si.checkProtectedImport(); err != nil {
+			return err
+		}
+		si.protectedImportReady = true
+	}
 
 	return err
+}
+
+func (si *stateImport) checkProtectedImport() error {
+	for shard, root := range si.protectedRoots {
+		adb, ok := si.accountDBsMap[shard].(*state.AccountsDB)
+		if !ok || adb == nil {
+			return fmt.Errorf("%w missing protected checkpoint for shard %d", update.ErrImportingData, shard)
+		}
+		actual, err := adb.RootHash()
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(root, actual) {
+			return fmt.Errorf("%w protected checkpoint root mismatch for shard %d", update.ErrImportingData, shard)
+		}
+		refs, err := adb.ProtectedChildResolver()(holders.NewDefaultRootHashesHolder(root))
+		if err != nil {
+			return err
+		}
+		for _, ref := range refs {
+			if err = ref.Verify(); err != nil {
+				return err
+			}
+			child := ref.RootHash()
+			if common.IsEmptyTrie(child) {
+				continue
+			}
+			id := TrieIdentifier + atSep + AddRootHashToIdentifier(CreateTrieIdentifier(shard, DataTrie), string(child))
+			physical, present := si.tries[id]
+			if !present || check.IfNil(physical) || !ref.IsForStorage(physical.GetStorageManager()) {
+				return fmt.Errorf("%w required protected child missing for shard %d", update.ErrImportingData, shard)
+			}
+			actualChild, errRoot := physical.RootHash()
+			if errRoot != nil {
+				return errRoot
+			}
+			if !bytes.Equal(actualChild, child) {
+				return fmt.Errorf("%w protected child root mismatch for shard %d", update.ErrImportingData, shard)
+			}
+		}
+	}
+	return nil
 }
 
 func (si *stateImport) importEpochStartMetaBlock(identifier string, keys [][]byte) error {
@@ -447,6 +525,10 @@ func (si *stateImport) getAccountsDB(accType Type, shardID uint32, accountFactor
 		SnapshotsManager:       disabledState.NewDisabledSnapshotsManager(),
 		StateAccessesCollector: disabledState.NewDisabledStateAccessesCollector(),
 	}
+	if _, required := si.protectedRoots[shardID]; required {
+		argsAccountDB.ProtectedChildRoot = si.protectedChildRoot
+		argsAccountDB.ProtectedChildCheckpoints = si.protectedCheckpoints
+	}
 	accountsDB, err = state.NewAccountsDB(argsAccountDB)
 	si.accountDBsMap[shardID] = accountsDB
 	return accountsDB, currentTrie, err
@@ -580,6 +662,9 @@ func (si *stateImport) saveRootHash(
 
 // GetAccountsDBForShard returns the accounts DB for a specific shard
 func (si *stateImport) GetAccountsDBForShard(shardID uint32) state.AccountsAdapter {
+	if si.protectedRoots != nil && !si.protectedImportReady {
+		return nil
+	}
 	adb, ok := si.accountDBsMap[shardID]
 	if !ok {
 		return nil

@@ -27,6 +27,8 @@ import (
 var _ process.VirtualMachinesContainerFactory = (*vmContainerFactory)(nil)
 
 type vmContainerFactory struct {
+	drwaDeletionGuard      vm.DRWAAccountDeletionGuard
+	drwaClassifier         vm.DRWATokenClassifier
 	chanceComputer         nodesCoordinator.ChanceComputer
 	validatorAccountsDB    state.AccountsAdapter
 	userAccountsDB         state.AccountsAdapter
@@ -50,6 +52,7 @@ type vmContainerFactory struct {
 
 // ArgsNewVMContainerFactory defines the arguments needed to create a new VM container factory
 type ArgsNewVMContainerFactory struct {
+	DRWAClassifier      vm.DRWATokenClassifier
 	ArgBlockChainHook   hooks.ArgBlockChainHook
 	Economics           process.EconomicsDataHandler
 	MessageSignVerifier vm.MessageSignVerifier
@@ -123,6 +126,7 @@ func NewVMContainerFactory(args ArgsNewVMContainerFactory) (*vmContainerFactory,
 	cryptoHook := hooks.NewVMCryptoHook()
 
 	return &vmContainerFactory{
+		drwaClassifier:         args.DRWAClassifier,
 		blockChainHook:         args.BlockChainHook,
 		cryptoHook:             cryptoHook,
 		economics:              args.Economics,
@@ -186,8 +190,17 @@ func (vmf *vmContainerFactory) CreateForGenesis() (process.VirtualMachinesContai
 }
 
 func (vmf *vmContainerFactory) createSystemVMFactoryAndEEI() (vm.SystemSCContainerFactory, vm.ContextHandler, error) {
+	// P-05: the native hook and System-SC user context must share the same
+	// captured journal owner. Equal roots on another adapter are insufficient.
+	// Nil classifiers retain native construction; typed nil is refused by EEI.
+	if vmf.drwaClassifier != nil && !check.IfNil(vmf.drwaClassifier) &&
+		vmf.blockChainHook.GetAccountsAdapter() != vmf.userAccountsDB {
+		return nil, nil, vm.ErrDRWAExecution
+	}
+
 	atArgumentParser := parsers.NewCallArgsParser()
 	vmContextArgs := systemSmartContracts.VMContextArgs{
+		DRWAClassifier:      vmf.drwaClassifier,
 		BlockChainHook:      vmf.blockChainHook,
 		CryptoHook:          vmf.cryptoHook,
 		InputParser:         atArgumentParser,
@@ -242,6 +255,9 @@ func (vmf *vmContainerFactory) finalizeSystemVMCreation(systemEI vm.ContextHandl
 	}
 
 	vmf.gasSchedule.RegisterNotifyHandler(systemVM)
+	if vmf.drwaClassifier != nil {
+		vmf.drwaDeletionGuard = systemVM
+	}
 
 	return systemVM, nil
 }
@@ -295,4 +311,8 @@ func (vmf *vmContainerFactory) SystemSmartContractContainerFactory() vm.SystemSC
 // IsInterfaceNil returns true if there is no value under the interface
 func (vmf *vmContainerFactory) IsInterfaceNil() bool {
 	return vmf == nil
+}
+
+func (vmf *vmContainerFactory) DRWAAccountDeletionGuard() vm.DRWAAccountDeletionGuard {
+	return vmf.drwaDeletionGuard
 }

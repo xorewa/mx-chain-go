@@ -16,6 +16,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/block"
+	"github.com/multiversx/mx-chain-core-go/data/endProcess"
 	outportcore "github.com/multiversx/mx-chain-core-go/data/outport"
 	"github.com/multiversx/mx-chain-core-go/data/scheduled"
 	"github.com/multiversx/mx-chain-core-go/data/typeConverters"
@@ -39,6 +40,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/block/bootstrapStorage"
 	"github.com/multiversx/mx-chain-go/process/block/cutoff"
 	"github.com/multiversx/mx-chain-go/process/block/processedMb"
+	processFactory "github.com/multiversx/mx-chain-go/process/factory"
 	"github.com/multiversx/mx-chain-go/process/headerCheck"
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/sharding/nodesCoordinator"
@@ -47,6 +49,7 @@ import (
 	"github.com/multiversx/mx-chain-go/state/parsers"
 	"github.com/multiversx/mx-chain-go/storage"
 	"github.com/multiversx/mx-chain-go/storage/storageunit"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 const (
@@ -132,6 +135,7 @@ type baseProcessor struct {
 	enableRoundsHandler           common.EnableRoundsHandler
 	vmContainerFactory            process.VirtualMachinesContainerFactory
 	vmContainer                   process.VirtualMachinesContainer
+	coreComponents                coreComponentsHolder
 	gasConsumedProvider           gasConsumedProvider
 	economicsData                 process.EconomicsDataHandler
 	epochChangeGracePeriodHandler common.EpochChangeGracePeriodHandler
@@ -236,6 +240,7 @@ func NewBaseProcessor(arguments ArgBaseProcessor) (*baseProcessor, error) {
 		epochChangeGracePeriodHandler:      arguments.CoreComponents.EpochChangeGracePeriodHandler(),
 		vmContainerFactory:                 arguments.VMContainersFactory,
 		vmContainer:                        arguments.VmContainer,
+		coreComponents:                     arguments.CoreComponents,
 		processDataTriesOnCommitEpoch:      arguments.Config.Debug.EpochStart.ProcessDataTrieOnCommitEpoch,
 		gasConsumedProvider:                arguments.GasHandler,
 		economicsData:                      arguments.CoreComponents.EconomicsData(),
@@ -905,6 +910,9 @@ func checkProcessorParameters(arguments ArgBaseProcessor) error {
 }
 
 func (bp *baseProcessor) createBlockStarted() error {
+	if err := bp.drwaExecutionError(); err != nil {
+		return err
+	}
 	bp.hdrsForCurrBlock.Reset()
 	scheduledGasAndFees := bp.scheduledTxsExecutionHandler.GetScheduledGasAndFees()
 	bp.txCoordinator.CreateBlockStarted()
@@ -915,6 +923,40 @@ func (bp *baseProcessor) createBlockStarted() error {
 		return err
 	}
 
+	return nil
+}
+
+// drwaExecutionError consults the existing System VM, rather than retaining a
+// second copy of its failure. Missing/older VMs follow the native path; that
+// fallback is not configuration, classifier or recovery admission (P-05).
+func (bp *baseProcessor) drwaExecutionError() error {
+	if check.IfNil(bp.vmContainer) {
+		return nil
+	}
+	systemVM, err := bp.vmContainer.Get(processFactory.SystemVirtualMachine)
+	if err != nil || check.IfNilReflect(systemVM) {
+		return nil
+	}
+	status, ok := systemVM.(interface{ DRWAExecutionError() error })
+	if !ok {
+		return nil
+	}
+	err = status.DRWAExecutionError()
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		// Read the native endpoint only after poison is recognized. Missing or
+		// unavailable endpoints cannot block the existing failure barrier.
+		if stopper, exists := bp.coreComponents.(interface {
+			ChanStopNodeProcess() chan endProcess.ArgEndProcess
+		}); exists {
+			select {
+			case stopper.ChanStopNodeProcess() <- endProcess.ArgEndProcess{
+				Reason: common.DRWAExecutionFailure, Description: vm.ErrDRWAExecution.Error(),
+			}:
+			default:
+			}
+		}
+		return err
+	}
 	return nil
 }
 
@@ -2601,6 +2643,9 @@ func (bp *baseProcessor) RevertAccountsDBToSnapshot(accountsSnapshot map[state.A
 }
 
 func (bp *baseProcessor) commitState(headerHandler data.HeaderHandler) error {
+	if err := bp.drwaExecutionError(); err != nil {
+		return err
+	}
 	startTime := time.Now()
 	defer func() {
 		elapsedTime := time.Since(startTime)
@@ -2618,6 +2663,9 @@ func (bp *baseProcessor) commitState(headerHandler data.HeaderHandler) error {
 }
 
 func (bp *baseProcessor) commitStateForHeader(headerHandler data.HeaderHandler, headerHash []byte) error {
+	if err := bp.drwaExecutionError(); err != nil {
+		return err
+	}
 	if !bp.outportHandler.HasDrivers() {
 		return bp.commitState(headerHandler)
 	}
@@ -3043,6 +3091,9 @@ func (bp *baseProcessor) Close() error {
 
 // ProcessScheduledBlock processes a scheduled block
 func (bp *baseProcessor) ProcessScheduledBlock(headerHandler data.HeaderHandler, bodyHandler data.BodyHandler, haveTime func() time.Duration) error {
+	if err := bp.drwaExecutionError(); err != nil {
+		return err
+	}
 	if check.IfNil(headerHandler) {
 		return process.ErrNilBlockHeader
 	}

@@ -149,3 +149,32 @@ func isESDTTransferFunction(function string) bool {
 		function == core.BuiltInFunctionESDTNFTTransfer ||
 		function == core.BuiltInFunctionMultiESDTNFTTransfer
 }
+
+// ProcessMaxBuiltInCountersWithESDTTransfers counts the builtin's prepared full
+// vector, including native EGLD entries, without parsing raw arguments again.
+// This optional consumer never replaces ordinary ProcessMaxBuiltInCounters.
+func (counter *usageCounter) ProcessMaxBuiltInCountersWithESDTTransfers(input *vmcommon.ContractCallInput, transfers *vmcommon.ParsedESDTTransfers) error {
+	if input == nil || !isESDTTransferFunction(input.Function) || transfers == nil || len(transfers.ESDTTransfers) == 0 {
+		return fmt.Errorf("shared ESDT transfer counter requires native transfer input and result")
+	}
+	counter.mutCounters.Lock()
+	defer counter.mutCounters.Unlock()
+
+	nextCalls := counter.crtNumberOfBuiltInFunctionCalls + 1
+	if nextCalls < counter.crtNumberOfBuiltInFunctionCalls {
+		return fmt.Errorf("%w: too many built-in functions calls", process.ErrMaxCallsReached)
+	}
+	counter.crtNumberOfBuiltInFunctionCalls = nextCalls
+	if nextCalls > counter.maxBuiltInCallsPerTx {
+		return fmt.Errorf("%w: too many built-in functions calls", process.ErrMaxCallsReached)
+	}
+	nextTransfers := counter.crtNumberOfTransfers + uint64(len(transfers.ESDTTransfers))
+	if nextTransfers < counter.crtNumberOfTransfers {
+		return fmt.Errorf("%w: too many ESDT transfers", process.ErrMaxCallsReached)
+	}
+	counter.crtNumberOfTransfers = nextTransfers
+	if nextTransfers > counter.maxNumberOfTransfersPerTx {
+		return fmt.Errorf("%w: too many ESDT transfers", process.ErrMaxCallsReached)
+	}
+	return nil
+}

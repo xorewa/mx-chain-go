@@ -1,5 +1,53 @@
+requireNativeDRWAProvenanceAdmission() {
+  if [[ -z ${NATIVE_DRWA_STARTUP_RECORD:-} && -z ${NATIVE_DRWA_OVERLAY:-} ]]; then
+    return 0
+  fi
+  local admission=/opt/original-generation-release/operator.json
+  [[ -f "$admission" && ! -L "$admission" ]] || return 1
+  nativeRestartCanonical "${admission%/*}" && nativeRestartMountAt "${admission%/*}" ro || return 1
+  jq -e --arg anchor "${NATIVE_DRWA_STARTUP_RECORD:-}" --arg overlay "${NATIVE_DRWA_OVERLAY:-}" '
+    type == "object" and . == {mode:"original",startup_anchor:$anchor,overlay:$overlay}
+    and ($anchor|length)>0 and ($overlay|length)>0
+  ' "$admission" >/dev/null || return
+}
+
+validateNativeLocalnetOptions() {
+  requireNativeDRWAProvenanceAdmission || return
+  [[ ${NATIVE_CONFIG_PREFLIGHT:-0} == 1 && ${SHARDCOUNT:-} == 3 && ${USETMUX:-0} == 1 && ${USE_PROXY:-0} == 1 ]] || return 1
+  local name
+  for name in USE_TXGEN USE_HARDFORK COPY_BACK_CONFIGS NODE_WATCHER MULTI_KEY_NODES; do
+    [[ ${!name} == 0 ]] || return 1
+  done
+  [[ ${SKIP_VALIDATOR_IDX:-} == -1 && ${SKIP_OBSERVER_IDX:-} == -1 ]] || return 1
+}
+
+nativePackageIdentity() (
+  set -o pipefail
+  cd -P -- "$TESTNETDIR" || exit
+  # The loaders open this exact path, so hash only a canonical directory.
+  if [[ "$TESTNETDIR" != "$PWD" ]]; then
+    printf '%s\n' 'expected a canonical package directory' >&2
+    exit 1
+  fi
+  [[ -z $(find . ! -type d ! -type f -print -quit) ]] || exit 1
+  for binary in filegen/filegen seednode/seednode node/node node/termui proxy/proxy; do
+    [[ -f "$binary" && -x "$binary" ]] || exit 1
+  done
+  printf 'Native execution package SHA-256: '
+  find . -type f -print0 | sort -z | xargs -0 sha256sum --zero | sha256sum
+)
+
 generateConfig() {
   echo "Generating configuration using values from scripts/variables.sh..."
+
+  local native_config_args=()
+  if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+    native_config_args=(
+      -node-config "$TESTNETDIR/node/config/config_validator.toml"
+      -epoch-config "$TESTNETDIR/node/config/enableEpochs.toml"
+      -output-rollback-epoch "${OUTPUT_ROLLBACK_EPOCH:?explicit rollback epoch required}"
+    )
+  fi
 
   TMP_SHARD_OBSERVERCOUNT=$SHARD_OBSERVERCOUNT
   TMP_META_OBSERVERCOUNT=$META_OBSERVERCOUNT
@@ -9,9 +57,10 @@ generateConfig() {
     TMP_META_OBSERVERCOUNT=0
   fi
 
-  pushd $TESTNETDIR/filegen
+  pushd "$TESTNETDIR/filegen" || return
+  local result=0
   ./filegen \
-    -output-directory $CONFIGGENERATOROUTPUTDIR               \
+    -output-directory "$CONFIGGENERATOROUTPUTDIR"               \
     -num-of-shards $SHARDCOUNT                                \
     -num-of-nodes-in-each-shard $SHARD_VALIDATORCOUNT         \
     -num-of-observers-in-each-shard $TMP_SHARD_OBSERVERCOUNT  \
@@ -21,90 +70,349 @@ generateConfig() {
     -metachain-consensus-group-size $META_CONSENSUS_SIZE      \
     -stake-type $GENESIS_STAKE_TYPE \
     -hysteresis $HYSTERESIS \
-    -round-duration $ROUND_DURATION_IN_MS
-  popd
+    -round-duration $ROUND_DURATION_IN_MS \
+    "${native_config_args[@]}" "$@" || result=$?
+  popd || return
+  return "$result"
 }
 
-copyConfig() {
-  pushd $TESTNETDIR
+preflightConfig() {
+  requireNativeDRWAProvenanceAdmission || return
+  [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]] || return 1
+  local role
+  for role in validator observer; do
+    assembleNativeDRWAStartupConfigArgs "$role" >/dev/null || return
+    generateConfig \
+      --validate-only --loopback-only \
+      --output-directory "$TESTNETDIR/node/config" \
+      --node-config "$TESTNETDIR/node/config/config_$role.toml" \
+      --economics-config "$TESTNETDIR/node/config/economics.toml" \
+      --node-p2p-config "$TESTNETDIR/node/config/p2p.toml" \
+      --seednode-p2p-config "$TESTNETDIR/seednode/config/p2p.toml" \
+      --node-preferences "$TESTNETDIR/node/config/prefs.toml" || return
+  done
+}
 
-  cp ./filegen/"$CONFIGGENERATOROUTPUTDIR"/genesis.json ./node/config
-  cp ./filegen/"$CONFIGGENERATOROUTPUTDIR"/nodesSetup.json ./node/config
-  cp ./filegen/"$CONFIGGENERATOROUTPUTDIR"/*.pem ./node/config #there might be more .pem files there
+preflightExpectedPackage() {
+  requireNativeDRWAProvenanceAdmission || return
+  if [[ ! $1 =~ ^[0-9a-f]{64}$ ]]; then
+    printf '%s\n' 'expected a lowercase SHA-256 digest' >&2
+    return 1
+  fi
+  local expected="Native execution package SHA-256: $1  -"
+  local observed
+  observed=$(nativePackageIdentity) || return
+  if [[ $observed != "$expected" ]]; then
+    printf '%s\n' 'package identity mismatch before loader checks' >&2
+    return 1
+  fi
+  preflightConfig || return
+  observed=$(nativePackageIdentity) || return
+  if [[ $observed != "$expected" ]]; then
+    printf '%s\n' 'package identity mismatch after loader checks' >&2
+    return 1
+  fi
+  printf '%s\n' "$observed"
+}
+
+# Restart receipts bind only cleanly stopped views. Their expected digest is
+# supplied by the supervisor after checking the previous stop and mount record.
+readNativeRestartReceipt() {
+  local receipt=$1 expected=$2 actual
+  [[ $expected =~ ^[0-9a-f]{64}$ && -f $receipt && ! -L $receipt ]] || return 1
+  nativeRestartCanonical "$receipt" || return
+  nativeRestartMountAt "$receipt" ro || return
+  actual=$(sha256sum < "$receipt") || return
+  [[ $actual == "$expected  -" ]] || return 1
+  jq -ers '
+    def path: type == "string" and startswith("/") and (test("[[:cntrl:]\\\\]") | not);
+    def digest: type == "string" and test("^[0-9a-f]{64}$");
+    def inode: type == "string" and test("^[0-9]+:[0-9]+$");
+    select(length == 1) | .[0] |
+    select(keys == ["mounts","operator_sha256","prior_stop","prior_stop_sha256","schema","seal",
+                    "socket","state_identity","state_root","static_root","view_root"]) |
+    select(.schema == "sp2-native-restart-view-v1" and
+           (.static_root | path) and (.view_root | path) and (.state_root | path) and
+           (.socket | path) and (.prior_stop | path) and (.state_identity | inode) and
+           (.seal | digest) and (.operator_sha256 | digest) and (.prior_stop_sha256 | digest) and
+           (.mounts | type == "array" and all(.[];
+            keys == ["identity","relative"] and
+            (.relative | type == "string" and test("^[a-z0-9_/]+$")) and (.identity | inode)))) |
+    (.seal,.static_root,.view_root,.state_root,.state_identity,.socket,
+     .operator_sha256,.prior_stop,.prior_stop_sha256, (.mounts[] | .relative + "=" + .identity))
+  ' "$receipt"
+}
+
+nativeRestartCanonical() {
+  local path=$1 actual
+  [[ $path == /* && $path != / && $path != *[$'\n\r\t\\']* ]] || return 1
+  actual=$(realpath -e -- "$path") || return
+  [[ $actual == "$path" ]]
+}
+
+nativeRestartMountAt() {
+  local want=$1 mode=$2 flat=${3:-} raw options hits=0
+  # mountinfo encodes spaces. The receipt excludes remaining escaped characters.
+  want=${want// /\\040}
+  while IFS=' ' read -r _ _ _ _ raw options _; do
+    [[ $flat != flat || $raw != "$want/"* ]] || return 1
+    [[ $raw == "$want" ]] || continue
+    [[ ,$options, == *",$mode,"* ]] || return 1
+    ((hits += 1))
+  done < /proc/self/mountinfo
+  [[ $hits -eq 1 ]]
+}
+
+# Project the common record explicitly selected by the external supervisor.
+assembleNativeDRWAStartupConfigArgs() {
+  local role=$1 startup overlay digest bytes record tail config nodes q_config q_nodes q_overlay q_startup
+  case "$role" in validator|observer) ;; *) return 1 ;; esac
+  startup=${NATIVE_DRWA_STARTUP_RECORD:-}
+  overlay=${NATIVE_DRWA_OVERLAY:-}
+  if [[ -z $startup && -z $overlay ]]; then
+    printf '%s\n' "-config ./config/config_$role.toml"
+    return
+  fi
+  [[ -n $startup && -n $overlay && $startup == *:*:* ]] || return 1
+  digest=${startup%%:*}
+  tail=${startup#*:}
+  bytes=${tail%%:*}
+  record=${tail#*:}
+  [[ $digest =~ ^[0-9a-f]{64}$ && $bytes =~ ^[1-9][0-9]*$ ]] || return 1
+  config=$TESTNETDIR/node/config/config_$role.toml
+  nodes=$TESTNETDIR/node/config/nodesSetup.json
+  local file
+  for file in "$record" "$overlay" "$config" "$nodes"; do
+    [[ $file == "$TESTNETDIR/"* && -f $file && ! -L $file ]] || return 1
+    nativeRestartCanonical "$file" && nativeRestartMountAt "$file" ro || return 1
+  done
+  [[ $(sha256sum < "$record") == "$digest  -" && $(stat -Lc '%s' -- "$record") == "$bytes" ]] || return 1
+  printf -v q_config '%q' "$config"
+  printf -v q_nodes '%q' "$nodes"
+  printf -v q_overlay '%q' "$overlay"
+  printf -v q_startup '%q' "$startup"
+  printf '%s\n' "-config $q_config --nodes-setup-file $q_nodes --drwa-config $q_overlay --drwa-startup-record $q_startup"
+}
+
+nativeRestartOperatorIdentity() (
+  set -o pipefail
+  cd -P -- "$MULTIVERSXTESTNETSCRIPTSDIR" || exit
+  local file
+  local files=(variables.sh include/config.sh include/build.sh include/terminal.sh
+    include/tools.sh include/validators.sh include/observers.sh preflight.sh start.sh stop.sh health.sh)
+  for file in "${files[@]}"; do
+    [[ -f $PWD/$file && ! -L $PWD/$file ]] || exit 1
+    nativeRestartCanonical "$PWD/$file" || exit
+    nativeRestartMountAt "$PWD/$file" ro || exit
+  done
+  sha256sum --zero -- "${files[@]}" | sha256sum
+)
+
+nativeRestartStaticSource() {
+  local source=$1 expected=$2 observed
+  [[ -d $source ]] && nativeRestartCanonical "$source" && nativeRestartMountAt "$source" ro flat || return
+  observed=$(TESTNETDIR="$source" nativePackageIdentity) || return
+  [[ $observed == "Native execution package SHA-256: $expected  -" ]]
+}
+
+# Verify the mounted override before variables.sh has a chance to source it.
+preflightRestartOverride() {
+  local expected=$1 receipt=$2 receipt_digest=$3 binding source view retained_stop identity
+  local -a rows
+  binding=$(readNativeRestartReceipt "$receipt" "$receipt_digest") || return
+  mapfile -t rows <<< "$binding"
+  [[ ${#rows[@]} -ge 9 && $expected == "${rows[0]}" ]] || return 1
+  source=${rows[1]}
+  view=${rows[2]}
+  retained_stop=${rows[7]}
+  [[ $view != "$source" && ${LOCAL_OVERRIDES:-} == "$view/local-overrides.sh" ]] || return 1
+  [[ -d $view ]] && nativeRestartCanonical "$view" && nativeRestartMountAt "$view" rw || return
+  nativeRestartStaticSource "$source" "$expected" || return
+  [[ -f $LOCAL_OVERRIDES && $LOCAL_OVERRIDES -ef $source/local-overrides.sh ]] || return 1
+  nativeRestartCanonical "$LOCAL_OVERRIDES" && nativeRestartMountAt "$LOCAL_OVERRIDES" ro || return
+  identity=$(nativeRestartOperatorIdentity) || return
+  [[ $identity == "${rows[6]}  -" && -f $retained_stop ]] || return 1
+  nativeRestartCanonical "$retained_stop" && nativeRestartMountAt "$retained_stop" ro || return
+  identity=$(sha256sum < "$retained_stop") || return
+  [[ $identity == "${rows[8]}  -" ]]
+}
+
+nativeRestartCheckStaticMembers() (
+  set -o pipefail
+  local source=$1 view=$2 member
+  cd -P -- "$source" || exit
+  find . -type f -print0 | while IFS= read -r -d '' member; do
+    member=${member#./}
+    [[ -f $view/$member && $view/$member -ef $source/$member ]] || exit 1
+    nativeRestartCanonical "$source/$member" && nativeRestartCanonical "$view/$member" || exit
+    nativeRestartMountAt "$view/$member" ro || exit
+  done
+)
+
+nativeRestartCheckViewEntries() (
+  set -o pipefail
+  local source=$1 view=$2 entry
+  shift 2
+  local -a exclusions=(-false)
+  for entry in "$@"; do
+    exclusions+=(-o -path "./$entry")
+  done
+  cd -P -- "$view" || exit
+  find . \( "${exclusions[@]}" \) -prune -o -print0 | while IFS= read -r -d '' entry; do
+    case "$entry" in
+      .|./node_working_dirs) [[ -d $entry && ! -L $entry ]] || exit 1 ;;
+      *) [[ ! -L $entry && ( -d $entry && -d $source/$entry || -f $entry && -f $source/$entry ) ]] || exit 1 ;;
+    esac
+  done
+)
+
+nativeRestartViewIdentity() {
+  local expected=$1 receipt=$2 receipt_digest=$3 binding view source state name count i index identity
+  local -a rows writable=()
+  preflightRestartOverride "$expected" "$receipt" "$receipt_digest" || return
+  binding=$(readNativeRestartReceipt "$receipt" "$receipt_digest") || return
+  mapfile -t rows <<< "$binding"
+  [[ ${#rows[@]} -ge 9 ]] || return 1
+  source=${rows[1]}
+  view=${rows[2]}
+  state=${rows[3]}
+  [[ $view == "$TESTNETDIR" && $state != "$view" && $state != "$source" ]] || return 1
+  [[ $state != "$view/"* && $state != "$source/"* && $source != "$view/"* && $view != "$source/"* &&
+     $view != "$state/"* && $source != "$state/"* ]] || return 1
+  [[ -d $state ]] && nativeRestartCanonical "$state" || return
+  identity=$(stat -Lc '%d:%i' -- "$state") || return
+  [[ $identity == "${rows[4]}" ]] || return 1
+  # Confirmed stop leaves this exact socket absent. Do not unlink or replace it.
+  [[ ${TMUX_SOCKET:-} == "$view/operator.sock" && $TMUX_SOCKET == "${rows[5]}" &&
+     ! -e $TMUX_SOCKET && ! -L $TMUX_SOCKET ]] || return 1
+  [[ $SHARDCOUNT == 3 && $MULTI_KEY_NODES == 0 ]] || return 1
+  for name in SHARD_VALIDATORCOUNT META_VALIDATORCOUNT SHARD_OBSERVERCOUNT META_OBSERVERCOUNT; do
+    [[ ${!name} =~ ^[1-9][0-9]{0,4}$ ]] || return 1
+    ((10#${!name} <= 65535)) || return 1
+  done
+  count=$((3 * SHARD_VALIDATORCOUNT + META_VALIDATORCOUNT))
+  ((count <= 65535)) || return 1
+  for ((i=0; i<count; i++)); do writable+=("node_working_dirs/validator$i"); done
+  count=$((3 * SHARD_OBSERVERCOUNT + META_OBSERVERCOUNT))
+  ((count <= 65535)) || return 1
+  for ((i=0; i<count; i++)); do writable+=("node_working_dirs/observer$i"); done
+  writable+=(node/logs seednode/logs proxy/logs)
+  [[ ${#rows[@]} -eq $((9 + ${#writable[@]})) ]] || return 1
+  index=9
+  for name in "${writable[@]}"; do
+    [[ ! -e $source/$name && ! -L $source/$name &&
+       -d $view/$name && -d $state/$name && $view/$name -ef $state/$name ]] || return 1
+    nativeRestartCanonical "$view/$name" && nativeRestartCanonical "$state/$name" || return
+    nativeRestartMountAt "$view/$name" rw flat || return
+    identity=$(stat -Lc '%d:%i' -- "$state/$name") || return
+    [[ ${rows[index]} == "$name=$identity" ]] || return 1
+    ((index += 1))
+  done
+  nativeRestartCheckStaticMembers "$source" "$view" &&
+    nativeRestartCheckViewEntries "$source" "$view" "${writable[@]}"
+}
+
+preflightExpectedRestartView() {
+  requireNativeDRWAProvenanceAdmission || return
+  nativeRestartViewIdentity "$@" || { printf '%s\n' 'restart view mismatch before loader checks' >&2; return 1; }
+  preflightConfig || return
+  nativeRestartViewIdentity "$@" || { printf '%s\n' 'restart view mismatch after loader checks' >&2; return 1; }
+  printf 'Native execution package SHA-256: %s  -\n' "$1"
+}
+
+copyConfig() (
+  cd "$TESTNETDIR" || exit
+
+  cp ./filegen/"$CONFIGGENERATOROUTPUTDIR"/genesis.json ./node/config || exit
+  cp ./filegen/"$CONFIGGENERATOROUTPUTDIR"/nodesSetup.json ./node/config || exit
+  cp ./filegen/"$CONFIGGENERATOROUTPUTDIR"/*.pem ./node/config || exit #there might be more .pem files there
   if [[ $MULTI_KEY_NODES -eq 1 ]]; then
-      mv ./node/config/"$VALIDATOR_KEY_PEM_FILE" ./node/config/"$MULTI_KEY_PEM_FILE"
+      mv ./node/config/"$VALIDATOR_KEY_PEM_FILE" ./node/config/"$MULTI_KEY_PEM_FILE" || exit
       if [[ $EXTRA_KEYS -eq 1 ]]; then
-        cat $NODEDIR/config/testKeys/"${EXTRA_KEY_PEM_FILE}" >> ./node/config/"$MULTI_KEY_PEM_FILE"
+        cat "$NODEDIR/config/testKeys/${EXTRA_KEY_PEM_FILE}" >> ./node/config/"$MULTI_KEY_PEM_FILE" || exit
       fi
   fi
   echo "Configuration files copied from the configuration generator to the working directories of the executables."
-  popd
-}
+)
 
 copySeednodeConfig() {
-  pushd $TESTNETDIR
-  cp $SEEDNODEDIR/config/* ./seednode/config
-  popd
+  local keyDir="$TESTNETDIR/seednode/config"
+  [[ ! -L "$keyDir/p2pKey.pem" && ! -L "$TESTNETDIR/seednode/keygenerator" ]] || return 1
+  cp "$SEEDNODEDIR"/config/{config.toml,p2p.toml} "$keyDir" || return
 
-  pushd $MULTIVERSXDIR/cmd/keygenerator
-
-  if [[ ! -f "p2pKey.pem" ]]; then
-      go build
-      ./keygenerator --key-type p2p
+  if [[ ! -f "$keyDir/p2pKey.pem" ]]; then
+    (
+      umask 077
+      cd "$MULTIVERSXDIR/cmd/keygenerator" || exit
+      go build -o "$TESTNETDIR/seednode/keygenerator" .
+    ) || return
+    (
+      umask 077
+      cd "$keyDir" || exit
+      ../keygenerator --key-type p2p
+    ) || return
   fi
 
-  cp p2pKey.pem $TESTNETDIR/seednode/config
-  GENERATED_P2P_PUB_KEY=$(grep for  ./p2pKey.pem | head -1 | grep -oP '[^[:blank:]-]*' | tail -1)
+  local GENERATED_P2P_PUB_KEY
+  GENERATED_P2P_PUB_KEY=$(sed -n '1s/^-----BEGIN PRIVATE KEY for \(.*\)-----$/\1/p' "$keyDir/p2pKey.pem") || return
+  [[ -n "$GENERATED_P2P_PUB_KEY" ]] || return 1
   export P2P_SEEDNODE_ADDRESS="/ip4/$SEEDNODE_IP/tcp/$PORT_SEEDNODE/p2p/$GENERATED_P2P_PUB_KEY"
-
-  popd
 }
 
-updateSeednodeConfig() {
-  pushd $TESTNETDIR/seednode/config
-  cp p2p.toml p2p_edit.toml
+updateSeednodeConfig() (
+  cd "$TESTNETDIR/seednode/config" || exit
+  cp p2p.toml p2p_edit.toml || exit
 
-  updateTOMLValue p2p_edit.toml "Port" "\"$PORT_SEEDNODE\""
+  updateTOMLValue p2p_edit.toml "Port" "\"$PORT_SEEDNODE\"" || exit
+  if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+    [[ "$SEEDNODE_IP" == "127.0.0.1" ]] || exit 1
+    updateLoopbackTransports p2p_edit.toml || exit
+    updateTOMLValue p2p_edit.toml "InitialPeerList" "[]" || exit
+  fi
 
-  cp p2p_edit.toml p2p.toml
-  rm p2p_edit.toml
+  cp p2p_edit.toml p2p.toml || exit
+  rm p2p_edit.toml || exit
 
   echo "Updated configuration for the Seednode."
-  popd
+)
+
+updateLoopbackTransports() {
+  updateTOMLValue "$1" "ListenAddress" '"/ip4/127.0.0.1/tcp/%d"' || return
+  updateTOMLValue "$1" "QUICAddress" '""' || return
+  updateTOMLValue "$1" "WebSocketAddress" '""' || return
+  updateTOMLValue "$1" "WebTransportAddress" '""'
 }
 
-copyNodeConfig() {
-  pushd $TESTNETDIR
-  cp $NODEDIR/config/api.toml ./node/config
-  cp $NODEDIR/config/config.toml ./node/config/config_validator.toml
-  cp $NODEDIR/config/config.toml ./node/config/config_observer.toml
-  cp $NODEDIR/config/economics.toml ./node/config
-  cp $NODEDIR/config/ratings.toml ./node/config
-  cp $NODEDIR/config/prefs.toml ./node/config
-  cp $NODEDIR/config/external.toml ./node/config
-  cp $NODEDIR/config/p2p.toml ./node/config
-  cp $NODEDIR/config/fullArchiveP2P.toml ./node/config
-  cp $NODEDIR/config/enableEpochs.toml ./node/config
-  cp $NODEDIR/config/enableRounds.toml ./node/config
-  cp $NODEDIR/config/systemSmartContractsConfig.toml ./node/config
-  cp $NODEDIR/config/genesisSmartContracts.json ./node/config
-  mkdir ./node/config/genesisContracts -p
-  cp $NODEDIR/config/genesisContracts/*.* ./node/config/genesisContracts
-  mkdir ./node/config/gasSchedules -p
-  cp $NODEDIR/config/gasSchedules/*.* ./node/config/gasSchedules
+copyNodeConfig() (
+  cd "$TESTNETDIR" || exit
+  cp "$NODEDIR"/config/{api.toml,economics.toml,ratings.toml,prefs.toml,external.toml,p2p.toml,fullArchiveP2P.toml,enableEpochs.toml,enableRounds.toml,systemSmartContractsConfig.toml,genesisSmartContracts.json} ./node/config || exit
+  cp "$NODEDIR/config/config.toml" ./node/config/config_validator.toml || exit
+  cp "$NODEDIR/config/config.toml" ./node/config/config_observer.toml || exit
+  mkdir -p ./node/config/genesisContracts ./node/config/gasSchedules || exit
+  cp "$NODEDIR"/config/genesisContracts/*.* ./node/config/genesisContracts || exit
+  cp "$NODEDIR"/config/gasSchedules/*.* ./node/config/gasSchedules || exit
 
   echo "Configuration files copied from the Node to the working directories of the executables."
-  popd
-}
+)
 
-updateNodeConfig() {
-  pushd $TESTNETDIR/node/config
-  cp p2p.toml p2p_edit.toml
+updateNodeConfig() (
+  cd "$TESTNETDIR/node/config" || exit
+  cp p2p.toml p2p_edit.toml || exit
 
-  updateTOMLValue p2p_edit.toml "InitialPeerList" "[\"$P2P_SEEDNODE_ADDRESS\"]"
+  updateTOMLValue p2p_edit.toml "InitialPeerList" "[\"$P2P_SEEDNODE_ADDRESS\"]" || exit
+  if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+    [[ "$SEEDNODE_IP" == "127.0.0.1" && "$P2P_SEEDNODE_ADDRESS" == /ip4/127.0.0.1/tcp/* ]] || exit 1
+    updateLoopbackTransports p2p_edit.toml || exit
+    updateTOMLValue config_validator.toml "Hosts" "[]" || exit
+    updateTOMLValue config_observer.toml "Hosts" "[]" || exit
+    updateTOMLValue config_validator.toml "StableTagLocation" '""' || exit
+    updateTOMLValue config_observer.toml "StableTagLocation" '""' || exit
+    updateTOMLValue config_validator.toml "URL" '""' || exit
+    updateTOMLValue config_observer.toml "URL" '""' || exit
+  fi
 
-  cp p2p_edit.toml p2p.toml
-  rm p2p_edit.toml
+  cp p2p_edit.toml p2p.toml || exit
+  rm p2p_edit.toml || exit
 
   cp nodesSetup.json nodesSetup_edit.json
   
@@ -133,24 +441,28 @@ updateNodeConfig() {
   updateChainParameters config_validator.toml
 
   echo "Updated configuration for Nodes."
-  popd
-}
+)
 
 updateChainParameters() {
-  tomlFile=$1
+  local tomlFile=$1
+  local hysteresis=$HYSTERESIS
+  # The CLI accepts integral floats, but native TOML decoding requires a float literal.
+  if [[ "$hysteresis" =~ ^[+-]?[0-9]+$ ]]; then
+    hysteresis+=.0
+  fi
 
-  sed -i "s,ShardConsensusGroupSize\([^,]*\),ShardConsensusGroupSize = $SHARD_CONSENSUS_SIZE," $tomlFile
-  sed -i "s,ShardMinNumNodes\([^,]*\),ShardMinNumNodes = $SHARD_CONSENSUS_SIZE," $tomlFile
-  sed -i "s,MetachainConsensusGroupSize\([^,]*\),MetachainConsensusGroupSize = $META_CONSENSUS_SIZE," $tomlFile
-  sed -i "s,MetachainMinNumNodes\([^,]*\),MetachainMinNumNodes = $META_CONSENSUS_SIZE," $tomlFile
-  sed -i "s,RoundDuration = 6000,RoundDuration = $ROUND_DURATION_IN_MS," $tomlFile
-  sed -i "s,Hysteresis\([^,]*\),Hysteresis = $HYSTERESIS," $tomlFile
+  sed -i "s,ShardConsensusGroupSize\([^,]*\),ShardConsensusGroupSize = $SHARD_CONSENSUS_SIZE," "$tomlFile" || return
+  sed -i "s,ShardMinNumNodes\([^,]*\),ShardMinNumNodes = $SHARD_VALIDATORCOUNT," "$tomlFile" || return
+  sed -i "s,MetachainConsensusGroupSize\([^,]*\),MetachainConsensusGroupSize = $META_CONSENSUS_SIZE," "$tomlFile" || return
+  sed -i "s,MetachainMinNumNodes\([^,]*\),MetachainMinNumNodes = $META_VALIDATORCOUNT," "$tomlFile" || return
+  sed -i "s,RoundDuration = 6000,RoundDuration = $ROUND_DURATION_IN_MS," "$tomlFile" || return
+  sed -i "s,Hysteresis\([^,]*\),Hysteresis = $hysteresis," "$tomlFile" || return
 
   if [ $ROUNDS_PER_EPOCH -ne 0 ]; then
-    NEW_ROUNDS_PER_EPOCH=$((ROUNDS_PER_EPOCH*ROUND_DURATION_IN_MS / 600))
-    sed -i "s,RoundsPerEpoch = 2000,RoundsPerEpoch = $NEW_ROUNDS_PER_EPOCH," $tomlFile
-    sed -i "s,RoundsPerEpoch = 200,RoundsPerEpoch = $ROUNDS_PER_EPOCH," $tomlFile
-    sed -i "s,MinRoundsBetweenEpochs = 20,MinRoundsBetweenEpochs = $ROUNDS_PER_EPOCH," $tomlFile
+    local NEW_ROUNDS_PER_EPOCH=$((ROUNDS_PER_EPOCH*ROUND_DURATION_IN_MS / 600))
+    sed -i "s,RoundsPerEpoch = 2000,RoundsPerEpoch = $NEW_ROUNDS_PER_EPOCH," "$tomlFile" || return
+    sed -i "s,RoundsPerEpoch = 200,RoundsPerEpoch = $ROUNDS_PER_EPOCH," "$tomlFile" || return
+    sed -i "s,MinRoundsBetweenEpochs = 20,MinRoundsBetweenEpochs = $ROUNDS_PER_EPOCH," "$tomlFile" || return
   fi
 }
 
@@ -195,37 +507,34 @@ updateConfigsForStakingV4() {
   fi
 }
 
-copyProxyConfig() {
-  pushd $TESTNETDIR
+copyProxyConfig() (
+  cd "$TESTNETDIR" || exit
 
-  cp -r $PROXYDIR/config/apiConfig ./proxy/config/
-  cp $PROXYDIR/config/config.toml ./proxy/config/
-  cp -r $PROXYDIR/config/apiConfig ./proxy/config
+  cp -r "$PROXYDIR/config/apiConfig" ./proxy/config/ || exit
+  cp "$PROXYDIR/config/config.toml" ./proxy/config/ || exit
 
-  cp ./node/config/economics.toml ./proxy/config/
-  cp ./node/config/external.toml ./proxy/config/
-  cp ./node/config/walletKey.pem ./proxy/config
+  cp ./node/config/economics.toml ./proxy/config/ || exit
+  cp ./node/config/external.toml ./proxy/config/ || exit
+  cp ./node/config/walletKey.pem ./proxy/config || exit
 
   echo "Copied configuration for the Proxy."
-  popd
-}
+)
 
-updateProxyConfig() {
-  pushd $TESTNETDIR/proxy/config
-  cp config.toml config_edit.toml
+updateProxyConfig() (
+  cd "$TESTNETDIR/proxy/config" || exit
+  cp config.toml config_edit.toml || exit
 
   # Truncate config.toml before the [[Observers]] list
-  sed -i -n '/\[\[Observers\]\]/q;p' config_edit.toml
+  sed -i -n '/\[\[Observers\]\]/q;p' config_edit.toml || exit
   
-  updateTOMLValue config_edit.toml "ServerPort" $PORT_PROXY
-  generateProxyObserverList config_edit.toml
+  updateTOMLValue config_edit.toml "ServerPort" "$PORT_PROXY" || exit
+  generateProxyObserverList config_edit.toml || exit
 
-  cp config_edit.toml config.toml
-  rm config_edit.toml
+  cp config_edit.toml config.toml || exit
+  rm config_edit.toml || exit
 
   echo "Updated configuration for the Proxy."
-  popd
-}
+)
 
 copyTxGenConfig() {
   pushd $TESTNETDIR
@@ -294,9 +603,10 @@ updateTOMLValue() {
   local key=$2
   local value=$3
 
-  escaped_value=$(printf "%q" $value)
+  local escaped_value
+  escaped_value=$(printf "%q" "$value") || return
 
-  sed -i "s,$key = .*\$,$key = $escaped_value," $filename
+  sed -i "s,$key = .*\$,$key = $escaped_value," "$filename"
 }
 
 
@@ -305,9 +615,10 @@ updateJSONValue() {
   local key=$2
   local value=$3
 
-  escaped_value=$(printf "%q" $value)
+  local escaped_value
+  escaped_value=$(printf "%q" "$value") || return
 
-  sed -i "s,\"$key\": .*\$,\"$key\": $escaped_value\,," $filename
+  sed -i "s,\"$key\": .*\$,\"$key\": $escaped_value\,," "$filename"
 }
 
 changeConfigForHardfork(){

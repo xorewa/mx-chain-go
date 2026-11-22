@@ -4,7 +4,7 @@
 export METASHARD_ID=4294967295
 
 # Path to mx-chain-go. Determined automatically. Do not change.
-export MULTIVERSXDIR=$(dirname $(dirname $MULTIVERSXTESTNETSCRIPTSDIR))
+export MULTIVERSXDIR="$(dirname "$(dirname "$MULTIVERSXTESTNETSCRIPTSDIR")")"
 
 # Enable the MultiversX Proxy. Note that this is a private repository
 # (mx-chain-proxy-go).
@@ -20,7 +20,7 @@ export USE_TXGEN=0
 export TESTNETDIR="$HOME/MultiversX/testnet"
 
 # Path to mx-chain-deploy-go, branch: master. Default: near mx-chain-go.
-export CONFIGGENERATORDIR="$(dirname $MULTIVERSXDIR)/mx-chain-deploy-go/cmd/filegen"
+export CONFIGGENERATORDIR="$(dirname "$MULTIVERSXDIR")/mx-chain-deploy-go/cmd/filegen"
 export CONFIGGENERATOR="$CONFIGGENERATORDIR/filegen"    # Leave unchanged.
 export CONFIGGENERATOROUTPUTDIR="output"
 
@@ -120,7 +120,7 @@ fi
 # Proxy configuration
 
 # Path to mx-chain-proxy-go, branch: master. Default: near mx-chain-go.
-export PROXYDIR="$(dirname $MULTIVERSXDIR)/mx-chain-proxy-go/cmd/proxy"
+export PROXYDIR="$(dirname "$MULTIVERSXDIR")/mx-chain-proxy-go/cmd/proxy"
 export PROXY=$PROXYDIR/proxy    # Leave unchanged.
 
 export PORT_PROXY="7950"
@@ -132,7 +132,7 @@ export PROXY_DELAY=10
 # TxGen configuration
 
 # Path to mx-chain-txgen-go. Default: near mx-chain-go.
-export TXGENDIR="$(dirname $MULTIVERSXDIR)/mx-chain-txgen-go/cmd/txgen"
+export TXGENDIR="$(dirname "$MULTIVERSXDIR")/mx-chain-txgen-go/cmd/txgen"
 export TXGEN=$TXGENDIR/txgen    # Leave unchanged.
 
 export PORT_TXGEN="7951"
@@ -160,9 +160,13 @@ export SKIP_OBSERVER_IDX=-1
 export USE_HARDFORK=1
 
 # Load local overrides, .gitignored
-LOCAL_OVERRIDES="$MULTIVERSXTESTNETSCRIPTSDIR/local.sh"
+if [[ -n ${LOCAL_OVERRIDES:-} ]]; then
+  [[ "$LOCAL_OVERRIDES" == /* && -f "$LOCAL_OVERRIDES" && ! -L "$LOCAL_OVERRIDES" ]] || return 1
+else
+  LOCAL_OVERRIDES="$MULTIVERSXTESTNETSCRIPTSDIR/local.sh"
+fi
 if [ -f "$LOCAL_OVERRIDES" ]; then
-  source "$MULTIVERSXTESTNETSCRIPTSDIR/local.sh"
+  source "$LOCAL_OVERRIDES" || return
 fi
 
 # Leave unchanged.

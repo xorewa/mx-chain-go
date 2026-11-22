@@ -5,6 +5,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-go/p2p"
 	"github.com/multiversx/mx-chain-go/process"
+	nativeValidation "github.com/multiversx/mx-chain-go/process/transaction"
 	"github.com/multiversx/mx-chain-go/storage"
 	logger "github.com/multiversx/mx-chain-logger-go"
 )
@@ -73,12 +74,22 @@ func (txip *TxInterceptorProcessor) Save(data process.InterceptedData, peerOrigi
 
 	txLog.Trace("received transaction", "pid", peerOriginator.Pretty(), "hash", data.Hash())
 	cacherIdentifier := process.ShardCacherIdentifier(interceptedTx.SenderShardId(), interceptedTx.ReceiverShardId())
-	txip.shardedPool.AddData(
-		data.Hash(),
-		interceptedTx.Transaction(),
-		interceptedTx.Transaction().Size(),
-		cacherIdentifier,
-	)
+	pool, hasReceiptPool := txip.shardedPool.(interface {
+		NativeValidationReceiptEnabled() bool
+		AddDataWithNativeValidationReceipt([]byte, interface{}, int, string, *nativeValidation.NativeValidationReceipt)
+	})
+	producer, hasReceiptProducer := data.(interface {
+		RequiresDRWANativeValidationReceipt() bool
+		NativeValidationReceipt() *nativeValidation.NativeValidationReceipt
+	})
+	if hasReceiptPool && hasReceiptProducer && pool.NativeValidationReceiptEnabled() && producer.RequiresDRWANativeValidationReceipt() {
+		pool.AddDataWithNativeValidationReceipt(data.Hash(), interceptedTx.Transaction(),
+			interceptedTx.Transaction().Size(), cacherIdentifier, producer.NativeValidationReceipt())
+	} else {
+		// Unconfigured native Save does not allocate or marshal a receipt.
+		txip.shardedPool.AddData(data.Hash(), interceptedTx.Transaction(),
+			interceptedTx.Transaction().Size(), cacherIdentifier)
+	}
 
 	isIntraShard := interceptedTx.SenderShardId() == interceptedTx.ReceiverShardId()
 	if isDirectSend(broadcastMethod) && isIntraShard {

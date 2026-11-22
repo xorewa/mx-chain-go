@@ -468,8 +468,26 @@ type ProcessConfigByRound struct {
 }
 
 // GeneralSettingsConfig will hold the general settings for a node
+// DRWAInitialProgrammeInput identifies raw genesis DATA, never an authority.
+type DRWAInitialProgrammeInput struct {
+	Path   string
+	SHA256 string
+}
+
+// DRWADeploymentIdentityConfig supplies explicit technical inputs for the
+// selected six-field construction. No default bounds or first-genesis
+// permission is implied. SHA256 must arrive through the admitted technical
+// configuration channel; this struct does not authenticate that channel.
+type DRWADeploymentIdentityConfig struct {
+	Path, SHA256                              string
+	MaxBytes, MaxChainIDBytes, MaxHeaderBytes int
+	DB                                        DBConfig
+}
+
 type GeneralSettingsConfig struct {
-	StatusPollingIntervalSec int
+	DRWADeploymentIdentity     *DRWADeploymentIdentityConfig `json:"-"`
+	DRWAInitialProgrammeInputs []DRWAInitialProgrammeInput
+	StatusPollingIntervalSec   int
 	// TODO: add config per epoch for supernova
 	MaxComputableRounds              uint64
 	StartInEpochEnabled              bool
@@ -799,6 +817,7 @@ type VersionsConfig struct {
 
 // Configs is a holder for the node configuration parameters
 type Configs struct {
+	DRWAInitialProgrammeStartup *DRWAInitialProgrammeStartup `json:"-" toml:"-"`
 	GeneralConfig            *Config
 	ApiRoutesConfig          *ApiRoutesConfig
 	EconomicsConfig          *EconomicsConfig
@@ -831,6 +850,8 @@ type InitialNodeConfig struct {
 
 // ConfigurationPathsHolder holds all configuration filenames and configuration paths used to start the node
 type ConfigurationPathsHolder struct {
+	// DRWA is the explicit experimental overlay path; empty leaves DRWA absent.
+	DRWA                     string `json:",omitempty"`
 	MainConfig               string
 	ApiRoutes                string
 	Economics                string

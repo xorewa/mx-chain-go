@@ -114,8 +114,8 @@ func (txCoordinator *TxCoordinator) SelectOutgoingTransactions(_ uint64, _ func(
 }
 
 // CreateMbsAndProcessTransactionsFromMe does nothing as it is disabled
-func (txCoordinator *TxCoordinator) CreateMbsAndProcessTransactionsFromMe(_ func() bool, _ []byte) block.MiniBlockSlice {
-	return make(block.MiniBlockSlice, 0)
+func (txCoordinator *TxCoordinator) CreateMbsAndProcessTransactionsFromMe(_ func() bool, _ []byte) (block.MiniBlockSlice, error) {
+	return make(block.MiniBlockSlice, 0), nil
 }
 
 // CreateMarshalizedData does nothing as it is disabled

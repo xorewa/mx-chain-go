@@ -13,6 +13,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/common/errChan"
+	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/process/factory"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/state/accounts"
@@ -37,9 +38,10 @@ type stats struct {
 
 type userAccountsSyncer struct {
 	*baseAccountsSyncer
-	throttler      data.GoRoutineThrottler
-	syncerMutex    sync.Mutex
-	pubkeyCoverter core.PubkeyConverter
+	throttler         data.GoRoutineThrottler
+	syncerMutex       sync.Mutex
+	pubkeyCoverter    core.PubkeyConverter
+	protectedChildren state.ProtectedChildResolver
 
 	mutStatistics sync.RWMutex
 	largeTries    []*stats
@@ -52,6 +54,7 @@ type ArgsNewUserAccountsSyncer struct {
 	ShardId                uint32
 	Throttler              data.GoRoutineThrottler
 	AddressPubKeyConverter core.PubkeyConverter
+	ProtectedChildren      state.ProtectedChildResolver
 }
 
 // NewUserAccountsSyncer creates a user account syncer
@@ -100,6 +103,7 @@ func NewUserAccountsSyncer(args ArgsNewUserAccountsSyncer) (*userAccountsSyncer,
 		throttler:          args.Throttler,
 		pubkeyCoverter:     args.AddressPubKeyConverter,
 		largeTries:         make([]*stats, 0),
+		protectedChildren:  args.ProtectedChildren,
 	}
 
 	return u, nil
@@ -179,10 +183,44 @@ func (u *userAccountsSyncer) syncAccounts(
 		return err
 	}
 
+	if err = u.syncProtectedChildren(ctx, rootHash, checkNodesOnDisk, requestHandler); err != nil {
+		return err
+	}
 	storageMarker.MarkStorerAsSyncedAndActive(u.trieStorageManager)
 
 	log.Debug("main trie and data tries synced", "main trie root hash", rootHash, "num data tries", len(u.dataTries))
 
+	return nil
+}
+
+func (u *userAccountsSyncer) syncProtectedChildren(ctx context.Context, rootHash []byte, checkNodesOnDisk bool, requestHandler trie.RequestHandler) error {
+	if u.protectedChildren == nil {
+		return nil
+	}
+	checkpoint := holders.NewRootHashHolder(rootHash, recoveryEpochForSync(requestHandler))
+	refs, err := u.protectedChildren(checkpoint)
+	if err != nil {
+		return err
+	}
+	for _, ref := range refs {
+		if !ref.IsForStorage(u.trieStorageManager) {
+			return fmt.Errorf("protected child resolver belongs to a different native store")
+		}
+		root := ref.RootHash()
+		if !common.IsEmptyTrie(root) {
+			if _, err = u.createAndStartSyncer(ctx, root, checkNodesOnDisk, requestHandler); err != nil {
+				return err
+			}
+		}
+		if err = ref.Verify(); err != nil {
+			return err
+		}
+		if !common.IsEmptyTrie(root) {
+			u.syncerMutex.Lock()
+			u.dataTries[string(root)] = struct{}{}
+			u.syncerMutex.Unlock()
+		}
+	}
 	return nil
 }
 

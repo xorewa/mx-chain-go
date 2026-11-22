@@ -156,6 +156,14 @@ func (st *syncAccountsDBs) syncAccountsOfType(accountType genesis.Type, trieID s
 		return err
 	}
 
+	if active, ok := st.activeAccountsDBs[trieID].(*state.AccountsDB); ok && active != nil && active.ProtectedChildResolver() != nil {
+		tries, recreateErr := active.RecreateAllTries(rootHash)
+		if recreateErr != nil {
+			return recreateErr
+		}
+		st.setTries(shardId, accAdapterIdentifier, rootHash, tries)
+		return nil
+	}
 	st.setTries(shardId, accAdapterIdentifier, rootHash, accountsDBSyncer.GetSyncedTries())
 
 	return nil
@@ -175,15 +183,17 @@ func (st *syncAccountsDBs) setTries(shId uint32, initialID string, rootHash []by
 }
 
 func (st *syncAccountsDBs) tryRecreateTrie(shardId uint32, id string, trieID state.AccountsDbIdentifier, rootHash []byte) bool {
+	activeTrie := st.activeAccountsDBs[trieID]
+	physical, _ := activeTrie.(*state.AccountsDB)
+	protected := physical != nil && physical.ProtectedChildResolver() != nil
 	savedTrie, ok := st.tries.getTrie(id)
-	if ok {
+	if ok && !protected {
 		currHash, err := savedTrie.RootHash()
 		if err == nil && bytes.Equal(currHash, rootHash) {
 			return true
 		}
 	}
 
-	activeTrie := st.activeAccountsDBs[trieID]
 	if check.IfNil(activeTrie) {
 		return false
 	}

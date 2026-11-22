@@ -55,6 +55,9 @@ func (sp *shardProcessor) CreateBlockProposal(
 	initialHdr data.HeaderHandler,
 	haveTime func() bool,
 ) (data.HeaderHandler, data.BodyHandler, error) {
+	if err := sp.drwaExecutionError(); err != nil {
+		return nil, nil, err
+	}
 	if check.IfNil(initialHdr) {
 		return nil, nil, process.ErrNilBlockHeader
 	}
@@ -309,6 +312,9 @@ func (sp *shardProcessor) ProcessBlockProposal(
 	headerHash []byte,
 	bodyHandler data.BodyHandler,
 ) (data.BaseExecutionResultHandler, error) {
+	if err := sp.drwaExecutionError(); err != nil {
+		return nil, err
+	}
 	if check.IfNil(headerHandler) {
 		return nil, process.ErrNilBlockHeader
 	}
@@ -323,6 +329,12 @@ func (sp *shardProcessor) ProcessBlockProposal(
 		return nil, process.ErrBlockProcessorBusy
 	}
 	defer sp.processStatusHandler.SetIdle()
+
+	installHeader, endHeaderTime, timeErr := beginEvaluatedHeaderTime(sp.blockChainHook, headerHandler)
+	if timeErr != nil {
+		return nil, timeErr
+	}
+	defer endHeaderTime()
 
 	sp.roundNotifier.CheckRound(headerHandler)
 	sp.epochNotifier.CheckEpoch(headerHandler)
@@ -381,7 +393,7 @@ func (sp *shardProcessor) ProcessBlockProposal(
 		return nil, err
 	}
 
-	err = sp.blockChainHook.SetCurrentHeader(header)
+	err = installHeader(header)
 	if err != nil {
 		return nil, err
 	}
@@ -429,6 +441,9 @@ func (sp *shardProcessor) ProcessBlockProposal(
 // CommitBlockProposalState commits the accounts state after processing a block proposal
 // and performs any post-commit operations (e.g. saving epoch start economics metrics).
 func (sp *shardProcessor) CommitBlockProposalState(headerHandler data.HeaderHandler, headerHash []byte) error {
+	if err := sp.drwaExecutionError(); err != nil {
+		return err
+	}
 	if check.IfNil(headerHandler) {
 		return process.ErrNilBlockHeader
 	}

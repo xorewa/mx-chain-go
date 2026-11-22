@@ -2,6 +2,9 @@ package node
 
 import (
 	"fmt"
+	"github.com/multiversx/mx-chain-core-go/hashing"
+	"github.com/multiversx/mx-chain-core-go/marshal"
+	"github.com/multiversx/mx-chain-go/process/drwa"
 	"io"
 	"math/big"
 	"os"
@@ -83,7 +86,9 @@ const (
 
 // nodeRunner holds the node runner configuration and controls running of a node
 type nodeRunner struct {
-	configs *config.Configs
+	configs                     *config.Configs
+	drwaOriginalCycleStarted     atomic.Bool
+	drwaOriginal                 *acquiredDRWAOriginal
 }
 
 // NewNodeRunner creates a nodeRunner instance
@@ -91,16 +96,48 @@ func NewNodeRunner(cfgs *config.Configs) (*nodeRunner, error) {
 	if cfgs == nil {
 		return nil, fmt.Errorf("nil configs provided")
 	}
+	if err := ValidateDRWAStartupMode(cfgs); err != nil {
+		return nil, err
+	}
 
-	return &nodeRunner{
-		configs: cfgs,
-	}, nil
+	runner := &nodeRunner{configs: cfgs}
+	if cfgs.DRWAInitialProgrammeStartup != nil {
+		acquired, err := acquireDRWAOriginal(cfgs)
+		if err != nil {
+			return nil, err
+		}
+		runner.drwaOriginal = acquired
+	}
+	return runner, nil
+}
+
+// ValidateDRWAStartupMode refuses configured persisted startup before native
+// providers can write during discovery. A configured identity without a
+// startup carrier reaches the persisted identity loader at processing.
+func ValidateDRWAStartupMode(configs *config.Configs) error {
+	if configs == nil {
+		return drwa.ErrDeploymentIdentity
+	}
+	startup := configs.DRWAInitialProgrammeStartup
+	if startup != nil && startup.Persisted {
+		return drwa.ErrDeploymentIdentity
+	}
+	if startup == nil && configs.GeneralConfig != nil && configs.GeneralConfig.GeneralSettings.DRWADeploymentIdentity != nil {
+		return drwa.ErrDeploymentIdentity
+	}
+	return nil
 }
 
 // Start creates and starts the managed components
 func (nr *nodeRunner) Start() error {
 	configs := nr.configs
+	if err := ValidateDRWAStartupMode(configs); err != nil {
+		return err
+	}
 	flagsConfig := configs.FlagsConfig
+	if configs.DRWAInitialProgrammeStartup != nil && flagsConfig.CleanupStorage {
+		return drwa.ErrDeploymentIdentity
+	}
 	configurationPaths := configs.ConfigurationPathsHolder
 	chanStopNodeProcess := make(chan endProcess.ArgEndProcess, 1)
 
@@ -275,6 +312,17 @@ func (nr *nodeRunner) doProfileOnShuffleOut() {
 func (nr *nodeRunner) executeOneComponentCreationCycle(
 	chanStopNodeProcess chan endProcess.ArgEndProcess,
 ) (bool, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return true, err
+	}
+	// A new process factory must not reuse an original-genesis input on shuffle-out.
+	startup := nr.configs.DRWAInitialProgrammeStartup
+	if startup != nil {
+		if !nr.drwaOriginalCycleStarted.CompareAndSwap(false, true) || nr.drwaOriginal.consume() != nil {
+			return true, drwa.ErrDeploymentIdentity
+		}
+	}
+
 	goRoutinesNumberStart := runtime.NumGoroutine()
 
 	log.Debug("applying custom configs based on the current architecture")
@@ -940,6 +988,9 @@ func (nr *nodeRunner) CreateManagedConsensusComponents(
 	processComponents mainFactory.ProcessComponentsHolder,
 	statusCoreComponents mainFactory.StatusCoreComponentsHolder,
 ) (mainFactory.ConsensusComponentsHandler, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	scheduledProcessorArgs := spos.ScheduledProcessorWrapperArgs{
 		SyncTimer:                coreComponents.SyncTimer(),
 		Processor:                processComponents.BlockProcessor(),
@@ -995,6 +1046,9 @@ func (nr *nodeRunner) CreateManagedHeartbeatV2Components(
 	processComponents mainFactory.ProcessComponentsHolder,
 	statusCoreComponents mainFactory.StatusCoreComponentsHolder,
 ) (mainFactory.HeartbeatV2ComponentsHandler, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	heartbeatV2Args := heartbeatComp.ArgHeartbeatV2ComponentsFactory{
 		Config:               *nr.configs.GeneralConfig,
 		Prefs:                *nr.configs.PreferencesConfig,
@@ -1149,6 +1203,9 @@ func (nr *nodeRunner) CreateManagedStatusComponents(
 	isInImportMode bool,
 	cryptoComponents mainFactory.CryptoComponentsHolder,
 ) (mainFactory.StatusComponentsHandler, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	statArgs := statusComp.StatusComponentsFactoryArgs{
 		Config:               *nr.configs.GeneralConfig,
 		ExternalConfig:       *nr.configs.ExternalConfig,
@@ -1229,6 +1286,17 @@ func (nr *nodeRunner) CreateManagedProcessComponents(
 	nodesCoordinator nodesCoordinator.NodesCoordinator,
 ) (mainFactory.ProcessComponentsHandler, error) {
 	configs := nr.configs
+	if err := ValidateDRWAStartupMode(configs); err != nil {
+		return nil, err
+	}
+	initialProgrammes, startup, drwaCandidate, err := loadManagedInitialProgrammeData(configs, coreComponents)
+	if err != nil {
+		return nil, err
+	}
+	var initialProgrammeLimits *drwa.InitialProgrammeLimits
+	if startup != nil {
+		initialProgrammeLimits = &startup.Limits
+	}
 	configurationPaths := nr.configs.ConfigurationPathsHolder
 	importStartHandler, err := trigger.NewImportStartHandler(filepath.Join(configs.FlagsConfig.DbDir, common.DefaultDBPath), configs.FlagsConfig.Version)
 	if err != nil {
@@ -1308,33 +1376,39 @@ func (nr *nodeRunner) CreateManagedProcessComponents(
 	txExecutionOrderHandler := ordering.NewOrderedCollection()
 
 	processArgs := processComp.ProcessComponentsFactoryArgs{
-		Config:                  *configs.GeneralConfig,
-		EpochConfig:             *configs.EpochConfig,
-		RoundConfig:             *configs.RoundConfig,
-		PrefConfigs:             *configs.PreferencesConfig,
-		ImportDBConfig:          *configs.ImportDbConfig,
-		EconomicsConfig:         *configs.EconomicsConfig,
-		AccountsParser:          accountsParser,
-		SmartContractParser:     smartContractParser,
-		GasSchedule:             gasScheduleNotifier,
-		NodesCoordinator:        nodesCoordinator,
-		Data:                    dataComponents,
-		CoreData:                coreComponents,
-		Crypto:                  cryptoComponents,
-		State:                   stateComponents,
-		Network:                 networkComponents,
-		BootstrapComponents:     bootstrapComponents,
-		StatusComponents:        statusComponents,
-		StatusCoreComponents:    statusCoreComponents,
-		RequestedItemsHandler:   requestedItemsHandler,
-		WhiteListHandler:        whiteListRequest,
-		WhiteListerVerifiedTxs:  whiteListerVerifiedTxs,
-		MaxRating:               configs.RatingsConfig.General.MaxRating,
-		SystemSCConfig:          configs.SystemSCConfig,
-		ImportStartHandler:      importStartHandler,
-		HistoryRepo:             historyRepository,
-		FlagsConfig:             *configs.FlagsConfig,
-		TxExecutionOrderHandler: txExecutionOrderHandler,
+		DRWAConfigurationOverlay: configurationPaths.DRWA,
+		DRWAEffectiveConfigs:     configs,
+		DRWAInitialProgrammes:    drwa.CloneInitialProgrammeEvidence(initialProgrammes),
+		DRWAInitialProgrammeLimits: initialProgrammeLimits,
+		DRWAInitialProgrammeStartup: startup,
+		DRWAResolvedConfiguration: drwaCandidate,
+		Config:                   *configs.GeneralConfig,
+		EpochConfig:              *configs.EpochConfig,
+		RoundConfig:              *configs.RoundConfig,
+		PrefConfigs:              *configs.PreferencesConfig,
+		ImportDBConfig:           *configs.ImportDbConfig,
+		EconomicsConfig:          *configs.EconomicsConfig,
+		AccountsParser:           accountsParser,
+		SmartContractParser:      smartContractParser,
+		GasSchedule:              gasScheduleNotifier,
+		NodesCoordinator:         nodesCoordinator,
+		Data:                     dataComponents,
+		CoreData:                 coreComponents,
+		Crypto:                   cryptoComponents,
+		State:                    stateComponents,
+		Network:                  networkComponents,
+		BootstrapComponents:      bootstrapComponents,
+		StatusComponents:         statusComponents,
+		StatusCoreComponents:     statusCoreComponents,
+		RequestedItemsHandler:    requestedItemsHandler,
+		WhiteListHandler:         whiteListRequest,
+		WhiteListerVerifiedTxs:   whiteListerVerifiedTxs,
+		MaxRating:                configs.RatingsConfig.General.MaxRating,
+		SystemSCConfig:           configs.SystemSCConfig,
+		ImportStartHandler:       importStartHandler,
+		HistoryRepo:              historyRepository,
+		FlagsConfig:              *configs.FlagsConfig,
+		TxExecutionOrderHandler:  txExecutionOrderHandler,
 	}
 	processComponentsFactory, err := processComp.NewProcessComponentsFactory(processArgs)
 	if err != nil {
@@ -1362,6 +1436,9 @@ func (nr *nodeRunner) CreateManagedDataComponents(
 	crypto mainFactory.CryptoComponentsHolder,
 ) (mainFactory.DataComponentsHandler, error) {
 	configs := nr.configs
+	if err := ValidateDRWAStartupMode(configs); err != nil {
+		return nil, err
+	}
 	storerEpoch := bootstrapComponents.EpochBootstrapParams().Epoch()
 	if !configs.GeneralConfig.StoragePruning.Enabled {
 		// TODO: refactor this as when the pruning storer is disabled, the default directory path is Epoch_0
@@ -1415,6 +1492,9 @@ func (nr *nodeRunner) CreateManagedStateComponents(
 	dataComponents mainFactory.DataComponentsHandler,
 	statusCoreComponents mainFactory.StatusCoreComponentsHolder,
 ) (mainFactory.StateComponentsHandler, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	stateArgs := stateComp.StateComponentsFactoryArgs{
 		Config:                   *nr.configs.GeneralConfig,
 		Core:                     coreComponents,
@@ -1449,7 +1529,9 @@ func (nr *nodeRunner) CreateManagedBootstrapComponents(
 	cryptoComponents mainFactory.CryptoComponentsHolder,
 	networkComponents mainFactory.NetworkComponentsHolder,
 ) (mainFactory.BootstrapComponentsHandler, error) {
-
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	bootstrapComponentsFactoryArgs := bootstrapComp.BootstrapComponentsFactoryArgs{
 		Config:               *nr.configs.GeneralConfig,
 		PrefConfig:           *nr.configs.PreferencesConfig,
@@ -1486,6 +1568,9 @@ func (nr *nodeRunner) CreateManagedNetworkComponents(
 	statusCoreComponents mainFactory.StatusCoreComponentsHolder,
 	cryptoComponents mainFactory.CryptoComponentsHolder,
 ) (mainFactory.NetworkComponentsHandler, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	networkComponentsFactoryArgs := networkComp.NetworkComponentsFactoryArgs{
 		MainP2pConfig:         *nr.configs.MainP2pConfig,
 		FullArchiveP2pConfig:  *nr.configs.FullArchiveP2pConfig,
@@ -1526,6 +1611,9 @@ func (nr *nodeRunner) CreateManagedNetworkComponents(
 func (nr *nodeRunner) CreateManagedCoreComponents(
 	chanStopNodeProcess chan endProcess.ArgEndProcess,
 ) (mainFactory.CoreComponentsHandler, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	coreArgs := coreComp.CoreComponentsFactoryArgs{
 		Config:                *nr.configs.GeneralConfig,
 		ConfigPathsHolder:     *nr.configs.ConfigurationPathsHolder,
@@ -1562,6 +1650,9 @@ func (nr *nodeRunner) CreateManagedCoreComponents(
 func (nr *nodeRunner) CreateManagedStatusCoreComponents(
 	coreComponents mainFactory.CoreComponentsHolder,
 ) (mainFactory.StatusCoreComponentsHandler, error) {
+	if err := ValidateDRWAStartupMode(nr.configs); err != nil {
+		return nil, err
+	}
 	args := statusCore.StatusCoreComponentsFactoryArgs{
 		Config:                     *nr.configs.GeneralConfig,
 		EpochConfig:                *nr.configs.EpochConfig,
@@ -1594,6 +1685,9 @@ func (nr *nodeRunner) CreateManagedCryptoComponents(
 	coreComponents mainFactory.CoreComponentsHolder,
 ) (mainFactory.CryptoComponentsHandler, error) {
 	configs := nr.configs
+	if err := ValidateDRWAStartupMode(configs); err != nil {
+		return nil, err
+	}
 	validatorKeyPemFileName := configs.ConfigurationPathsHolder.ValidatorKey
 	allValidatorKeysPemFileName := configs.ConfigurationPathsHolder.AllValidatorKeys
 	cryptoComponentsHandlerArgs := cryptoComp.CryptoComponentsFactoryArgs{
@@ -1820,4 +1914,53 @@ func createWhiteListerVerifiedTxs(generalConfig *config.Config) (process.WhiteLi
 	}
 	// the entries only record that a transaction's signatures were already verified, which does not become stale
 	return interceptors.NewWhiteListDataVerifier(whiteListCacheVerified, 0)
+}
+
+func loadManagedInitialProgrammeData(configs *config.Configs, coreComponents mainFactory.CoreComponentsHolder) (
+	[]drwa.InitialProgrammeEvidence, *config.DRWAInitialProgrammeStartup, *coreComp.DRWAConfigurationCandidate, error) {
+	inputs := configs.GeneralConfig.GeneralSettings.DRWAInitialProgrammeInputs
+	startup := configs.DRWAInitialProgrammeStartup.Clone()
+	if len(inputs) == 0 && startup == nil {
+		return nil, nil, nil, nil
+	}
+	if startup == nil || startup.Limits.Validate() != nil ||
+		(!startup.Persisted && (len(inputs) == 0 || len(inputs) > startup.Limits.Files)) ||
+		(startup.Persisted && len(inputs) != 0) {
+		return nil, nil, nil, drwa.ErrInitialProgrammeLimits
+	}
+	if err := drwa.ValidateInitialProgrammeMinimum(startup.Minimum); err != nil {
+		return nil, nil, nil, err
+	}
+	if configs.ConfigurationPathsHolder == nil || configs.ConfigurationPathsHolder.DRWA == "" ||
+		configs.GeneralConfig.GeneralSettings.DRWADeploymentIdentity == nil || startup.OriginalDatabasePath == "" {
+		return nil, nil, nil, drwa.ErrDeploymentIdentity
+	}
+	if check.IfNil(coreComponents) {
+		return nil, nil, nil, ErrNilCoreComponents
+	}
+	marshaller, hasher := coreComponents.InternalMarshalizer(), coreComponents.Hasher()
+	if check.IfNil(marshaller) {
+		return nil, nil, nil, core.ErrNilMarshalizer
+	}
+	if check.IfNil(hasher) {
+		return nil, nil, nil, core.ErrNilHasher
+	}
+	candidate, err := coreComp.NewDRWAConfigurationCandidateFromPinnedOverlay(configs, configs.ConfigurationPathsHolder.DRWA,
+		startup.OverlaySHA256, startup.OverlayMaxBytes, coreComp.DRWAConfigurationSupport{ProcessorV1: true, RelayedV3: true})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if startup.Persisted {
+		return nil, startup, candidate, nil
+	}
+	programmes, err := loadInitialProgrammeData(inputs, &startup.Limits, marshaller, hasher)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return programmes, startup, candidate, nil
+}
+
+// The explicit loader decodes DATA and does not authorize an appointment.
+func loadInitialProgrammeData(inputs []config.DRWAInitialProgrammeInput, limits *drwa.InitialProgrammeLimits, marshaller marshal.Marshalizer, hasher hashing.Hasher) ([]drwa.InitialProgrammeEvidence, error) {
+	return parsing.LoadDRWAInitialProgrammeInputs(inputs, limits, marshaller, hasher)
 }

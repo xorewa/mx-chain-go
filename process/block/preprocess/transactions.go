@@ -14,15 +14,18 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/data/transaction"
 	logger "github.com/multiversx/mx-chain-logger-go"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 
 	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/config"
 	"github.com/multiversx/mx-chain-go/txcache"
+	"github.com/multiversx/mx-chain-go/vm"
 
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/process/block/helpers"
+	nativeValidation "github.com/multiversx/mx-chain-go/process/transaction"
 	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/storage"
 )
@@ -947,7 +950,10 @@ func (txs *transactions) processAndRemoveBadTransaction(
 	dstShardId uint32,
 ) error {
 	txs.txExecutionOrderHandler.Add(txHash)
-	_, err := txs.txProcessor.ProcessTransaction(tx)
+	_, err := txs.processNativeTransaction(txHash, tx, sndShardId, dstShardId)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 
 	isNotExecutable := errors.Is(err, process.ErrLowerNonceInTransaction) || errors.Is(err, process.ErrInsufficientFee) || errors.Is(err, process.ErrTransactionNotExecutable)
 	isAsyncExecEnabled := common.IsAsyncExecutionEnabled(txs.enableEpochsHandler, txs.enableRoundsHandler)
@@ -1137,6 +1143,9 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 		haveTime,
 	)
 	elapsedTime := time.Since(startTime)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("computeSortedTxs", "error", err.Error())
 		return make(block.MiniBlockSlice, 0), nil
@@ -1179,6 +1188,9 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 		"time [s]", elapsedTime,
 	)
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessMiniBlocksFromMe", "error", err.Error())
 		return make(block.MiniBlockSlice, 0), nil
@@ -1195,6 +1207,9 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 		sortedTxsForScheduled,
 		mapSCTxs,
 	)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, err
+	}
 	if err != nil {
 		log.Debug("createAndProcessScheduledMiniBlocksFromMeAsProposer", "error", err.Error())
 		return make(block.MiniBlockSlice, 0), nil
@@ -1289,7 +1304,7 @@ func (txs *transactions) createAndProcessMiniBlocksFromMeV1(
 
 		err = txs.processMiniBlockBuilderTx(mbBuilder, wtx, tx)
 		if err != nil {
-			if core.IsGetNodeFromDBError(err) {
+			if core.IsGetNodeFromDBError(err) || errors.Is(err, vm.ErrDRWAExecution) {
 				return nil, nil, err
 			}
 			continue
@@ -1354,6 +1369,9 @@ func (txs *transactions) processMiniBlockBuilderTx(
 	elapsedTime := time.Since(startTime)
 	mb.stats.totalProcessingTime += elapsedTime
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 	if err != nil && !errors.Is(err, process.ErrFailedTransaction) {
 		txs.handleBadTransaction(err, wtx, tx, mb, snapshot)
 		return err
@@ -1747,7 +1765,7 @@ func (txs *transactions) ProcessMiniBlock(
 				miniBlockTxHashes[txIndex],
 				&gasInfo,
 				gasProvidedByTxInSelfShard,
-				miniBlockHash)
+				miniBlockHash, miniBlock.SenderShardID, miniBlock.ReceiverShardID)
 			if err != nil {
 				break
 			}
@@ -1759,6 +1777,9 @@ func (txs *transactions) ProcessMiniBlock(
 		numTXsProcessed++
 	}
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, indexOfLastTxProcessed, false, err
+	}
 	if err != nil && (!partialMbExecutionMode || scheduledMode) {
 		return processedTxHashes, txIndex - 1, true, err
 	}
@@ -1803,12 +1824,16 @@ func (txs *transactions) processInNormalMode(
 	gasInfo *gasConsumedInfo,
 	gasProvidedByTxInSelfShard uint64,
 	mbHash []byte,
+	nativeShards ...uint32,
 ) error {
 
 	snapshot := txs.handleProcessTransactionInit(preProcessorExecutionInfoHandler, txHash, mbHash)
 
 	txs.txExecutionOrderHandler.Add(txHash)
-	_, err := txs.txProcessor.ProcessTransaction(tx)
+	_, err := txs.processNativeTransaction(txHash, tx, nativeShards...)
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return err
+	}
 	if err != nil {
 		txs.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, txHash)
 		return err
@@ -2040,4 +2065,31 @@ func (txs *transactions) createAndProcessMiniBlocksFromMe(
 	}
 
 	return miniBlocks, remainingTxs, mapSCTxs, err
+}
+
+// processNativeTransaction forwards the actual pool observation from the exact
+// native miniblock route. No caller metadata or alternate/latest cache supplies
+// authentication. The meta consumer still requires its current native lease.
+func (txs *transactions) processNativeTransaction(hash []byte, tx *transaction.Transaction, nativeShards ...uint32) (vmcommon.ReturnCode, error) {
+	native, ok := txs.txProcessor.(interface {
+		ProcessTransactionWithDRWA(*transaction.Transaction, *nativeValidation.NativeValidationReceipt) (vmcommon.ReturnCode, error)
+	})
+	if !ok {
+		return txs.txProcessor.ProcessTransaction(tx)
+	}
+	source, exists := txs.txPool.(interface {
+		NativeValidationReceiptEnabled() bool
+		NativeValidationReceiptFor([]byte, string, *transaction.Transaction) *nativeValidation.NativeValidationReceipt
+	})
+	if !exists || !source.NativeValidationReceiptEnabled() {
+		// Unconfigured transport keeps the original native consumer, including
+		// its account/fee/VM lookup ordering and unknown-name behaviour.
+		return txs.txProcessor.ProcessTransaction(tx)
+	}
+	if len(nativeShards) != 2 {
+		return vmcommon.ExecutionFailed, vm.ErrDRWAExecution
+	}
+	route := process.ShardCacherIdentifier(nativeShards[0], nativeShards[1])
+	receipt := source.NativeValidationReceiptFor(hash, route, tx)
+	return native.ProcessTransactionWithDRWA(tx, receipt)
 }

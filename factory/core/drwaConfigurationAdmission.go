@@ -1,0 +1,374 @@
+package core
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"math"
+	"os"
+	"path/filepath"
+
+	nativeCore "github.com/multiversx/mx-chain-core-go/core"
+	hashFactory "github.com/multiversx/mx-chain-core-go/hashing/factory"
+	"github.com/multiversx/mx-chain-core-go/marshal"
+	marshalFactory "github.com/multiversx/mx-chain-core-go/marshal/factory"
+	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/common/chainparametersnotifier"
+	commonConfigs "github.com/multiversx/mx-chain-go/common/configs"
+	"github.com/multiversx/mx-chain-go/common/enablers"
+	converterFactory "github.com/multiversx/mx-chain-go/common/factory"
+	"github.com/multiversx/mx-chain-go/common/forking"
+	"github.com/multiversx/mx-chain-go/common/graceperiod"
+	"github.com/multiversx/mx-chain-go/config"
+	"github.com/multiversx/mx-chain-go/epochStart/notifier"
+	factoryBlock "github.com/multiversx/mx-chain-go/factory/block"
+	"github.com/multiversx/mx-chain-go/process"
+	"github.com/multiversx/mx-chain-go/process/guardian"
+	"github.com/multiversx/mx-chain-go/sharding"
+	"github.com/pelletier/go-toml"
+)
+
+// DRWAConfigurationSupport is an explicit proposed route/processor matrix.
+// Its values are not defaults or a grant to exclude an architecture obligation.
+// Owner admission and T10's transitive inventory remain separate prerequisites.
+type DRWAConfigurationSupport struct {
+	ProcessorV1, RelayedV3 bool
+	// RegisterMetaESDTPath denotes a supported path calling the native
+	// registerMetaESDT handler (E05 L606); it does not select a token family.
+	RegisterMetaESDTPath bool
+}
+
+// DRWAConfigurationCandidate retains native handlers built from native inputs.
+// The processing factory uses this component for the E05 minimum and native
+// startup tuple. It does not admit a profile, validate the entire node startup,
+// appoint authorities, launch a node, or grant an enforcement capability.
+// The execution/import owner must bind these exact inputs and all further
+// T10-discovered prerequisites before enabling any DRWA dependent effect.
+type DRWAConfigurationCandidate struct {
+	enforcement uint32
+	epochs      common.EnableEpochsHandler
+	rounds      common.EnableRoundsHandler
+	support     DRWAConfigurationSupport
+	overlayPath string
+	overlayPin  [32]byte
+}
+
+// NewDRWAConfigurationCandidateFromPinnedOverlay reads the existing E05
+// coordinate from bytes selected by the admitted in-memory startup input.
+// The pin and bound must originate outside the operator's mutable file.
+func NewDRWAConfigurationCandidateFromPinnedOverlay(configs *config.Configs, overlay string,
+	pin [32]byte, maxBytes int64, support DRWAConfigurationSupport) (*DRWAConfigurationCandidate, error) {
+	if pin == [32]byte{} || maxBytes <= 0 || maxBytes == math.MaxInt64 ||
+		!filepath.IsAbs(overlay) || filepath.Clean(overlay) != overlay {
+		return nil, fmt.Errorf("missing or invalid DRWA pinned overlay input")
+	}
+	raw, err := ReadDRWAPinnedStartupInput(overlay, pin, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	var input struct{ DRWAEnforcementEnableEpoch *uint32 }
+	if err = toml.NewDecoder(bytes.NewReader(raw)).Strict(true).Decode(&input); err != nil {
+		return nil, err
+	}
+	if input.DRWAEnforcementEnableEpoch == nil {
+		return nil, fmt.Errorf("missing DRWAEnforcementEnableEpoch")
+	}
+	candidate, err := NewDRWAConfigurationCandidate(configs, *input.DRWAEnforcementEnableEpoch, support)
+	if err != nil {
+		return nil, err
+	}
+	candidate.overlayPath, candidate.overlayPin = overlay, pin
+	return candidate, nil
+}
+
+// ReadDRWAPinnedStartupInput reads one bounded native startup member
+// selected by the independently bound configured package or its startup record.
+func ReadDRWAPinnedStartupInput(path string, pin [32]byte, maxBytes int64) ([]byte, error) {
+	if pin == [32]byte{} || maxBytes <= 0 || maxBytes == math.MaxInt64 ||
+		!filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return nil, fmt.Errorf("missing or invalid DRWA startup input")
+	}
+	canonical, err := filepath.EvalSymlinks(path)
+	if err != nil || canonical != path {
+		return nil, fmt.Errorf("invalid DRWA path path")
+	}
+	before, err := os.Lstat(path)
+	if err != nil || !before.Mode().IsRegular() || before.Size() > maxBytes {
+		return nil, fmt.Errorf("invalid DRWA path file")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	opened, err := f.Stat()
+	if err != nil || !os.SameFile(before, opened) {
+		return nil, fmt.Errorf("DRWA path changed during open")
+	}
+	raw, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	after, err := os.Lstat(path)
+	if err != nil || !os.SameFile(before, after) || int64(len(raw)) > maxBytes || sha256.Sum256(raw) != pin {
+		return nil, fmt.Errorf("DRWA path does not match the admitted bytes")
+	}
+	return raw, nil
+}
+
+// MatchesPinnedOverlay checks the native processing handoff without reopening
+// the already verified overlay or choosing another enforcement coordinate.
+func (c *DRWAConfigurationCandidate) MatchesPinnedOverlay(path string, pin [32]byte) bool {
+	return c != nil && pin != [32]byte{} && c.overlayPath == path && c.overlayPin == pin
+}
+
+// LoadDRWAConfigurationCandidate reuses the actual native loaders and handlers.
+// The DRWA-defined enforcement coordinate is in an EXPERIMENTAL separate TOML
+// overlay; pointer presence distinguishes explicit epoch zero from an absent
+// field. This location is a construction candidate, not a release allocation.
+// No shared loader, native field, notifier or ordinary startup path is changed.
+func LoadDRWAConfigurationCandidate(paths config.ConfigurationPathsHolder, overlay string,
+	support DRWAConfigurationSupport) (*DRWAConfigurationCandidate, error) {
+	enforcement, err := loadDRWAEnforcementEpoch(overlay)
+	if err != nil {
+		return nil, err
+	}
+	main, err := common.LoadMainConfig(paths.MainConfig)
+	if err != nil {
+		return nil, err
+	}
+	epoch, err := common.LoadEpochConfig(paths.Epoch)
+	if err != nil {
+		return nil, err
+	}
+	round, err := common.LoadRoundConfig(paths.RoundActivation)
+	if err != nil {
+		return nil, err
+	}
+	economics, err := common.LoadEconomicsConfig(paths.Economics)
+	if err != nil {
+		return nil, err
+	}
+	ratings, err := common.LoadRatingsConfig(paths.Ratings)
+	if err != nil {
+		return nil, err
+	}
+	return NewDRWAConfigurationCandidate(&config.Configs{GeneralConfig: main,
+		EpochConfig: epoch, RoundConfig: round, EconomicsConfig: economics, RatingsConfig: ratings},
+		enforcement, support)
+}
+
+// NewDRWAConfigurationCandidateFromOverlay binds the sole experimental
+// coordinate source to the final effective native objects. Unlike the file
+// loader above, it never replaces already overridden inputs with earlier files.
+func NewDRWAConfigurationCandidateFromOverlay(configs *config.Configs, overlay string,
+	support DRWAConfigurationSupport) (*DRWAConfigurationCandidate, error) {
+	enforcement, err := loadDRWAEnforcementEpoch(overlay)
+	if err != nil {
+		return nil, err
+	}
+	return NewDRWAConfigurationCandidate(configs, enforcement, support)
+}
+
+func loadDRWAEnforcementEpoch(overlay string) (uint32, error) {
+	var drwa struct{ DRWAEnforcementEnableEpoch *uint32 }
+	if err := nativeCore.LoadTomlFile(&drwa, overlay); err != nil {
+		return 0, err
+	}
+	if drwa.DRWAEnforcementEnableEpoch == nil {
+		return 0, fmt.Errorf("missing DRWAEnforcementEnableEpoch")
+	}
+	return *drwa.DRWAEnforcementEnableEpoch, nil
+}
+
+// NewDRWAConfigurationCandidate validates the effective native objects supplied
+// AFTER the startup owner's preferences and CLI overrides. It never reloads
+// earlier file values or applies overrides itself. These are the five consumed
+// objects, not a proof of complete startup provenance or configuration admission.
+// The caller must serialize and finish its changes before validation; a later
+// modification requires a fresh candidate and the owning admission checks.
+func NewDRWAConfigurationCandidate(configs *config.Configs, enforcement uint32,
+	support DRWAConfigurationSupport) (*DRWAConfigurationCandidate, error) {
+	if configs == nil || configs.GeneralConfig == nil || configs.EpochConfig == nil ||
+		configs.RoundConfig == nil || configs.EconomicsConfig == nil || configs.RatingsConfig == nil {
+		return nil, fmt.Errorf("missing DRWA effective configuration inputs")
+	}
+	main := *configs.GeneralConfig
+	// NewHeaderVersionHandler sorts its supplied slice in place. Validate a
+	// private slice while retaining the original effective startup object/order.
+	main.Versions.VersionsByEpochs = append([]config.VersionByEpochs(nil), main.Versions.VersionsByEpochs...)
+	// LoadMainConfig runs these native shape checks before preferences/CLI
+	// overrides. Repeat their existing composition on the final objects.
+	// This is no proof of authentic predecessor history or recovery admission.
+	if _, err := common.NewConfiguredRoundExclusionHandler(&main); err != nil {
+		return nil, err
+	}
+	epochs, err := enablers.NewEnableEpochsHandler(configs.EpochConfig.EnableEpochs, forking.NewGenericEpochNotifier())
+	if err != nil {
+		return nil, err
+	}
+	roundNotifier := forking.NewGenericRoundNotifier()
+	rounds, err := enablers.NewEnableRoundsHandler(*configs.RoundConfig, roundNotifier)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateDRWAStartupConfigs(main, roundNotifier); err != nil {
+		return nil, err
+	}
+	// Reuse the WHOLE native cross-file tuple validation, including every epoch
+	// and round table, versions, economics, ratings and round-duration changes.
+	if err = validateSupernovaActivationTuple(main, *configs.EconomicsConfig, *configs.RatingsConfig,
+		epochs.GetActivationEpoch(common.SupernovaFlag), rounds.GetActivationRound(common.SupernovaRoundFlag)); err != nil {
+		return nil, err
+	}
+	// Validate the actual next consumers too. The tuple helper alone permits a
+	// missing epoch-zero chain entry; the native holder rejects it. The header
+	// constructor sorts in place, so reconcile the tuple AFTER that real sorter.
+	_, err = sharding.NewChainParametersHolder(sharding.ArgsChainParametersHolder{
+		ChainParameters:         main.GeneralSettings.ChainParametersByEpoch,
+		EpochStartEventNotifier: notifier.NewEpochStartSubscriptionHandler(),
+		ChainParametersNotifier: chainparametersnotifier.NewChainParametersNotifier(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	_, err = factoryBlock.NewHeaderVersionHandler(main.Versions.VersionsByEpochs, main.Versions.DefaultVersion)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateSupernovaActivationTuple(main, *configs.EconomicsConfig, *configs.RatingsConfig,
+		epochs.GetActivationEpoch(common.SupernovaFlag), rounds.GetActivationRound(common.SupernovaRoundFlag)); err != nil {
+		return nil, err
+	}
+	candidate := &DRWAConfigurationCandidate{enforcement: enforcement,
+		epochs: epochs, rounds: rounds, support: support}
+	if err = candidate.checkPrerequisites(candidate.enforcement); err != nil {
+		return nil, err
+	}
+	return candidate, nil
+}
+
+// validateDRWAStartupConfigs adopts the pure native core startup constructors.
+// The activation-tuple check only requires matching boundary entries; these
+// constructors also reject missing base entries, duplicates and invalid values
+// throughout the tables, including future entries. No startup timer, network,
+// account adapter or parallel configuration mechanism is created here.
+func validateDRWAStartupConfigs(cfg config.Config, rounds process.RoundNotifier) error {
+	for _, name := range []string{cfg.Hasher.Type, cfg.TxSignHasher.Type} {
+		if _, err := hashFactory.NewHasher(name); err != nil {
+			return err
+		}
+	}
+	var internalMarshalizer marshal.Marshalizer
+	for index, name := range []string{cfg.Marshalizer.Type, cfg.VmMarshalizer.Type, cfg.TxSignMarshalizer.Type} {
+		marshaller, err := marshalFactory.NewMarshalizer(name)
+		if err != nil {
+			return err
+		}
+		if index == 0 {
+			internalMarshalizer = marshaller
+		}
+	}
+	var validatorConverter nativeCore.PubkeyConverter
+	for index, pubkeyCfg := range []config.PubkeyConfig{cfg.AddressPubkeyConverter, cfg.ValidatorPubkeyConverter} {
+		converter, err := converterFactory.NewPubkeyConverter(pubkeyCfg)
+		if err != nil {
+			return err
+		}
+		if index == 1 {
+			validatorConverter = converter
+		}
+	}
+	// Native core and processing startup decode this consumed field even when
+	// the hardfork trigger is disabled. Decoding grants no trigger authority.
+	if _, err := validatorConverter.Decode(cfg.Hardfork.PublicKeyToListenFrom); err != nil {
+		return err
+	}
+	gs := cfg.GeneralSettings
+	// E05 also binds the actual bootstrap guardian-delay consumer. Reuse its
+	// constructor and native error; this local notifier starts no runtime.
+	if _, err := guardian.NewGuardedAccount(internalMarshalizer, forking.NewGenericEpochNotifier(), gs.SetGuardianEpochsDelay); err != nil {
+		return err
+	}
+	if _, err := graceperiod.NewEpochChangeGracePeriod(gs.EpochChangeGracePeriodByEpoch); err != nil {
+		return err
+	}
+	if _, err := commonConfigs.NewCommonConfigsHandler(gs.EpochStartConfigsByEpoch,
+		gs.EpochStartConfigsByRound, gs.ConsensusConfigsByEpoch, gs.ConsensusConfigsByRound, false); err != nil {
+		return err
+	}
+	if _, err := commonConfigs.NewProcessConfigsHandler(gs.ProcessConfigsByEpoch, gs.ProcessConfigsByRound, rounds); err != nil {
+		return err
+	}
+	_, err := commonConfigs.NewAntifloodConfigsHandler(cfg.Antiflood, rounds)
+	return err
+}
+
+func (c *DRWAConfigurationCandidate) checkPrerequisites(epoch uint32) error {
+	if c == nil || c.epochs == nil || c.rounds == nil {
+		return fmt.Errorf("missing DRWA loaded configuration candidate")
+	}
+	// E05's positive predicates, plus actual transitive native consumers:
+	// ManagedCryptoAPIsFlag for MetaESDT special-role validation and
+	// ESDTNFTImprovementV1Flag for the retained multi-transfer builtin.
+	// EGLDInESDTMultiTransferFlag alone does not activate that builtin.
+	// Do not infer polarity from names; the remaining T10 inventory stays due.
+	required := []nativeCore.EnableEpochFlag{common.SupernovaFlag, common.DynamicESDTFlag,
+		common.ESDTFlag, common.NFTStopCreateFlag, common.SetGuardianFlag,
+		common.EGLDInESDTMultiTransferFlag, common.ManagedCryptoAPIsFlag,
+		common.ESDTNFTImprovementV1Flag}
+	if c.support.RegisterMetaESDTPath {
+		required = append(required, common.MetaESDTSetFlag)
+	}
+	if !c.support.ProcessorV1 {
+		required = append(required, common.SCProcessorV2Flag)
+	}
+	// The native proxy selects V1 only while this actual predicate is false.
+	// V1 dispatch requires BuiltInFunctionsFlag; V2 does not inherit that gate.
+	if !c.epochs.IsFlagEnabledInEpoch(common.SCProcessorV2Flag, epoch) {
+		required = append(required, common.BuiltInFunctionsFlag)
+	}
+	if c.support.RelayedV3 {
+		required = append(required, common.RelayedTransactionsV3Flag,
+			common.RelayedTransactionsV3FixESDTTransferFlag, common.FixRelayedBaseCostFlag,
+			common.FixRelayedMoveBalanceToNonPayableSCFlag)
+	}
+	for _, flag := range required {
+		if !c.epochs.IsFlagDefined(flag) || !c.epochs.IsFlagEnabledInEpoch(flag, epoch) {
+			return fmt.Errorf("DRWA prerequisite %s is inactive at epoch %d", flag, epoch)
+		}
+	}
+	// The negative predicate is deliberately separate: E05/W01 require FALSE.
+	if !c.epochs.IsFlagDefined(common.GlobalMintBurnFlag) || c.epochs.IsFlagEnabledInEpoch(common.GlobalMintBurnFlag, epoch) {
+		return fmt.Errorf("DRWA requires GlobalMintBurnFlag=false at epoch %d", epoch)
+	}
+	return nil
+}
+
+// Enabled is the exact A L573/E05 joint predicate using pinned native semantics.
+// In particular, the epoch-on/round-off drain window cannot enable DRWA.
+func (c *DRWAConfigurationCandidate) Enabled(epoch uint32, round uint64) bool {
+	return c != nil && c.epochs != nil && c.rounds != nil && epoch >= c.enforcement &&
+		common.IsAsyncExecutionEnabledForEpochAndRound(c.epochs, c.rounds, epoch, round)
+}
+
+// CheckEnforcedBlock rejects unsupported coordinates BEFORE dependent execution.
+// It is a configuration predicate only, never a caller-authenticated block token.
+func (c *DRWAConfigurationCandidate) CheckEnforcedBlock(epoch uint32, round uint64) error {
+	if !c.Enabled(epoch, round) {
+		return fmt.Errorf("DRWA is inactive for epoch %d round %d", epoch, round)
+	}
+	return c.checkPrerequisites(epoch)
+}
+
+// ActivationInventory records all actual native epoch and round values, including
+// flags outside the E05 minimum (e.g. cleanup). Returned maps are native copies.
+// Source/loader/consumer provenance and actual selected processor bindings must
+// be retained alongside these values; this map alone is not an admission record.
+func (c *DRWAConfigurationCandidate) ActivationInventory() (map[string]uint32, map[string]uint64) {
+	if c == nil {
+		return nil, nil
+	}
+	return c.epochs.GetAllEnableEpochs(), c.rounds.GetAllEnableRounds()
+}

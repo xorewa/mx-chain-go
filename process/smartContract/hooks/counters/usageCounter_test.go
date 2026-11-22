@@ -261,3 +261,69 @@ func TestUsageCounter_ProcessMaxBuiltInCounters(t *testing.T) {
 		assert.Nil(t, err)
 	})
 }
+
+func TestUsageCounterSharedPreparedVectorDoesNotReparse(t *testing.T) {
+	parserCalls := 0
+	counter, err := NewUsageCounter(&testscommon.ESDTTransferParserStub{ParseESDTTransfersCalled: func([]byte, []byte, string, [][]byte) (*vmcommon.ParsedESDTTransfers, error) {
+		parserCalls++
+		return nil, errors.New("raw parser must not run")
+	}}, enableEpochsHandlerMock.NewEnableEpochsHandlerStub())
+	assert.NoError(t, err)
+	// EXPERIMENTAL native counter limits, not production defaults.
+	limits := generateMapsOfValues(6)
+	limits[maxBuiltinCalls] = 3
+	counter.SetMaximumValues(limits)
+	input := &vmcommon.ContractCallInput{Function: core.BuiltInFunctionMultiESDTNFTTransfer}
+	prepared := &vmcommon.ParsedESDTTransfers{ESDTTransfers: []*vmcommon.ESDTTransfer{{ESDTTokenName: []byte("TOKEN-abcdef")}, {ESDTTokenName: []byte(vmcommon.EGLDIdentifier)}}}
+	for i := 0; i < 3; i++ {
+		assert.NoError(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(input, prepared))
+	}
+	assert.Equal(t, uint64(3), counter.GetCounterValues()[crtBuiltinCalls])
+	assert.Equal(t, uint64(6), counter.GetCounterValues()[crtTransfers])
+	assert.Zero(t, parserCalls)
+	assert.ErrorIs(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(input, prepared), process.ErrMaxCallsReached)
+	assert.Equal(t, uint64(4), counter.GetCounterValues()[crtBuiltinCalls])
+	assert.Equal(t, uint64(6), counter.GetCounterValues()[crtTransfers])
+	assert.Zero(t, parserCalls)
+	counter.ResetCounters()
+	assert.Zero(t, counter.GetCounterValues()[crtBuiltinCalls])
+	assert.Zero(t, counter.GetCounterValues()[crtTransfers])
+}
+
+func TestUsageCounterSharedPreparedRejectsMissingResult(t *testing.T) {
+	counter, err := NewUsageCounter(&testscommon.ESDTTransferParserStub{}, enableEpochsHandlerMock.NewEnableEpochsHandlerStub())
+	assert.NoError(t, err)
+	counter.SetMaximumValues(generateMapsOfValues(3))
+	input := &vmcommon.ContractCallInput{Function: core.BuiltInFunctionESDTTransfer}
+	one := &vmcommon.ParsedESDTTransfers{ESDTTransfers: []*vmcommon.ESDTTransfer{{}}}
+	assert.Error(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(nil, one))
+	assert.Error(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(input, nil))
+	assert.Error(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(input, &vmcommon.ParsedESDTTransfers{}))
+	assert.Error(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(&vmcommon.ContractCallInput{Function: "ordinaryCustomFunction"}, one))
+	assert.Zero(t, counter.GetCounterValues()[crtBuiltinCalls])
+	assert.Zero(t, counter.GetCounterValues()[crtTransfers])
+}
+
+func TestUsageCounterSharedPreparedPreservesLimitErrorsAndRejectsWrap(t *testing.T) {
+	counter, err := NewUsageCounter(&testscommon.ESDTTransferParserStub{}, enableEpochsHandlerMock.NewEnableEpochsHandlerStub())
+	assert.NoError(t, err)
+	limits := generateMapsOfValues(3)
+	limits[maxTransfers] = 1
+	counter.SetMaximumValues(limits)
+	input := &vmcommon.ContractCallInput{Function: core.BuiltInFunctionMultiESDTNFTTransfer}
+	two := &vmcommon.ParsedESDTTransfers{ESDTTransfers: []*vmcommon.ESDTTransfer{{}, {}}}
+	err = counter.ProcessMaxBuiltInCountersWithESDTTransfers(input, two)
+	assert.ErrorIs(t, err, process.ErrMaxCallsReached)
+	if err != nil {
+		assert.Equal(t, "max calls reached: too many ESDT transfers", err.Error())
+	}
+	assert.Equal(t, uint64(2), counter.GetCounterValues()[crtTransfers])
+	counter.ResetCounters()
+	counter.SetMaximumValues(generateMapsOfValues(^uint64(0)))
+	counter.crtNumberOfTransfers = ^uint64(0)
+	assert.ErrorIs(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(input, two), process.ErrMaxCallsReached)
+	assert.Equal(t, ^uint64(0), counter.GetCounterValues()[crtTransfers])
+	counter.crtNumberOfBuiltInFunctionCalls = ^uint64(0)
+	assert.ErrorIs(t, counter.ProcessMaxBuiltInCountersWithESDTTransfers(input, two), process.ErrMaxCallsReached)
+	assert.Equal(t, ^uint64(0), counter.GetCounterValues()[crtBuiltinCalls])
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/smartContract/processorV2"
 	"github.com/multiversx/mx-chain-go/process/smartContract/scrCommon"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/vm"
 	logger "github.com/multiversx/mx-chain-logger-go"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
@@ -50,29 +51,30 @@ func NewSmartContractProcessorProxy(args scrCommon.ArgsNewSmartContractProcessor
 
 	proxy := &scProcessorProxy{
 		args: scrCommon.ArgsNewSmartContractProcessor{
-			VmContainer:         args.VmContainer,
-			ArgsParser:          args.ArgsParser,
-			Hasher:              args.Hasher,
-			Marshalizer:         args.Marshalizer,
-			AccountsDB:          args.AccountsDB,
-			BlockChainHook:      args.BlockChainHook,
-			BuiltInFunctions:    args.BuiltInFunctions,
-			PubkeyConv:          args.PubkeyConv,
-			ShardCoordinator:    args.ShardCoordinator,
-			ScrForwarder:        args.ScrForwarder,
-			TxFeeHandler:        args.TxFeeHandler,
-			EconomicsFee:        args.EconomicsFee,
-			TxTypeHandler:       args.TxTypeHandler,
-			GasHandler:          args.GasHandler,
-			GasSchedule:         args.GasSchedule,
-			TxLogsProcessor:     args.TxLogsProcessor,
-			BadTxForwarder:      args.BadTxForwarder,
-			EnableRoundsHandler: args.EnableRoundsHandler,
-			EnableEpochsHandler: args.EnableEpochsHandler,
-			EnableEpochs:        args.EnableEpochs,
-			VMOutputCacher:      args.VMOutputCacher,
-			WasmVMChangeLocker:  args.WasmVMChangeLocker,
-			IsGenesisProcessing: args.IsGenesisProcessing,
+			DRWAAccountDeletionGuard: args.DRWAAccountDeletionGuard,
+			VmContainer:              args.VmContainer,
+			ArgsParser:               args.ArgsParser,
+			Hasher:                   args.Hasher,
+			Marshalizer:              args.Marshalizer,
+			AccountsDB:               args.AccountsDB,
+			BlockChainHook:           args.BlockChainHook,
+			BuiltInFunctions:         args.BuiltInFunctions,
+			PubkeyConv:               args.PubkeyConv,
+			ShardCoordinator:         args.ShardCoordinator,
+			ScrForwarder:             args.ScrForwarder,
+			TxFeeHandler:             args.TxFeeHandler,
+			EconomicsFee:             args.EconomicsFee,
+			TxTypeHandler:            args.TxTypeHandler,
+			GasHandler:               args.GasHandler,
+			GasSchedule:              args.GasSchedule,
+			TxLogsProcessor:          args.TxLogsProcessor,
+			BadTxForwarder:           args.BadTxForwarder,
+			EnableRoundsHandler:      args.EnableRoundsHandler,
+			EnableEpochsHandler:      args.EnableEpochsHandler,
+			EnableEpochs:             args.EnableEpochs,
+			VMOutputCacher:           args.VMOutputCacher,
+			WasmVMChangeLocker:       args.WasmVMChangeLocker,
+			IsGenesisProcessing:      args.IsGenesisProcessing,
 		},
 	}
 	if check.IfNil(epochNotifier) {
@@ -179,4 +181,29 @@ func (proxy *scProcessorProxy) EpochConfirmed(epoch uint32, _ uint64) {
 	}
 
 	proxy.setActiveProcessorV1()
+}
+
+// ExecuteSmartContractTransactionWithDRWA preserves the selected processor and
+// forwards explicit native validation without manufacturing an operation owner.
+func (proxy *scProcessorProxy) ExecuteSmartContractTransactionWithDRWA(tx data.TransactionHandler,
+	acntSrc, acntDst state.UserAccountHandler, validation any) (vmcommon.ReturnCode, error) {
+	processor := proxy.getProcessor()
+	native, ok := processor.(interface {
+		ExecuteSmartContractTransactionWithDRWA(data.TransactionHandler, state.UserAccountHandler, state.UserAccountHandler, any) (vmcommon.ReturnCode, error)
+	})
+	if !ok {
+		return vmcommon.ExecutionFailed, vm.ErrDRWAExecution
+	}
+	return native.ExecuteSmartContractTransactionWithDRWA(tx, acntSrc, acntDst, validation)
+}
+
+// WithDRWANativeTransaction captures the qualified processor once. The
+// unconfigured observation returns no executor, preserving native reselection.
+func (proxy *scProcessorProxy) WithDRWANativeTransaction(tx data.TransactionHandler, validation any,
+	execute func(vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error)) (vmcommon.ReturnCode, error) {
+	native, ok := proxy.getProcessor().(vm.DRWANativeTransactionContext)
+	if !ok {
+		return vmcommon.ExecutionFailed, vm.ErrDRWAExecution
+	}
+	return native.WithDRWANativeTransaction(tx, validation, execute)
 }

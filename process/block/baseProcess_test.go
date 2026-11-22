@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	processFactory "github.com/multiversx/mx-chain-go/process/factory"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"math/big"
 	"reflect"
 	"sort"
@@ -8509,4 +8511,45 @@ func TestCheckEWLSizeAndReset(t *testing.T) {
 
 		sp.CheckEWLSizeAndReset()
 	})
+}
+
+type legacyStatusContainer struct {
+	process.VirtualMachinesContainer
+	get func([]byte) (vmcommon.VMExecutionHandler, error)
+}
+
+func (c *legacyStatusContainer) Get(key []byte) (vmcommon.VMExecutionHandler, error) {
+	return c.get(key)
+}
+func (c *legacyStatusContainer) IsInterfaceNil() bool { return c == nil }
+
+type legacyStatusVM struct{ vmcommon.VMExecutionHandler }
+
+func TestBaseProcessor_DRWAExecutionError(t *testing.T) {
+	for _, mode := range []string{"missing container", "missing VM", "typed nil VM", "old VM"} {
+		t.Run(strings.ReplaceAll(mode, "/", " ")+" should preserve the expected result", func(t *testing.T) {
+			calls := 0
+			var container process.VirtualMachinesContainer
+			if mode != "missing container" {
+				container = &legacyStatusContainer{get: func(key []byte) (vmcommon.VMExecutionHandler, error) {
+					calls++
+					require.Equal(t, processFactory.SystemVirtualMachine, key)
+					if mode == "missing VM" {
+						return nil, errors.New("native VM absent in unconfigured context")
+					}
+					if mode == "typed nil VM" {
+						var absent *legacyStatusVM
+						return absent, nil
+					}
+					return &legacyStatusVM{}, nil
+				}}
+			}
+			require.NoError(t, blproc.DRWAExecutionErrorForTest(container), "ordinary optional capability creates no DRWA failure")
+			if mode == "missing container" {
+				require.Zero(t, calls)
+			} else {
+				require.Equal(t, 1, calls)
+			}
+		})
+	}
 }

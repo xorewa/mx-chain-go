@@ -1,93 +1,66 @@
 prepareFolders() {
-  [ -d $TESTNETDIR ] || mkdir -p $TESTNETDIR
-  cd $TESTNETDIR
-  [ -d filegen ] || mkdir -p filegen
-  [ -d node ] || mkdir -p node
-  [ -d node/config ] || mkdir -p node/config
-  [ -d seednode ] || mkdir -p seednode
-  [ -d seednode/config ] || mkdir -p seednode/config
-  [ -d node_working_dirs ] || mkdir -p node_working_dirs
+  mkdir -p "$TESTNETDIR" || return
+  cd "$TESTNETDIR" || return
+  mkdir -p filegen node/config seednode/config node_working_dirs
 }
 
 prepareFolders_Proxy() {
-  [ -d $TESTNETDIR ] || mkdir -p $TESTNETDIR
-  cd $TESTNETDIR
-  [ -d proxy ] || mkdir -p proxy
-  [ -d ./proxy/config ] || mkdir -p ./proxy/config
+  mkdir -p "$TESTNETDIR" || return
+  cd "$TESTNETDIR" || return
+  mkdir -p proxy/config
 }
 
 prepareFolders_TxGen() {
-  [ -d $TESTNETDIR ] || mkdir -p $TESTNETDIR
-  cd $TESTNETDIR
-  [ -d txgen ] || mkdir -p txgen
-  [ -d ./txgen/config ] || mkdir -p ./txgen/config
-  [ -d ./txgen/config/nodeConfig ] || mkdir -p ./txgen/config/nodeConfig
-  [ -d ./txgen/config/nodeConfig/config ] || mkdir -p ./txgen/config/nodeConfig/config
+  mkdir -p "$TESTNETDIR" || return
+  cd "$TESTNETDIR" || return
+  mkdir -p txgen/config/nodeConfig/config
 }
 
-buildConfigGenerator() {
+buildConfigGenerator() (
   echo "Building Configuration Generator..."
-  pushd $CONFIGGENERATORDIR
-  go build .
-  popd
-
-  pushd $TESTNETDIR
-  mv $CONFIGGENERATOR ./filegen/
+  cd "$CONFIGGENERATORDIR" || exit
+  go build -o "$TESTNETDIR/filegen/filegen" . || exit
   echo "Configuration Generator built..."
-  popd
-}
+)
 
 
-buildNode() {
+buildNode() (
   echo "Building Node executable..."
-  pushd $NODEDIR
+  cd "$NODEDIR" || exit
 
   APP_VERSION="v1.0.0"
   if [ $ALWAYS_NEW_APP_VERSION -eq 1 ]; then
     APP_VERSION="$(date +"v%Y.%m.%d.%H.%M.%S")"
   fi
 
-  go build -gcflags="all=-N -l" -ldflags="-X main.appVersion=$APP_VERSION" .
-  popd
-
-  pushd $TESTNETDIR
-  mv $NODE ./node/
+  go build -o "$TESTNETDIR/node/node" -gcflags="all=-N -l" -ldflags="-X main.appVersion=$APP_VERSION" . || exit
   echo "Node executable built."
-  popd
-}
+)
 
-buildSeednode() {
+buildSeednode() (
   echo "Building Seednode executable..."
-  pushd $SEEDNODEDIR
-  go build .
-  popd
-
-  pushd $TESTNETDIR
-  mv $SEEDNODE ./seednode/
+  cd "$SEEDNODEDIR" || exit
+  go build -o "$TESTNETDIR/seednode/seednode" . || exit
   echo "Seednode executable built."
-  popd
-}
+)
 
-buildProxy() {
+buildTermUI() (
+  echo "Building TermUI executable..."
+  cd "$MULTIVERSXDIR/cmd/termui" || exit
+  go build -o "$TESTNETDIR/node/termui" . || exit
+  echo "TermUI executable built."
+)
+
+buildProxy() (
   echo "Building Proxy executable..."
-  pushd $PROXYDIR
-  go build .
-  popd
-
-  pushd $TESTNETDIR
-  mv $PROXY ./proxy/
+  cd "$PROXYDIR" || exit
+  go build -o "$TESTNETDIR/proxy/proxy" . || exit
   echo "Proxy executable built."
-  popd
-}
+)
 
-buildTxGen() {
+buildTxGen() (
   echo "Building TxGen executable..."
-  pushd $TXGENDIR
-  go build .
-  popd
-
-  pushd $TESTNETDIR
-  mv $TXGEN ./txgen/
+  cd "$TXGENDIR" || exit
+  go build -o "$TESTNETDIR/txgen/txgen" . || exit
   echo "TxGen executable built."
-  popd
-}
+)

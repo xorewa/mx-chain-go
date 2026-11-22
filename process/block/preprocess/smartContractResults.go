@@ -1,6 +1,7 @@
 package preprocess
 
 import (
+	"errors"
 	"time"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -14,6 +15,7 @@ import (
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/storage"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 var _ process.DataMarshalizer = (*smartContractResults)(nil)
@@ -616,6 +618,9 @@ func (scr *smartContractResults) ProcessMiniBlock(
 
 		scr.txExecutionOrderHandler.Add(miniBlockTxHashes[txIndex])
 		_, err = scr.scrProcessor.ProcessSmartContractResult(miniBlockScrs[txIndex])
+		if errors.Is(err, vm.ErrDRWAExecution) {
+			return nil, indexOfLastTxProcessed, false, err
+		}
 		if err != nil {
 			scr.handleProcessTransactionError(preProcessorExecutionInfoHandler, snapshot, miniBlockTxHashes[txIndex])
 			break
@@ -627,6 +632,9 @@ func (scr *smartContractResults) ProcessMiniBlock(
 		numSCRsProcessed++
 	}
 
+	if errors.Is(err, vm.ErrDRWAExecution) {
+		return nil, indexOfLastTxProcessed, false, err
+	}
 	if err != nil && !partialMbExecutionMode {
 		return processedTxHashes, txIndex - 1, true, err
 	}

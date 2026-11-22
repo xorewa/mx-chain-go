@@ -17,6 +17,14 @@ type BlockChainHookCounter interface {
 	IsInterfaceNil() bool
 }
 
+// BlockChainHookCounterWithESDTTransfers is the optional shared native parse
+// consumer. Ordinary calls keep BlockChainHookCounter and its original parser.
+// The owner must supply the actual prepared vector for this operation.
+type BlockChainHookCounterWithESDTTransfers interface {
+	BlockChainHookCounter
+	ProcessMaxBuiltInCountersWithESDTTransfers(input *vmcommon.ContractCallInput, transfers *vmcommon.ParsedESDTTransfers) error
+}
+
 // EpochStartTriggerHandler defines the operations of an epoch start trigger handler needed by the blockchain hook
 type EpochStartTriggerHandler interface {
 	LastCommitedEpochStartHdr() (data.HeaderHandler, error)

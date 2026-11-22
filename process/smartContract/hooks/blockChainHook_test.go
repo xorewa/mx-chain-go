@@ -1,6 +1,19 @@
 package hooks_test
 
 import (
+	"encoding/json"
+	drwaINV0Marshal "github.com/multiversx/mx-chain-core-go/marshal"
+	"github.com/multiversx/mx-chain-go/sharding"
+)
+
+import (
+	drwaINV0Check "github.com/multiversx/mx-chain-core-go/core/check"
+	"github.com/multiversx/mx-chain-go/testscommon/guardianMocks"
+	"reflect"
+	"sort"
+)
+
+import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
@@ -3244,4 +3257,552 @@ func TestBlockChainHookImpl_ConcurrencyTimeOperations(t *testing.T) {
 
 	wg.Wait()
 
+}
+
+// DRWA INV-0 old hook reference: pinned node 5123176d1fa9237e52df2680d4e8bbcdc3ceb11a.
+// Only receiver/constructor field spelling changes; private elapsed-time logging is omitted.
+type drwaINV0Baseline struct{ hooks.ArgBlockChainHook }
+
+func (bh *drwaINV0Baseline) ProcessBuiltInFunction(input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+
+	if input == nil {
+		return nil, process.ErrNilVmInput
+	}
+
+	function, err := bh.BuiltInFunctions.Get(input.Function)
+	if err != nil {
+		return nil, err
+	}
+
+	sndAccount, dstAccount, err := bh.getUserAccounts(input)
+	if err != nil {
+		return nil, err
+	}
+
+	err = bh.processMaxBuiltInCounters(input)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshot := bh.Accounts.JournalLen()
+	vmOutput, err := function.ProcessBuiltinFunction(sndAccount, dstAccount, input)
+	if err != nil {
+		_ = bh.Accounts.RevertToSnapshot(snapshot)
+		return nil, err
+	}
+
+	if !drwaINV0Check.IfNil(sndAccount) {
+		err = bh.Accounts.SaveAccount(sndAccount)
+		if err != nil {
+			_ = bh.Accounts.RevertToSnapshot(snapshot)
+			return nil, err
+		}
+	}
+
+	if !drwaINV0Check.IfNil(dstAccount) && !bytes.Equal(input.CallerAddr, input.RecipientAddr) {
+		err = bh.Accounts.SaveAccount(dstAccount)
+		if err != nil {
+			_ = bh.Accounts.RevertToSnapshot(snapshot)
+			return nil, err
+		}
+	}
+
+	return vmOutput, nil
+}
+
+func (bh *drwaINV0Baseline) processMaxBuiltInCounters(input *vmcommon.ContractCallInput) error {
+	if !bh.EnableEpochsHandler.IsFlagEnabled(common.MaxBlockchainHookCountersFlag) {
+		return nil
+	}
+	if bh.ShardCoordinator.SelfId() == core.MetachainShardId {
+		return nil
+	}
+
+	return bh.Counter.ProcessMaxBuiltInCounters(input)
+}
+
+func (bh *drwaINV0Baseline) getUserAccounts(
+	input *vmcommon.ContractCallInput,
+) (vmcommon.UserAccountHandler, vmcommon.UserAccountHandler, error) {
+	var sndAccount vmcommon.UserAccountHandler
+	sndShardId := bh.ShardCoordinator.ComputeId(input.CallerAddr)
+	if sndShardId == bh.ShardCoordinator.SelfId() {
+		acc, err := bh.Accounts.GetExistingAccount(input.CallerAddr)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var ok bool
+		sndAccount, ok = acc.(vmcommon.UserAccountHandler)
+		if !ok {
+			return nil, nil, process.ErrWrongTypeAssertion
+		}
+
+		if bytes.Equal(input.CallerAddr, input.RecipientAddr) {
+			return sndAccount, sndAccount, nil
+		}
+	}
+
+	var dstAccount vmcommon.UserAccountHandler
+	dstShardId := bh.ShardCoordinator.ComputeId(input.RecipientAddr)
+	if dstShardId == bh.ShardCoordinator.SelfId() {
+		acc, err := bh.Accounts.LoadAccount(input.RecipientAddr)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var ok bool
+		dstAccount, ok = acc.(vmcommon.UserAccountHandler)
+		if !ok {
+			return nil, nil, process.ErrWrongTypeAssertion
+		}
+	}
+
+	return sndAccount, dstAccount, nil
+}
+
+// drwaINV0NativeNames obtains the real constructor's dispatch set. The generic
+// doubles below test shared hook control flow, not these native implementations.
+func drwaINV0NativeNames(t *testing.T) []string {
+	t.Helper()
+	// EXPERIMENTAL constructor costs7 and role bound100, not a gas profile.
+	gas := make(map[string]map[string]uint64)
+	for key, value := range map[string]interface{}{core.BaseOperationCostString: vmcommon.BaseOperationCost{}, core.BuiltInCostString: vmcommon.BuiltInCost{}} {
+		fields := reflect.TypeOf(value)
+		gas[key] = make(map[string]uint64)
+		for i := 0; i < fields.NumField(); i++ {
+			require.Equal(t, reflect.Uint64, fields.Field(i).Type.Kind())
+			gas[key][fields.Field(i).Name] = 7
+		}
+	}
+	creator, err := vmcommonBuiltInFunctions.NewBuiltInFunctionsCreator(vmcommonBuiltInFunctions.ArgsCreateBuiltInFunctionContainer{
+		GasMap: gas, MapDNSAddresses: map[string]struct{}{}, MapDNSV2Addresses: map[string]struct{}{},
+		Marshalizer: &mock.MarshalizerMock{}, Accounts: &stateMock.AccountsStub{},
+		ShardCoordinator: mock.NewOneShardCoordinatorMock(), EnableEpochsHandler: enableEpochsHandlerMock.NewEnableEpochsHandlerStub(),
+		GuardedAccountHandler:            &guardianMocks.GuardedAccountHandlerStub{},
+		MaxNumOfAddressesForTransferRole: 100, ConfigAddress: bytes.Repeat([]byte{1}, 32),
+	})
+	require.NoError(t, err)
+	require.NoError(t, creator.CreateBuiltInFunctionContainer())
+	var names []string
+	for name := range creator.BuiltInFunctionContainer().Keys() {
+		names = append(names, name)
+	}
+	require.NotEmpty(t, names)
+	sort.Strings(names)
+	return names
+}
+
+type drwaINV0DispatchFixture struct {
+	args             hooks.ArgBlockChainHook
+	input            *vmcommon.ContractCallInput
+	trace            []string
+	sender, receiver state.UserAccountHandler
+	journal          int
+}
+
+func drwaINV0Dispatch(t *testing.T, name, mode string, faults map[string]error) *drwaINV0DispatchFixture {
+	t.Helper()
+	// EXPERIMENTAL addresses1/2 repeated32, balances100/20, debit/credit3,
+	// journal5, gas1000/47/13 and locked11. No native trie rollback is simulated.
+	source, destination := bytes.Repeat([]byte{1}, 32), bytes.Repeat([]byte{2}, 32)
+	f := &drwaINV0DispatchFixture{args: createMockBlockChainHookArgs(), sender: createAccount(source), receiver: createAccount(destination), journal: 5}
+	require.NoError(t, f.sender.AddToBalance(big.NewInt(100)))
+	require.NoError(t, f.receiver.AddToBalance(big.NewInt(20)))
+	self := uint32(0)
+	if mode == "metachain" {
+		self = core.MetachainShardId
+	}
+	shard := func(address []byte) uint32 {
+		if mode == "both-remote" || mode == "receiver-only" && bytes.Equal(address, source) || mode == "sender-only" && bytes.Equal(address, destination) {
+			return 1
+		}
+		return self
+	}
+	f.args.ShardCoordinator = &mock.ShardCoordinatorStub{ComputeIdCalled: shard, SelfIdCalled: func() uint32 { return self }}
+	f.args.EnableEpochsHandler = enableEpochsHandlerMock.NewEnableEpochsHandlerStub(common.MaxBlockchainHookCountersFlag)
+	if mode == "counter-disabled" {
+		f.args.EnableEpochsHandler = enableEpochsHandlerMock.NewEnableEpochsHandlerStub()
+	}
+	f.args.Accounts = &stateMock.AccountsStub{
+		GetExistingAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			f.trace = append(f.trace, fmt.Sprintf("existing:%x", address))
+			if mode == "sender-read" {
+				return nil, faults["sender-read"]
+			}
+			if mode == "sender-type" {
+				return &stateMock.PeerAccountHandlerMock{}, nil
+			}
+			return f.sender, nil
+		},
+		LoadAccountCalled: func(address []byte) (vmcommon.AccountHandler, error) {
+			f.trace = append(f.trace, fmt.Sprintf("load:%x", address))
+			if mode == "sender-read" || mode == "sender-type" || mode == "destination-read" {
+				return nil, faults["destination-read"]
+			}
+			if mode == "destination-type" {
+				return &stateMock.PeerAccountHandlerMock{}, nil
+			}
+			return f.receiver, nil
+		},
+		JournalLenCalled: func() int { f.trace = append(f.trace, "journal"); return f.journal },
+		SaveAccountCalled: func(account vmcommon.AccountHandler) error {
+			f.trace = append(f.trace, fmt.Sprintf("save:%x", account.AddressBytes()))
+			f.journal++
+			if mode == "sender-save" && bytes.Equal(account.AddressBytes(), source) {
+				return faults["sender-save"]
+			}
+			if mode == "receiver-save" && bytes.Equal(account.AddressBytes(), destination) {
+				return faults["receiver-save"]
+			}
+			return nil
+		},
+		RevertToSnapshotCalled: func(snapshot int) error {
+			f.trace = append(f.trace, fmt.Sprintf("revert:%d", snapshot))
+			if mode == "rollback-error" {
+				return faults["rollback-error"]
+			}
+			f.journal = snapshot
+			return nil
+		},
+	}
+	f.args.Counter = &testscommon.BlockChainHookCounterStub{ProcessMaxBuiltInCountersCalled: func(input *vmcommon.ContractCallInput) error {
+		f.trace = append(f.trace, "counter:"+input.Function)
+		if mode == "sender-read" || mode == "sender-type" || mode == "destination-read" || mode == "destination-type" || mode == "counter-error" {
+			return faults["counter-error"]
+		}
+		return nil
+	}}
+	require.NoError(t, f.args.BuiltInFunctions.Add(name, &mock.BuiltInFunctionStub{ProcessBuiltinFunctionCalled: func(sender, receiver vmcommon.UserAccountHandler, input *vmcommon.ContractCallInput) (*vmcommon.VMOutput, error) {
+		f.trace = append(f.trace, "builtin:"+input.Function)
+		if mode == "builtin-error" || mode == "rollback-error" || mode == "counter-error" {
+			return nil, faults["builtin-error"]
+		}
+		if !drwaINV0Check.IfNil(sender) {
+			require.NoError(t, sender.SubFromBalance(big.NewInt(3)))
+		}
+		if !drwaINV0Check.IfNil(receiver) {
+			require.NoError(t, receiver.AddToBalance(big.NewInt(3)))
+		}
+		return &vmcommon.VMOutput{
+			ReturnCode: vmcommon.Ok, GasRemaining: 47, ReturnData: [][]byte{[]byte("experimental output")},
+			OutputAccounts: map[string]*vmcommon.OutputAccount{"experimental": {Address: bytes.Clone(input.RecipientAddr), BalanceDelta: big.NewInt(3), OutputTransfers: []vmcommon.OutputTransfer{{Index: 1, Value: big.NewInt(0), Data: []byte("experimental transfer"), GasLimit: 13, GasLocked: 11}}}},
+			Logs:           []*vmcommon.LogEntry{{Identifier: []byte(name), Address: bytes.Clone(input.CallerAddr), Topics: [][]byte{[]byte("experimental topic")}}},
+		}, nil
+	}}))
+	f.input = createContractCallInput(name, source, destination)
+	f.input.CallValue, f.input.GasProvided, f.input.GasLocked = big.NewInt(0), 1000, 11
+	f.input.Arguments = [][]byte{[]byte("experimental input"), {3}}
+	if mode == "same-account" {
+		f.input.RecipientAddr = bytes.Clone(source)
+	}
+	if mode == "nil-input" {
+		f.input = nil
+	}
+	if mode == "missing-function" {
+		f.input.Function = "experimental unregistered builtin"
+	}
+	return f
+}
+
+func drwaINV0Input(t *testing.T, f *drwaINV0DispatchFixture) []byte {
+	t.Helper()
+	if f.input == nil {
+		return nil
+	}
+	raw, err := f.args.Marshalizer.Marshal(f.input)
+	require.NoError(t, err)
+	return raw
+}
+
+func TestBlockChainHookImpl_OrdinaryDispatchINV0(t *testing.T) {
+	// The reference is frozen from pinned native source, not this implementation.
+	// Shared-hook doubles deliberately claim no native token effect qualification.
+	modes := []string{"success", "same-account", "sender-only", "receiver-only", "both-remote", "nil-input", "missing-function", "sender-read", "sender-type", "destination-read", "destination-type", "counter-error", "builtin-error", "sender-save", "receiver-save", "rollback-error", "counter-disabled", "metachain"}
+	for _, name := range drwaINV0NativeNames(t) {
+		for _, mode := range modes {
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				// EXPERIMENTAL distinct I/O sentinels; no public denial-code choice.
+				faults := make(map[string]error)
+				for _, key := range []string{"sender-read", "destination-read", "counter-error", "builtin-error", "sender-save", "receiver-save", "rollback-error"} {
+					faults[key] = errors.New("experimental INV-0 " + key)
+				}
+				old, current := drwaINV0Dispatch(t, name, mode, faults), drwaINV0Dispatch(t, name, mode, faults)
+				oldInput, currentInput := drwaINV0Input(t, old), drwaINV0Input(t, current)
+				require.Equal(t, oldInput, currentInput)
+				baseline := &drwaINV0Baseline{ArgBlockChainHook: old.args}
+				actual, err := hooks.NewBlockChainHookImpl(current.args)
+				require.NoError(t, err)
+				want, wantErr := baseline.ProcessBuiltInFunction(old.input)
+				got, gotErr := actual.ProcessBuiltInFunction(current.input)
+				require.Equal(t, fmt.Sprintf("%T:%v", wantErr, wantErr), fmt.Sprintf("%T:%v", gotErr, gotErr))
+				for _, injected := range faults {
+					if wantErr == injected {
+						require.Same(t, injected, gotErr)
+					}
+				}
+				require.Equal(t, want, got, "all VM output fields must match")
+				require.Equal(t, old.trace, current.trace, "account/counter/save/revert order must match")
+				require.Equal(t, old.journal, current.journal)
+				for i, user := range []state.UserAccountHandler{old.sender, old.receiver} {
+					next := []state.UserAccountHandler{current.sender, current.receiver}[i]
+					a, e := old.args.Marshalizer.Marshal(user)
+					require.NoError(t, e)
+					b, e := current.args.Marshalizer.Marshal(next)
+					require.NoError(t, e)
+					require.Equal(t, a, b, "all native account fields must match")
+				}
+				require.Equal(t, oldInput, drwaINV0Input(t, old))
+				require.Equal(t, currentInput, drwaINV0Input(t, current))
+			})
+		}
+	}
+}
+
+type drwaINV0NativeFixture struct {
+	*drwaINV0DispatchFixture
+	data  map[string]map[string][]byte
+	users []state.UserAccountHandler
+	hook  *hooks.BlockChainHookImpl
+}
+
+func drwaINV0Native(t *testing.T, function, side, variant string, faults map[string]error) *drwaINV0NativeFixture {
+	t.Helper()
+	mode := "success"
+	if variant == "sender-save" || variant == "receiver-save" {
+		mode = variant
+	}
+	f := &drwaINV0NativeFixture{drwaINV0DispatchFixture: drwaINV0Dispatch(t, function, mode, faults), data: make(map[string]map[string][]byte)}
+	// EXPERIMENTAL native coordinator3, source shard1/destination shard2;
+	// same-shard fixture changes only the destination's last byte to1.
+	self := uint32(1)
+	if side == "receiver" {
+		self = 2
+	}
+	if side == "same" {
+		f.receiver.AddressBytes()[31] = 1
+	}
+	coordinator, err := sharding.NewMultiShardCoordinator(3, self)
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), coordinator.ComputeId(f.sender.AddressBytes()))
+	destinationShard := uint32(2)
+	if side == "same" {
+		destinationShard = 1
+	}
+	require.Equal(t, destinationShard, coordinator.ComputeId(f.receiver.AddressBytes()))
+	f.args.ShardCoordinator = coordinator
+	f.args.Marshalizer = &drwaINV0Marshal.GogoProtoMarshalizer{}
+	f.args.EnableEpochsHandler = enableEpochsHandlerMock.NewEnableEpochsHandlerStub(common.MaxBlockchainHookCountersFlag,
+		vmcommonBuiltInFunctions.SaveToSystemAccountFlag, vmcommonBuiltInFunctions.SendAlwaysFlag,
+		vmcommonBuiltInFunctions.ESDTNFTImprovementV1Flag, vmcommonBuiltInFunctions.EGLDInESDTMultiTransferFlag,
+		vmcommonBuiltInFunctions.CheckTransferFlag, vmcommonBuiltInFunctions.CheckCorrectTokenIDForTransferRoleFlag)
+	f.users = []state.UserAccountHandler{f.sender, f.receiver, createAccount(bytes.Clone(core.SystemAccountAddress))}
+	byAddress := make(map[string]state.UserAccountHandler)
+	for _, user := range f.users {
+		address := string(user.AddressBytes())
+		byAddress[address] = user
+		f.data[address] = make(map[string][]byte)
+		nativeUser, found := user.(vmcommon.UserAccountHandler)
+		require.True(t, found)
+		tracker, found := nativeUser.AccountDataHandler().(*trie.DataTrieTrackerStub)
+		require.True(t, found)
+		tracker.RetrieveValueCalled = func(key []byte) ([]byte, uint32, error) {
+			f.trace = append(f.trace, fmt.Sprintf("data-read:%x:%x", address, key))
+			return bytes.Clone(f.data[address][string(key)]), 0, nil
+		}
+		tracker.SaveKeyValueCalled = func(key, value []byte) error {
+			f.trace = append(f.trace, fmt.Sprintf("data-write:%x:%x:%x", address, key, value))
+			f.data[address][string(key)] = bytes.Clone(value)
+			return nil
+		}
+	}
+	backend, found := f.args.Accounts.(*stateMock.AccountsStub)
+	require.True(t, found)
+	resolve := func(kind string, address []byte) (vmcommon.AccountHandler, error) {
+		f.trace = append(f.trace, fmt.Sprintf("%s:%x", kind, address))
+		user := byAddress[string(address)]
+		if user == nil {
+			return nil, state.ErrAccNotFound
+		}
+		return user, nil
+	}
+	backend.GetExistingAccountCalled = func(address []byte) (vmcommon.AccountHandler, error) { return resolve("existing", address) }
+	backend.LoadAccountCalled = func(address []byte) (vmcommon.AccountHandler, error) { return resolve("load", address) }
+	// EXPERIMENTAL native FT/SFT quantities100/20 and system NFT liquidity120.
+	// No ESDigitalToken is written into the system global-settings nonce0 slot.
+	for i, user := range f.users {
+		balance := int64(100)
+		if i == 1 {
+			balance = 20
+		}
+		if i == 2 {
+			balance = 120
+		}
+		for _, token := range []struct {
+			id    string
+			nonce uint64
+			typ   uint32
+		}{{"ORDINARY-abcdef", 0, uint32(core.Fungible)}, {"NONFUNG-abcdef", 1, uint32(core.SemiFungible)}} {
+			if i == 2 && token.nonce == 0 {
+				continue
+			}
+			var metadata *esdt.MetaData
+			if token.nonce != 0 {
+				metadata = &esdt.MetaData{Nonce: 1, Name: []byte("experimental metadata"), URIs: [][]byte{[]byte("experimental uri")}}
+			}
+			raw, e := f.args.Marshalizer.Marshal(&esdt.ESDigitalToken{Type: token.typ, Value: big.NewInt(balance), TokenMetaData: metadata})
+			require.NoError(t, e)
+			key := append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier+token.id), new(big.Int).SetUint64(token.nonce).Bytes()...)
+			f.data[string(user.AddressBytes())][string(key)] = raw
+		}
+	}
+	settings, err := vmcommonBuiltInFunctions.NewESDTGlobalSettingsFunc(backend, f.args.Marshalizer, true, core.BuiltInFunctionESDTPause, func() bool { return true })
+	require.NoError(t, err)
+	roles, err := vmcommonBuiltInFunctions.NewESDTRolesFunc(f.args.Marshalizer, true)
+	require.NoError(t, err)
+	storage, err := vmcommonBuiltInFunctions.NewESDTDataStorage(vmcommonBuiltInFunctions.ArgsNewESDTDataStorage{Accounts: backend, GlobalSettingsHandler: settings, Marshalizer: f.args.Marshalizer, EnableEpochsHandler: f.args.EnableEpochsHandler, ShardCoordinator: coordinator})
+	require.NoError(t, err)
+	f.args.GlobalSettingsHandler, f.args.NFTStorageHandler = settings, storage
+	var builtin vmcommon.BuiltinFunction
+	// EXPERIMENTAL builtin/byte costs7, gas20000, locked11, token quantity10,
+	// mixed native EGLD leg5; these are not production prices or profile bounds.
+	baseCost := vmcommon.BaseOperationCost{StorePerByte: 7, ReleasePerByte: 7, DataCopyPerByte: 7, PersistPerByte: 7, CompilePerByte: 7, AoTPreparePerByte: 7}
+	switch function {
+	case core.BuiltInFunctionESDTTransfer:
+		builtin, err = vmcommonBuiltInFunctions.NewESDTTransferFunc(7, f.args.Marshalizer, settings, coordinator, roles, f.args.EnableEpochsHandler)
+	case core.BuiltInFunctionESDTNFTTransfer:
+		builtin, err = vmcommonBuiltInFunctions.NewESDTNFTTransferFunc(7, f.args.Marshalizer, settings, backend, coordinator, baseCost, roles, storage, f.args.EnableEpochsHandler)
+	case core.BuiltInFunctionMultiESDTNFTTransfer:
+		builtin, err = vmcommonBuiltInFunctions.NewESDTNFTMultiTransferFunc(7, f.args.Marshalizer, settings, backend, coordinator, baseCost, f.args.EnableEpochsHandler, roles, storage)
+	}
+	require.NoError(t, err)
+	require.NotNil(t, builtin)
+	require.NoError(t, f.args.BuiltInFunctions.Replace(function, builtin))
+	f.hook, err = hooks.NewBlockChainHookImpl(f.args)
+	require.NoError(t, err)
+	payable, err := vmcommonBuiltInFunctions.NewPayableCheckFunc(f.hook, f.args.EnableEpochsHandler)
+	require.NoError(t, err)
+	setter, found := builtin.(interface {
+		SetPayableChecker(vmcommon.PayableChecker) error
+	})
+	require.True(t, found)
+	require.NoError(t, setter.SetPayableChecker(payable))
+	f.input = createContractCallInput(function, bytes.Clone(f.sender.AddressBytes()), bytes.Clone(f.receiver.AddressBytes()))
+	f.input.CallValue, f.input.GasProvided, f.input.GasLocked = big.NewInt(0), 20000, 11
+	payload, err := f.args.Marshalizer.Marshal(&esdt.ESDigitalToken{Type: uint32(core.SemiFungible), Value: big.NewInt(10), TokenMetaData: &esdt.MetaData{Nonce: 1, Name: []byte("experimental metadata"), URIs: [][]byte{[]byte("experimental uri")}}})
+	require.NoError(t, err)
+	switch function {
+	case core.BuiltInFunctionESDTTransfer:
+		f.input.Arguments = [][]byte{[]byte("ORDINARY-abcdef"), {10}}
+	case core.BuiltInFunctionESDTNFTTransfer:
+		f.input.Arguments = [][]byte{[]byte("NONFUNG-abcdef"), {1}, {10}, payload}
+		if side != "receiver" {
+			f.input.RecipientAddr = bytes.Clone(f.sender.AddressBytes())
+			f.input.Arguments[3] = bytes.Clone(f.receiver.AddressBytes())
+		}
+	case core.BuiltInFunctionMultiESDTNFTTransfer:
+		f.input.Arguments = [][]byte{{3}, []byte("ORDINARY-abcdef"), {}, {10}, []byte("NONFUNG-abcdef"), {1}, payload, []byte(vmcommon.EGLDIdentifier), {}, {5}}
+		if side != "receiver" {
+			f.input.RecipientAddr = bytes.Clone(f.sender.AddressBytes())
+			f.input.Arguments = [][]byte{bytes.Clone(f.receiver.AddressBytes()), {3}, []byte("ORDINARY-abcdef"), {}, {10}, []byte("NONFUNG-abcdef"), {1}, {10}, []byte(vmcommon.EGLDIdentifier), {}, {5}}
+		}
+	}
+	if variant == "malformed" {
+		f.input.Arguments = nil
+	}
+	f.trace = nil
+	return f
+}
+
+func TestBlockChainHookImpl_OrdinaryNativeTransfersINV0(t *testing.T) {
+	for _, function := range []string{core.BuiltInFunctionESDTTransfer, core.BuiltInFunctionESDTNFTTransfer, core.BuiltInFunctionMultiESDTNFTTransfer} {
+		for _, side := range []string{"same", "source", "receiver"} {
+			for _, variant := range []string{"healthy", "malformed", "sender-save", "receiver-save"} {
+				// A remote absent account is never expected to reach SaveAccount.
+				if variant == "sender-save" && side == "receiver" || variant == "receiver-save" && side == "source" {
+					continue
+				}
+				t.Run(function+"/"+side+"/"+variant, func(t *testing.T) {
+					faults := map[string]error{"sender-save": errors.New("experimental native sender save"), "receiver-save": errors.New("experimental native receiver save")}
+					old, current := drwaINV0Native(t, function, side, variant, faults), drwaINV0Native(t, function, side, variant, faults)
+					beforeOld, e := json.Marshal(old.input)
+					require.NoError(t, e)
+					beforeCurrent, e := json.Marshal(current.input)
+					require.NoError(t, e)
+					require.Equal(t, beforeOld, beforeCurrent)
+					baseline := &drwaINV0Baseline{ArgBlockChainHook: old.args}
+					want, wantErr := baseline.ProcessBuiltInFunction(old.input)
+					got, gotErr := current.hook.ProcessBuiltInFunction(current.input)
+					if variant == "healthy" {
+						require.NoError(t, wantErr)
+						require.NoError(t, gotErr)
+						require.NotNil(t, got)
+					} else {
+						require.Error(t, wantErr)
+						require.Error(t, gotErr)
+					}
+					require.Equal(t, fmt.Sprintf("%T:%v", wantErr, wantErr), fmt.Sprintf("%T:%v", gotErr, gotErr))
+					for _, fault := range faults {
+						if wantErr == fault {
+							require.Same(t, fault, gotErr)
+						}
+					}
+					require.Equal(t, want, got)
+					require.Equal(t, old.data, current.data, "all raw native protobuf values and metadata must match")
+					require.Equal(t, old.trace, current.trace)
+					require.Equal(t, old.journal, current.journal)
+					for i, user := range old.users {
+						a, e := json.Marshal(user)
+						require.NoError(t, e)
+						b, e := json.Marshal(current.users[i])
+						require.NoError(t, e)
+						require.Equal(t, a, b)
+					}
+					a, e := json.Marshal(old.input)
+					require.NoError(t, e)
+					b, e := json.Marshal(current.input)
+					require.NoError(t, e)
+					require.Equal(t, a, b, "preserve the old input's actual post-call shape")
+					if variant != "healthy" {
+						return
+					}
+					for _, f := range []*drwaINV0NativeFixture{old, current} {
+						for i, user := range []state.UserAccountHandler{f.sender, f.receiver} {
+							for _, token := range []struct {
+								id    string
+								nonce uint64
+							}{{"ORDINARY-abcdef", 0}, {"NONFUNG-abcdef", 1}} {
+								expected := int64(100)
+								if i == 1 {
+									expected = 20
+								}
+								moved := function == core.BuiltInFunctionMultiESDTNFTTransfer || function == core.BuiltInFunctionESDTTransfer && token.nonce == 0 || function == core.BuiltInFunctionESDTNFTTransfer && token.nonce == 1
+								if moved && i == 0 && side != "receiver" {
+									expected -= 10
+								}
+								if moved && i == 1 && side != "source" {
+									expected += 10
+								}
+								key := append([]byte(core.ProtectedKeyPrefix+core.ESDTKeyIdentifier+token.id), new(big.Int).SetUint64(token.nonce).Bytes()...)
+								value := &esdt.ESDigitalToken{}
+								require.NoError(t, f.args.Marshalizer.Unmarshal(value, f.data[string(user.AddressBytes())][string(key)]))
+								require.Equal(t, big.NewInt(expected), value.Value)
+							}
+							expected := int64(100)
+							if i == 1 {
+								expected = 20
+							}
+							if function == core.BuiltInFunctionMultiESDTNFTTransfer && i == 0 && side != "receiver" {
+								expected -= 5
+							}
+							if function == core.BuiltInFunctionMultiESDTNFTTransfer && i == 1 && side != "source" {
+								expected += 5
+							}
+							require.Equal(t, big.NewInt(expected), user.GetBalance())
+						}
+					}
+				})
+			}
+		}
+	}
 }

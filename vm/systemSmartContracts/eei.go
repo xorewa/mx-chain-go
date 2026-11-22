@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
+	"sync/atomic"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
@@ -37,10 +39,23 @@ type vmContext struct {
 
 	enableEpochsHandler common.EnableEpochsHandler
 	crtTransferIndex    uint32
+	drwaClassifier      vm.DRWATokenClassifier
+	// Immutable after construction: a context without a classifier cannot
+	// acquire one by handoff. Reading this bit needs no replacement lock.
+	drwaClassifierConfigured bool
+	// The sole write acquisition is TryLock, so nested native reads cannot
+	// deadlock behind a handoff waiting for their own execution to finish.
+	mutDRWAClassifier sync.RWMutex
+	// Passive status readers serialize with replacement without preventing its
+	// execution-exclusion TryLock. Replacement takes this lock only after that
+	// TryLock succeeds, so reentrant native work still refuses without waiting.
+	mutDRWAStatus      sync.RWMutex
+	drwaExecutionError atomic.Pointer[error]
 }
 
 // VMContextArgs holds the arguments needed to create a new vmContext
 type VMContextArgs struct {
+	DRWAClassifier      vm.DRWATokenClassifier
 	BlockChainHook      vm.BlockchainHook
 	CryptoHook          vmcommon.CryptoHook
 	InputParser         vm.ArgumentsParser
@@ -52,6 +67,9 @@ type VMContextArgs struct {
 
 // NewVMContext creates a context where smart contracts can run and write
 func NewVMContext(args VMContextArgs) (*vmContext, error) {
+	if args.DRWAClassifier != nil && check.IfNil(args.DRWAClassifier) {
+		return nil, vm.ErrDRWAExecution
+	}
 	if check.IfNilReflect(args.BlockChainHook) {
 		return nil, vm.ErrNilBlockchainHook
 	}
@@ -82,14 +100,22 @@ func NewVMContext(args VMContextArgs) (*vmContext, error) {
 		return nil, err
 	}
 
+	if args.DRWAClassifier != nil {
+		if err = args.DRWAClassifier.ValidateAccounts(args.UserAccountsDB, args.ValidatorAccountsDB); err != nil {
+			return nil, fmt.Errorf("%w: %w", vm.ErrDRWAExecution, err)
+		}
+	}
+
 	vmc := &vmContext{
-		blockChainHook:      args.BlockChainHook,
-		cryptoHook:          args.CryptoHook,
-		inputParser:         args.InputParser,
-		validatorAccountsDB: args.ValidatorAccountsDB,
-		userAccountsDB:      args.UserAccountsDB,
-		chanceComputer:      args.ChanceComputer,
-		enableEpochsHandler: args.EnableEpochsHandler,
+		drwaClassifier:           args.DRWAClassifier,
+		drwaClassifierConfigured: args.DRWAClassifier != nil,
+		blockChainHook:           args.BlockChainHook,
+		cryptoHook:               args.CryptoHook,
+		inputParser:              args.InputParser,
+		validatorAccountsDB:      args.ValidatorAccountsDB,
+		userAccountsDB:           args.UserAccountsDB,
+		chanceComputer:           args.ChanceComputer,
+		enableEpochsHandler:      args.EnableEpochsHandler,
 	}
 	vmc.CleanCache()
 
@@ -561,8 +587,14 @@ func (host *vmContext) ExecuteOnDestContext(destination []byte, sender []byte, v
 	if err != nil {
 		return nil, err
 	}
+	return host.ExecuteDRWASystemCall(callInput, func() (*vmcommon.VMOutput, error) {
+		return host.executeOnDestContext(callInput, sender)
+	})
+}
 
-	err = host.transferBeforeInternalExec(callInput, sender, "ExecuteOnDestContext")
+func (host *vmContext) executeOnDestContext(callInput *vmcommon.ContractCallInput, sender []byte) (*vmcommon.VMOutput, error) {
+
+	err := host.transferBeforeInternalExec(callInput, sender, "ExecuteOnDestContext")
 	if err != nil {
 		return nil, err
 	}

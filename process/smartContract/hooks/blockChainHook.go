@@ -17,6 +17,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	"github.com/multiversx/mx-chain-core-go/data/esdt"
 	"github.com/multiversx/mx-chain-core-go/data/typeConverters"
+	"github.com/multiversx/mx-chain-core-go/hashing"
 	"github.com/multiversx/mx-chain-core-go/hashing/keccak"
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	logger "github.com/multiversx/mx-chain-logger-go"
@@ -46,13 +47,23 @@ const maxTokenIdentifierLen = 32
 
 // ArgBlockChainHook represents the arguments structure for the blockchain hook
 type ArgBlockChainHook struct {
-	Accounts                 state.AccountsAdapter
-	PubkeyConv               core.PubkeyConverter
-	StorageService           dataRetriever.StorageService
-	DataPool                 dataRetriever.PoolsHolder
-	BlockChain               data.ChainHandler
-	ShardCoordinator         sharding.Coordinator
-	Marshalizer              marshal.Marshalizer
+	Accounts         state.AccountsAdapter
+	PubkeyConv       core.PubkeyConverter
+	StorageService   dataRetriever.StorageService
+	DataPool         dataRetriever.PoolsHolder
+	BlockChain       data.ChainHandler
+	ShardCoordinator sharding.Coordinator
+	Marshalizer      marshal.Marshalizer
+	// Hasher is the configured native header hasher for the DRWA typed view.
+	// An omitted hasher leaves that view unavailable, preserving ordinary hooks.
+	Hasher hashing.Hasher
+	// DRWAHeaderTimeEnabled is the native owner's current DRWA activation
+	// predicate. An omitted predicate leaves ordinary header installation alone.
+	// It is a constructor dependency, never supplied by transaction input.
+	DRWAHeaderTimeEnabled func() bool
+	// DRWAHeaderTimeEnabledAt binds the actual native candidate coordinate to
+	// the configured joint activation predicate. It grants no policy authority.
+	DRWAHeaderTimeEnabledAt  func(epoch uint32, round uint64) bool
 	Uint64Converter          typeConverters.Uint64ByteSliceConverter
 	BuiltInFunctions         vmcommon.BuiltInFunctionContainer
 	NFTStorageHandler        vmcommon.SimpleESDTNFTStorageHandler
@@ -91,6 +102,7 @@ type BlockChainHookImpl struct {
 
 	mutCurrentHdr sync.RWMutex
 	currentHdr    data.HeaderHandler
+	drwaTime      *evaluatedHeaderTime
 
 	mutEpochStartHdr sync.RWMutex
 	epochStartHdr    data.HeaderHandler
@@ -152,6 +164,13 @@ func NewBlockChainHookImpl(
 	blockChainHookImpl.epochStartHdr = &block.Header{}
 	blockChainHookImpl.mapActivationEpochs = createMapActivationEpochs(&args.EnableEpochs)
 	blockChainHookImpl.vmContainer = containers.NewVirtualMachinesContainer()
+	if err = blockChainHookImpl.initializeEvaluatedHeaderTime(args.Hasher); err != nil {
+		return nil, err
+	}
+	if blockChainHookImpl.drwaTime != nil {
+		blockChainHookImpl.drwaTime.enabled = args.DRWAHeaderTimeEnabled
+		blockChainHookImpl.drwaTime.enabledAt = args.DRWAHeaderTimeEnabledAt
+	}
 
 	args.EpochNotifier.RegisterNotifyHandler(blockChainHookImpl)
 	args.GasSchedule.RegisterNotifyHandler(blockChainHookImpl)
@@ -523,7 +542,7 @@ func (bh *BlockChainHookImpl) CurrentTimeStampMs() uint64 {
 	bh.mutCurrentHdr.RLock()
 	defer bh.mutCurrentHdr.RUnlock()
 
-	_, timestampMs, _ := common.GetHeaderTimestamps(bh.currentHdr, bh.enableEpochsHandler)
+	timestampMs, _ := bh.currentTimeStampMsLocked()
 
 	return timestampMs
 }
@@ -882,13 +901,22 @@ func createSuffixMask(creatorAddress []byte) []byte {
 
 // SetCurrentHeader sets current header to be used by smart contracts
 func (bh *BlockChainHookImpl) SetCurrentHeader(hdr data.HeaderHandler) error {
+	bh.invalidateEvaluatedHeaderTime()
 	if check.IfNil(hdr) {
 		return ErrNilCurrentHeader
 	}
 
 	bh.mutCurrentHdr.Lock()
 	defer bh.mutCurrentHdr.Unlock()
+	// A new evaluation may have begun while this native installation waited.
+	bh.invalidateEvaluatedHeaderTime()
+	return bh.setCurrentHeaderLocked(hdr)
+}
 
+func (bh *BlockChainHookImpl) setCurrentHeaderLocked(hdr data.HeaderHandler) error {
+	if check.IfNil(hdr) {
+		return ErrNilCurrentHeader
+	}
 	err := bh.updateEpochStartHeaderFromCurrentHeader(hdr)
 	if err != nil {
 		return err
@@ -1011,6 +1039,10 @@ func (bh *BlockChainHookImpl) DeleteCompiledCode(codeHash []byte) {
 
 // Close closes/cleans up the blockchain hook
 func (bh *BlockChainHookImpl) Close() error {
+	if bh.drwaTime != nil {
+		bh.drwaTime.closed.Store(true)
+		bh.invalidateEvaluatedHeaderTime()
+	}
 	bh.compiledScPool.Clear()
 
 	bh.mutCompiledSc.Lock()

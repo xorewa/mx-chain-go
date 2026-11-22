@@ -5,6 +5,7 @@ import (
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
+	"github.com/multiversx/mx-chain-core-go/data"
 	"github.com/multiversx/mx-chain-core-go/data/transaction"
 	"github.com/multiversx/mx-chain-core-go/hashing"
 	"github.com/multiversx/mx-chain-core-go/marshal"
@@ -14,6 +15,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 var _ process.TransactionProcessor = (*metaTxProcessor)(nil)
@@ -102,6 +104,26 @@ func NewMetaTxProcessor(args ArgsNewMetaTxProcessor) (*metaTxProcessor, error) {
 
 // ProcessTransaction modifies the account states in respect with the transaction data
 func (txProc *metaTxProcessor) ProcessTransaction(tx *transaction.Transaction) (vmcommon.ReturnCode, error) {
+	return txProc.processTransaction(tx, nil)
+}
+
+// ProcessTransactionWithDRWA receives static native validation only. Its
+// presence is never authority. The installed current owner must independently
+// bind the exact original/inner bytes, native hash, header, accounts and lifetime.
+func (txProc *metaTxProcessor) ProcessTransactionWithDRWA(tx *transaction.Transaction, validation *NativeValidationReceipt) (vmcommon.ReturnCode, error) {
+	if !RequiresDRWANativeValidationReceipt(tx) {
+		return txProc.ProcessTransaction(tx)
+	}
+	native, ok := txProc.scProcessor.(vm.DRWANativeTransactionContext)
+	if !ok {
+		return vmcommon.ExecutionFailed, vm.ErrDRWAExecution
+	}
+	return native.WithDRWANativeTransaction(tx, validation, func(execute vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error) {
+		return txProc.processTransaction(tx, execute)
+	})
+}
+
+func (txProc *metaTxProcessor) processTransaction(tx *transaction.Transaction, native vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error) {
 	if check.IfNil(tx) {
 		return 0, process.ErrNilTransaction
 	}
@@ -146,10 +168,10 @@ func (txProc *metaTxProcessor) ProcessTransaction(tx *transaction.Transaction) (
 	case process.SCDeployment:
 		return txProc.processSCDeployment(tx, tx.SndAddr)
 	case process.SCInvoking:
-		return txProc.processSCInvoking(tx, tx.SndAddr, tx.RcvAddr)
+		return txProc.processSCInvoking(tx, tx.SndAddr, tx.RcvAddr, native)
 	case process.BuiltInFunctionCall:
 		if txProc.enableEpochsHandler.IsFlagEnabled(common.ESDTFlag) {
-			return txProc.processSCInvoking(tx, tx.SndAddr, tx.RcvAddr)
+			return txProc.processSCInvoking(tx, tx.SndAddr, tx.RcvAddr, native)
 		}
 	}
 
@@ -179,6 +201,7 @@ func (txProc *metaTxProcessor) processSCDeployment(
 func (txProc *metaTxProcessor) processSCInvoking(
 	tx *transaction.Transaction,
 	adrSrc, adrDst []byte,
+	native ...vm.DRWANativeSCExecutor,
 ) (vmcommon.ReturnCode, error) {
 	// getAccounts returns acntSrc not nil if the adrSrc is in the node shard, the same, acntDst will be not nil
 	// if adrDst is in the node shard. If an error occurs it will be signaled in err variable.
@@ -187,6 +210,9 @@ func (txProc *metaTxProcessor) processSCInvoking(
 		return 0, err
 	}
 
+	if len(native) != 0 && native[0] != nil {
+		return native[0](data.TransactionHandler(tx), acntSrc, acntDst)
+	}
 	return txProc.scProcessor.ExecuteSmartContractTransaction(tx, acntSrc, acntDst)
 }
 

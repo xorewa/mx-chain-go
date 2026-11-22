@@ -1,6 +1,8 @@
 package txpool
 
 import (
+	"bytes"
+	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -11,11 +13,14 @@ import (
 	"github.com/multiversx/mx-chain-core-go/data/block"
 	logger "github.com/multiversx/mx-chain-logger-go"
 
+	nativeTransaction "github.com/multiversx/mx-chain-core-go/data/transaction"
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	"github.com/multiversx/mx-chain-go/process"
+	nativeValidation "github.com/multiversx/mx-chain-go/process/transaction"
 	"github.com/multiversx/mx-chain-go/storage"
 	"github.com/multiversx/mx-chain-go/txcache"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 var _ dataRetriever.ShardedDataCacherNotifier = (*shardedTxPool)(nil)
@@ -32,6 +37,108 @@ type shardedTxPool struct {
 	configPrototypeSourceMe      txcache.ConfigSourceMe
 	selfShardID                  uint32
 	host                         txcache.MempoolHost
+	mutNativeValidation          sync.RWMutex
+	nativeValidationSource       *nativeValidation.NativeValidationSource
+}
+
+// ConfigureNativeValidationSource binds the actual native factory inputs once,
+// before interception starts. This is static provider wiring, not business
+// authority, canonical context or an operation capability. Nil leaves the
+// original pool/Save path in place.
+func (txPool *shardedTxPool) ConfigureNativeValidationSource(source *nativeValidation.NativeValidationSource) error {
+	if source == nil {
+		return nil
+	}
+	txPool.mutNativeValidation.Lock()
+	defer txPool.mutNativeValidation.Unlock()
+	if txPool.nativeValidationSource != nil {
+		return vm.ErrDRWAExecution
+	}
+	copySource := *source
+	txPool.nativeValidationSource = &copySource
+	return nil
+}
+
+func (txPool *shardedTxPool) NativeValidationReceiptEnabled() bool {
+	txPool.mutNativeValidation.RLock()
+	defer txPool.mutNativeValidation.RUnlock()
+	return txPool.nativeValidationSource != nil
+}
+
+// AddDataWithNativeValidationReceipt preserves the concrete native transaction
+// and native insertion semantics. An unavailable/mismatched observation can
+// never manufacture authority; the ordinary transaction still uses AddData.
+func (txPool *shardedTxPool) AddDataWithNativeValidationReceipt(key []byte, value interface{}, sizeInBytes int, cacheID string, receipt *nativeValidation.NativeValidationReceipt) {
+	tx, ok := value.(*nativeTransaction.Transaction)
+	// Even an authentic static receipt is not retained for ordinary traffic.
+	// Use the unchanged native insertion, size and eviction path before any
+	// receipt re-encoding, hashing, key copying or metadata allocation.
+	if !ok || !nativeValidation.RequiresDRWANativeValidationReceipt(tx) {
+		txPool.AddData(key, value, sizeInBytes, cacheID)
+		return
+	}
+	source := txPool.currentNativeValidationSource()
+	if source == nil || nativeValidation.VerifyNativeValidationReceipt(*source, receipt, tx, key) != nil {
+		txPool.AddData(key, value, sizeInBytes, cacheID)
+		return
+	}
+	extra := receipt.RetainedSize()
+	if extra < 0 || sizeInBytes < 0 || extra > int64(math.MaxInt)-int64(sizeInBytes)-int64(len(key)) {
+		txPool.AddData(key, value, sizeInBytes, cacheID)
+		return
+	}
+	immutableKey := bytes.Clone(key)
+	if int64(cap(immutableKey)) > int64(math.MaxInt)-int64(sizeInBytes)-extra {
+		txPool.AddData(key, value, sizeInBytes, cacheID)
+		return
+	}
+	extra += int64(cap(immutableKey))
+	sender, receiver, err := process.ParseShardCacherIdentifier(cacheID)
+	if err != nil {
+		// Keep native invalid-cache behavior, including its diagnostic.
+		txPool.AddData(key, value, sizeInBytes, cacheID)
+		return
+	}
+	txPool.addTx(&txcache.WrappedTransaction{Tx: tx, TxHash: immutableKey,
+		SenderShardID: sender, ReceiverShardID: receiver,
+		Size: int64(sizeInBytes) + extra, DRWAValidationReceipt: receipt}, cacheID)
+}
+
+func (txPool *shardedTxPool) currentNativeValidationSource() *nativeValidation.NativeValidationSource {
+	txPool.mutNativeValidation.RLock()
+	defer txPool.mutNativeValidation.RUnlock()
+	if txPool.nativeValidationSource == nil {
+		return nil
+	}
+	source := *txPool.nativeValidationSource
+	// Use the same native flag reader as interceptedTxDataFactory.Create.
+	if source.EnableEpochsHandler == nil || source.EnableEpochsHandler.IsInterfaceNil() {
+		return nil
+	}
+	source.EnableSignedTxWithHash = source.EnableEpochsHandler.IsFlagEnabled(common.TransactionSignedWithTxHashFlag)
+	return &source
+}
+
+// NativeValidationReceiptFor returns only a still-present, exact static native
+// observation. It does NOT hold cache membership or an execution lease through
+// the caller's effects. The native operation owner must supply that boundary.
+func (txPool *shardedTxPool) NativeValidationReceiptFor(key []byte, cacheID string, tx *nativeTransaction.Transaction) *nativeValidation.NativeValidationReceipt {
+	if !nativeValidation.RequiresDRWANativeValidationReceipt(tx) {
+		return nil
+	}
+	source := txPool.currentNativeValidationSource()
+	if source == nil {
+		return nil
+	}
+	wrapped, found := txPool.getTxCache(cacheID).GetByTxHash(key)
+	if !found || wrapped.Tx != tx || !bytes.Equal(wrapped.TxHash, key) {
+		return nil
+	}
+	receipt, _ := wrapped.DRWAValidationReceipt.(*nativeValidation.NativeValidationReceipt)
+	if nativeValidation.VerifyNativeValidationReceipt(*source, receipt, tx, key) != nil {
+		return nil
+	}
+	return receipt
 }
 
 type txPoolShard struct {

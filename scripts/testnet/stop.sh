@@ -8,10 +8,15 @@ else
   KEEPOPEN=0
 fi
 
-source "$MULTIVERSXTESTNETSCRIPTSDIR/variables.sh"
+source "$MULTIVERSXTESTNETSCRIPTSDIR/variables.sh" || exit $?
 source "$MULTIVERSXTESTNETSCRIPTSDIR/include/validators.sh"
 source "$MULTIVERSXTESTNETSCRIPTSDIR/include/observers.sh"
 source "$MULTIVERSXTESTNETSCRIPTSDIR/include/tools.sh"
+
+if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+  stopNativeLocalnet
+  exit $?
+fi
 
 if [ $USE_PROXY -eq 1 ]; then
   stopProxy

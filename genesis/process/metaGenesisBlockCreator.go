@@ -3,6 +3,7 @@ package process
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"math"
 	"math/big"
 	"sort"
@@ -37,6 +38,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/process/block/preprocess"
 	"github.com/multiversx/mx-chain-go/process/coordinator"
+	"github.com/multiversx/mx-chain-go/process/drwa"
 	"github.com/multiversx/mx-chain-go/process/factory"
 	"github.com/multiversx/mx-chain-go/process/factory/metachain"
 	disabledGuardian "github.com/multiversx/mx-chain-go/process/guardian/disabled"
@@ -55,15 +57,64 @@ import (
 	"github.com/multiversx/mx-chain-go/vm"
 )
 
+func checkDRWAOriginalGenesis(arg ArgsGenesisBlockCreator) error {
+	if arg.DRWAMinimumGenesis == nil {
+		return nil
+	}
+	if len(arg.DRWAInitialProgrammes) == 0 {
+		return drwa.ErrInitialProgrammeLimits
+	}
+	if arg.HardForkConfig.AfterHardFork || !mustDoGenesisProcess(arg) {
+		return drwa.ErrDeploymentIdentity
+	}
+	return nil
+}
+
 // CreateMetaGenesisBlock will create a metachain genesis block
 func CreateMetaGenesisBlock(
 	arg ArgsGenesisBlockCreator,
 	body *block.Body,
 	nodesListSplitter genesis.NodesListSplitter,
 	hardForkBlockProcessor update.HardForkBlockProcessor,
-) (data.MetaHeaderHandler, [][]byte, *genesis.IndexingData, error) {
+) (_ data.MetaHeaderHandler, _ [][]byte, _ *genesis.IndexingData, returnErr error) {
+	if err := checkDRWAOriginalGenesis(arg); err != nil {
+		return nil, nil, nil, err
+	}
 	if mustDoHardForkImportProcess(arg) {
 		return createMetaGenesisBlockAfterHardFork(arg, body, hardForkBlockProcessor)
+	}
+
+	commitAttempted := false
+	if len(arg.DRWAInitialProgrammes) != 0 {
+		if arg.DRWAMinimumGenesis != nil && (check.IfNil(arg.drwaGenesisAccounts) || arg.Accounts != arg.drwaGenesisAccounts) {
+			return nil, nil, nil, drwa.ErrDeploymentIdentity
+		}
+		if check.IfNil(arg.Core) {
+			return nil, nil, nil, process.ErrNilCoreComponentsHolder
+		}
+		_, _, epoch := getGenesisBlocksRoundNonceEpoch(arg)
+		stage, err := drwa.PrepareInitialProgrammeGenesis(arg.Accounts, arg.DRWAInitialProgrammes,
+			arg.DRWAInitialProgrammeLimits, arg.DRWAMinimumGenesis, arg.Core.InternalMarshalizer(), arg.Core.Hasher(), epoch)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		snapshot := arg.Accounts.JournalLen()
+		if snapshot != 0 {
+			return nil, nil, nil, drwa.ErrUncommittedState
+		}
+		defer func() {
+			// Native Commit may clear the journal before returning a failure.
+			// Only a pre-Commit failure still belongs to this rollback.
+			if returnErr == nil || commitAttempted {
+				return
+			}
+			if rollbackErr := arg.Accounts.RevertToSnapshot(snapshot); rollbackErr != nil {
+				returnErr = errors.Join(returnErr, rollbackErr)
+			}
+		}()
+		if err = stage(); err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	indexingData := &genesis.IndexingData{
@@ -95,6 +146,7 @@ func CreateMetaGenesisBlock(
 	}
 	indexingData.StakingTxs = stakingTxs
 
+	commitAttempted = true
 	rootHash, err := arg.Accounts.Commit()
 	if err != nil {
 		return nil, nil, nil, err
@@ -330,6 +382,7 @@ func createProcessorsForMetaGenesisBlock(arg ArgsGenesisBlockCreator, enableEpoc
 		BlockChain:               arg.Data.Blockchain(),
 		ShardCoordinator:         arg.ShardCoordinator,
 		Marshalizer:              arg.Core.InternalMarshalizer(),
+		Hasher:                   arg.Core.Hasher(),
 		Uint64Converter:          arg.Core.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncs,
 		NFTStorageHandler:        &disabled.SimpleNFTStorage{},

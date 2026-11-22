@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	factoryCore "github.com/multiversx/mx-chain-go/factory/core"
+	"github.com/multiversx/mx-chain-go/process/drwa"
 	"math/big"
 	"path/filepath"
+	"reflect"
+	"sync/atomic"
 	"time"
 
 	"github.com/multiversx/mx-chain-core-go/core"
@@ -68,6 +72,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/smartContract"
 	"github.com/multiversx/mx-chain-go/process/sync"
 	"github.com/multiversx/mx-chain-go/process/track"
+	nativeValidation "github.com/multiversx/mx-chain-go/process/transaction"
 	"github.com/multiversx/mx-chain-go/process/transactionLog"
 	"github.com/multiversx/mx-chain-go/process/txsSender"
 	"github.com/multiversx/mx-chain-go/redundancy"
@@ -85,6 +90,7 @@ import (
 	updateDisabled "github.com/multiversx/mx-chain-go/update/disabled"
 	updateFactory "github.com/multiversx/mx-chain-go/update/factory"
 	"github.com/multiversx/mx-chain-go/update/trigger"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 // timeSpanForBadHeaders is the expiry time for an added block header hash; it is a wall-clock
@@ -93,6 +99,7 @@ var timeSpanForBadHeaders = time.Minute * 2
 
 // processComponents struct holds the process components
 type processComponents struct {
+	drwaNetworkIdentity              *drwaIdentityUnit
 	nodesCoordinator                 nodesCoordinator.NodesCoordinator
 	shardCoordinator                 sharding.Coordinator
 	mainInterceptorsContainer        process.InterceptorsContainer
@@ -150,24 +157,32 @@ type processComponents struct {
 
 // ProcessComponentsFactoryArgs holds the arguments needed to create a process components factory
 type ProcessComponentsFactoryArgs struct {
-	Config                 config.Config
-	RoundConfig            config.RoundConfig
-	EpochConfig            config.EpochConfig
-	PrefConfigs            config.Preferences
-	ImportDBConfig         config.ImportDbConfig
-	EconomicsConfig        config.EconomicsConfig
-	AccountsParser         genesis.AccountsParser
-	SmartContractParser    genesis.InitialSmartContractParser
-	GasSchedule            core.GasScheduleNotifier
-	NodesCoordinator       nodesCoordinator.NodesCoordinator
-	RequestedItemsHandler  dataRetriever.RequestedItemsHandler
-	WhiteListHandler       process.WhiteListHandler
-	WhiteListerVerifiedTxs process.WhiteListHandler
-	MaxRating              uint32
-	SystemSCConfig         *config.SystemSmartContractsConfig
-	ImportStartHandler     update.ImportStartHandler
-	HistoryRepo            dblookupext.HistoryRepository
-	FlagsConfig            config.ContextFlagsConfig
+	// DRWAConfigurationOverlay is an explicit experimental path, with no default.
+	// Effective inputs are the final native objects after startup overrides.
+	DRWAConfigurationOverlay   string
+	DRWAEffectiveConfigs       *config.Configs
+	DRWAInitialProgrammes      []drwa.InitialProgrammeEvidence
+	DRWAInitialProgrammeLimits *drwa.InitialProgrammeLimits
+	DRWAInitialProgrammeStartup *config.DRWAInitialProgrammeStartup
+	DRWAResolvedConfiguration *factoryCore.DRWAConfigurationCandidate
+	Config                     config.Config
+	RoundConfig                config.RoundConfig
+	EpochConfig                config.EpochConfig
+	PrefConfigs                config.Preferences
+	ImportDBConfig             config.ImportDbConfig
+	EconomicsConfig            config.EconomicsConfig
+	AccountsParser             genesis.AccountsParser
+	SmartContractParser        genesis.InitialSmartContractParser
+	GasSchedule                core.GasScheduleNotifier
+	NodesCoordinator           nodesCoordinator.NodesCoordinator
+	RequestedItemsHandler      dataRetriever.RequestedItemsHandler
+	WhiteListHandler           process.WhiteListHandler
+	WhiteListerVerifiedTxs     process.WhiteListHandler
+	MaxRating                  uint32
+	SystemSCConfig             *config.SystemSmartContractsConfig
+	ImportStartHandler         update.ImportStartHandler
+	HistoryRepo                dblookupext.HistoryRepository
+	FlagsConfig                config.ContextFlagsConfig
 
 	Data                    factory.DataComponentsHolder
 	CoreData                factory.CoreComponentsHolder
@@ -184,31 +199,38 @@ type ProcessComponentsFactoryArgs struct {
 }
 
 type processComponentsFactory struct {
-	miniBlockTracker       process.MiniBlockTracker
-	config                 config.Config
-	roundConfig            config.RoundConfig
-	epochConfig            config.EpochConfig
-	prefConfigs            config.Preferences
-	importDBConfig         config.ImportDbConfig
-	economicsConfig        config.EconomicsConfig
-	accountsParser         genesis.AccountsParser
-	smartContractParser    genesis.InitialSmartContractParser
-	gasSchedule            core.GasScheduleNotifier
-	nodesCoordinator       nodesCoordinator.NodesCoordinator
-	requestedItemsHandler  dataRetriever.RequestedItemsHandler
-	whiteListHandler       process.WhiteListHandler
-	whiteListerVerifiedTxs process.WhiteListHandler
-	maxRating              uint32
-	systemSCConfig         *config.SystemSmartContractsConfig
-	txLogsProcessor        process.TransactionLogProcessor
-	importStartHandler     update.ImportStartHandler
-	historyRepo            dblookupext.HistoryRepository
-	epochNotifier          process.EpochNotifier
-	importHandler          update.ImportHandler
-	flagsConfig            config.ContextFlagsConfig
-	esdtNftStorage         vmcommon.ESDTNFTStorageHandler
-	stakingDataProviderAPI peer.StakingDataProviderAPI
-	auctionListSelectorAPI epochStart.AuctionListSelector
+	drwaDeploymentIdentity     *config.DRWADeploymentIdentityConfig
+	drwaIdentityOwner          drwaIdentityLifecycle
+	drwaInitialProgrammes      []drwa.InitialProgrammeEvidence
+	drwaInitialProgrammeLimits *drwa.InitialProgrammeLimits
+	drwaInitialProgrammeStartup *config.DRWAInitialProgrammeStartup
+	drwaOriginalGenesisStarted  atomic.Bool
+	drwaConfigurationCandidate *factoryCore.DRWAConfigurationCandidate
+	miniBlockTracker           process.MiniBlockTracker
+	config                     config.Config
+	roundConfig                config.RoundConfig
+	epochConfig                config.EpochConfig
+	prefConfigs                config.Preferences
+	importDBConfig             config.ImportDbConfig
+	economicsConfig            config.EconomicsConfig
+	accountsParser             genesis.AccountsParser
+	smartContractParser        genesis.InitialSmartContractParser
+	gasSchedule                core.GasScheduleNotifier
+	nodesCoordinator           nodesCoordinator.NodesCoordinator
+	requestedItemsHandler      dataRetriever.RequestedItemsHandler
+	whiteListHandler           process.WhiteListHandler
+	whiteListerVerifiedTxs     process.WhiteListHandler
+	maxRating                  uint32
+	systemSCConfig             *config.SystemSmartContractsConfig
+	txLogsProcessor            process.TransactionLogProcessor
+	importStartHandler         update.ImportStartHandler
+	historyRepo                dblookupext.HistoryRepository
+	epochNotifier              process.EpochNotifier
+	importHandler              update.ImportHandler
+	flagsConfig                config.ContextFlagsConfig
+	esdtNftStorage             vmcommon.ESDTNFTStorageHandler
+	stakingDataProviderAPI     peer.StakingDataProviderAPI
+	auctionListSelectorAPI     epochStart.AuctionListSelector
 
 	data                    factory.DataComponentsHolder
 	coreData                factory.CoreComponentsHolder
@@ -234,11 +256,60 @@ func NewProcessComponentsFactory(args ProcessComponentsFactoryArgs) (*processCom
 		return nil, err
 	}
 
+	startup := args.DRWAInitialProgrammeStartup.Clone()
+	drwaCandidate := args.DRWAResolvedConfiguration
+	if startup != nil {
+		if (len(args.DRWAInitialProgrammes) == 0) != startup.Persisted ||
+			!reflect.DeepEqual(args.DRWAInitialProgrammeLimits, &startup.Limits) {
+			return nil, drwa.ErrInitialProgrammeLimits
+		}
+		if !drwaCandidate.MatchesPinnedOverlay(args.DRWAConfigurationOverlay, startup.OverlaySHA256) {
+			return nil, drwa.ErrDeploymentIdentity
+		}
+	} else if drwaCandidate != nil {
+		return nil, drwa.ErrDeploymentIdentity
+	} else if args.DRWAConfigurationOverlay != "" {
+		drwaCandidate, err = factoryCore.NewDRWAConfigurationCandidateFromOverlay(args.DRWAEffectiveConfigs,
+			args.DRWAConfigurationOverlay, factoryCore.DRWAConfigurationSupport{ProcessorV1: true, RelayedV3: true})
+		if err != nil {
+			return nil, err
+		}
+	}
+	if drwaCandidate != nil {
+		effective := args.DRWAEffectiveConfigs
+		if effective == nil || effective.GeneralConfig == nil || effective.EpochConfig == nil ||
+			effective.RoundConfig == nil || effective.EconomicsConfig == nil {
+			return nil, drwa.ErrDeploymentIdentity
+		}
+		if !reflect.DeepEqual(args.Config, *effective.GeneralConfig) ||
+			!reflect.DeepEqual(args.EpochConfig, *effective.EpochConfig) ||
+			!reflect.DeepEqual(args.RoundConfig, *effective.RoundConfig) ||
+			!reflect.DeepEqual(args.EconomicsConfig, *effective.EconomicsConfig) {
+			return nil, fmt.Errorf("DRWA effective inputs do not match processing inputs")
+		}
+		epochs, rounds := args.CoreData.EnableEpochsHandler(), args.CoreData.EnableRoundsHandler()
+		if check.IfNil(epochs) {
+			return nil, process.ErrNilEnableEpochsHandler
+		}
+		if check.IfNil(rounds) {
+			return nil, process.ErrNilEnableRoundsHandler
+		}
+		expectedEpochs, expectedRounds := drwaCandidate.ActivationInventory()
+		if !reflect.DeepEqual(expectedEpochs, epochs.GetAllEnableEpochs()) || !reflect.DeepEqual(expectedRounds, rounds.GetAllEnableRounds()) {
+			return nil, fmt.Errorf("DRWA effective activation inputs do not match native core handlers")
+		}
+	}
+
 	interceptedDataVerifierFactory := interceptorFactory.NewInterceptedDataVerifierFactory(interceptorFactory.InterceptedDataVerifierFactoryArgs{
 		InterceptedDataVerifierConfig: args.Config.InterceptedDataVerifier,
 	})
 
 	return &processComponentsFactory{
+		drwaDeploymentIdentity:         cloneDRWAIdentityConfig(args.Config.GeneralSettings.DRWADeploymentIdentity),
+		drwaInitialProgrammes:          drwa.CloneInitialProgrammeEvidence(args.DRWAInitialProgrammes),
+		drwaInitialProgrammeLimits:     args.DRWAInitialProgrammeLimits.Clone(),
+		drwaInitialProgrammeStartup:    startup,
+		drwaConfigurationCandidate:     drwaCandidate,
 		config:                         args.Config,
 		epochConfig:                    args.EpochConfig,
 		prefConfigs:                    args.PrefConfigs,
@@ -276,7 +347,42 @@ func NewProcessComponentsFactory(args ProcessComponentsFactoryArgs) (*processCom
 // TODO: Think if it would make sense here to create an array of closable interfaces
 
 // Create will create and return a struct containing process components
-func (pcf *processComponentsFactory) Create() (*processComponents, error) {
+func (pcf *processComponentsFactory) Create() (components *processComponents, returnErr error) {
+	var identity *drwaIdentityUnit
+	var freshIdentity *drwa.DeploymentIdentity
+	var err error
+	if pcf.drwaInitialProgrammeStartup == nil {
+		identity, err = pcf.openConfiguredDRWAIdentity()
+	} else if pcf.drwaInitialProgrammeStartup.Persisted {
+		if pcf.config.Hardfork.AfterHardFork || pcf.config.HardforkRecoveryCheckpoint.Enabled ||
+			pcf.importDBConfig.IsImportDBMode ||
+			check.IfNil(pcf.bootstrapComponents) || check.IfNil(pcf.bootstrapComponents.EpochBootstrapParams()) ||
+			pcf.bootstrapComponents.EpochBootstrapParams().Epoch() <= pcf.config.EpochStartConfig.GenesisEpoch ||
+			check.IfNil(pcf.coreData) || check.IfNil(pcf.coreData.PathHandler()) ||
+			pcf.coreData.PathHandler().DatabasePath() != pcf.drwaInitialProgrammeStartup.OriginalDatabasePath {
+			return nil, drwa.ErrDeploymentIdentity
+		}
+		// Native later-epoch bootstrap already uses the non-provisioning path.
+		identity, err = pcf.openConfiguredDRWAIdentity()
+		if err == nil && identity == nil {
+			return nil, drwa.ErrDeploymentIdentity
+		}
+	} else {
+		// A configured original-generation attempt may have reached native
+		// persistence even when Create returned an error.
+		if !pcf.drwaOriginalGenesisStarted.CompareAndSwap(false, true) {
+			return nil, drwa.ErrDeploymentIdentity
+		}
+		freshIdentity, err = pcf.prepareOriginalDRWAGenesis()
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if components == nil && identity != nil {
+			returnErr = errors.Join(returnErr, identity.Close())
+		}
+	}()
 	genesisUnixTime := common.GetGenesisUnixTimestampFromStartTime(pcf.coreData.GenesisTime(), pcf.coreData.EnableEpochsHandler())
 	currentEpochProvider, err := epochProviders.CreateCurrentEpochProvider(
 		pcf.coreData.ChainParametersHandler(),
@@ -427,34 +533,16 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 		log.Warn("cannot index genesis accounts", "error", err)
 	}
 
-	genesisBlock, ok := genesisBlocks[core.MetachainShardId]
-	if !ok {
-		return nil, errors.New("genesis meta block does not exist")
-	}
-
-	genesisMetaBlock, ok := genesisBlock.(data.MetaHeaderHandler)
-	if !ok {
-		return nil, errors.New("genesis meta block invalid")
-	}
-
-	err = pcf.setGenesisHeader(genesisBlocks)
+	genesisMetaBlock, validatorStatisticsProcessor, err := pcf.finalizeGenesisHeaders(genesisBlocks)
 	if err != nil {
 		return nil, err
 	}
 
-	validatorStatisticsProcessor, err := pcf.newValidatorStatisticsProcessor()
-	if err != nil {
-		return nil, err
-	}
-
-	validatorStatsRootHash, err := validatorStatisticsProcessor.RootHash()
-	if err != nil {
-		return nil, err
-	}
-
-	err = genesisMetaBlock.SetValidatorStatsRootHash(validatorStatsRootHash)
-	if err != nil {
-		return nil, err
+	if freshIdentity != nil {
+		identity, err = pcf.openFinalizedDRWAGenesis(freshIdentity, genesisMetaBlock)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	epochStartTrigger, err := pcf.newEpochStartTrigger(requestHandler)
@@ -473,7 +561,7 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 		return nil, err
 	}
 
-	log.Debug("Validator stats created", "validatorStatsRootHash", validatorStatsRootHash)
+	log.Debug("Validator stats created", "validatorStatsRootHash", genesisMetaBlock.GetValidatorStatsRootHash())
 
 	err = pcf.prepareGenesisBlock(genesisBlocks)
 	if err != nil {
@@ -800,6 +888,7 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 	}
 
 	return &processComponents{
+		drwaNetworkIdentity:              identity,
 		nodesCoordinator:                 pcf.nodesCoordinator,
 		shardCoordinator:                 pcf.bootstrapComponents.ShardCoordinator(),
 		mainInterceptorsContainer:        mainInterceptorsContainer,
@@ -854,6 +943,43 @@ func (pcf *processComponentsFactory) Create() (*processComponents, error) {
 		aotSelector:                      blockProcessorComponents.aotSelector,
 		transactionProcessor:             blockProcessorComponents.transactionProcessor,
 	}, nil
+}
+
+// finalizeGenesisHeaders preserves the native header/storage and statistics
+// initialization order and returns the finalized metachain object.
+func (pcf *processComponentsFactory) finalizeGenesisHeaders(genesisBlocks map[uint32]data.HeaderHandler) (
+	data.MetaHeaderHandler, process.ValidatorStatisticsProcessor, error) {
+	genesisBlock, ok := genesisBlocks[core.MetachainShardId]
+	if !ok {
+		return nil, nil, errors.New("genesis meta block does not exist")
+	}
+
+	genesisMetaBlock, ok := genesisBlock.(data.MetaHeaderHandler)
+	if !ok {
+		return nil, nil, errors.New("genesis meta block invalid")
+	}
+
+	err := pcf.setGenesisHeader(genesisBlocks)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	validatorStatisticsProcessor, err := pcf.newValidatorStatisticsProcessor()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	validatorStatsRootHash, err := validatorStatisticsProcessor.RootHash()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = genesisMetaBlock.SetValidatorStatsRootHash(validatorStatsRootHash)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return genesisMetaBlock, validatorStatisticsProcessor, nil
 }
 
 func (pcf *processComponentsFactory) newValidatorStatisticsProcessor() (process.ValidatorStatisticsProcessor, error) {
@@ -1013,6 +1139,7 @@ func (pcf *processComponentsFactory) generateGenesisHeadersAndApplyInitialBalanc
 		TxCacheSelectionConfig:  pcf.config.TxCacheSelection,
 	}
 
+	pcf.setInitialProgrammeGenesisData(&arg)
 	gbc, err := processGenesis.NewGenesisBlockCreator(arg)
 	if err != nil {
 		return nil, nil, err
@@ -1817,6 +1944,9 @@ func (pcf *processComponentsFactory) newShardInterceptorContainerFactory(
 		Config:                                  pcf.config,
 	}
 
+	if err := pcf.configureNativeValidationSource(shardInterceptorsContainerFactoryArgs); err != nil {
+		return nil, nil, err
+	}
 	interceptorContainerFactory, err := interceptorscontainer.NewShardInterceptorsContainerFactory(shardInterceptorsContainerFactoryArgs)
 	if err != nil {
 		return nil, nil, err
@@ -1875,12 +2005,47 @@ func (pcf *processComponentsFactory) newMetaInterceptorContainerFactory(
 		Config:                                  pcf.config,
 	}
 
+	if err := pcf.configureNativeValidationSource(metaInterceptorsContainerFactoryArgs); err != nil {
+		return nil, nil, err
+	}
 	interceptorContainerFactory, err := interceptorscontainer.NewMetaInterceptorsContainerFactory(metaInterceptorsContainerFactoryArgs)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return interceptorContainerFactory, headerBlackList, nil
+}
+
+// configureNativeValidationSource forwards the exact provider instances used
+// by the existing native interception factory. It does not install an authority
+// body, original-G6 locator, current operation owner or business permission.
+// Unconfigured nodes retain their original pool and interception path.
+func (pcf *processComponentsFactory) configureNativeValidationSource(args interceptorscontainer.CommonInterceptorsContainerFactoryArgs) error {
+	if pcf.drwaDeploymentIdentity == nil {
+		return nil
+	}
+	if check.IfNil(args.CoreComponents) || check.IfNil(args.CryptoComponents) || check.IfNil(args.DataPool) {
+		return vm.ErrDRWAExecution
+	}
+	transactions := args.DataPool.Transactions()
+	if check.IfNil(transactions) {
+		return vm.ErrDRWAExecution
+	}
+	pool, ok := transactions.(interface {
+		ConfigureNativeValidationSource(*nativeValidation.NativeValidationSource) error
+	})
+	if !ok {
+		return vm.ErrDRWAExecution
+	}
+	return pool.ConfigureNativeValidationSource(&nativeValidation.NativeValidationSource{
+		ProtoMarshalizer: args.CoreComponents.InternalMarshalizer(), SignMarshalizer: args.CoreComponents.TxMarshalizer(),
+		Hasher: args.CoreComponents.Hasher(), TxSignHasher: args.CoreComponents.TxSignHasher(),
+		KeyGen: args.CryptoComponents.TxSignKeyGen(), Signer: args.CryptoComponents.TxSingleSigner(),
+		Converter: args.CoreComponents.AddressPubKeyConverter(), VersionChecker: args.CoreComponents.TxVersionChecker(),
+		Coordinator: args.ShardCoordinator, FeeHandler: args.TxFeeHandler,
+		VerifiedTransactions: args.WhiteListerVerifiedTxs, ArgsParser: args.ArgumentsParser,
+		EnableEpochsHandler: args.CoreComponents.EnableEpochsHandler(), ChainID: args.CoreComponents.ChainID(),
+	})
 }
 
 func (pcf *processComponentsFactory) newForkDetector(
@@ -2216,7 +2381,8 @@ func (pc *processComponents) Close() error {
 		log.LogIfError(pc.blockTracker.Close())
 	}
 
-	return nil
+	// Keep the original identity through the last native consumer close.
+	return pc.drwaNetworkIdentity.Close()
 }
 
 func wrapTxsInfo(txs map[string]*outport.TxInfo) map[string]data.TransactionHandler {
@@ -2257,4 +2423,13 @@ func wrapLogs(logs []*transaction.LogData) []data.LogDataHandler {
 	}
 
 	return ret
+}
+
+func (pcf *processComponentsFactory) setInitialProgrammeGenesisData(arg *processGenesis.ArgsGenesisBlockCreator) {
+	arg.DRWAInitialProgrammes = drwa.CloneInitialProgrammeEvidence(pcf.drwaInitialProgrammes)
+	arg.DRWAInitialProgrammeLimits = pcf.drwaInitialProgrammeLimits.Clone()
+	if pcf.drwaInitialProgrammeStartup != nil && !pcf.drwaInitialProgrammeStartup.Persisted {
+		minimum := pcf.drwaInitialProgrammeStartup.Minimum
+		arg.DRWAMinimumGenesis = &minimum
+	}
 }

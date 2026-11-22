@@ -565,6 +565,24 @@ func (tr *patriciaMerkleTrie) GetProof(key []byte) ([][]byte, []byte, error) {
 	tr.mutOperation.Lock()
 	defer tr.mutOperation.Unlock()
 
+	proof, value, err := tr.getProofForQuery(key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return proof, value, nil
+}
+
+// GetProofForQuery returns the native visited path, including a prefix on error.
+// Its error is retained; a returned prefix does not establish absence or finality.
+func (tr *patriciaMerkleTrie) GetProofForQuery(key []byte) ([][]byte, []byte, error) {
+	tr.mutOperation.Lock()
+	defer tr.mutOperation.Unlock()
+
+	return tr.getProofForQuery(key)
+}
+
+func (tr *patriciaMerkleTrie) getProofForQuery(key []byte) ([][]byte, []byte, error) {
 	if tr.root == nil {
 		return nil, nil, ErrNilNode
 	}
@@ -581,14 +599,14 @@ func (tr *patriciaMerkleTrie) GetProof(key []byte) ([][]byte, []byte, error) {
 	for {
 		encodedNode, errGet := currentNode.getEncodedNode()
 		if errGet != nil {
-			return nil, nil, errGet
+			return proof, nil, errGet
 		}
 		proof = append(proof, encodedNode)
 		value := currentNode.getValue()
 
 		currentNode, hexKey, errGet = currentNode.getNext(hexKey, tr.trieStorage)
 		if errGet != nil {
-			return nil, nil, errGet
+			return proof, nil, errGet
 		}
 
 		if currentNode == nil {

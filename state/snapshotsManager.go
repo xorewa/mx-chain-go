@@ -11,6 +11,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/marshal"
 
 	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/common/holders"
 	"github.com/multiversx/mx-chain-go/storage/storageEpochChange"
 	"github.com/multiversx/mx-chain-go/trie/storageMarker"
 )
@@ -44,6 +45,7 @@ type snapshotsManager struct {
 	channelsProvider     IteratorChannelsProvider
 	accountFactory       AccountFactory
 	stateStatsHandler    StateStatsHandler
+	protectedChildren    ProtectedChildResolver
 	mutex                sync.RWMutex
 }
 
@@ -257,6 +259,7 @@ func (sm *snapshotsManager) snapshotState(
 		// TODO if the leaf was retrieved from epoch db n-2, the data trie should start retrieving from
 		// epoch n-2 and checking only older dbs
 		sm.snapshotUserAccountDataTrie(rootHash, iteratorChannels, missingNodesChannel, stats, epoch, trieStorageManager)
+		sm.snapshotProtectedChildren(rootHash, epoch, trieStorageManager, iteratorChannels.ErrChan, missingNodesChannel, stats)
 
 		stats.SnapshotFinished()
 	}()
@@ -264,6 +267,38 @@ func (sm *snapshotsManager) snapshotState(
 	go sm.syncMissingNodes(missingNodesChannel, iteratorChannels.ErrChan, stats, sm.getTrieSyncer())
 
 	go sm.processSnapshotCompletion(stats, trieStorageManager, missingNodesChannel, iteratorChannels.ErrChan, rootHash, epoch)
+}
+
+func (sm *snapshotsManager) snapshotProtectedChildren(root []byte, epoch uint32, storage common.StorageManager,
+	fail common.BufferedErrChan, missing chan []byte, stats common.SnapshotStatisticsHandler) {
+	sm.mutex.RLock()
+	resolve := sm.protectedChildren
+	sm.mutex.RUnlock()
+	if resolve == nil {
+		return
+	}
+	checkpoint := holders.NewRootHashHolder(root, core.OptionalUint32{Value: epoch, HasValue: true})
+	refs, err := resolve(checkpoint)
+	if err != nil {
+		fail.WriteInChanNonBlocking(err)
+		return
+	}
+	for _, ref := range refs {
+		if !ref.IsForStorage(storage) {
+			fail.WriteInChanNonBlocking(errProtectedChild)
+			return
+		}
+		if err = ref.Verify(); err != nil {
+			fail.WriteInChanNonBlocking(err)
+			return
+		}
+		child := ref.RootHash()
+		if common.IsEmptyTrie(child) {
+			continue
+		}
+		stats.NewSnapshotStarted()
+		storage.TakeSnapshot("", child, root, &common.TrieIteratorChannels{ErrChan: fail}, missing, stats, epoch)
+	}
 }
 
 func (sm *snapshotsManager) earlySnapshotCompletion(stats *snapshotStatistics, trieStorageManager common.StorageManager) {

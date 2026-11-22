@@ -181,7 +181,7 @@ type TransactionCoordinator interface {
 
 	CreateBlockStarted()
 	CreateMbsAndProcessCrossShardTransactionsDstMe(header data.HeaderHandler, processedMiniBlocksInfo map[string]*processedMb.ProcessedMiniBlockInfo, haveTime func() bool, haveAdditionalTime func() bool, scheduledMode bool, allowStartingPartialExecution bool, gasProcessingPolicy GasProcessingPolicy) (block.MiniBlockSlice, uint32, bool, error)
-	CreateMbsAndProcessTransactionsFromMe(haveTime func() bool, randomness []byte) block.MiniBlockSlice
+	CreateMbsAndProcessTransactionsFromMe(haveTime func() bool, randomness []byte) (block.MiniBlockSlice, error)
 	CreatePostProcessMiniBlocks() block.MiniBlockSlice
 	CreateMarshalizedData(body *block.Body) map[string][][]byte
 	CreateMarshalledDataForHeader(header data.HeaderHandler, body *block.Body, miniBlocksMap map[string]block.MiniBlockSlice) map[string][][]byte

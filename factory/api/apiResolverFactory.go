@@ -408,6 +408,7 @@ func createScQueryElement(
 		StorageService:           args.dataComponents.StorageService(),
 		ShardCoordinator:         args.processComponents.ShardCoordinator(),
 		Marshalizer:              args.coreComponents.InternalMarshalizer(),
+		Hasher:                   args.coreComponents.Hasher(),
 		Uint64Converter:          args.coreComponents.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncFactory.BuiltInFunctionContainer(),
 		NFTStorageHandler:        builtInFuncFactory.NFTStorageHandler(),

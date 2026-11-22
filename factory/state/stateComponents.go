@@ -23,7 +23,9 @@ import (
 	"github.com/multiversx/mx-chain-go/state/storagePruningManager"
 	"github.com/multiversx/mx-chain-go/state/storagePruningManager/evictionWaitingList"
 	"github.com/multiversx/mx-chain-go/state/syncer"
+	"github.com/multiversx/mx-chain-go/trie"
 	trieFactory "github.com/multiversx/mx-chain-go/trie/factory"
+	"github.com/multiversx/mx-chain-go/trie/keyBuilder"
 	"github.com/multiversx/mx-chain-go/trie/leavesRetriever"
 )
 
@@ -38,6 +40,8 @@ type StateComponentsFactoryArgs struct {
 	ProcessingMode           common.NodeProcessingMode
 	ShouldSerializeSnapshots bool
 	ChainHandler             chainData.ChainHandler
+	ProtectedChildRoot       state.ProtectedChildRoot
+	ProtectedCheckpoints     *state.ProtectedChildCheckpoints
 }
 
 type stateComponentsFactory struct {
@@ -48,6 +52,8 @@ type stateComponentsFactory struct {
 	processingMode           common.NodeProcessingMode
 	shouldSerializeSnapshots bool
 	chainHandler             chainData.ChainHandler
+	protectedChildRoot       state.ProtectedChildRoot
+	protectedCheckpoints     *state.ProtectedChildCheckpoints
 }
 
 // stateComponents struct holds the state components of the MultiversX protocol
@@ -66,6 +72,9 @@ type stateComponents struct {
 
 // NewStateComponentsFactory will return a new instance of stateComponentsFactory
 func NewStateComponentsFactory(args StateComponentsFactoryArgs) (*stateComponentsFactory, error) {
+	if (args.ProtectedChildRoot == nil) != (args.ProtectedCheckpoints == nil) {
+		return nil, fmt.Errorf("%w: partial protected child configuration", errors.ErrAccountsAdapterCreation)
+	}
 	if check.IfNil(args.Core) {
 		return nil, errors.ErrNilCoreComponents
 	}
@@ -84,6 +93,8 @@ func NewStateComponentsFactory(args StateComponentsFactoryArgs) (*stateComponent
 		processingMode:           args.ProcessingMode,
 		shouldSerializeSnapshots: args.ShouldSerializeSnapshots,
 		chainHandler:             args.ChainHandler,
+		protectedChildRoot:       args.ProtectedChildRoot,
+		protectedCheckpoints:     args.ProtectedCheckpoints,
 	}, nil
 }
 
@@ -252,16 +263,28 @@ func (scf *stateComponentsFactory) createAccountsAdapters(triesContainer common.
 		return nil, err
 	}
 
+	var protectedCheckpoints *state.ProtectedChildCheckpoints
+	if scf.protectedCheckpoints != nil {
+		owned := *scf.protectedCheckpoints
+		marshaller, hasher := scf.core.InternalMarshalizer(), scf.core.Hasher()
+		owned.ReadNode = func(hash []byte, db common.TrieStorageInteractor) ([]common.TrieNodeData, error) {
+			return trie.GetNodeDataFromHash(hash, keyBuilder.NewKeyBuilder(), db, marshaller, hasher)
+		}
+		protectedCheckpoints = &owned
+	}
+
 	argsProcessingAccountsDB := state.ArgsAccountsDB{
-		Trie:                   merkleTrie,
-		Hasher:                 scf.core.Hasher(),
-		Marshaller:             scf.core.InternalMarshalizer(),
-		AccountFactory:         accountFactory,
-		StoragePruningManager:  storagePruning,
-		AddressConverter:       scf.core.AddressPubKeyConverter(),
-		SnapshotsManager:       snapshotsManager,
-		StateAccessesCollector: StateAccessesCollector,
-		PruningEnabled:         scf.config.StateTriesConfig.AccountsStatePruningEnabled,
+		Trie:                      merkleTrie,
+		Hasher:                    scf.core.Hasher(),
+		Marshaller:                scf.core.InternalMarshalizer(),
+		AccountFactory:            accountFactory,
+		StoragePruningManager:     storagePruning,
+		AddressConverter:          scf.core.AddressPubKeyConverter(),
+		SnapshotsManager:          snapshotsManager,
+		StateAccessesCollector:    StateAccessesCollector,
+		PruningEnabled:            scf.config.StateTriesConfig.AccountsStatePruningEnabled,
+		ProtectedChildRoot:        scf.protectedChildRoot,
+		ProtectedChildCheckpoints: protectedCheckpoints,
 	}
 	accountsAdapter, err := state.NewAccountsDB(argsProcessingAccountsDB)
 	if err != nil {
@@ -316,7 +339,10 @@ func (scf *stateComponentsFactory) createAccountsAdapters(triesContainer common.
 		return nil, fmt.Errorf("accountsRepository: %w", err)
 	}
 
-	accountsAdapterProposal, err := state.NewAccountsDB(argsAPIAccountsDB)
+	argsProposal := argsAPIAccountsDB
+	argsProposal.ProtectedChildRoot = scf.protectedChildRoot
+	argsProposal.ProtectedChildCheckpoints = protectedCheckpoints
+	accountsAdapterProposal, err := state.NewAccountsDB(argsProposal)
 	if err != nil {
 		return nil, fmt.Errorf("accounts adapter for proposal: %w: %s", errors.ErrAccountsAdapterCreation, err)
 	}

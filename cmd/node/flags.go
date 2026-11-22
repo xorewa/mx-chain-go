@@ -38,6 +38,20 @@ var (
 			"such as consensus group size, round duration, validators public keys and so on.",
 		Value: "./config/nodesSetup.json",
 	}
+	// DRWA-defined experimental overlay; no production/profile placement default.
+	drwaConfigurationFile = cli.StringFlag{
+		Name:  "drwa-config",
+		Usage: "Explicit experimental DRWA configuration overlay (optional)",
+		Value: "",
+	}
+
+	// drwaStartupRecord is the experimental configured-package identity from
+	// the independently checked startup command. The overlay cannot set it.
+	drwaStartupRecord = cli.StringFlag{
+		Name: "drwa-startup-record",
+		Usage: "Pinned configured startup record as sha256:bytes:absolute-path",
+	}
+
 	// configurationFile defines a flag for the path to the main toml configuration file
 	configurationFile = cli.StringFlag{
 		Name: "config",
@@ -430,6 +444,8 @@ func getFlags() []cli.Flag {
 		smartContractsFile,
 		nodesFile,
 		configurationFile,
+		drwaConfigurationFile,
+		drwaStartupRecord,
 		configurationApiFile,
 		configurationEconomicsFile,
 		configurationSystemSCFile,

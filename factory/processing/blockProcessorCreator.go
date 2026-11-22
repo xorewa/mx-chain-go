@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/core/check"
 	dataBlock "github.com/multiversx/mx-chain-core-go/data/block"
 	logger "github.com/multiversx/mx-chain-logger-go"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
@@ -319,28 +320,29 @@ func (pcf *processComponentsFactory) newShardBlockProcessor(
 
 	txFeeHandler := postprocess.NewFeeAccumulator()
 	argsNewScProcessor := scrCommon.ArgsNewSmartContractProcessor{
-		VmContainer:         vmContainer,
-		ArgsParser:          argsParser,
-		Hasher:              pcf.coreData.Hasher(),
-		Marshalizer:         pcf.coreData.InternalMarshalizer(),
-		AccountsDB:          pcf.state.AccountsAdapter(),
-		BlockChainHook:      vmFactory.BlockChainHookImpl(),
-		BuiltInFunctions:    builtInFuncFactory.BuiltInFunctionContainer(),
-		PubkeyConv:          pcf.coreData.AddressPubKeyConverter(),
-		ShardCoordinator:    pcf.bootstrapComponents.ShardCoordinator(),
-		ScrForwarder:        scForwarder,
-		TxFeeHandler:        txFeeHandler,
-		EconomicsFee:        pcf.coreData.EconomicsData(),
-		GasHandler:          gasHandler,
-		GasSchedule:         pcf.gasSchedule,
-		TxLogsProcessor:     pcf.txLogsProcessor,
-		TxTypeHandler:       txTypeHandler,
-		IsGenesisProcessing: false,
-		BadTxForwarder:      badTxInterim,
-		EnableRoundsHandler: pcf.coreData.EnableRoundsHandler(),
-		EnableEpochsHandler: pcf.coreData.EnableEpochsHandler(),
-		VMOutputCacher:      txcache.NewDisabledCache(),
-		WasmVMChangeLocker:  wasmVMChangeLocker,
+		DRWAAccountDeletionGuard: nativeDRWAAccountDeletionGuard(vmFactory),
+		VmContainer:              vmContainer,
+		ArgsParser:               argsParser,
+		Hasher:                   pcf.coreData.Hasher(),
+		Marshalizer:              pcf.coreData.InternalMarshalizer(),
+		AccountsDB:               pcf.state.AccountsAdapter(),
+		BlockChainHook:           vmFactory.BlockChainHookImpl(),
+		BuiltInFunctions:         builtInFuncFactory.BuiltInFunctionContainer(),
+		PubkeyConv:               pcf.coreData.AddressPubKeyConverter(),
+		ShardCoordinator:         pcf.bootstrapComponents.ShardCoordinator(),
+		ScrForwarder:             scForwarder,
+		TxFeeHandler:             txFeeHandler,
+		EconomicsFee:             pcf.coreData.EconomicsData(),
+		GasHandler:               gasHandler,
+		GasSchedule:              pcf.gasSchedule,
+		TxLogsProcessor:          pcf.txLogsProcessor,
+		TxTypeHandler:            txTypeHandler,
+		IsGenesisProcessing:      false,
+		BadTxForwarder:           badTxInterim,
+		EnableRoundsHandler:      pcf.coreData.EnableRoundsHandler(),
+		EnableEpochsHandler:      pcf.coreData.EnableEpochsHandler(),
+		VMOutputCacher:           txcache.NewDisabledCache(),
+		WasmVMChangeLocker:       wasmVMChangeLocker,
 	}
 
 	scProcessorProxy, err := processProxy.NewSmartContractProcessorProxy(argsNewScProcessor, pcf.epochNotifier)
@@ -803,28 +805,29 @@ func (pcf *processComponentsFactory) newMetaBlockProcessor(
 	txFeeHandler := postprocess.NewFeeAccumulator()
 	enableEpochs := pcf.epochConfig.EnableEpochs
 	argsNewScProcessor := scrCommon.ArgsNewSmartContractProcessor{
-		VmContainer:         vmContainer,
-		ArgsParser:          argsParser,
-		Hasher:              pcf.coreData.Hasher(),
-		Marshalizer:         pcf.coreData.InternalMarshalizer(),
-		AccountsDB:          pcf.state.AccountsAdapter(),
-		BlockChainHook:      vmFactory.BlockChainHookImpl(),
-		BuiltInFunctions:    builtInFuncFactory.BuiltInFunctionContainer(),
-		PubkeyConv:          pcf.coreData.AddressPubKeyConverter(),
-		ShardCoordinator:    pcf.bootstrapComponents.ShardCoordinator(),
-		ScrForwarder:        scForwarder,
-		TxFeeHandler:        txFeeHandler,
-		EconomicsFee:        pcf.coreData.EconomicsData(),
-		TxTypeHandler:       txTypeHandler,
-		GasHandler:          gasHandler,
-		GasSchedule:         pcf.gasSchedule,
-		TxLogsProcessor:     pcf.txLogsProcessor,
-		IsGenesisProcessing: false,
-		BadTxForwarder:      badTxForwarder,
-		EnableRoundsHandler: pcf.coreData.EnableRoundsHandler(),
-		EnableEpochsHandler: pcf.coreData.EnableEpochsHandler(),
-		VMOutputCacher:      txcache.NewDisabledCache(),
-		WasmVMChangeLocker:  wasmVMChangeLocker,
+		DRWAAccountDeletionGuard: nativeDRWAAccountDeletionGuard(vmFactory),
+		VmContainer:              vmContainer,
+		ArgsParser:               argsParser,
+		Hasher:                   pcf.coreData.Hasher(),
+		Marshalizer:              pcf.coreData.InternalMarshalizer(),
+		AccountsDB:               pcf.state.AccountsAdapter(),
+		BlockChainHook:           vmFactory.BlockChainHookImpl(),
+		BuiltInFunctions:         builtInFuncFactory.BuiltInFunctionContainer(),
+		PubkeyConv:               pcf.coreData.AddressPubKeyConverter(),
+		ShardCoordinator:         pcf.bootstrapComponents.ShardCoordinator(),
+		ScrForwarder:             scForwarder,
+		TxFeeHandler:             txFeeHandler,
+		EconomicsFee:             pcf.coreData.EconomicsData(),
+		TxTypeHandler:            txTypeHandler,
+		GasHandler:               gasHandler,
+		GasSchedule:              pcf.gasSchedule,
+		TxLogsProcessor:          pcf.txLogsProcessor,
+		IsGenesisProcessing:      false,
+		BadTxForwarder:           badTxForwarder,
+		EnableRoundsHandler:      pcf.coreData.EnableRoundsHandler(),
+		EnableEpochsHandler:      pcf.coreData.EnableEpochsHandler(),
+		VMOutputCacher:           txcache.NewDisabledCache(),
+		WasmVMChangeLocker:       wasmVMChangeLocker,
 	}
 
 	scProcessorProxy, err := processProxy.NewSmartContractProcessorProxy(argsNewScProcessor, pcf.epochNotifier)
@@ -1443,6 +1446,10 @@ func (pcf *processComponentsFactory) createVMFactoryShard(
 	globalSettingsHandler vmcommon.ESDTGlobalSettingsHandler,
 	epochStartTriggerHandler process.EpochStartTriggerHandler,
 ) (process.VirtualMachinesContainerFactory, error) {
+	headerTimeEnabledAt, err := pcf.drwaHeaderTimeEnabledAt()
+	if err != nil {
+		return nil, err
+	}
 	counter, err := counters.NewUsageCounter(esdtTransferParser, pcf.coreData.EnableEpochsHandler())
 	if err != nil {
 		return nil, err
@@ -1455,6 +1462,8 @@ func (pcf *processComponentsFactory) createVMFactoryShard(
 		BlockChain:               pcf.data.Blockchain(),
 		ShardCoordinator:         pcf.bootstrapComponents.ShardCoordinator(),
 		Marshalizer:              pcf.coreData.InternalMarshalizer(),
+		Hasher:                   pcf.coreData.Hasher(),
+		DRWAHeaderTimeEnabledAt:  headerTimeEnabledAt,
 		Uint64Converter:          pcf.coreData.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncs,
 		DataPool:                 pcf.data.Datapool(),
@@ -1495,6 +1504,22 @@ func (pcf *processComponentsFactory) createVMFactoryShard(
 	return shard.NewVMContainerFactory(argsNewVMFactory)
 }
 
+// drwaHeaderTimeEnabledAt obtains both activation and E05 checks from the
+// sole overlay-backed candidate. It cannot admit token effects by itself.
+func (pcf *processComponentsFactory) drwaHeaderTimeEnabledAt() (func(uint32, uint64) bool, error) {
+	candidate := pcf.drwaConfigurationCandidate
+	if candidate == nil {
+		return nil, nil
+	}
+	if check.IfNil(pcf.coreData.EnableEpochsHandler()) {
+		return nil, process.ErrNilEnableEpochsHandler
+	}
+	if check.IfNil(pcf.coreData.EnableRoundsHandler()) {
+		return nil, process.ErrNilEnableRoundsHandler
+	}
+	return func(epoch uint32, round uint64) bool { return candidate.CheckEnforcedBlock(epoch, round) == nil }, nil
+}
+
 func (pcf *processComponentsFactory) createVMFactoryMeta(
 	accounts state.AccountsAdapter,
 	peerAccounts state.AccountsAdapter,
@@ -1511,6 +1536,7 @@ func (pcf *processComponentsFactory) createVMFactoryMeta(
 		BlockChain:               pcf.data.Blockchain(),
 		ShardCoordinator:         pcf.bootstrapComponents.ShardCoordinator(),
 		Marshalizer:              pcf.coreData.InternalMarshalizer(),
+		Hasher:                   pcf.coreData.Hasher(),
 		Uint64Converter:          pcf.coreData.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncs,
 		DataPool:                 pcf.data.Datapool(),
@@ -1595,4 +1621,13 @@ func (pcf *processComponentsFactory) createBuiltInFunctionContainer(
 	}
 
 	return builtInFunctions.CreateBuiltInFunctionsFactory(argsBuiltIn)
+}
+
+func nativeDRWAAccountDeletionGuard(factory process.VirtualMachinesContainerFactory) vm.DRWAAccountDeletionGuard {
+	if source, ok := factory.(interface {
+		DRWAAccountDeletionGuard() vm.DRWAAccountDeletionGuard
+	}); ok {
+		return source.DRWAAccountDeletionGuard()
+	}
+	return nil
 }

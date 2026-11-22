@@ -1,7 +1,7 @@
 source "$MULTIVERSXTESTNETSCRIPTSDIR/include/terminal.sh"
 
 startObservers() {
-  setTerminalSession "multiversx-nodes"
+  setTerminalSession "multiversx-nodes" || return
   setTerminalLayout "tiled"
   setWorkdirForNextCommands "$TESTNETDIR/node"
   iterateOverObservers startSingleObserver
@@ -28,7 +28,7 @@ iterateOverObservers() {
   for SHARD in $(seq 0 1 $max_shard_id); do
     for _ in $(seq $SHARD_OBSERVERCOUNT); do
       if [ $OBSERVER_INDEX -ne $SKIP_OBSERVER_IDX ]; then
-        $callback $SHARD $OBSERVER_INDEX
+        $callback $SHARD $OBSERVER_INDEX || return
         sleep 0.2
       fi
       (( OBSERVER_INDEX++ ))
@@ -39,7 +39,7 @@ iterateOverObservers() {
   local SHARD="metachain"
   for META_OBSERVER in $(seq $META_OBSERVERCOUNT); do
     if [ $OBSERVER_INDEX -ne $SKIP_OBSERVER_IDX ]; then
-      $callback $SHARD $OBSERVER_INDEX
+      $callback $SHARD $OBSERVER_INDEX || return
       sleep 0.2
     fi
     (( OBSERVER_INDEX++ ))
@@ -49,7 +49,8 @@ iterateOverObservers() {
 startSingleObserver() {
   local SHARD=$1
   local OBSERVER_INDEX=$2
-  local startCommand="$(assembleCommand_startObserverNode $SHARD $OBSERVER_INDEX)"
+  local startCommand
+  startCommand="$(assembleCommand_startObserverNode $SHARD $OBSERVER_INDEX)" || return
   runCommandInTerminal "$startCommand"
 }
 
@@ -90,16 +91,25 @@ assembleCommand_startObserverNode() {
         KEYS_FLAGS="-all-validator-keys-pem-file $TMP_MISSING_PEM -validator-key-pem-file $TMP_MISSING_PEM"
   fi
 
+  local quoted_working_dir rest_host="localhost"
+  printf -v quoted_working_dir '%q' "$WORKING_DIR"
+  if [[ ${NATIVE_CONFIG_PREFLIGHT:-0} -eq 1 ]]; then
+    rest_host="127.0.0.1"
+  fi
+  local drwaConfigArgs="-config ./config/config_observer.toml"
+  if [[ -n ${NATIVE_DRWA_STARTUP_RECORD:-} || -n ${NATIVE_DRWA_OVERLAY:-} ]]; then
+    drwaConfigArgs=$(assembleNativeDRWAStartupConfigArgs observer) || return
+  fi
   local nodeCommand="./node \
-        -port $PORT --profile-mode -log-save -log-level $LOGLEVEL --log-logger-name --log-correlation --use-health-service -rest-api-interface localhost:$RESTAPIPORT \
+        -port $PORT --profile-mode -log-save -log-level $LOGLEVEL --log-logger-name --log-correlation --use-health-service -rest-api-interface $rest_host:$RESTAPIPORT \
         -destination-shard-as-observer $SHARD \
         $KEYS_FLAGS \
-        -working-directory $WORKING_DIR -config ./config/config_observer.toml $EXTRA_OBSERVERS_FLAGS"
+        -working-directory $quoted_working_dir $drwaConfigArgs $EXTRA_OBSERVERS_FLAGS"
 
   if [ -n "$NODE_NICENESS" ]
   then
     nodeCommand="nice -n $NODE_NICENESS $nodeCommand"
   fi
 
-  echo $nodeCommand
+  printf '%s\n' "$nodeCommand"
 }
