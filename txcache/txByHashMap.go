@@ -1,9 +1,42 @@
 package txcache
 
 import (
+	"unsafe"
+
 	"github.com/multiversx/mx-chain-core-go/core/atomic"
 	"github.com/multiversx/mx-chain-go/txcache/maps"
 )
+
+// ForEachTransactionWithValidationReceipt is an iterator over paired cache entries.
+type ForEachTransactionWithValidationReceipt func(txHash []byte, tx *WrappedTransaction, receipt interface{})
+
+// transactionWithValidationReceipt lives and is removed with its native cache entry.
+type transactionWithValidationReceipt struct {
+	tx      *WrappedTransaction
+	receipt interface{}
+}
+
+// ValidationReceiptEntrySize is the extra cache-value size for a retained receipt.
+const ValidationReceiptEntrySize = int64(unsafe.Sizeof(transactionWithValidationReceipt{}))
+
+func cachedTransactionValue(tx *WrappedTransaction, receipt interface{}) interface{} {
+	if receipt == nil {
+		return tx
+	}
+
+	return &transactionWithValidationReceipt{tx: tx, receipt: receipt}
+}
+
+func unwrapCachedTransaction(value interface{}) (*WrappedTransaction, interface{}, bool) {
+	switch item := value.(type) {
+	case *WrappedTransaction:
+		return item, nil, true
+	case *transactionWithValidationReceipt:
+		return item.tx, item.receipt, true
+	default:
+		return nil, nil, false
+	}
+}
 
 // txByHashMap is a new map-like structure for holding and accessing transactions by txHash
 type txByHashMap struct {
@@ -23,7 +56,11 @@ func newTxByHashMap(nChunksHint uint32) *txByHashMap {
 
 // addTx adds a transaction to the map
 func (txMap *txByHashMap) addTx(tx *WrappedTransaction) bool {
-	added := txMap.backingMap.SetIfAbsent(string(tx.TxHash), tx)
+	return txMap.addTxWithValidationReceipt(tx, nil)
+}
+
+func (txMap *txByHashMap) addTxWithValidationReceipt(tx *WrappedTransaction, receipt interface{}) bool {
+	added := txMap.backingMap.SetIfAbsent(string(tx.TxHash), cachedTransactionValue(tx, receipt))
 	if added {
 		txMap.counter.Increment()
 		txMap.numBytes.Add(tx.Size)
@@ -39,15 +76,13 @@ func (txMap *txByHashMap) removeTx(txHash string) (*WrappedTransaction, bool) {
 		return nil, false
 	}
 
-	tx, ok := item.(*WrappedTransaction)
+	tx, _, ok := unwrapCachedTransaction(item)
 	if !ok {
 		return nil, false
 	}
 
-	if removed {
-		txMap.counter.Decrement()
-		txMap.numBytes.Subtract(tx.Size)
-	}
+	txMap.counter.Decrement()
+	txMap.numBytes.Subtract(tx.Size)
 
 	return tx, true
 }
@@ -59,25 +94,27 @@ func (txMap *txByHashMap) hasTx(txHash string) bool {
 
 // getTx gets a transaction from the map
 func (txMap *txByHashMap) getTx(txHash string) (*WrappedTransaction, bool) {
-	txUntyped, ok := txMap.backingMap.Get(txHash)
+	tx, _, ok := txMap.getTxWithValidationReceipt(txHash)
+	return tx, ok
+}
+
+func (txMap *txByHashMap) getTxWithValidationReceipt(txHash string) (*WrappedTransaction, interface{}, bool) {
+	item, ok := txMap.backingMap.Get(txHash)
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 
-	tx := txUntyped.(*WrappedTransaction)
-	return tx, true
+	return unwrapCachedTransaction(item)
 }
 
 // GetTxsBulk gets a bulk of transactions from map
 func (txMap *txByHashMap) GetTxsBulk(txHashes [][]byte) []*WrappedTransaction {
 	txs := make([]*WrappedTransaction, 0, len(txHashes))
 	for _, txHash := range txHashes {
-		txUntyped, ok := txMap.backingMap.Get(string(txHash))
+		tx, ok := txMap.getTx(string(txHash))
 		if !ok {
 			continue
 		}
-
-		tx := txUntyped.(*WrappedTransaction)
 
 		txs = append(txs, tx)
 	}
@@ -101,9 +138,17 @@ func (txMap *txByHashMap) RemoveTxsBulk(txHashes [][]byte) uint32 {
 
 // forEach iterates over the senders
 func (txMap *txByHashMap) forEach(function ForEachTransaction) {
+	txMap.forEachWithValidationReceipt(func(key []byte, tx *WrappedTransaction, _ interface{}) {
+		function(key, tx)
+	})
+}
+
+func (txMap *txByHashMap) forEachWithValidationReceipt(function ForEachTransactionWithValidationReceipt) {
 	txMap.backingMap.IterCb(func(key string, item interface{}) {
-		tx := item.(*WrappedTransaction)
-		function([]byte(key), tx)
+		tx, receipt, ok := unwrapCachedTransaction(item)
+		if ok {
+			function([]byte(key), tx, receipt)
+		}
 	})
 }
 

@@ -326,7 +326,7 @@ func (r *registrationCandidate) WithTokenClassification(accounts state.AccountsA
 		return nil, errInvalidMetaContext
 	}
 	if !r.view.parent.mut.TryRLock() {
-		return nil, ErrExecutionBusy
+		return nil, vm.NewDRWAClassificationUnavailable(ErrExecutionBusy)
 	}
 	defer r.view.parent.mut.RUnlock()
 	regulated, err := r.view.classifyLocked(r.view.after.candidateHash, tokenID)

@@ -676,6 +676,132 @@ func TestPendingFinalRecords_OrdinaryPath(t *testing.T) {
 		qualAssertContainmentBalance(t, direct.s.qualNativeStore, 120)
 		qualAssertContainmentBalance(t, wrapped.s.qualNativeStore, 120)
 	})
+
+	t.Run("ordinary committed state carries into a fresh batch", func(t *testing.T) {
+		direct := newPendingFinalTestFixture(t, 0)
+		wrapped := newPendingFinalTestFixture(t, 0)
+		first := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("first batch")}}
+		second := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("second batch")}}
+
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 120))
+		directRoot, err := direct.s.Commit()
+		require.NoError(t, err)
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return first, qualContainmentBalance(wrapped.s.qualNativeStore, 120)
+		}))
+		roots, outputs, err := wrapped.owner.Commit()
+		require.NoError(t, err)
+		require.Equal(t, [][]byte{directRoot}, roots)
+		require.Equal(t, []*vmcommon.VMOutput{first}, outputs)
+
+		wrapped.reopen(t)
+		qualAssertContainmentBalance(t, direct.s.qualNativeStore, 120)
+		qualAssertContainmentBalance(t, wrapped.s.qualNativeStore, 120)
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 135))
+		directRoot, err = direct.s.Commit()
+		require.NoError(t, err)
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return second, qualContainmentBalance(wrapped.s.qualNativeStore, 135)
+		}))
+		roots, outputs, err = wrapped.owner.Commit()
+		require.NoError(t, err)
+		require.Equal(t, [][]byte{directRoot}, roots)
+		require.Equal(t, []*vmcommon.VMOutput{second}, outputs)
+		qualAssertContainmentBalance(t, direct.s.qualNativeStore, 135)
+		qualAssertContainmentBalance(t, wrapped.s.qualNativeStore, 135)
+	})
+
+	t.Run("ordinary replacement discards abandoned state and output", func(t *testing.T) {
+		direct := newPendingFinalTestFixture(t, 0)
+		wrapped := newPendingFinalTestFixture(t, 0)
+		discarded := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("abandoned batch")}}
+		accepted := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("replacement batch")}}
+		before, err := direct.s.RootHash()
+		require.NoError(t, err)
+		wrappedBefore, err := wrapped.s.RootHash()
+		require.NoError(t, err)
+		require.Equal(t, before, wrappedBefore)
+
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 140))
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return discarded, qualContainmentBalance(wrapped.s.qualNativeStore, 140)
+		}))
+		require.NoError(t, direct.s.RecreateTrie(holders.NewDefaultRootHashesHolder(before)))
+		require.NoError(t, wrapped.owner.Abort())
+		for _, f := range []*pendingFinalTestFixture{direct, wrapped} {
+			root, err := f.s.RootHash()
+			require.NoError(t, err)
+			require.Equal(t, before, root)
+			qualAssertContainmentBalance(t, f.s.qualNativeStore, 100)
+		}
+
+		wrapped.reopen(t)
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 125))
+		directRoot, err := direct.s.Commit()
+		require.NoError(t, err)
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return accepted, qualContainmentBalance(wrapped.s.qualNativeStore, 125)
+		}))
+		roots, outputs, err := wrapped.owner.Commit()
+		require.NoError(t, err)
+		require.Equal(t, [][]byte{directRoot}, roots)
+		require.Equal(t, []*vmcommon.VMOutput{accepted}, outputs)
+		qualAssertContainmentBalance(t, direct.s.qualNativeStore, 125)
+		qualAssertContainmentBalance(t, wrapped.s.qualNativeStore, 125)
+	})
+
+	t.Run("ordinary operation sequence preserves committed state and output order", func(t *testing.T) {
+		direct := newPendingFinalTestFixture(t, 0)
+		wrapped := newPendingFinalTestFixture(t, 0)
+		first := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("first native result")}}
+		second := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("second native result")}}
+
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 120))
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 130))
+		directRoot, err := direct.s.Commit()
+		require.NoError(t, err)
+
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return first, qualContainmentBalance(wrapped.s.qualNativeStore, 120)
+		}))
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return second, qualContainmentBalance(wrapped.s.qualNativeStore, 130)
+		}))
+		roots, outputs, err := wrapped.owner.Commit()
+		require.NoError(t, err)
+		require.Equal(t, [][]byte{directRoot}, roots)
+		require.Equal(t, []*vmcommon.VMOutput{first, second}, outputs)
+		qualAssertContainmentBalance(t, direct.s.qualNativeStore, 130)
+		qualAssertContainmentBalance(t, wrapped.s.qualNativeStore, 130)
+	})
+
+	t.Run("ordinary operation error preserves prior native state and output", func(t *testing.T) {
+		direct := newPendingFinalTestFixture(t, 0)
+		wrapped := newPendingFinalTestFixture(t, 0)
+		observation := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, ReturnData: [][]byte{[]byte("native result")}}
+		nativeErr := errors.New("ordinary operation error before write")
+		ordinaryError := func() (*vmcommon.VMOutput, error) {
+			return nil, nativeErr
+		}
+
+		require.NoError(t, qualContainmentBalance(direct.s.qualNativeStore, 120))
+		output, err := ordinaryError()
+		require.ErrorIs(t, err, nativeErr)
+		require.Nil(t, output)
+		directRoot, err := direct.s.Commit()
+		require.NoError(t, err)
+
+		require.NoError(t, wrapped.owner.Execute(func() (*vmcommon.VMOutput, error) {
+			return observation, qualContainmentBalance(wrapped.s.qualNativeStore, 120)
+		}))
+		require.ErrorIs(t, wrapped.owner.Execute(ordinaryError), nativeErr)
+		roots, outputs, err := wrapped.owner.Commit()
+		require.NoError(t, err)
+		require.Equal(t, [][]byte{directRoot}, roots)
+		require.Equal(t, []*vmcommon.VMOutput{observation}, outputs)
+		qualAssertContainmentBalance(t, direct.s.qualNativeStore, 120)
+		qualAssertContainmentBalance(t, wrapped.s.qualNativeStore, 120)
+	})
 }
 
 func TestPendingFinalRecords_CodecBoundaries(t *testing.T) {

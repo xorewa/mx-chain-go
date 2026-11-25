@@ -66,7 +66,7 @@ func TestQualPartialsG25FactoryDependencies(t *testing.T) {
 			nft, global := &testscommon.SimpleNFTStorageHandlerStub{}, &testscommon.ESDTGlobalSettingsHandlerStub{}
 			makeFactory := func(user, peer state.AccountsAdapter) (process.VirtualMachinesContainerFactory, error) {
 				if chain == "meta" {
-					return pcf.createVMFactoryMeta(user, peer, builtins, pcf.config.SmartContractsStorage, nft, global, &testscommon.EpochStartTriggerStub{})
+					return pcf.createVMFactoryMeta(user, peer, builtins, pcf.config.SmartContractsStorage, nft, global, &testscommon.EpochStartTriggerStub{}, nil)
 				}
 				return pcf.createVMFactoryShard(user, &testscommon.MissingTrieNodesNotifierStub{}, builtins, &testscommon.ESDTTransferParserStub{}, &sync.RWMutex{}, pcf.config.SmartContractsStorage, nft, global, &testscommon.EpochStartTriggerStub{})
 			}

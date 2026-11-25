@@ -42,3 +42,36 @@ func TestQualDRWAA19SyncDeniesReadinessWithUnavailableProtectedInput(t *testing.
 		}
 	}
 }
+
+func TestQualLaneDProtectedChildSyncReadiness(t *testing.T) {
+	root := common.EmptyTrieHash
+	run := func(provider state.ProtectedChildResolver) (bool, error) {
+		t.Helper()
+		args := getDefaultUserAccountsSyncerArgs()
+		args.ProtectedChildren = provider
+		accountsSyncer, err := syncer.NewUserAccountsSyncer(args)
+		require.NoError(t, err)
+		marker := &qualA19ReadinessMarker{}
+		err = accountsSyncer.SyncAccounts(root, marker)
+		return marker.marked, err
+	}
+
+	marked, err := run(nil)
+	require.NoError(t, err)
+	require.True(t, marked)
+
+	unavailable := errors.New("fixture checkpoint unavailable")
+	marked, err = run(func(checkpoint common.RootHashHolder) ([]state.ProtectedChildReference, error) {
+		require.Equal(t, root, checkpoint.GetRootHash())
+		require.False(t, checkpoint.GetEpoch().HasValue)
+		return nil, unavailable
+	})
+	require.ErrorIs(t, err, unavailable)
+	require.False(t, marked)
+
+	marked, err = run(func(common.RootHashHolder) ([]state.ProtectedChildReference, error) {
+		return []state.ProtectedChildReference{{}}, nil
+	})
+	require.ErrorContains(t, err, "protected child resolver belongs to a different native store")
+	require.False(t, marked)
+}

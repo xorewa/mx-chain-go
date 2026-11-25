@@ -159,6 +159,7 @@ func (pcf *processComponentsFactory) createArgsTxSimulatorProcessorForMeta(
 		builtInFuncFactory.NFTStorageHandler(),
 		builtInFuncFactory.ESDTGlobalSettingsHandler(),
 		epochStartTrigger,
+		nil,
 	)
 	if err != nil {
 		return args, nil, nil, nil, err

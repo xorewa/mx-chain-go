@@ -587,9 +587,9 @@ func (host *vmContext) ExecuteOnDestContext(destination []byte, sender []byte, v
 	if err != nil {
 		return nil, err
 	}
-	return host.ExecuteDRWASystemCall(callInput, func() (*vmcommon.VMOutput, error) {
+	return host.executeDRWASystemCall(callInput, func() (*vmcommon.VMOutput, error) {
 		return host.executeOnDestContext(callInput, sender)
-	})
+	}, false)
 }
 
 func (host *vmContext) executeOnDestContext(callInput *vmcommon.ContractCallInput, sender []byte) (*vmcommon.VMOutput, error) {

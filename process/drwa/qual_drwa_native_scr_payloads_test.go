@@ -50,30 +50,7 @@ func (s *qualSCRPayloadStorage) GetStorer(unit dataRetriever.UnitType) (storage.
 
 func qualReadSCRPayloads(r *ResultAccountReader, source dataRetriever.StorageService, epoch uint32,
 	miniHash, resultHash []byte, limit int) ([]byte, []byte, error) {
-	if reader, ok := interface{}(r).(interface {
-		ReadNativeSCRPayloads(dataRetriever.StorageService, uint32, []byte, []byte, int) ([]byte, []byte, error)
-	}); ok {
-		return reader.ReadNativeSCRPayloads(source, epoch, miniHash, resultHash, limit)
-	}
-	// The pre-adapter native getters return bytes by key; they do not bind the
-	// requested hash to the returned bytes before the canonical observer sees it.
-	mini, err := source.GetStorer(dataRetriever.MiniBlockUnit)
-	if err != nil {
-		return nil, nil, err
-	}
-	results, err := source.GetStorer(dataRetriever.UnsignedTransactionUnit)
-	if err != nil {
-		return nil, nil, err
-	}
-	a, err := mini.GetFromEpoch(miniHash, epoch)
-	if err != nil {
-		return nil, nil, err
-	}
-	z, err := results.GetFromEpoch(resultHash, epoch)
-	if err != nil {
-		return nil, nil, err
-	}
-	return a, z, nil
+	return r.ReadNativeSCRPayloads(source, epoch, miniHash, resultHash, limit)
 }
 
 func TestQualDRWANativeSCRPayloadSource(t *testing.T) {

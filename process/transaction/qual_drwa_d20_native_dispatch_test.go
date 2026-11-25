@@ -3,6 +3,8 @@ package transaction
 import (
 	"bytes"
 	"errors"
+	"testing"
+
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/data"
 	native "github.com/multiversx/mx-chain-core-go/data/transaction"
@@ -11,7 +13,6 @@ import (
 	"github.com/multiversx/mx-chain-go/vm"
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // This fixture always refuses the native source; it never supplies a lease,
@@ -117,4 +118,46 @@ func TestQualD20MetaOrdinaryDispatchPreservation(t *testing.T) {
 			require.Equal(t, n, m)
 		})
 	}
+}
+
+// Qualification-only exact native function comparator; official mx-chain-go
+// 06c383cf316ab391d60695a4eeb7c085fb40232b, process/transaction/interceptedTransaction.go.
+// Actual source snapshot/hash and function-scoped limitations are in TASK_RECORD.
+func QualD18UntouchedNativeCheckValidity(inTx *InterceptedTransaction) error {
+	err := inTx.integrity(inTx.tx)
+	if err != nil {
+		return err
+	}
+
+	whiteListedVerified := inTx.whiteListerVerifiedTxs.IsWhiteListed(inTx)
+	if !whiteListedVerified {
+		err = inTx.verifySig(inTx.tx)
+		if err != nil {
+			return err
+		}
+
+		err = inTx.VerifyGuardianSig(inTx.tx)
+		if err != nil {
+			return err
+		}
+
+		err = inTx.verifyIfRelayedTxV3(inTx.tx)
+		if err != nil {
+			return err
+		}
+
+		err = inTx.verifyIfRelayedTx(inTx.tx)
+		if err != nil {
+			return err
+		}
+
+		err = inTx.verifyIfRelayedTxV2(inTx.tx)
+		if err != nil {
+			return err
+		}
+
+		inTx.whiteListerVerifiedTxs.Add([][]byte{inTx.Hash()})
+	}
+
+	return nil
 }

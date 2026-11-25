@@ -2466,9 +2466,9 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
+      "source_sha256": "726fc311b0ba66ad5e1fc8f2c5ba534e96f2aee48a1d271d7b19dfe1537d94dd",
       "function": "SendGlobalSettingToAll",
       "receiver": "*vmContext",
       "start": 243,
@@ -2536,9 +2536,9 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
+      "source_sha256": "726fc311b0ba66ad5e1fc8f2c5ba534e96f2aee48a1d271d7b19dfe1537d94dd",
       "function": "Transfer",
       "receiver": "*vmContext",
       "start": 306,
@@ -2578,9 +2578,9 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
+      "source_sha256": "726fc311b0ba66ad5e1fc8f2c5ba534e96f2aee48a1d271d7b19dfe1537d94dd",
       "function": "createContractCallInput",
       "receiver": "*vmContext",
       "start": 465,
@@ -2604,9 +2604,9 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
+      "source_sha256": "726fc311b0ba66ad5e1fc8f2c5ba534e96f2aee48a1d271d7b19dfe1537d94dd",
       "function": "transferBeforeInternalExec",
       "receiver": "*vmContext",
       "start": 498,
@@ -2646,14 +2646,14 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4ee8960916d5a8d2b89223adb9c72e1c016e0859",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "vm/systemSmartContracts/eei.go",
-      "source_sha256": "ec708ee99edb608bcdac29961ee9615faae88eb437a41f9e36ffafc44bf2e2c8",
+      "source_sha256": "726fc311b0ba66ad5e1fc8f2c5ba534e96f2aee48a1d271d7b19dfe1537d94dd",
       "function": "ExecuteOnDestContext",
       "receiver": "*vmContext",
       "start": 581,
       "end": 593,
-      "body_sha256": "1139bc3c6a0b15f67a5c7762cfbdb8cceff2557bab3f73ce19dbeb48c2fbb033",
+      "body_sha256": "34b715c4495f27af7dc81235e447b38183795d82b55c0fbabbc1ea23c998b825",
       "calls": [
         {
           "line": 582,
@@ -2665,7 +2665,7 @@
         },
         {
           "line": 590,
-          "expression": "host.ExecuteDRWASystemCall"
+          "expression": "host.executeDRWASystemCall"
         },
         {
           "line": 591,
@@ -6834,9 +6834,9 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtNFTTransfer.go",
-      "source_sha256": "17ae4d9f2e99eac699ba38c3ded38d0fd34e60ac0e43d95406517087510bdf1b",
+      "source_sha256": "c5520627442cc54cc84a9775790d0c932200c41fc03dc9a4d363782dc397e71e",
       "function": "ProcessBuiltinFunction",
       "receiver": "*esdtNFTTransfer",
       "start": 116,
@@ -6844,8 +6844,8 @@
       "body_sha256": "a5275621350657972d267dafe6496964accf4207ff16b8ecfedc56e2e91ebc09",
       "calls": [
         {
-          "expression": "e.processBuiltinFunction",
-          "line": 120
+          "line": 120,
+          "expression": "e.processBuiltinFunction"
         }
       ]
     },
@@ -7356,18 +7356,18 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/multiESDTNFTTransfer.go",
-      "source_sha256": "e8edd96afad656ed29a470232877b5a7e23c089fe8332d23a5562cc38ee54d69",
+      "source_sha256": "148c03f098182218e0b3c5ef1ea02438bd7d9d5dd45178966d5521021b61339c",
       "function": "ProcessBuiltinFunction",
       "receiver": "*esdtNFTMultiTransfer",
       "start": 121,
       "end": 126,
-      "body_sha256": "51a6b75cb46d222baa34c4e9a188b05084c9a741a53a043d9daa4cb61892687d",
+      "body_sha256": "0bb60b4454033c1b1831ad22313e946ad3af9d3237b610403131c2e0c2074108",
       "calls": [
         {
-          "expression": "e.processBuiltinFunction",
-          "line": 125
+          "line": 125,
+          "expression": "e.processBuiltinFunction"
         }
       ]
     },
@@ -7822,130 +7822,78 @@
       ]
     },
     {
-      "body_sha256": "08781626fd04bf093d9e83250cfcf4eb4c320b4daa0cc07e21be2fa17be7daca",
+      "body_sha256": "d2e93221c2a431209b474b36d1b663ca4dc862cf8aeaf2c66bf8905c155be0d8",
       "calls": [
         {
-          "line": 27,
-          "expression": "bytes.Equal"
-        },
-        {
-          "line": 28,
-          "expression": "host.executeDRWAESDTCall"
-        },
-        {
-          "line": 30,
-          "expression": "host.executeWithDRWAErrorCheck"
+          "line": 24,
+          "expression": "host.executeDRWASystemCall"
         }
       ],
-      "end": 31,
+      "end": 25,
       "function": "ExecuteDRWASystemCall",
       "receiver": "*vmContext",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "8d71179620b266b71e88d103e706019c4e5b8c09d3513994a2b82ef20a244aac",
+      "source_sha256": "46f48c11d496cd975e3d1c6341d2edd20d6d44259cb23135bf176e54f921d458",
       "start": 22,
-      "repo_revision": "d9d4d9e966701f52441aa927a5c2e8259b573010"
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745"
     },
     {
       "body_sha256": "b63c68d873fc9fee813b8b2646d62e595ccb40e2471ea3297494debd31733b48",
       "calls": [
         {
-          "line": 35,
+          "line": 40,
           "expression": "execute"
-        },
-        {
-          "line": 37,
-          "expression": "host.mutDRWAClassifier.RLock"
-        },
-        {
-          "line": 38,
-          "expression": "host.mutDRWAClassifier.RUnlock"
-        },
-        {
-          "line": 39,
-          "expression": "host.drwaExecutionAvailabilityError"
         },
         {
           "line": 42,
+          "expression": "host.mutDRWAClassifier.RLock"
+        },
+        {
+          "line": 43,
+          "expression": "host.mutDRWAClassifier.RUnlock"
+        },
+        {
+          "line": 44,
+          "expression": "host.drwaExecutionAvailabilityError"
+        },
+        {
+          "line": 47,
           "expression": "execute"
         },
         {
-          "line": 45,
+          "line": 50,
           "expression": "host.drwaExecutionAvailabilityError"
         }
       ],
-      "end": 49,
+      "end": 54,
       "function": "executeWithDRWAErrorCheck",
       "receiver": "*vmContext",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "8d71179620b266b71e88d103e706019c4e5b8c09d3513994a2b82ef20a244aac",
-      "start": 33,
-      "repo_revision": "d9d4d9e966701f52441aa927a5c2e8259b573010"
+      "source_sha256": "46f48c11d496cd975e3d1c6341d2edd20d6d44259cb23135bf176e54f921d458",
+      "start": 38,
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745"
     },
     {
-      "body_sha256": "676b36812d769bbb631198d368ed640b91ea3b09439ca9970cd167c7aa165b82",
+      "body_sha256": "9850db9db5c7786747acb814e964d07ba586dc58743d324cf473566c3789810f",
       "calls": [
         {
-          "line": 53,
-          "expression": "host.executeWithDRWAErrorCheck"
-        },
-        {
-          "line": 57,
-          "expression": "bytes.Equal"
-        },
-        {
           "line": 58,
-          "expression": "input.CallValue.Sign"
-        },
-        {
-          "line": 58,
-          "expression": "len"
-        },
-        {
-          "line": 59,
-          "expression": "big.NewInt"
-        },
-        {
-          "line": 62,
-          "expression": "len"
-        },
-        {
-          "line": 62,
-          "expression": "drwaPublicTokenMutation"
-        },
-        {
-          "line": 63,
-          "expression": "execute"
-        },
-        {
-          "line": 66,
-          "expression": "host.drwaClassifier.WithTokenClassification"
-        },
-        {
-          "line": 70,
-          "expression": "big.NewInt"
-        },
-        {
-          "line": 73,
-          "expression": "execute"
-        },
-        {
-          "line": 79,
-          "expression": "host.retainDRWAExecutionError"
+          "expression": "host.executeDRWAESDTCallAtEntry"
         }
       ],
-      "end": 83,
+      "end": 59,
       "function": "executeDRWAESDTCall",
       "receiver": "*vmContext",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "vm/systemSmartContracts/drwaPublicCall.go",
-      "source_sha256": "8d71179620b266b71e88d103e706019c4e5b8c09d3513994a2b82ef20a244aac",
-      "start": 51,
-      "repo_revision": "d9d4d9e966701f52441aa927a5c2e8259b573010"
+      "source_sha256": "46f48c11d496cd975e3d1c6341d2edd20d6d44259cb23135bf176e54f921d458",
+      "start": 56,
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745"
     },
     {
       "root": "node",
@@ -8298,1420 +8246,1326 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtNFTTransfer.go",
-      "source_sha256": "17ae4d9f2e99eac699ba38c3ded38d0fd34e60ac0e43d95406517087510bdf1b",
+      "source_sha256": "c5520627442cc54cc84a9775790d0c932200c41fc03dc9a4d363782dc397e71e",
       "function": "processBuiltinFunction",
       "receiver": "*esdtNFTTransfer",
       "start": 123,
       "end": 242,
-      "body_sha256": "5f2f16b33235df6d6f6fd09c1d7a85e6f8dc45e6fb1f2ef784fee0c64497994e",
+      "body_sha256": "3494628ca0a0e2b58142d8003b57c6ee2c62e3b13954c1e33174d11b252cf4d5",
       "calls": [
         {
-          "expression": "e.mutExecution.RLock",
-          "line": 128
+          "line": 128,
+          "expression": "e.mutExecution.RLock"
         },
         {
-          "expression": "e.mutExecution.RUnlock",
-          "line": 129
+          "line": 129,
+          "expression": "e.mutExecution.RUnlock"
         },
         {
-          "expression": "checkBasicESDTArguments",
-          "line": 131
+          "line": 131,
+          "expression": "checkBasicESDTArguments"
         },
         {
-          "expression": "len",
-          "line": 135
+          "line": 135,
+          "expression": "len"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 139
+          "line": 139,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "e.processNFTTransferOnSenderShard",
-          "line": 140
+          "line": 140,
+          "expression": "e.processNFTTransferOnSenderShard"
         },
         {
-          "expression": "check.IfNil",
-          "line": 144
+          "line": 144,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "check.IfNil",
-          "line": 147
+          "line": 147,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "vmcommon.IsSystemAccountAddress",
-          "line": 147
+          "line": 147,
+          "expression": "vmcommon.IsSystemAccountAddress"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 152
+          "line": 152,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "vmcommon.ValidateToken",
-          "line": 152
+          "line": 152,
+          "expression": "vmcommon.ValidateToken"
         },
         {
-          "expression": "append",
-          "line": 155
+          "line": 155,
+          "expression": "append"
         },
         {
-          "expression": "big.NewInt(0).SetBytes(vmInput.Arguments[1]).Uint64",
-          "line": 156
+          "line": 156,
+          "expression": "big.NewInt(0).SetBytes(vmInput.Arguments[1]).Uint64"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 156
+          "line": 156,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 156
+          "line": 156,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 157
+          "line": 157,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 157
+          "line": 157,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "big.NewInt",
-          "line": 159
+          "line": 159,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 160
+          "line": 160,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "e.marshaller.Unmarshal",
-          "line": 162
+          "line": 162,
+          "expression": "e.marshaller.Unmarshal"
         },
         {
-          "expression": "big.NewInt(0).Set",
-          "line": 170
+          "line": 170,
+          "expression": "big.NewInt(0).Set"
         },
         {
-          "expression": "big.NewInt",
-          "line": 170
+          "line": 170,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "uint32",
-          "line": 171
+          "line": 171,
+          "expression": "uint32"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 172
+          "line": 172,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "e.esdtStorageHandler.GetMetaDataFromSystemAccount",
-          "line": 173
+          "line": 173,
+          "expression": "loadESDTTransferMetadata"
         },
         {
-          "expression": "admission.check",
-          "line": 183
+          "line": 183,
+          "expression": "admission.check"
         },
         {
-          "expression": "e.payableHandler.CheckPayable",
-          "line": 188
+          "line": 188,
+          "expression": "e.payableHandler.CheckPayable"
         },
         {
-          "expression": "e.addNFTToDestination",
-          "line": 192
+          "line": 192,
+          "expression": "e.addNFTToDestination"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 208
+          "line": 208,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "e.payableHandler.DetermineIsSCCallAfter",
-          "line": 209
+          "line": 209,
+          "expression": "e.payableHandler.DetermineIsSCCallAfter"
         },
         {
-          "expression": "len",
-          "line": 211
+          "line": 211,
+          "expression": "len"
         },
         {
-          "expression": "vmcommon.IsSmartContractAddress",
-          "line": 211
+          "line": 211,
+          "expression": "vmcommon.IsSmartContractAddress"
         },
         {
-          "expression": "len",
-          "line": 215
+          "line": 215,
+          "expression": "len"
         },
         {
-          "expression": "addOutputTransferToVMOutput",
-          "line": 219
+          "line": 219,
+          "expression": "addOutputTransferToVMOutput"
         },
         {
-          "expression": "string",
-          "line": 222
+          "line": 222,
+          "expression": "string"
         },
         {
-          "expression": "addESDTEntryForTransferInVMOutput",
-          "line": 230
+          "line": 230,
+          "expression": "addESDTEntryForTransferInVMOutput"
         },
         {
-          "expression": "[]byte",
-          "line": 232
+          "line": 232,
+          "expression": "[]byte"
         },
         {
-          "expression": "acntDst.AddressBytes",
-          "line": 233
+          "line": 233,
+          "expression": "acntDst.AddressBytes"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtNFTTransfer.go",
-      "source_sha256": "17ae4d9f2e99eac699ba38c3ded38d0fd34e60ac0e43d95406517087510bdf1b",
+      "source_sha256": "c5520627442cc54cc84a9775790d0c932200c41fc03dc9a4d363782dc397e71e",
       "function": "processNFTTransferOnSenderShard",
       "receiver": "*esdtNFTTransfer",
       "start": 244,
-      "end": 395,
-      "body_sha256": "6eb0025c77a6a3aece627c2dafd6eb1bd96fda993f3866a426fc46e3cac461d9",
+      "end": 398,
+      "body_sha256": "eddab8982109f5f865905e7fdf30ef70f6896ec6e93234fad37d8df3192dce34",
       "calls": [
         {
-          "expression": "len",
-          "line": 250
+          "line": 250,
+          "expression": "len"
         },
         {
-          "expression": "len",
-          "line": 250
+          "line": 250,
+          "expression": "len"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 251
+          "line": 251,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 253
+          "line": 253,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 254
+          "line": 254,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "e.shardCoordinator.ComputeId",
-          "line": 256
+          "line": 256,
+          "expression": "e.shardCoordinator.ComputeId"
         },
         {
-          "expression": "vmcommon.IsSystemAccountAddress",
-          "line": 257
+          "line": 257,
+          "expression": "vmcommon.IsSystemAccountAddress"
         },
         {
-          "expression": "noGasUseIfReturnCallAfterErrorWithFlag",
-          "line": 260
+          "line": 260,
+          "expression": "noGasUseIfReturnCallAfterErrorWithFlag"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 266
+          "line": 266,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "vmcommon.ValidateToken",
-          "line": 266
+          "line": 266,
+          "expression": "vmcommon.ValidateToken"
         },
         {
-          "expression": "append",
-          "line": 269
+          "line": 269,
+          "expression": "append"
         },
         {
-          "expression": "big.NewInt(0).SetBytes(vmInput.Arguments[1]).Uint64",
-          "line": 270
+          "line": 270,
+          "expression": "big.NewInt(0).SetBytes(vmInput.Arguments[1]).Uint64"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 270
+          "line": 270,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 270
+          "line": 270,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "e.esdtStorageHandler.GetESDTNFTTokenOnSender",
-          "line": 271
+          "line": 271,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 275
+          "line": 274,
+          "expression": "e.esdtStorageHandler.GetESDTNFTTokenOnSender"
         },
         {
-          "expression": "len",
-          "line": 279
+          "line": 278,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 279
+          "line": 282,
+          "expression": "len"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 280
+          "line": 282,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 282
+          "line": 283,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "big.NewInt",
-          "line": 282
+          "line": 285,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "esdtData.Value.Cmp",
-          "line": 283
+          "line": 285,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 287
+          "line": 286,
+          "expression": "esdtData.Value.Cmp"
         },
         {
-          "expression": "quantityToTransfer.Cmp",
-          "line": 288
+          "line": 290,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "admission.check",
-          "line": 292
+          "line": 291,
+          "expression": "quantityToTransfer.Cmp"
         },
         {
-          "expression": "acntSnd.AddressBytes",
-          "line": 293
+          "line": 295,
+          "expression": "admission.check"
         },
         {
-          "expression": "e.shardCoordinator.SelfId",
-          "line": 299
+          "line": 296,
+          "expression": "acntSnd.AddressBytes"
         },
         {
-          "expression": "e.shardCoordinator.ComputeId",
-          "line": 299
+          "line": 302,
+          "expression": "e.shardCoordinator.SelfId"
         },
         {
-          "expression": "e.accounts.LoadAccount",
-          "line": 300
+          "line": 302,
+          "expression": "e.shardCoordinator.ComputeId"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 313
+          "line": 303,
+          "expression": "e.accounts.LoadAccount"
         },
         {
-          "expression": "checkIfTransferCanHappenWithLimitedTransfer",
-          "line": 317
+          "line": 316,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "acntSnd.AddressBytes",
-          "line": 317
+          "line": 320,
+          "expression": "checkIfTransferCanHappenWithLimitedTransfer"
         },
         {
-          "expression": "esdtData.Value.Sub",
-          "line": 322
+          "line": 320,
+          "expression": "acntSnd.AddressBytes"
         },
         {
-          "expression": "e.esdtStorageHandler.SaveESDTNFTToken",
-          "line": 329
+          "line": 325,
+          "expression": "esdtData.Value.Sub"
         },
         {
-          "expression": "acntSnd.AddressBytes",
-          "line": 329
+          "line": 332,
+          "expression": "e.esdtStorageHandler.SaveESDTNFTToken"
         },
         {
-          "expression": "esdtData.Value.Set",
-          "line": 334
+          "line": 332,
+          "expression": "acntSnd.AddressBytes"
         },
         {
-          "expression": "e.payableHandler.CheckPayable",
-          "line": 337
+          "line": 337,
+          "expression": "esdtData.Value.Set"
         },
         {
-          "expression": "e.addNFTToDestination",
-          "line": 341
+          "line": 340,
+          "expression": "e.payableHandler.CheckPayable"
         },
         {
-          "expression": "shouldKeepMetaDataOnZeroLiquidity",
-          "line": 356
+          "line": 344,
+          "expression": "e.addNFTToDestination"
         },
         {
-          "expression": "e.esdtStorageHandler.AddToLiquiditySystemAcc",
-          "line": 361
+          "line": 359,
+          "expression": "shouldKeepMetaDataOnZeroLiquidity"
         },
         {
-          "expression": "big.NewInt(0).Neg",
-          "line": 361
+          "line": 364,
+          "expression": "e.esdtStorageHandler.AddToLiquiditySystemAcc"
         },
         {
-          "expression": "big.NewInt",
-          "line": 361
+          "line": 364,
+          "expression": "big.NewInt(0).Neg"
         },
         {
-          "expression": "computeGasRemainingIfNeeded",
-          "line": 369
+          "line": 364,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "e.createNFTOutputTransfers",
-          "line": 371
+          "line": 372,
+          "expression": "computeGasRemainingIfNeeded"
         },
         {
-          "expression": "addESDTEntryForTransferInVMOutput",
-          "line": 376
+          "line": 374,
+          "expression": "e.createNFTOutputTransfers"
         },
         {
-          "expression": "[]byte",
-          "line": 378
+          "line": 379,
+          "expression": "addESDTEntryForTransferInVMOutput"
         },
         {
-          "expression": "e.accounts.SaveAccount",
-          "line": 388
+          "line": 381,
+          "expression": "[]byte"
+        },
+        {
+          "line": 391,
+          "expression": "e.accounts.SaveAccount"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/multiESDTNFTTransfer.go",
-      "source_sha256": "e8edd96afad656ed29a470232877b5a7e23c089fe8332d23a5562cc38ee54d69",
+      "source_sha256": "148c03f098182218e0b3c5ef1ea02438bd7d9d5dd45178966d5521021b61339c",
       "function": "processBuiltinFunction",
       "receiver": "*esdtNFTMultiTransfer",
-      "start": 128,
-      "end": 273,
-      "body_sha256": "31fa7400f99d33590c8674ceb74afa7291c80219a146661417ca43acbd93ba25",
+      "start": 196,
+      "end": 332,
+      "body_sha256": "6b0fe11a316f754839a0be33da4d21764377c612c455aad80e11a9ae056312b9",
       "calls": [
         {
-          "expression": "e.mutExecution.RLock",
-          "line": 133
+          "line": 202,
+          "expression": "e.mutExecution.RLock"
         },
         {
-          "expression": "e.mutExecution.RUnlock",
-          "line": 134
+          "line": 203,
+          "expression": "e.mutExecution.RUnlock"
         },
         {
-          "expression": "checkBasicESDTArguments",
-          "line": 136
+          "line": 205,
+          "expression": "checkBasicESDTArguments"
         },
         {
-          "expression": "len",
-          "line": 140
+          "line": 209,
+          "expression": "len"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 144
+          "line": 213,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "e.processESDTNFTMultiTransferOnSenderShard",
-          "line": 145
+          "line": 214,
+          "expression": "e.processESDTNFTMultiTransferOnSenderShard"
         },
         {
-          "expression": "check.IfNil",
-          "line": 149
+          "line": 218,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "check.IfNil",
-          "line": 152
+          "line": 221,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "vmcommon.IsSystemAccountAddress",
-          "line": 152
+          "line": 221,
+          "expression": "vmcommon.IsSystemAccountAddress"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 156
+          "line": 225,
+          "expression": "e.multiTransferArguments"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 157
+          "line": 231,
+          "expression": "make"
         },
         {
-          "expression": "big.NewInt",
-          "line": 157
+          "line": 232,
+          "expression": "uint64"
         },
         {
-          "expression": "uint64",
-          "line": 158
+          "line": 236,
+          "expression": "make"
         },
         {
-          "expression": "len",
-          "line": 158
+          "line": 237,
+          "expression": "make"
         },
         {
-          "expression": "numOfTransfersBig.IsUint64",
-          "line": 159
+          "line": 238,
+          "expression": "uint64"
         },
         {
-          "expression": "numOfTransfersBig.Uint64",
-          "line": 159
+          "line": 239,
+          "expression": "e.parseESDTReceiverLeg"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 160
+          "line": 245,
+          "expression": "admission.check"
         },
         {
-          "expression": "big.NewInt(0).SetBytes(vmInput.Arguments[0]).Uint64",
-          "line": 163
+          "line": 245,
+          "expression": "int"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 163
+          "line": 249,
+          "expression": "e.payableHandler.CheckPayable"
         },
         {
-          "expression": "big.NewInt",
-          "line": 163
+          "line": 249,
+          "expression": "int"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 165
+          "line": 254,
+          "expression": "make"
         },
         {
-          "expression": "uint64",
-          "line": 168
+          "line": 255,
+          "expression": "uint64"
         },
         {
-          "expression": "len",
-          "line": 168
+          "line": 257,
+          "expression": "(*preparedESDTReceiverLeg)"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 169
+          "line": 261,
+          "expression": "e.parseESDTReceiverLeg"
         },
         {
-          "expression": "make",
-          "line": 173
+          "line": 267,
+          "expression": "append"
         },
         {
-          "expression": "uint64",
-          "line": 174
+          "line": 269,
+          "expression": "e.addNFTToDestination"
         },
         {
-          "expression": "make",
-          "line": 178
+          "line": 270,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "make",
-          "line": 179
+          "line": 272,
+          "expression": "acntDst.AddToBalance"
         },
         {
-          "expression": "uint64",
-          "line": 180
+          "line": 272,
+          "expression": "new(big.Int).Set"
         },
         {
-          "expression": "e.parseESDTReceiverLeg",
-          "line": 181
+          "line": 272,
+          "expression": "new"
         },
         {
-          "expression": "admission.check",
-          "line": 187
+          "line": 274,
+          "expression": "addToESDTBalance"
         },
         {
-          "expression": "int",
-          "line": 187
+          "line": 277,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "e.payableHandler.CheckPayable",
-          "line": 191
+          "line": 277,
+          "expression": "string"
         },
         {
-          "expression": "int",
-          "line": 191
+          "line": 280,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "make",
-          "line": 196
+          "line": 281,
+          "expression": "append"
         },
         {
-          "expression": "uint64",
-          "line": 197
+          "line": 288,
+          "expression": "addESDTEntryInVMOutput"
         },
         {
-          "expression": "(*preparedESDTReceiverLeg)",
-          "line": 199
+          "line": 289,
+          "expression": "[]byte"
         },
         {
-          "expression": "e.parseESDTReceiverLeg",
-          "line": 203
+          "line": 294,
+          "expression": "acntDst.AddressBytes"
         },
         {
-          "expression": "append",
-          "line": 209
+          "line": 298,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "e.addNFTToDestination",
-          "line": 211
+          "line": 299,
+          "expression": "addESDTEntryForTransferInVMOutput"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 212
+          "line": 301,
+          "expression": "[]byte"
         },
         {
-          "expression": "acntDst.AddToBalance",
-          "line": 213
+          "line": 302,
+          "expression": "acntDst.AddressBytes"
         },
         {
-          "expression": "addToESDTBalance",
-          "line": 215
+          "line": 309,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 218
+          "line": 310,
+          "expression": "e.payableHandler.DetermineIsSCCallAfter"
         },
         {
-          "expression": "string",
-          "line": 218
+          "line": 310,
+          "expression": "int"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 221
+          "line": 312,
+          "expression": "len"
         },
         {
-          "expression": "append",
-          "line": 222
+          "line": 312,
+          "expression": "int"
         },
         {
-          "expression": "addESDTEntryInVMOutput",
-          "line": 229
+          "line": 312,
+          "expression": "vmcommon.IsSmartContractAddress"
         },
         {
-          "expression": "[]byte",
-          "line": 230
+          "line": 316,
+          "expression": "len"
         },
         {
-          "expression": "acntDst.AddressBytes",
-          "line": 235
+          "line": 316,
+          "expression": "int"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 239
+          "line": 320,
+          "expression": "addOutputTransferToVMOutput"
         },
         {
-          "expression": "addESDTEntryForTransferInVMOutput",
-          "line": 240
-        },
-        {
-          "expression": "[]byte",
-          "line": 242
-        },
-        {
-          "expression": "acntDst.AddressBytes",
-          "line": 243
-        },
-        {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 250
-        },
-        {
-          "expression": "e.payableHandler.DetermineIsSCCallAfter",
-          "line": 251
-        },
-        {
-          "expression": "int",
-          "line": 251
-        },
-        {
-          "expression": "len",
-          "line": 253
-        },
-        {
-          "expression": "int",
-          "line": 253
-        },
-        {
-          "expression": "vmcommon.IsSmartContractAddress",
-          "line": 253
-        },
-        {
-          "expression": "len",
-          "line": 257
-        },
-        {
-          "expression": "int",
-          "line": 257
-        },
-        {
-          "expression": "addOutputTransferToVMOutput",
-          "line": 261
-        },
-        {
-          "expression": "string",
-          "line": 264
+          "line": 323,
+          "expression": "string"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/multiESDTNFTTransfer.go",
-      "source_sha256": "e8edd96afad656ed29a470232877b5a7e23c089fe8332d23a5562cc38ee54d69",
+      "source_sha256": "148c03f098182218e0b3c5ef1ea02438bd7d9d5dd45178966d5521021b61339c",
       "function": "processESDTNFTMultiTransferOnSenderShard",
       "receiver": "*esdtNFTMultiTransfer",
-      "start": 275,
-      "end": 434,
-      "body_sha256": "5a7473e178f952aee2f3254b6cd47826755e3248891a52f1a325650c5c135342",
+      "start": 334,
+      "end": 479,
+      "body_sha256": "4edef1317cd9280e8ce7feea64a53ba2979c54c7ed6d59b956a8732cf24c2044",
       "calls": [
         {
-          "expression": "len",
-          "line": 281
+          "line": 341,
+          "expression": "e.checkMultiTransferSenderDestination"
         },
         {
-          "expression": "len",
-          "line": 281
+          "line": 344,
+          "expression": "e.multiTransferArguments"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 282
+          "line": 349,
+          "expression": "noGasUseIfReturnCallAfterErrorWithFlag"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 284
+          "line": 357,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 285
+          "line": 360,
+          "expression": "make"
         },
         {
-          "expression": "e.shardCoordinator.ComputeId",
-          "line": 287
+          "line": 361,
+          "expression": "uint64"
         },
         {
-          "expression": "vmcommon.IsSystemAccountAddress",
-          "line": 288
+          "line": 363,
+          "expression": "e.parseESDTSenderLeg"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 291
+          "line": 364,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 292
+          "line": 369,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "big.NewInt",
-          "line": 292
+          "line": 370,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "uint64",
-          "line": 293
+          "line": 371,
+          "expression": "computeInsufficientQuantityESDTError"
         },
         {
-          "expression": "len",
-          "line": 293
+          "line": 373,
+          "expression": "uint32"
         },
         {
-          "expression": "numOfTransfersBig.IsUint64",
-          "line": 294
+          "line": 379,
+          "expression": "e.esdtStorageHandler.GetESDTNFTTokenOnSender"
         },
         {
-          "expression": "numOfTransfersBig.Uint64",
-          "line": 294
+          "line": 379,
+          "expression": "append"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 295
+          "line": 386,
+          "expression": "admission.check"
         },
         {
-          "expression": "big.NewInt(0).SetBytes(vmInput.Arguments[1]).Uint64",
-          "line": 298
+          "line": 386,
+          "expression": "int"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 298
+          "line": 386,
+          "expression": "acntSnd.AddressBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 298
+          "line": 390,
+          "expression": "e.loadAccountIfInShard"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 300
+          "line": 395,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "uint64",
-          "line": 303
+          "line": 396,
+          "expression": "e.payableHandler.CheckPayable"
         },
         {
-          "expression": "len",
-          "line": 303
+          "line": 396,
+          "expression": "int"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 304
+          "line": 404,
+          "expression": "computeGasRemainingIfNeeded"
         },
         {
-          "expression": "noGasUseIfReturnCallAfterErrorWithFlag",
-          "line": 307
+          "line": 405,
+          "expression": "make"
         },
         {
-          "expression": "make",
-          "line": 315
+          "line": 408,
+          "expression": "uint64"
         },
         {
-          "expression": "uint64",
-          "line": 316
+          "line": 409,
+          "expression": "make"
         },
         {
-          "expression": "e.parseESDTSenderLeg",
-          "line": 318
+          "line": 410,
+          "expression": "make"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 319
+          "line": 415,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 324
+          "line": 416,
+          "expression": "make"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 325
+          "line": 417,
+          "expression": "uint64"
         },
         {
-          "expression": "computeInsufficientQuantityESDTError",
-          "line": 326
+          "line": 420,
+          "expression": "e.parseESDTSenderLeg"
         },
         {
-          "expression": "uint32",
-          "line": 328
+          "line": 426,
+          "expression": "e.transferOneTokenOnSenderShard"
         },
         {
-          "expression": "e.esdtStorageHandler.GetESDTNFTTokenOnSender",
-          "line": 334
+          "line": 432,
+          "expression": "core.IsGetNodeFromDBError"
         },
         {
-          "expression": "append",
-          "line": 334
+          "line": 436,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "admission.check",
-          "line": 341
+          "line": 436,
+          "expression": "string"
         },
         {
-          "expression": "int",
-          "line": 341
+          "line": 439,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "acntSnd.AddressBytes",
-          "line": 341
+          "line": 440,
+          "expression": "append"
         },
         {
-          "expression": "e.loadAccountIfInShard",
-          "line": 345
+          "line": 447,
+          "expression": "addESDTEntryInVMOutput"
         },
         {
-          "expression": "check.IfNil",
-          "line": 350
+          "line": 448,
+          "expression": "[]byte"
         },
         {
-          "expression": "e.payableHandler.CheckPayable",
-          "line": 351
+          "line": 457,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "int",
-          "line": 351
+          "line": 458,
+          "expression": "addESDTEntryForTransferInVMOutput"
         },
         {
-          "expression": "computeGasRemainingIfNeeded",
-          "line": 359
+          "line": 460,
+          "expression": "[]byte"
         },
         {
-          "expression": "make",
-          "line": 360
+          "line": 466,
+          "expression": "e.createESDTNFTOutputTransfers"
         },
         {
-          "expression": "uint64",
-          "line": 363
+          "line": 471,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "make",
-          "line": 364
-        },
-        {
-          "expression": "make",
-          "line": 365
-        },
-        {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 370
-        },
-        {
-          "expression": "make",
-          "line": 371
-        },
-        {
-          "expression": "uint64",
-          "line": 372
-        },
-        {
-          "expression": "e.parseESDTSenderLeg",
-          "line": 375
-        },
-        {
-          "expression": "e.transferOneTokenOnSenderShard",
-          "line": 381
-        },
-        {
-          "expression": "core.IsGetNodeFromDBError",
-          "line": 387
-        },
-        {
-          "expression": "fmt.Errorf",
-          "line": 391
-        },
-        {
-          "expression": "string",
-          "line": 391
-        },
-        {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 394
-        },
-        {
-          "expression": "append",
-          "line": 395
-        },
-        {
-          "expression": "addESDTEntryInVMOutput",
-          "line": 402
-        },
-        {
-          "expression": "[]byte",
-          "line": 403
-        },
-        {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 412
-        },
-        {
-          "expression": "addESDTEntryForTransferInVMOutput",
-          "line": 413
-        },
-        {
-          "expression": "[]byte",
-          "line": 415
-        },
-        {
-          "expression": "e.createESDTNFTOutputTransfers",
-          "line": 421
-        },
-        {
-          "expression": "check.IfNil",
-          "line": 426
-        },
-        {
-          "expression": "e.accounts.SaveAccount",
-          "line": 427
+          "line": 472,
+          "expression": "e.accounts.SaveAccount"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/multiESDTNFTTransfer.go",
-      "source_sha256": "e8edd96afad656ed29a470232877b5a7e23c089fe8332d23a5562cc38ee54d69",
+      "source_sha256": "148c03f098182218e0b3c5ef1ea02438bd7d9d5dd45178966d5521021b61339c",
       "function": "parseESDTSenderLeg",
       "receiver": "*esdtNFTMultiTransfer",
-      "start": 686,
-      "end": 700,
+      "start": 744,
+      "end": 758,
       "body_sha256": "dd10d47b33072a257542a8dea173d0d51c8a56bfe724683a2f559305f06fc690",
       "calls": [
         {
-          "expression": "len",
-          "line": 687
+          "line": 745,
+          "expression": "len"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 688
+          "line": 746,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 691
+          "line": 749,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 691
+          "line": 749,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "big.NewInt(0).SetBytes(input.Arguments[index+1]).Uint64",
-          "line": 694
+          "line": 752,
+          "expression": "big.NewInt(0).SetBytes(input.Arguments[index+1]).Uint64"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 694
+          "line": 752,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 694
+          "line": 752,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "uint32",
-          "line": 697
+          "line": 755,
+          "expression": "uint32"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/multiESDTNFTTransfer.go",
-      "source_sha256": "e8edd96afad656ed29a470232877b5a7e23c089fe8332d23a5562cc38ee54d69",
+      "source_sha256": "148c03f098182218e0b3c5ef1ea02438bd7d9d5dd45178966d5521021b61339c",
       "function": "parseESDTReceiverLeg",
       "receiver": "*esdtNFTMultiTransfer",
-      "start": 709,
-      "end": 745,
-      "body_sha256": "6d0eb9f4b76618f3b19f0f9841089f81dd4827fe97a074274e0db41ae34b3fe1",
+      "start": 767,
+      "end": 805,
+      "body_sha256": "f6839cf356fea0af9ce7023054a85206ad1e3ce07ee721ff252183a8122d1765",
       "calls": [
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 711
+          "line": 769,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 711
+          "line": 769,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "vmcommon.ValidateToken",
-          "line": 711
+          "line": 769,
+          "expression": "vmcommon.ValidateToken"
         },
         {
-          "expression": "big.NewInt(0).SetBytes(input.Arguments[index+1]).Uint64",
-          "line": 714
+          "line": 772,
+          "expression": "big.NewInt(0).SetBytes(input.Arguments[index+1]).Uint64"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 714
+          "line": 772,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 714
+          "line": 772,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "big.NewInt",
-          "line": 715
+          "line": 773,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "big.NewInt",
-          "line": 718
+          "line": 776,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "len",
-          "line": 719
+          "line": 777,
+          "expression": "len"
         },
         {
-          "expression": "e.marshaller.Unmarshal",
-          "line": 720
+          "line": 778,
+          "expression": "e.marshaller.Unmarshal"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 721
+          "line": 779,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "string",
-          "line": 721
+          "line": 779,
+          "expression": "string"
         },
         {
-          "expression": "big.NewInt(0).SetBytes",
-          "line": 727
+          "line": 785,
+          "expression": "big.NewInt(0).SetBytes"
         },
         {
-          "expression": "big.NewInt",
-          "line": 727
+          "line": 785,
+          "expression": "big.NewInt"
         },
         {
-          "expression": "uint32",
-          "line": 728
+          "line": 786,
+          "expression": "uint32"
         },
         {
-          "expression": "e.enableEpochsHandler.IsFlagEnabled",
-          "line": 729
+          "line": 787,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
         },
         {
-          "expression": "e.esdtStorageHandler.GetMetaDataFromSystemAccount",
-          "line": 730
+          "line": 788,
+          "expression": "loadESDTTransferMetadata"
         },
         {
-          "expression": "append",
-          "line": 730
+          "line": 788,
+          "expression": "append"
         },
         {
-          "expression": "value.Set",
-          "line": 736
+          "line": 796,
+          "expression": "value.Set"
         },
         {
-          "expression": "value.SetBytes",
-          "line": 738
+          "line": 798,
+          "expression": "value.SetBytes"
         },
         {
-          "expression": "uint32",
-          "line": 740
+          "line": 800,
+          "expression": "uint32"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "check",
       "receiver": "*esdtTransferAdmission",
-      "start": 23,
-      "end": 34,
+      "start": 28,
+      "end": 39,
       "body_sha256": "0f2592d8c29d020a7022882016960dfdc2cc6799db18aa76d620292c813978bb",
       "calls": [
         {
-          "expression": "len",
-          "line": 25
+          "line": 30,
+          "expression": "len"
         },
         {
-          "expression": "string",
-          "line": 26
+          "line": 31,
+          "expression": "string"
         },
         {
-          "expression": "a.gate.CheckTransfer",
-          "line": 29
+          "line": 34,
+          "expression": "a.gate.CheckTransfer"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 29
+          "line": 34,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "cloneParsedESDTTransfers",
-          "line": 29
+          "line": 34,
+          "expression": "cloneParsedESDTTransfers"
         },
         {
-          "expression": "cloneESDTTransferInput",
-          "line": 29
+          "line": 34,
+          "expression": "cloneESDTTransferInput"
         },
         {
-          "expression": "cloneParsedESDTTransfers",
-          "line": 32
+          "line": 37,
+          "expression": "cloneParsedESDTTransfers"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
-      "function": "transferIdentifiers",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
+      "function": "singleTransferIdentifiers",
       "receiver": "",
-      "start": 39,
-      "end": 67,
-      "body_sha256": "0e5683582f283054a73fd787598b73a22ca03a36925576dab465696f1195daa9",
+      "start": 42,
+      "end": 47,
+      "body_sha256": "c2bcdbde16c5619de77c2880632a9d5bd741627f39f0decadc8e252365e680d1",
       "calls": [
         {
-          "expression": "len",
-          "line": 45
+          "line": 43,
+          "expression": "len"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 48
-        },
-        {
-          "expression": "bytes.Equal",
-          "line": 51
-        },
-        {
-          "expression": "len",
-          "line": 54
-        },
-        {
-          "expression": "new(big.Int).SetBytes",
-          "line": 57
-        },
-        {
-          "expression": "new",
-          "line": 57
-        },
-        {
-          "expression": "count.IsUint64",
-          "line": 59
-        },
-        {
-          "expression": "count.Uint64",
-          "line": 59
-        },
-        {
-          "expression": "uint64",
-          "line": 59
-        },
-        {
-          "expression": "len",
-          "line": 59
-        },
-        {
-          "expression": "make",
-          "line": 62
-        },
-        {
-          "expression": "int",
-          "line": 62
-        },
-        {
-          "expression": "count.Uint64",
-          "line": 62
-        },
-        {
-          "expression": "bytes.Clone",
-          "line": 64
+          "line": 46,
+          "expression": "bytes.Clone"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
+      "source_file": "builtInFunctions/multiESDTNFTTransfer.go",
+      "source_sha256": "148c03f098182218e0b3c5ef1ea02438bd7d9d5dd45178966d5521021b61339c",
+      "function": "multiTransferIdentifiers",
+      "receiver": "*esdtNFTMultiTransfer",
+      "start": 151,
+      "end": 185,
+      "body_sha256": "3802c3e98b98f87cc73e096153ec55599c9c241900c4bd64e30108eb264b9f49",
+      "calls": [
+        {
+          "line": 152,
+          "expression": "len"
+        },
+        {
+          "line": 156,
+          "expression": "bytes.Equal"
+        },
+        {
+          "line": 159,
+          "expression": "e.multiTransferArguments"
+        },
+        {
+          "line": 164,
+          "expression": "checkMultiTransferIdentifierBounds"
+        },
+        {
+          "line": 164,
+          "expression": "len"
+        },
+        {
+          "line": 167,
+          "expression": "checkBasicESDTArguments"
+        },
+        {
+          "line": 171,
+          "expression": "e.checkMultiTransferSenderDestination"
+        },
+        {
+          "line": 174,
+          "expression": "vmcommon.IsSystemAccountAddress"
+        },
+        {
+          "line": 180,
+          "expression": "make"
+        },
+        {
+          "line": 180,
+          "expression": "int"
+        },
+        {
+          "line": 182,
+          "expression": "bytes.Clone"
+        },
+        {
+          "line": 182,
+          "expression": "int"
+        }
+      ]
+    },
+    {
+      "root": "builtin",
+      "repository": "mx-chain-vm-common-go",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "executeWithESDTTransferGate",
       "receiver": "",
-      "start": 69,
-      "end": 94,
-      "body_sha256": "1ed076b97463b39dc577df91963a1f2392675bcd98192c593fce38d552fa0c54",
+      "start": 67,
+      "end": 100,
+      "body_sha256": "cd98d031c03b09cb4f01ff7a19f1f6f09f92b12f053d5d6d62f1babd7240dd8c",
       "calls": [
         {
-          "expression": "check.IfNil",
-          "line": 72
+          "line": 71,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "gate.Classify",
-          "line": 75
+          "line": 75,
+          "expression": "cloneESDTTransferInput"
         },
         {
-          "expression": "transferIdentifiers",
-          "line": 75
+          "line": 76,
+          "expression": "identify"
         },
         {
-          "expression": "cloneESDTTransferInput",
-          "line": 82
+          "line": 80,
+          "expression": "gate.Classify"
         },
         {
-          "expression": "resolve",
-          "line": 85
+          "line": 88,
+          "expression": "resolve"
         },
         {
-          "expression": "cloneESDTTransferInput",
-          "line": 85
+          "line": 88,
+          "expression": "cloneESDTTransferInput"
         },
         {
-          "expression": "execute",
-          "line": 89
+          "line": 92,
+          "expression": "execute"
         },
         {
-          "expression": "cloneParsedESDTTransfers",
-          "line": 93
+          "line": 99,
+          "expression": "cloneParsedESDTTransfers"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "ProcessBuiltinFunctionWithESDTTransferGate",
       "receiver": "*esdtTransfer",
-      "start": 97,
-      "end": 99,
-      "body_sha256": "2b6d7bd3186425dfa2adff6dab11a8ae1c97b54d629c139e0f2783415aaec9c4",
+      "start": 103,
+      "end": 105,
+      "body_sha256": "43b58332e6997bb9b50826e0a52d97fd095b05d7f7b39c380511bd3a95510ed9",
       "calls": [
         {
-          "expression": "executeWithESDTTransferGate",
-          "line": 98
+          "line": 104,
+          "expression": "executeWithESDTTransferGate"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "ProcessBuiltinFunctionWithESDTTransferGate",
       "receiver": "*esdtNFTTransfer",
-      "start": 102,
-      "end": 104,
-      "body_sha256": "8758311a41b3ad1266f0d1ce670033b620139b644f101be87a8a609668a54fc3",
+      "start": 108,
+      "end": 110,
+      "body_sha256": "73514d55d0c544167d4051931e1b5fb51844d218e3d36b9980ef70ddaf77dbee",
       "calls": [
         {
-          "expression": "executeWithESDTTransferGate",
-          "line": 103
+          "line": 109,
+          "expression": "executeWithESDTTransferGate"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "ProcessBuiltinFunctionWithESDTTransferGate",
       "receiver": "*esdtNFTMultiTransfer",
-      "start": 107,
-      "end": 109,
-      "body_sha256": "1042923278a6c9d4f2f19a897e50804370b8a7a030bc5f310a0d89f539b75ad6",
+      "start": 113,
+      "end": 124,
+      "body_sha256": "a19409e09edd872118b68f97bafb07d87ec70ac638de73527ff29b2aa52eabd0",
       "calls": [
         {
-          "expression": "executeWithESDTTransferGate",
-          "line": 108
+          "line": 117,
+          "expression": "e.enableEpochsHandler.IsFlagEnabled"
+        },
+        {
+          "line": 118,
+          "expression": "e.multiTransferIdentifiers"
+        },
+        {
+          "line": 121,
+          "expression": "e.processBuiltinFunction"
+        },
+        {
+          "line": 123,
+          "expression": "executeWithESDTTransferGate"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "cloneESDTTransferInput",
       "receiver": "",
-      "start": 111,
-      "end": 130,
+      "start": 126,
+      "end": 145,
       "body_sha256": "70d659680e1d0be85803101393cb431ef39b3915276e019feaeeb7d4b3e816a4",
       "calls": [
         {
-          "expression": "bytes.Clone",
-          "line": 116
+          "line": 131,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 116
+          "line": 131,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "cloneESDTTransferBytes",
-          "line": 117
+          "line": 132,
+          "expression": "cloneESDTTransferBytes"
         },
         {
-          "expression": "new(big.Int).Set",
-          "line": 119
+          "line": 134,
+          "expression": "new(big.Int).Set"
         },
         {
-          "expression": "new",
-          "line": 119
+          "line": 134,
+          "expression": "new"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 121
+          "line": 136,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 121
+          "line": 136,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 121
+          "line": 136,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 122
+          "line": 137,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 122
+          "line": 137,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 122
+          "line": 137,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 125
+          "line": 140,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 125
+          "line": 140,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 125
+          "line": 140,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "cloneESDTTransferList",
-          "line": 128
+          "line": 143,
+          "expression": "cloneESDTTransferList"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "cloneParsedESDTTransfers",
       "receiver": "",
-      "start": 132,
-      "end": 137,
+      "start": 147,
+      "end": 152,
       "body_sha256": "667ced7ffbcfd50c7a5a814c8b6879e0d9bbb85fc1a7f5636c78f99c141b0221",
       "calls": [
         {
-          "expression": "bytes.Clone",
-          "line": 136
+          "line": 151,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "cloneESDTTransferList",
-          "line": 136
+          "line": 151,
+          "expression": "cloneESDTTransferList"
         },
         {
-          "expression": "cloneESDTTransferBytes",
-          "line": 136
+          "line": 151,
+          "expression": "cloneESDTTransferBytes"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "cloneESDTTransferList",
       "receiver": "",
-      "start": 139,
-      "end": 156,
+      "start": 154,
+      "end": 171,
       "body_sha256": "35a2c5c3aea4cf9a8d1a6812e46bb03b59e26ced5bcdda8274346f54d183b9ac",
       "calls": [
         {
-          "expression": "make",
-          "line": 143
+          "line": 158,
+          "expression": "make"
         },
         {
-          "expression": "len",
-          "line": 143
+          "line": 158,
+          "expression": "len"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 149
+          "line": 164,
+          "expression": "bytes.Clone"
         },
         {
-          "expression": "new(big.Int).Set",
-          "line": 151
+          "line": 166,
+          "expression": "new(big.Int).Set"
         },
         {
-          "expression": "new",
-          "line": 151
+          "line": 166,
+          "expression": "new"
         }
       ]
     },
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "f762445f7d6228e624f1840f1817c6a32cc97d3b",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtTransferGate.go",
-      "source_sha256": "120cdbfba1f0152393b94045a035c62c9afbf3a1d3a49c25ba017a15f089f3c8",
+      "source_sha256": "335271bf96a7f4dee293feaa38b9ab8ecd10a831194eb70815eac1ab6d30a82c",
       "function": "cloneESDTTransferBytes",
       "receiver": "",
-      "start": 158,
-      "end": 167,
+      "start": 173,
+      "end": 182,
       "body_sha256": "3f34a3a98f2f4bdb3c6f3ce9a21fcfd7d83f0f15c7247794b0ae692814bdf9e3",
       "calls": [
         {
-          "expression": "make",
-          "line": 162
+          "line": 177,
+          "expression": "make"
         },
         {
-          "expression": "len",
-          "line": 162
+          "line": 177,
+          "expression": "len"
         },
         {
-          "expression": "bytes.Clone",
-          "line": 164
+          "line": 179,
+          "expression": "bytes.Clone"
         }
       ]
     },
@@ -11683,153 +11537,153 @@
       "body_sha256": "4b5d32f58be09f7a2e4a6472b6c3d55ac11745a316403b7497ada7aa50f3e1d7",
       "calls": [
         {
-          "line": 1449,
+          "line": 1455,
           "expression": "pcf.drwaHeaderTimeEnabledAt"
         },
         {
-          "line": 1453,
+          "line": 1459,
           "expression": "counters.NewUsageCounter"
         },
         {
-          "line": 1453,
+          "line": 1459,
           "expression": "pcf.coreData.EnableEpochsHandler"
         },
         {
-          "line": 1460,
+          "line": 1466,
           "expression": "pcf.coreData.AddressPubKeyConverter"
-        },
-        {
-          "line": 1461,
-          "expression": "pcf.data.StorageService"
-        },
-        {
-          "line": 1462,
-          "expression": "pcf.data.Blockchain"
-        },
-        {
-          "line": 1463,
-          "expression": "pcf.bootstrapComponents.ShardCoordinator"
-        },
-        {
-          "line": 1464,
-          "expression": "pcf.coreData.InternalMarshalizer"
-        },
-        {
-          "line": 1465,
-          "expression": "pcf.coreData.Hasher"
         },
         {
           "line": 1467,
-          "expression": "pcf.coreData.Uint64ByteSliceConverter"
+          "expression": "pcf.data.StorageService"
+        },
+        {
+          "line": 1468,
+          "expression": "pcf.data.Blockchain"
         },
         {
           "line": 1469,
-          "expression": "pcf.data.Datapool"
-        },
-        {
-          "line": 1470,
-          "expression": "pcf.data.Datapool().SmartContracts"
-        },
-        {
-          "line": 1470,
-          "expression": "pcf.data.Datapool"
-        },
-        {
-          "line": 1474,
-          "expression": "pcf.coreData.EpochNotifier"
-        },
-        {
-          "line": 1475,
-          "expression": "pcf.coreData.EnableEpochsHandler"
-        },
-        {
-          "line": 1482,
-          "expression": "pcf.coreData.RoundHandler"
-        },
-        {
-          "line": 1485,
-          "expression": "hooks.NewBlockChainHookImpl"
-        },
-        {
-          "line": 1494,
-          "expression": "pcf.coreData.EconomicsData().MaxGasLimitPerBlock"
-        },
-        {
-          "line": 1494,
-          "expression": "pcf.coreData.EconomicsData"
-        },
-        {
-          "line": 1494,
-          "expression": "pcf.bootstrapComponents.ShardCoordinator().SelfId"
-        },
-        {
-          "line": 1494,
           "expression": "pcf.bootstrapComponents.ShardCoordinator"
         },
         {
-          "line": 1496,
-          "expression": "pcf.coreData.EpochNotifier"
+          "line": 1470,
+          "expression": "pcf.coreData.InternalMarshalizer"
         },
         {
-          "line": 1497,
-          "expression": "pcf.coreData.EnableEpochsHandler"
-        },
-        {
-          "line": 1500,
+          "line": 1471,
           "expression": "pcf.coreData.Hasher"
         },
         {
-          "line": 1501,
+          "line": 1473,
+          "expression": "pcf.coreData.Uint64ByteSliceConverter"
+        },
+        {
+          "line": 1475,
+          "expression": "pcf.data.Datapool"
+        },
+        {
+          "line": 1476,
+          "expression": "pcf.data.Datapool().SmartContracts"
+        },
+        {
+          "line": 1476,
+          "expression": "pcf.data.Datapool"
+        },
+        {
+          "line": 1480,
+          "expression": "pcf.coreData.EpochNotifier"
+        },
+        {
+          "line": 1481,
+          "expression": "pcf.coreData.EnableEpochsHandler"
+        },
+        {
+          "line": 1488,
+          "expression": "pcf.coreData.RoundHandler"
+        },
+        {
+          "line": 1491,
+          "expression": "hooks.NewBlockChainHookImpl"
+        },
+        {
+          "line": 1500,
+          "expression": "pcf.coreData.EconomicsData().MaxGasLimitPerBlock"
+        },
+        {
+          "line": 1500,
+          "expression": "pcf.coreData.EconomicsData"
+        },
+        {
+          "line": 1500,
+          "expression": "pcf.bootstrapComponents.ShardCoordinator().SelfId"
+        },
+        {
+          "line": 1500,
+          "expression": "pcf.bootstrapComponents.ShardCoordinator"
+        },
+        {
+          "line": 1502,
+          "expression": "pcf.coreData.EpochNotifier"
+        },
+        {
+          "line": 1503,
+          "expression": "pcf.coreData.EnableEpochsHandler"
+        },
+        {
+          "line": 1506,
+          "expression": "pcf.coreData.Hasher"
+        },
+        {
+          "line": 1507,
           "expression": "pcf.coreData.AddressPubKeyConverter"
         },
         {
-          "line": 1504,
+          "line": 1510,
           "expression": "shard.NewVMContainerFactory"
         }
       ],
-      "end": 1505,
+      "end": 1511,
       "function": "createVMFactoryShard",
       "receiver": "*processComponentsFactory",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/processing/blockProcessorCreator.go",
-      "source_sha256": "62d88782acfa8ea5903fc457341a7b6814d82e3c1a012ab00b0a64f6cabb5902",
-      "start": 1438
+      "source_sha256": "d5d57bf0d29c153123ff7db0da849ff57d7939818d313501ee1d3d873111695f",
+      "start": 1444
     },
     {
       "body_sha256": "d783b6a3eaffb1c6b7b39223d111cbd2d7c1fde58515b1bd4c7685bf5aecacc9",
       "calls": [
         {
-          "line": 1514,
+          "line": 1520,
           "expression": "check.IfNil"
-        },
-        {
-          "line": 1514,
-          "expression": "pcf.coreData.EnableEpochsHandler"
-        },
-        {
-          "line": 1517,
-          "expression": "check.IfNil"
-        },
-        {
-          "line": 1517,
-          "expression": "pcf.coreData.EnableRoundsHandler"
         },
         {
           "line": 1520,
+          "expression": "pcf.coreData.EnableEpochsHandler"
+        },
+        {
+          "line": 1523,
+          "expression": "check.IfNil"
+        },
+        {
+          "line": 1523,
+          "expression": "pcf.coreData.EnableRoundsHandler"
+        },
+        {
+          "line": 1526,
           "expression": "candidate.CheckEnforcedBlock"
         }
       ],
-      "end": 1521,
+      "end": 1527,
       "function": "drwaHeaderTimeEnabledAt",
       "receiver": "*processComponentsFactory",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/processing/blockProcessorCreator.go",
-      "source_sha256": "62d88782acfa8ea5903fc457341a7b6814d82e3c1a012ab00b0a64f6cabb5902",
-      "start": 1509
+      "source_sha256": "d5d57bf0d29c153123ff7db0da849ff57d7939818d313501ee1d3d873111695f",
+      "start": 1515
     },
     {
       "body_sha256": "a6d4c458dfbc38eda57e8d49950e05ea93bcc457678325449fbe640868f49bd1",
@@ -11858,186 +11712,190 @@
       "start": 8
     },
     {
-      "body_sha256": "4a7b1ee58d7fce089eee9a8e60079966e01f13faec1d3c0ca6816aed7ba7976e",
+      "body_sha256": "6374df2c77a2ba0e3e359463f3f731f8e39ec45f3cfdc5bd8d753ba00ccd253e",
       "calls": [
         {
-          "expression": "sp.drwaExecutionError",
-          "line": 315
+          "line": 316,
+          "expression": "sp.drwaExecutionError"
         },
         {
-          "expression": "check.IfNil",
-          "line": 318
+          "line": 319,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "check.IfNil",
-          "line": 321
+          "line": 322,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "headerHandler.IsHeaderV3",
-          "line": 324
+          "line": 325,
+          "expression": "headerHandler.IsHeaderV3"
         },
         {
-          "expression": "sp.processStatusHandler.TrySetBusy",
-          "line": 328
+          "line": 329,
+          "expression": "sp.processStatusHandler.TrySetBusy"
         },
         {
-          "expression": "sp.processStatusHandler.SetIdle",
-          "line": 331
+          "line": 332,
+          "expression": "sp.processStatusHandler.SetIdle"
         },
         {
-          "expression": "beginEvaluatedHeaderTime",
-          "line": 333
+          "line": 334,
+          "expression": "beginEvaluatedHeaderTime"
         },
         {
-          "expression": "endHeaderTime",
-          "line": 337
+          "line": 338,
+          "expression": "endHeaderTime"
         },
         {
-          "expression": "sp.roundNotifier.CheckRound",
-          "line": 339
+          "line": 340,
+          "expression": "sp.roundNotifier.CheckRound"
         },
         {
-          "expression": "sp.epochNotifier.CheckEpoch",
-          "line": 340
+          "line": 341,
+          "expression": "sp.epochNotifier.CheckEpoch"
         },
         {
-          "expression": "sp.requestHandler.SetEpoch",
-          "line": 341
+          "line": 342,
+          "expression": "sp.requestHandler.SetEpoch"
         },
         {
-          "expression": "headerHandler.GetEpoch",
-          "line": 341
+          "line": 342,
+          "expression": "headerHandler.GetEpoch"
         },
         {
-          "expression": "log.Debug",
-          "line": 353
+          "line": 354,
+          "expression": "log.Debug"
         },
         {
-          "expression": "headerHandler.GetEpoch",
-          "line": 354
+          "line": 355,
+          "expression": "headerHandler.GetEpoch"
         },
         {
-          "expression": "headerHandler.GetShardID",
-          "line": 355
+          "line": 356,
+          "expression": "headerHandler.GetShardID"
         },
         {
-          "expression": "headerHandler.GetRound",
-          "line": 356
+          "line": 357,
+          "expression": "headerHandler.GetRound"
         },
         {
-          "expression": "headerHandler.GetNonce",
-          "line": 357
+          "line": 358,
+          "expression": "headerHandler.GetNonce"
         },
         {
-          "expression": "sp.accountsDB[state.UserAccountsState].JournalLen",
-          "line": 360
+          "line": 361,
+          "expression": "sp.accountsDB[state.UserAccountsState].JournalLen"
         },
         {
-          "expression": "log.Error",
-          "line": 361
+          "line": 362,
+          "expression": "log.Error"
         },
         {
-          "expression": "string",
-          "line": 361
+          "line": 362,
+          "expression": "string"
         },
         {
-          "expression": "sp.accountsDB[state.UserAccountsState].GetStackDebugFirstEntry",
-          "line": 361
+          "line": 362,
+          "expression": "sp.accountsDB[state.UserAccountsState].GetStackDebugFirstEntry"
         },
         {
-          "expression": "sp.createBlockStarted",
-          "line": 366
+          "line": 367,
+          "expression": "sp.createBlockStarted"
         },
         {
-          "expression": "sp.txCoordinator.RequestBlockTransactions",
-          "line": 373
+          "line": 374,
+          "expression": "sp.txCoordinator.RequestBlockTransactions"
         },
         {
-          "expression": "sp.hdrsForCurrBlock.RequestMetaHeaders",
-          "line": 374
+          "line": 375,
+          "expression": "sp.hdrsForCurrBlock.RequestMetaHeaders"
         },
         {
-          "expression": "time.Now",
-          "line": 378
+          "line": 379,
+          "expression": "time.Now"
         },
         {
-          "expression": "getHaveTimeForProposal",
-          "line": 379
+          "line": 380,
+          "expression": "getHaveTimeForProposal"
         },
         {
-          "expression": "sp.processConfigsHandler.GetMaxBlockProcessingTime",
-          "line": 379
+          "line": 380,
+          "expression": "sp.processConfigsHandler.GetMaxBlockProcessingTime"
         },
         {
-          "expression": "headerHandler.GetRound",
-          "line": 379
+          "line": 380,
+          "expression": "headerHandler.GetRound"
         },
         {
-          "expression": "sp.txCoordinator.IsDataPreparedForProcessing",
-          "line": 381
+          "line": 382,
+          "expression": "sp.txCoordinator.IsDataPreparedForProcessing"
         },
         {
-          "expression": "sp.ensureEpochStartInfoAvailable",
-          "line": 386
+          "line": 387,
+          "expression": "sp.ensureEpochStartInfoAvailable"
         },
         {
-          "expression": "sp.hdrsForCurrBlock.WaitForHeadersIfNeeded",
-          "line": 391
+          "line": 392,
+          "expression": "sp.hdrsForCurrBlock.WaitForHeadersIfNeeded"
         },
         {
-          "expression": "installHeader",
-          "line": 396
+          "line": 397,
+          "expression": "installHeader"
         },
         {
-          "expression": "func() {\n\t\tif err != nil {\n\t\t\tsp.RevertCurrentBlock()\n\t\t}\n\t}",
-          "line": 401
+          "line": 402,
+          "expression": "func() {\n\t\tresultErr = sp.finishBlockFailure(err, resultErr)\n\t\tif errors.Is(resultErr, vm.ErrDRWAExecution) {\n\t\t\tresult = nil\n\t\t}\n\t}"
         },
         {
-          "expression": "sp.RevertCurrentBlock",
-          "line": 403
+          "line": 403,
+          "expression": "sp.finishBlockFailure"
         },
         {
-          "expression": "sp.checkAndUpdateContextBeforeExecution",
-          "line": 407
+          "line": 404,
+          "expression": "errors.Is"
         },
         {
-          "expression": "time.Now",
-          "line": 412
+          "line": 409,
+          "expression": "sp.checkAndUpdateContextBeforeExecution"
         },
         {
-          "expression": "sp.txCoordinator.ProcessBlockTransaction",
-          "line": 413
+          "line": 414,
+          "expression": "time.Now"
         },
         {
-          "expression": "time.Since",
-          "line": 414
+          "line": 415,
+          "expression": "sp.txCoordinator.ProcessBlockTransaction"
         },
         {
-          "expression": "log.Debug",
-          "line": 415
+          "line": 416,
+          "expression": "time.Since"
         },
         {
-          "expression": "sp.txCoordinator.VerifyCreatedBlockTransactions",
-          "line": 422
+          "line": 417,
+          "expression": "log.Debug"
         },
         {
-          "expression": "sp.collectExecutionResults",
-          "line": 428
+          "line": 424,
+          "expression": "sp.txCoordinator.VerifyCreatedBlockTransactions"
         },
         {
-          "expression": "sp.blockProcessingCutoffHandler.HandleProcessErrorCutoff",
-          "line": 433
+          "line": 430,
+          "expression": "sp.collectExecutionResults"
+        },
+        {
+          "line": 435,
+          "expression": "sp.blockProcessingCutoffHandler.HandleProcessErrorCutoff"
         }
       ],
-      "end": 439,
+      "end": 441,
       "function": "ProcessBlockProposal",
       "receiver": "*shardProcessor",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/block/shardblockProposal.go",
-      "source_sha256": "3e85a0fb6849c91470971f0b224efc13856e46870792f8097026a35c86b84b40",
-      "start": 310
+      "source_sha256": "9c748873ebb2c62fdf0ca960ee4245cfdf69477dc4bd426962f829236097a4ba",
+      "start": 311
     },
     {
       "body_sha256": "7ce640d9936824bbf14c6b395570697743fe44c773ec2ba788bb32a8e237e9d8",
@@ -12547,862 +12405,882 @@
       "body_sha256": "95681e9824daf8c6c9037686c186938204ba3952de9772948480ef6cfba57cea",
       "calls": [
         {
-          "expression": "loadDRWAEnforcementEpoch",
-          "line": 55
+          "line": 133,
+          "expression": "loadDRWAEnforcementEpoch"
         },
         {
-          "expression": "common.LoadMainConfig",
-          "line": 59
+          "line": 137,
+          "expression": "common.LoadMainConfig"
         },
         {
-          "expression": "common.LoadEpochConfig",
-          "line": 63
+          "line": 141,
+          "expression": "common.LoadEpochConfig"
         },
         {
-          "expression": "common.LoadRoundConfig",
-          "line": 67
+          "line": 145,
+          "expression": "common.LoadRoundConfig"
         },
         {
-          "expression": "common.LoadEconomicsConfig",
-          "line": 71
+          "line": 149,
+          "expression": "common.LoadEconomicsConfig"
         },
         {
-          "expression": "common.LoadRatingsConfig",
-          "line": 75
+          "line": 153,
+          "expression": "common.LoadRatingsConfig"
         },
         {
-          "expression": "NewDRWAConfigurationCandidate",
-          "line": 79
+          "line": 157,
+          "expression": "NewDRWAConfigurationCandidate"
         }
       ],
-      "end": 82,
+      "end": 160,
       "function": "LoadDRWAConfigurationCandidate",
       "receiver": "",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 53
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 131
     },
     {
       "body_sha256": "82b72a0d5fe2aabc80475da3cc5983d953549c55139615dd1e1c1345194d5a1a",
       "calls": [
         {
-          "expression": "loadDRWAEnforcementEpoch",
-          "line": 89
+          "line": 167,
+          "expression": "loadDRWAEnforcementEpoch"
         },
         {
-          "expression": "NewDRWAConfigurationCandidate",
-          "line": 93
+          "line": 171,
+          "expression": "NewDRWAConfigurationCandidate"
         }
       ],
-      "end": 94,
+      "end": 172,
       "function": "NewDRWAConfigurationCandidateFromOverlay",
       "receiver": "",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 87
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 165
     },
     {
       "body_sha256": "660d4aafead825a722e3c60107ab241ebb77ae5565cd7edf5754088ca9a5c6f8",
       "calls": [
         {
-          "expression": "nativeCore.LoadTomlFile",
-          "line": 98
+          "line": 176,
+          "expression": "nativeCore.LoadTomlFile"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 102
+          "line": 180,
+          "expression": "fmt.Errorf"
         }
       ],
-      "end": 105,
+      "end": 183,
       "function": "loadDRWAEnforcementEpoch",
       "receiver": "",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 96
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 174
     },
     {
       "body_sha256": "176c9ef36acc14545fd4d3bc585fba52f1911fa0de32feee71943573b7f04d38",
       "calls": [
         {
-          "expression": "fmt.Errorf",
-          "line": 117
+          "line": 195,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "append",
-          "line": 122
+          "line": 200,
+          "expression": "append"
         },
         {
-          "expression": "[]config.VersionByEpochs",
-          "line": 122
+          "line": 200,
+          "expression": "[]config.VersionByEpochs"
         },
         {
-          "expression": "common.NewConfiguredRoundExclusionHandler",
-          "line": 126
+          "line": 204,
+          "expression": "common.NewConfiguredRoundExclusionHandler"
         },
         {
-          "expression": "enablers.NewEnableEpochsHandler",
-          "line": 129
+          "line": 207,
+          "expression": "enablers.NewEnableEpochsHandler"
         },
         {
-          "expression": "forking.NewGenericEpochNotifier",
-          "line": 129
+          "line": 207,
+          "expression": "forking.NewGenericEpochNotifier"
         },
         {
-          "expression": "forking.NewGenericRoundNotifier",
-          "line": 133
+          "line": 211,
+          "expression": "forking.NewGenericRoundNotifier"
         },
         {
-          "expression": "enablers.NewEnableRoundsHandler",
-          "line": 134
+          "line": 212,
+          "expression": "enablers.NewEnableRoundsHandler"
         },
         {
-          "expression": "validateDRWAStartupConfigs",
-          "line": 138
+          "line": 216,
+          "expression": "validateDRWAStartupConfigs"
         },
         {
-          "expression": "validateSupernovaActivationTuple",
-          "line": 143
+          "line": 221,
+          "expression": "validateSupernovaActivationTuple"
         },
         {
-          "expression": "epochs.GetActivationEpoch",
-          "line": 144
+          "line": 222,
+          "expression": "epochs.GetActivationEpoch"
         },
         {
-          "expression": "rounds.GetActivationRound",
-          "line": 144
+          "line": 222,
+          "expression": "rounds.GetActivationRound"
         },
         {
-          "expression": "sharding.NewChainParametersHolder",
-          "line": 150
+          "line": 228,
+          "expression": "sharding.NewChainParametersHolder"
         },
         {
-          "expression": "notifier.NewEpochStartSubscriptionHandler",
-          "line": 152
+          "line": 230,
+          "expression": "notifier.NewEpochStartSubscriptionHandler"
         },
         {
-          "expression": "chainparametersnotifier.NewChainParametersNotifier",
-          "line": 153
+          "line": 231,
+          "expression": "chainparametersnotifier.NewChainParametersNotifier"
         },
         {
-          "expression": "factoryBlock.NewHeaderVersionHandler",
-          "line": 158
+          "line": 236,
+          "expression": "factoryBlock.NewHeaderVersionHandler"
         },
         {
-          "expression": "validateSupernovaActivationTuple",
-          "line": 162
+          "line": 240,
+          "expression": "validateSupernovaActivationTuple"
         },
         {
-          "expression": "epochs.GetActivationEpoch",
-          "line": 163
+          "line": 241,
+          "expression": "epochs.GetActivationEpoch"
         },
         {
-          "expression": "rounds.GetActivationRound",
-          "line": 163
+          "line": 241,
+          "expression": "rounds.GetActivationRound"
         },
         {
-          "expression": "candidate.checkPrerequisites",
-          "line": 168
+          "line": 246,
+          "expression": "candidate.checkPrerequisites"
         }
       ],
-      "end": 172,
+      "end": 250,
       "function": "NewDRWAConfigurationCandidate",
       "receiver": "",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 113
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 191
     },
     {
       "body_sha256": "efdab1114ce3e568f952410c4f76853164b27d954b61a74ab65263e87af7a382",
       "calls": [
         {
-          "expression": "hashFactory.NewHasher",
-          "line": 181
+          "line": 259,
+          "expression": "hashFactory.NewHasher"
         },
         {
-          "expression": "marshalFactory.NewMarshalizer",
-          "line": 187
+          "line": 265,
+          "expression": "marshalFactory.NewMarshalizer"
         },
         {
-          "expression": "converterFactory.NewPubkeyConverter",
-          "line": 197
+          "line": 275,
+          "expression": "converterFactory.NewPubkeyConverter"
         },
         {
-          "expression": "validatorConverter.Decode",
-          "line": 207
+          "line": 285,
+          "expression": "validatorConverter.Decode"
         },
         {
-          "expression": "guardian.NewGuardedAccount",
-          "line": 213
+          "line": 291,
+          "expression": "guardian.NewGuardedAccount"
         },
         {
-          "expression": "forking.NewGenericEpochNotifier",
-          "line": 213
+          "line": 291,
+          "expression": "forking.NewGenericEpochNotifier"
         },
         {
-          "expression": "graceperiod.NewEpochChangeGracePeriod",
-          "line": 216
+          "line": 294,
+          "expression": "graceperiod.NewEpochChangeGracePeriod"
         },
         {
-          "expression": "commonConfigs.NewCommonConfigsHandler",
-          "line": 219
+          "line": 297,
+          "expression": "commonConfigs.NewCommonConfigsHandler"
         },
         {
-          "expression": "commonConfigs.NewProcessConfigsHandler",
-          "line": 223
+          "line": 301,
+          "expression": "commonConfigs.NewProcessConfigsHandler"
         },
         {
-          "expression": "commonConfigs.NewAntifloodConfigsHandler",
-          "line": 226
+          "line": 304,
+          "expression": "commonConfigs.NewAntifloodConfigsHandler"
         }
       ],
-      "end": 228,
+      "end": 306,
       "function": "validateDRWAStartupConfigs",
       "receiver": "",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 179
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 257
     },
     {
       "body_sha256": "334e64557e445cc2f01b796e56f3d37fb98a18bc3915e68941d5c3420f555d9b",
       "calls": [
         {
-          "expression": "fmt.Errorf",
-          "line": 232
+          "line": 310,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "append",
-          "line": 244
+          "line": 322,
+          "expression": "append"
         },
         {
-          "expression": "append",
-          "line": 247
+          "line": 325,
+          "expression": "append"
         },
         {
-          "expression": "c.epochs.IsFlagEnabledInEpoch",
-          "line": 251
+          "line": 329,
+          "expression": "c.epochs.IsFlagEnabledInEpoch"
         },
         {
-          "expression": "append",
-          "line": 252
+          "line": 330,
+          "expression": "append"
         },
         {
-          "expression": "append",
-          "line": 255
+          "line": 333,
+          "expression": "append"
         },
         {
-          "expression": "c.epochs.IsFlagDefined",
-          "line": 260
+          "line": 338,
+          "expression": "c.epochs.IsFlagDefined"
         },
         {
-          "expression": "c.epochs.IsFlagEnabledInEpoch",
-          "line": 260
+          "line": 338,
+          "expression": "c.epochs.IsFlagEnabledInEpoch"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 261
+          "line": 339,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "c.epochs.IsFlagDefined",
-          "line": 265
+          "line": 343,
+          "expression": "c.epochs.IsFlagDefined"
         },
         {
-          "expression": "c.epochs.IsFlagEnabledInEpoch",
-          "line": 265
+          "line": 343,
+          "expression": "c.epochs.IsFlagEnabledInEpoch"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 266
+          "line": 344,
+          "expression": "fmt.Errorf"
         }
       ],
-      "end": 269,
+      "end": 347,
       "function": "checkPrerequisites",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 230
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 308
     },
     {
       "body_sha256": "fc8ee90b579d97efbb32bacfa9b798b28fdf44c4a86f3771100a298d7b9b330c",
       "calls": [
         {
-          "expression": "common.IsAsyncExecutionEnabledForEpochAndRound",
-          "line": 275
+          "line": 353,
+          "expression": "common.IsAsyncExecutionEnabledForEpochAndRound"
         }
       ],
-      "end": 276,
+      "end": 354,
       "function": "Enabled",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 273
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 351
     },
     {
       "body_sha256": "030ffeeceb212ec03d9b3ff0739cae017f6dfe055102b013a0edf2f2dcac8103",
       "calls": [
         {
-          "expression": "c.Enabled",
-          "line": 281
+          "line": 359,
+          "expression": "c.Enabled"
         },
         {
-          "expression": "fmt.Errorf",
-          "line": 282
+          "line": 360,
+          "expression": "fmt.Errorf"
         },
         {
-          "expression": "c.checkPrerequisites",
-          "line": 284
+          "line": 362,
+          "expression": "c.checkPrerequisites"
         }
       ],
-      "end": 285,
+      "end": 363,
       "function": "CheckEnforcedBlock",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 280
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 358
     },
     {
       "body_sha256": "c94f8bc82d0d09f376f5a2a17de77df35a1c6329697e28f00e49f498c97a47ad",
       "calls": [
         {
-          "expression": "c.epochs.GetAllEnableEpochs",
-          "line": 295
+          "line": 373,
+          "expression": "c.epochs.GetAllEnableEpochs"
         },
         {
-          "expression": "c.rounds.GetAllEnableRounds",
-          "line": 295
+          "line": 373,
+          "expression": "c.rounds.GetAllEnableRounds"
         }
       ],
-      "end": 296,
+      "end": 374,
       "function": "ActivationInventory",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fb650f59dc4974ba363ecbbdd6b77a1deb835594e4dd7577c2dada26e09c0ac",
-      "start": 291
+      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "start": 369
     },
     {
-      "body_sha256": "40f7d588da54929e02998a2da4085db5a2fef9da7325f62ae0dd54f2592935b5",
+      "body_sha256": "32642f5e0504ce674c25b7a46d7d7181a7ffdba551bd1ae5f326fe2b2ba751a7",
       "calls": [
         {
-          "line": 249,
+          "line": 254,
           "expression": "checkProcessComponentsArgs"
         },
         {
-          "line": 256,
-          "expression": "factoryCore.NewDRWAConfigurationCandidateFromOverlay"
+          "line": 259,
+          "expression": "args.DRWAInitialProgrammeStartup.Clone"
         },
         {
           "line": 262,
-          "expression": "reflect.DeepEqual"
+          "expression": "len"
         },
         {
           "line": 263,
           "expression": "reflect.DeepEqual"
         },
         {
-          "line": 264,
-          "expression": "reflect.DeepEqual"
-        },
-        {
-          "line": 265,
-          "expression": "reflect.DeepEqual"
-        },
-        {
           "line": 266,
-          "expression": "fmt.Errorf"
-        },
-        {
-          "line": 268,
-          "expression": "args.CoreData.EnableEpochsHandler"
-        },
-        {
-          "line": 268,
-          "expression": "args.CoreData.EnableRoundsHandler"
-        },
-        {
-          "line": 269,
-          "expression": "check.IfNil"
+          "expression": "drwaCandidate.MatchesPinnedOverlay"
         },
         {
           "line": 272,
-          "expression": "check.IfNil"
+          "expression": "factoryCore.NewDRWAConfigurationCandidateFromOverlay"
         },
         {
-          "line": 275,
-          "expression": "drwaCandidate.ActivationInventory"
-        },
-        {
-          "line": 276,
+          "line": 284,
           "expression": "reflect.DeepEqual"
         },
         {
-          "line": 276,
-          "expression": "epochs.GetAllEnableEpochs"
-        },
-        {
-          "line": 276,
+          "line": 285,
           "expression": "reflect.DeepEqual"
-        },
-        {
-          "line": 276,
-          "expression": "rounds.GetAllEnableRounds"
-        },
-        {
-          "line": 277,
-          "expression": "fmt.Errorf"
-        },
-        {
-          "line": 281,
-          "expression": "interceptorFactory.NewInterceptedDataVerifierFactory"
         },
         {
           "line": 286,
-          "expression": "cloneDRWAIdentityConfig"
+          "expression": "reflect.DeepEqual"
         },
         {
           "line": 287,
-          "expression": "drwa.CloneInitialProgrammeEvidence"
+          "expression": "reflect.DeepEqual"
         },
         {
           "line": 288,
+          "expression": "fmt.Errorf"
+        },
+        {
+          "line": 290,
+          "expression": "args.CoreData.EnableEpochsHandler"
+        },
+        {
+          "line": 290,
+          "expression": "args.CoreData.EnableRoundsHandler"
+        },
+        {
+          "line": 291,
+          "expression": "check.IfNil"
+        },
+        {
+          "line": 294,
+          "expression": "check.IfNil"
+        },
+        {
+          "line": 297,
+          "expression": "drwaCandidate.ActivationInventory"
+        },
+        {
+          "line": 298,
+          "expression": "reflect.DeepEqual"
+        },
+        {
+          "line": 298,
+          "expression": "epochs.GetAllEnableEpochs"
+        },
+        {
+          "line": 298,
+          "expression": "reflect.DeepEqual"
+        },
+        {
+          "line": 298,
+          "expression": "rounds.GetAllEnableRounds"
+        },
+        {
+          "line": 299,
+          "expression": "fmt.Errorf"
+        },
+        {
+          "line": 303,
+          "expression": "interceptorFactory.NewInterceptedDataVerifierFactory"
+        },
+        {
+          "line": 308,
+          "expression": "cloneDRWAIdentityConfig"
+        },
+        {
+          "line": 309,
+          "expression": "drwa.CloneInitialProgrammeEvidence"
+        },
+        {
+          "line": 310,
           "expression": "args.DRWAInitialProgrammeLimits.Clone"
         },
         {
-          "line": 313,
+          "line": 336,
           "expression": "args.CoreData.EpochNotifier"
         }
       ],
-      "end": 322,
+      "end": 345,
       "function": "NewProcessComponentsFactory",
       "receiver": "",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/processing/processComponents.go",
-      "source_sha256": "9b102f4a195be6fd45c64b4d23e3213f09e6a6d1a2de7df010f4b232e6a32704",
-      "start": 248
+      "source_sha256": "bd95ffa4feaba19c6dc59eb8dc5cf24d64ceb0fcdddc88cca2811e368d2605dd",
+      "start": 253
     },
     {
-      "body_sha256": "49a076e2541a9d492553322a8b26cdd4deb72b933a84a7e3200889f242350b4a",
+      "body_sha256": "a24de3aa3579f9ec55945b78e1e690dff0a807439119bcd0a8cdf97b916d62d1",
       "calls": [],
-      "end": 498,
+      "end": 506,
       "function": "getFlags",
       "receiver": "",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "cmd/node/flags.go",
-      "source_sha256": "606934cc06f01d098a8de5c9c67869bc9486ef42ee4836de1959562f87cf433d",
-      "start": 434
+      "source_sha256": "1af18b75cc4b9059b2339c14baa1512bc09f1fc9bb0f4b9f99278895786a6bf6",
+      "start": 441
     },
     {
       "body_sha256": "09dfc4f943d1619f0d5512f081587c6cb4e5bbd753e221fb7879ab8c239a4fc7",
       "calls": [
         {
-          "expression": "log.Trace",
-          "line": 160
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 163
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 165
-        },
-        {
-          "expression": "common.LoadMainConfig",
-          "line": 166
-        },
-        {
-          "expression": "log.Debug",
-          "line": 170
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 172
-        },
-        {
-          "expression": "common.LoadApiConfig",
-          "line": 173
-        },
-        {
-          "expression": "log.Debug",
-          "line": 177
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 179
-        },
-        {
-          "expression": "common.LoadEconomicsConfig",
-          "line": 180
-        },
-        {
-          "expression": "log.Debug",
-          "line": 184
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 186
-        },
-        {
-          "expression": "common.LoadSystemSmartContractsConfig",
-          "line": 187
-        },
-        {
-          "expression": "log.Debug",
-          "line": 191
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 193
-        },
-        {
-          "expression": "common.LoadRatingsConfig",
-          "line": 194
-        },
-        {
-          "expression": "log.Debug",
-          "line": 198
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 200
-        },
-        {
-          "expression": "common.LoadPreferencesConfig",
-          "line": 201
-        },
-        {
-          "expression": "log.Debug",
-          "line": 205
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 207
-        },
-        {
-          "expression": "common.LoadExternalConfig",
-          "line": 208
-        },
-        {
-          "expression": "log.Debug",
-          "line": 212
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 214
-        },
-        {
-          "expression": "common.LoadP2PConfig",
-          "line": 215
-        },
-        {
-          "expression": "log.Debug",
-          "line": 219
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 221
-        },
-        {
-          "expression": "common.LoadP2PConfig",
-          "line": 222
-        },
-        {
-          "expression": "log.Debug",
-          "line": 226
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 228
-        },
-        {
-          "expression": "common.LoadEpochConfig",
-          "line": 229
-        },
-        {
-          "expression": "log.Debug",
-          "line": 233
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 235
-        },
-        {
-          "expression": "common.LoadRoundConfig",
-          "line": 236
-        },
-        {
-          "expression": "log.Debug",
-          "line": 240
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 243
-        },
-        {
-          "expression": "core.LoadJsonFile",
-          "line": 244
-        },
-        {
-          "expression": "log.Debug",
-          "line": 248
-        },
-        {
-          "expression": "ctx.IsSet",
-          "line": 250
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 251
-        },
-        {
-          "expression": "ctx.IsSet",
-          "line": 253
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 254
-        },
-        {
-          "expression": "ctx.IsSet",
-          "line": 256
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 257
-        },
-        {
-          "expression": "ctx.IsSet",
-          "line": 259
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 260
-        },
-        {
-          "expression": "ctx.IsSet",
-          "line": 262
-        },
-        {
-          "expression": "ctx.GlobalString",
-          "line": 263
-        },
-        {
-          "expression": "ctx.IsSet",
-          "line": 265
-        },
-        {
-          "expression": "ctx.GlobalStringSlice",
-          "line": 266
-        }
-      ],
-      "end": 284,
-      "function": "readConfigs",
-      "receiver": "",
-      "repo_revision": "1c29767362e70032c156cc03e79a16f83d6826cd + run_9 owner-approved sole-overlay installation",
-      "repository": "mx-chain-go",
-      "root": "node",
-      "source_file": "cmd/node/main.go",
-      "source_sha256": "e3619b9a76b81572e928e48fedfbeba440b30db4ce4129036d6a617a6dea0158",
-      "start": 159
-    },
-    {
-      "body_sha256": "329537aa8fbd7d8ece28fd3286132529a1935d3959b498831b0615314210278d",
-      "calls": [
-        {
-          "line": 1235,
-          "expression": "loadInitialProgrammeData"
-        },
-        {
-          "line": 1240,
-          "expression": "trigger.NewImportStartHandler"
-        },
-        {
-          "line": 1240,
-          "expression": "filepath.Join"
-        },
-        {
-          "line": 1245,
-          "expression": "big.NewInt(0).SetString"
-        },
-        {
-          "line": 1245,
-          "expression": "big.NewInt"
-        },
-        {
-          "line": 1247,
-          "expression": "fmt.Errorf"
-        },
-        {
-          "line": 1257,
-          "expression": "coreComponents.AddressPubKeyConverter"
-        },
-        {
-          "line": 1258,
-          "expression": "cryptoComponents.TxSignKeyGen"
-        },
-        {
-          "line": 1259,
-          "expression": "coreComponents.Hasher"
-        },
-        {
-          "line": 1260,
-          "expression": "coreComponents.InternalMarshalizer"
-        },
-        {
-          "line": 1263,
-          "expression": "parsing.NewAccountsParser"
-        },
-        {
-          "line": 1268,
-          "expression": "parsing.NewSmartContractsParser"
-        },
-        {
-          "line": 1270,
-          "expression": "coreComponents.AddressPubKeyConverter"
-        },
-        {
-          "line": 1271,
-          "expression": "cryptoComponents.TxSignKeyGen"
-        },
-        {
-          "line": 1278,
-          "expression": "bootstrapComponents.ShardCoordinator().SelfId"
-        },
-        {
-          "line": 1278,
-          "expression": "bootstrapComponents.ShardCoordinator"
-        },
-        {
-          "line": 1280,
-          "expression": "coreComponents.Hasher"
-        },
-        {
-          "line": 1281,
-          "expression": "coreComponents.InternalMarshalizer"
-        },
-        {
-          "line": 1282,
-          "expression": "dataComponents.StorageService"
-        },
-        {
-          "line": 1283,
-          "expression": "coreComponents.Uint64ByteSliceConverter"
-        },
-        {
-          "line": 1284,
-          "expression": "dataComponents.Datapool"
-        },
-        {
-          "line": 1286,
-          "expression": "dbLookupFactory.NewHistoryRepositoryFactory"
-        },
-        {
-          "line": 1291,
-          "expression": "storageunit.NewCache"
-        },
-        {
-          "line": 1291,
-          "expression": "storageFactory.GetCacherFromConfig"
-        },
-        {
-          "line": 1295,
-          "expression": "time.Duration"
-        },
-        {
-          "line": 1295,
-          "expression": "coreComponents.GenesisNodesSetup().GetRoundDuration"
-        },
-        {
-          "line": 1295,
-          "expression": "coreComponents.GenesisNodesSetup"
-        },
-        {
-          "line": 1296,
-          "expression": "interceptors.NewWhiteListDataVerifier"
-        },
-        {
-          "line": 1296,
-          "expression": "interceptors.WhiteListRequestTTL"
-        },
-        {
-          "line": 1301,
-          "expression": "createWhiteListerVerifiedTxs"
-        },
-        {
-          "line": 1306,
-          "expression": "historyRepositoryFactory.Create"
-        },
-        {
-          "line": 1311,
+          "line": 210,
           "expression": "log.Trace"
         },
         {
-          "line": 1313,
-          "expression": "cache.NewTimeCache"
+          "line": 213,
+          "expression": "ctx.GlobalString"
         },
         {
-          "line": 1315,
-          "expression": "ordering.NewOrderedCollection"
+          "line": 215,
+          "expression": "ctx.GlobalString"
         },
         {
-          "line": 1320,
-          "expression": "drwa.CloneInitialProgrammeEvidence"
+          "line": 216,
+          "expression": "common.LoadMainConfig"
         },
         {
-          "line": 1349,
-          "expression": "processComp.NewProcessComponentsFactory"
+          "line": 220,
+          "expression": "log.Debug"
         },
         {
-          "line": 1351,
+          "line": 222,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 223,
+          "expression": "common.LoadApiConfig"
+        },
+        {
+          "line": 227,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 229,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 230,
+          "expression": "common.LoadEconomicsConfig"
+        },
+        {
+          "line": 234,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 236,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 237,
+          "expression": "common.LoadSystemSmartContractsConfig"
+        },
+        {
+          "line": 241,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 243,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 244,
+          "expression": "common.LoadRatingsConfig"
+        },
+        {
+          "line": 248,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 250,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 251,
+          "expression": "common.LoadPreferencesConfig"
+        },
+        {
+          "line": 255,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 257,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 258,
+          "expression": "common.LoadExternalConfig"
+        },
+        {
+          "line": 262,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 264,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 265,
+          "expression": "common.LoadP2PConfig"
+        },
+        {
+          "line": 269,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 271,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 272,
+          "expression": "common.LoadP2PConfig"
+        },
+        {
+          "line": 276,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 278,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 279,
+          "expression": "common.LoadEpochConfig"
+        },
+        {
+          "line": 283,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 285,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 286,
+          "expression": "common.LoadRoundConfig"
+        },
+        {
+          "line": 290,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 293,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 294,
+          "expression": "core.LoadJsonFile"
+        },
+        {
+          "line": 298,
+          "expression": "log.Debug"
+        },
+        {
+          "line": 300,
+          "expression": "ctx.IsSet"
+        },
+        {
+          "line": 301,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 303,
+          "expression": "ctx.IsSet"
+        },
+        {
+          "line": 304,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 306,
+          "expression": "ctx.IsSet"
+        },
+        {
+          "line": 307,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 309,
+          "expression": "ctx.IsSet"
+        },
+        {
+          "line": 310,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 312,
+          "expression": "ctx.IsSet"
+        },
+        {
+          "line": 313,
+          "expression": "ctx.GlobalString"
+        },
+        {
+          "line": 315,
+          "expression": "ctx.IsSet"
+        },
+        {
+          "line": 316,
+          "expression": "ctx.GlobalStringSlice"
+        }
+      ],
+      "end": 334,
+      "function": "readConfigs",
+      "receiver": "",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repository": "mx-chain-go",
+      "root": "node",
+      "source_file": "cmd/node/main.go",
+      "source_sha256": "51f8885b45bfe70698eb2823ffd2f06d85a57def6581777b905f8bd67182248b",
+      "start": 209
+    },
+    {
+      "body_sha256": "97aca94659d3cdcc144c9cbdc0dd34fccdaa60747461384f63ce9ab4873d70f6",
+      "calls": [
+        {
+          "line": 1289,
+          "expression": "ValidateDRWAStartupMode"
+        },
+        {
+          "line": 1292,
+          "expression": "loadManagedInitialProgrammeData"
+        },
+        {
+          "line": 1301,
+          "expression": "trigger.NewImportStartHandler"
+        },
+        {
+          "line": 1301,
+          "expression": "filepath.Join"
+        },
+        {
+          "line": 1306,
+          "expression": "big.NewInt(0).SetString"
+        },
+        {
+          "line": 1306,
+          "expression": "big.NewInt"
+        },
+        {
+          "line": 1308,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 1354,
+          "line": 1318,
+          "expression": "coreComponents.AddressPubKeyConverter"
+        },
+        {
+          "line": 1319,
+          "expression": "cryptoComponents.TxSignKeyGen"
+        },
+        {
+          "line": 1320,
+          "expression": "coreComponents.Hasher"
+        },
+        {
+          "line": 1321,
+          "expression": "coreComponents.InternalMarshalizer"
+        },
+        {
+          "line": 1324,
+          "expression": "parsing.NewAccountsParser"
+        },
+        {
+          "line": 1329,
+          "expression": "parsing.NewSmartContractsParser"
+        },
+        {
+          "line": 1331,
+          "expression": "coreComponents.AddressPubKeyConverter"
+        },
+        {
+          "line": 1332,
+          "expression": "cryptoComponents.TxSignKeyGen"
+        },
+        {
+          "line": 1339,
+          "expression": "bootstrapComponents.ShardCoordinator().SelfId"
+        },
+        {
+          "line": 1339,
+          "expression": "bootstrapComponents.ShardCoordinator"
+        },
+        {
+          "line": 1341,
+          "expression": "coreComponents.Hasher"
+        },
+        {
+          "line": 1342,
+          "expression": "coreComponents.InternalMarshalizer"
+        },
+        {
+          "line": 1343,
+          "expression": "dataComponents.StorageService"
+        },
+        {
+          "line": 1344,
+          "expression": "coreComponents.Uint64ByteSliceConverter"
+        },
+        {
+          "line": 1345,
+          "expression": "dataComponents.Datapool"
+        },
+        {
+          "line": 1347,
+          "expression": "dbLookupFactory.NewHistoryRepositoryFactory"
+        },
+        {
+          "line": 1352,
+          "expression": "storageunit.NewCache"
+        },
+        {
+          "line": 1352,
+          "expression": "storageFactory.GetCacherFromConfig"
+        },
+        {
+          "line": 1356,
+          "expression": "time.Duration"
+        },
+        {
+          "line": 1356,
+          "expression": "coreComponents.GenesisNodesSetup().GetRoundDuration"
+        },
+        {
+          "line": 1356,
+          "expression": "coreComponents.GenesisNodesSetup"
+        },
+        {
+          "line": 1357,
+          "expression": "interceptors.NewWhiteListDataVerifier"
+        },
+        {
+          "line": 1357,
+          "expression": "interceptors.WhiteListRequestTTL"
+        },
+        {
+          "line": 1362,
+          "expression": "createWhiteListerVerifiedTxs"
+        },
+        {
+          "line": 1367,
+          "expression": "historyRepositoryFactory.Create"
+        },
+        {
+          "line": 1372,
+          "expression": "log.Trace"
+        },
+        {
+          "line": 1374,
+          "expression": "cache.NewTimeCache"
+        },
+        {
+          "line": 1376,
+          "expression": "ordering.NewOrderedCollection"
+        },
+        {
+          "line": 1381,
+          "expression": "drwa.CloneInitialProgrammeEvidence"
+        },
+        {
+          "line": 1413,
+          "expression": "processComp.NewProcessComponentsFactory"
+        },
+        {
+          "line": 1415,
+          "expression": "fmt.Errorf"
+        },
+        {
+          "line": 1418,
           "expression": "processComp.NewManagedProcessComponents"
         },
         {
-          "line": 1359,
+          "line": 1423,
           "expression": "managedProcessComponents.Create"
         }
       ],
-      "end": 1365,
+      "end": 1429,
       "function": "CreateManagedProcessComponents",
       "receiver": "*nodeRunner",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "node/nodeRunner.go",
-      "source_sha256": "98b89a5bce60f611cd4d5a934239499429aeb8e0ece1a2d70c94e46f2f816148",
-      "start": 1222
+      "source_sha256": "92671e7acde7386aa967a63f21abb85e20ca5ed3be7e879b3ec7d79b52b4dff0",
+      "start": 1276
     },
     {
       "root": "builtin",
@@ -14001,53 +13879,53 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
       "function": "check",
       "receiver": "*esdtSupplyAdmission",
-      "start": 20,
-      "end": 35,
-      "body_sha256": "f017e8e4216b1ed3938d582689acc43df3a0a0fb863833cfc950f072b437ae2c",
+      "start": 21,
+      "end": 40,
+      "body_sha256": "8922d349050a5194289c530f73ba646dffc63928db40dc0ac3220501760503d2",
       "calls": [
         {
-          "line": 25,
+          "line": 26,
           "expression": "check.IfNil"
         },
         {
-          "line": 25,
+          "line": 26,
           "expression": "len"
         },
         {
-          "line": 25,
+          "line": 26,
           "expression": "quantity.Sign"
         },
         {
-          "line": 31,
-          "expression": "bytes.Clone"
-        },
-        {
           "line": 32,
           "expression": "bytes.Clone"
         },
         {
-          "line": 32,
+          "line": 33,
+          "expression": "bytes.Clone"
+        },
+        {
+          "line": 33,
           "expression": "account.AddressBytes"
         },
         {
-          "line": 33,
+          "line": 34,
           "expression": "new(big.Int).Set"
         },
         {
-          "line": 33,
+          "line": 34,
           "expression": "new"
         },
         {
-          "line": 34,
+          "line": 35,
           "expression": "a.gate.CheckSupply"
         },
         {
-          "line": 34,
+          "line": 35,
           "expression": "cloneESDTTransferInput"
         }
       ]
@@ -14055,45 +13933,45 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
       "function": "executeWithDRWASupplyGate",
       "receiver": "",
-      "start": 37,
-      "end": 76,
-      "body_sha256": "4459863a5758e62a2d263840751c65972b5a1a9cd3fa8d81fe4a8390e26bc436",
+      "start": 42,
+      "end": 85,
+      "body_sha256": "976fec1d75ff16cd1964147708e52fceb1ba3c1be47514fad1e5fb0704e33583",
       "calls": [
         {
-          "line": 41,
+          "line": 46,
           "expression": "check.IfNil"
         },
         {
-          "line": 48,
+          "line": 53,
           "expression": "cloneESDTTransferInput"
         },
         {
-          "line": 50,
+          "line": 55,
           "expression": "len"
         },
         {
-          "line": 51,
+          "line": 56,
           "expression": "bytes.Clone"
         },
         {
-          "line": 53,
+          "line": 58,
           "expression": "gate.ClassifySupply"
         },
         {
-          "line": 67,
+          "line": 70,
           "expression": "resolve"
         },
         {
-          "line": 67,
+          "line": 70,
           "expression": "cloneESDTTransferInput"
         },
         {
-          "line": 71,
+          "line": 74,
           "expression": "execute"
         }
       ]
@@ -14101,68 +13979,14 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
       "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
       "receiver": "*esdtLocalMint",
-      "start": 78,
-      "end": 80,
-      "body_sha256": "0531b446cd1fdf76346e673547546ca3b6517d409a14ed91207cc8cdaaaa8eef",
-      "calls": [
-        {
-          "line": 79,
-          "expression": "executeWithDRWASupplyGate"
-        }
-      ]
-    },
-    {
-      "root": "builtin",
-      "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
-      "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
-      "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
-      "receiver": "*esdtLocalBurn",
-      "start": 81,
-      "end": 83,
-      "body_sha256": "33ae59454add8d80b8c70728a56d80373ca732bc7f2113715d74d1a737b8608b",
-      "calls": [
-        {
-          "line": 82,
-          "expression": "executeWithDRWASupplyGate"
-        }
-      ]
-    },
-    {
-      "root": "builtin",
-      "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
-      "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
-      "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
-      "receiver": "*esdtNFTCreate",
-      "start": 84,
-      "end": 86,
-      "body_sha256": "60f5fdcc5fa994b319b6b03be90f0100267efa6b999f0491b151288696d883f2",
-      "calls": [
-        {
-          "line": 85,
-          "expression": "executeWithDRWASupplyGate"
-        }
-      ]
-    },
-    {
-      "root": "builtin",
-      "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
-      "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
-      "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
-      "receiver": "*esdtNFTAddQuantity",
       "start": 87,
       "end": 89,
-      "body_sha256": "76915e18ba44054d2c378d230443cd821012f828063a56b6c8507bb5c9f3fb58",
+      "body_sha256": "0531b446cd1fdf76346e673547546ca3b6517d409a14ed91207cc8cdaaaa8eef",
       "calls": [
         {
           "line": 88,
@@ -14173,14 +13997,14 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
       "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
-      "receiver": "*esdtNFTBurn",
+      "receiver": "*esdtLocalBurn",
       "start": 90,
       "end": 92,
-      "body_sha256": "87527357d3c58afe1835616dac33b5b3a552036adaa9b92e3b75844244e12f1c",
+      "body_sha256": "33ae59454add8d80b8c70728a56d80373ca732bc7f2113715d74d1a737b8608b",
       "calls": [
         {
           "line": 91,
@@ -14191,21 +14015,75 @@
     {
       "root": "builtin",
       "repository": "mx-chain-vm-common-go",
-      "repo_revision": "a5c91f0227853245790b95132354c91534a643ed",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
       "source_file": "builtInFunctions/esdtSupplyGate.go",
-      "source_sha256": "172d8df5d9130d3796e9090458fb5674991462b16b580a3c7e3ddae909ff01a9",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
       "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
-      "receiver": "*esdtBurn",
+      "receiver": "*esdtNFTCreate",
       "start": 93,
-      "end": 98,
-      "body_sha256": "946654de75d2ade83dba12a6f2b0c1f150de85a006ac60afe72ec6f19ee1f831",
+      "end": 95,
+      "body_sha256": "60f5fdcc5fa994b319b6b03be90f0100267efa6b999f0491b151288696d883f2",
       "calls": [
         {
           "line": 94,
           "expression": "executeWithDRWASupplyGate"
+        }
+      ]
+    },
+    {
+      "root": "builtin",
+      "repository": "mx-chain-vm-common-go",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
+      "source_file": "builtInFunctions/esdtSupplyGate.go",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
+      "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
+      "receiver": "*esdtNFTAddQuantity",
+      "start": 96,
+      "end": 98,
+      "body_sha256": "76915e18ba44054d2c378d230443cd821012f828063a56b6c8507bb5c9f3fb58",
+      "calls": [
+        {
+          "line": 97,
+          "expression": "executeWithDRWASupplyGate"
+        }
+      ]
+    },
+    {
+      "root": "builtin",
+      "repository": "mx-chain-vm-common-go",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
+      "source_file": "builtInFunctions/esdtSupplyGate.go",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
+      "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
+      "receiver": "*esdtNFTBurn",
+      "start": 99,
+      "end": 101,
+      "body_sha256": "87527357d3c58afe1835616dac33b5b3a552036adaa9b92e3b75844244e12f1c",
+      "calls": [
+        {
+          "line": 100,
+          "expression": "executeWithDRWASupplyGate"
+        }
+      ]
+    },
+    {
+      "root": "builtin",
+      "repository": "mx-chain-vm-common-go",
+      "repo_revision": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
+      "source_file": "builtInFunctions/esdtSupplyGate.go",
+      "source_sha256": "d3fe9548e093bd6bfc3e815bc0aaee2bdf3bde6b71ccee61d2247dbfe4bdcb0b",
+      "function": "ProcessBuiltinFunctionWithDRWASupplyGate",
+      "receiver": "*esdtBurn",
+      "start": 102,
+      "end": 107,
+      "body_sha256": "946654de75d2ade83dba12a6f2b0c1f150de85a006ac60afe72ec6f19ee1f831",
+      "calls": [
+        {
+          "line": 103,
+          "expression": "executeWithDRWASupplyGate"
         },
         {
-          "line": 96,
+          "line": 105,
           "expression": "e.ProcessBuiltinFunction"
         }
       ]
@@ -14291,17 +14169,17 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "node/nodeRunner.go",
-      "source_sha256": "98b89a5bce60f611cd4d5a934239499429aeb8e0ece1a2d70c94e46f2f816148",
+      "source_sha256": "92671e7acde7386aa967a63f21abb85e20ca5ed3be7e879b3ec7d79b52b4dff0",
       "function": "loadInitialProgrammeData",
       "receiver": "",
-      "start": 1837,
-      "end": 1839,
+      "start": 1964,
+      "end": 1966,
       "body_sha256": "3bc90d3c89f7e2fdd35d609f1c634582d9f9b9b2d6d01491b0fa52759695362b",
       "calls": [
         {
-          "line": 1838,
+          "line": 1965,
           "expression": "parsing.LoadDRWAInitialProgrammeInputs"
         }
       ]
@@ -14309,46 +14187,46 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "factory/processing/drwaNetworkIdentityStartup.go",
-      "source_sha256": "b53cccc90ad9e7d087e7adfd4f9830c11fbae32ce303723faa0ca1cfb4fc4cf1",
+      "source_sha256": "05942f749d240e9e2e203179a1f043293d1f02719aaeb55f01d1c3ef89464f56",
       "function": "cloneDRWAIdentityConfig",
       "receiver": "",
-      "start": 16,
-      "end": 22,
+      "start": 20,
+      "end": 26,
       "body_sha256": "a74ca2f8ece18c12cf31fddfbb26225c2c51d035b14b871ecf7eb6b1668ff544",
       "calls": []
     },
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
+      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
       "source_file": "process/drwa/initialProgrammeEvidence.go",
-      "source_sha256": "bd2c6558a0e50052f227e075c7692d9818f71c2d5bdcae0f405fc756eb3de0f5",
+      "source_sha256": "60b7708c3f34e9963d4fd6b77b7856d3003f7cfbd006a8d8ae3b2872f69d0504",
       "function": "CloneInitialProgrammeEvidence",
       "receiver": "",
-      "start": 60,
-      "end": 69,
+      "start": 31,
+      "end": 40,
       "body_sha256": "9433515850745fb818c00739c76d87c1a3f50349c00a363c5fd82486c5a8661a",
       "calls": [
         {
-          "line": 64,
+          "line": 35,
           "expression": "make"
         },
         {
-          "line": 64,
+          "line": 35,
           "expression": "len"
         },
         {
-          "line": 66,
+          "line": 37,
           "expression": "bytes.Clone"
         },
         {
-          "line": 66,
+          "line": 37,
           "expression": "bytes.Clone"
         },
         {
-          "line": 66,
+          "line": 37,
           "expression": "bytes.Clone"
         }
       ]
@@ -14356,21 +14234,21 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "4b6634f9ba9ff33e7585fcc3b24f7477761b1877",
-      "source_file": "process/drwa/initialProgrammeEvidence.go",
-      "source_sha256": "bd2c6558a0e50052f227e075c7692d9818f71c2d5bdcae0f405fc756eb3de0f5",
+      "repo_revision": "b41b15f7faab68fca20e0cc09d61b319f8073a73",
+      "source_file": "config/drwaInitialProgramme.go",
+      "source_sha256": "cc856957da6b92cc168e3aa6dec19b06ae89243c4bcb8905904327b36a28cac0",
       "function": "Clone",
-      "receiver": "*InitialProgrammeLimits",
-      "start": 26,
-      "end": 34,
-      "body_sha256": "896efbf978236a28bbfbc6de57b2d835f18dd17b6e91e2695e0917e9bbe87189",
+      "receiver": "*DRWAInitialProgrammeLimits",
+      "start": 21,
+      "end": 29,
+      "body_sha256": "c94fddac037dddeb783a7ddb37b138f283b852dd31ec4805bf81fe0b55533d27",
       "calls": [
         {
-          "line": 31,
+          "line": 26,
           "expression": "bytes.Clone"
         },
         {
-          "line": 32,
+          "line": 27,
           "expression": "bytes.Clone"
         }
       ]

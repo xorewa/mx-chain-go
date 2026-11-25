@@ -200,17 +200,17 @@ func qualOrdinaryPoolReceiptEquivalence(t *testing.T, source transaction.NativeV
 							f.pool.ShardDataStore(route).Clear()
 						}
 						cache := f.pool.ShardDataStore(route).(interface {
-							GetByTxHash([]byte) (*txcache.WrappedTransaction, bool)
+							GetByTxHashWithValidationReceipt([]byte) (*txcache.WrappedTransaction, interface{}, bool)
 							NumBytes() int
 							Len() int
 						})
 						v := observation{Bytes: cache.NumBytes(), Count: cache.Len(), Callbacks: f.callbacks, Direct: f.directWrites, Broadcast: f.broadcastRemovals, Stored: stored, Work: qualReceiptWork(source).subtract(before)}
 						for _, in := range stream {
-							tx, found := cache.GetByTxHash(in.Hash())
+							tx, metadata, found := cache.GetByTxHashWithValidationReceipt(in.Hash())
 							v.Found = append(v.Found, found)
 							if found {
 								v.Size = append(v.Size, tx.Size)
-								if tx.DRWAValidationReceipt != nil {
+								if metadata != nil {
 									t.Errorf("ordinary receipt retained: mode=%d step=%d", mode, step)
 								}
 							} else {

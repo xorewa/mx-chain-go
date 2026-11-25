@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from race import FATAL, HOOK, MODULE, classify, race_commands, execute
+from race import (FATAL, HOOK, MODULE, STATE_TRIE, STATE_TRIE_LEAVES, MIGRATION, classify, race_commands, execute)
 
 
 class RacePolicyTests(unittest.TestCase):
@@ -82,6 +82,88 @@ class RacePolicyTests(unittest.TestCase):
         e = self.fixture()
         e[-1]["Action"] = "pass"
         self.assertTrue(self.check(e, code=0)["errors"])
+
+    def state_trie_fixture(self, leaf="TestTriePruningWhenBlockIsFinal"):
+        name = MODULE + STATE_TRIE[2:]
+        report = ("==================\nWARNING: DATA RACE\n"
+                  "Write at 0x01 by goroutine 1:\n"
+                  "  " + MODULE + "integrationTests.UpdateRound()\n"
+                  "      integrationTests/testInitializer.go:2738 +0x1\n"
+                  "Previous read at 0x01 by goroutine 2:\n"
+                  "  " + MODULE + "integrationTests/mock.(*RoundHandlerMock).Index()\n"
+                  "      integrationTests/mock/roundHandlerMock.go:30 +0x1\n"
+                  "==================\n")
+        events = [{"Action": "output", "Package": name, "Test": leaf, "Output": line}
+                  for line in report.splitlines(keepends=True)]
+        events.extend([
+            {"Action": "output", "Package": name, "Test": leaf,
+             "Output": "    testing.go:1712: race detected during execution of test\n"},
+            {"Action": "output", "Package": name, "Test": leaf,
+             "Output": "--- FAIL: " + leaf + " (0.01s)\n"},
+            {"Action": "fail", "Package": name, "Test": leaf},
+        ])
+        if leaf.startswith(MIGRATION + "/"):
+            events.extend([{"Action": "output", "Package": name, "Test": MIGRATION,
+                            "Output": "--- FAIL: " + MIGRATION + " (0.01s)\n"},
+                           {"Action": "fail", "Package": name, "Test": MIGRATION}])
+        events.append({"Action": "fail", "Package": name})
+        return events
+
+    def test_inherited_state_trie_fixture_is_report_only(self):
+        for leaf in sorted(STATE_TRIE_LEAVES):
+            with self.subTest(leaf=leaf):
+                r = self.check(self.state_trie_fixture(leaf), package=STATE_TRIE)
+                self.assertEqual(r["errors"], [])
+                self.assertEqual(r["default_exit"], 1)
+                self.assertEqual(r["known_wasmer2_aborts"], [])
+                self.assertEqual(r["known_inherited_statetrie_failures"],
+                                 [{"package": MODULE + STATE_TRIE[2:], "failed_tests": [leaf]}])
+
+    def test_inherited_state_trie_rejects_other_outcomes(self):
+        for leaf in ("TestUnlisted", MIGRATION, MIGRATION + "/migrate_shard_2_user_account"):
+            self.assertTrue(self.check(self.state_trie_fixture(leaf), package=STATE_TRIE)["errors"])
+        for old, new in (("Index()", "Other()"), ("go:30", "go:31"),
+                         ("integrationTests/mock/", "unrelated/"),
+                         ("WARNING: DATA RACE", "unrelated output"),
+                         ("race detected during execution of test", "assertion failed")):
+            events = self.state_trie_fixture()
+            for e in events:
+                if "Output" in e:
+                    e["Output"] = e["Output"].replace(old, new)
+            self.assertTrue(self.check(events, package=STATE_TRIE)["errors"])
+        for extra in ("    toy_test.go:11: distinct failure\n", "panic: unrelated\n",
+                      "WARNING: DATA RACE\n", "--- FAIL: TestUnlisted (0.00s)\n"):
+            events = self.state_trie_fixture()
+            events[0]["Output"] = extra + events[0]["Output"]
+            self.assertTrue(self.check(events, package=STATE_TRIE)["errors"])
+        self.assertTrue(self.check(self.state_trie_fixture(), package=STATE_TRIE, stderr="error")["errors"])
+
+    def test_inherited_state_trie_driver_keeps_raw_default_and_no_rerun(self):
+        script = pathlib.Path(__file__).with_name("race.py").resolve()
+        with tempfile.TemporaryDirectory() as scratch:
+            root = pathlib.Path(scratch)
+            fake = root / "go"
+            raw = "\n".join(map(json.dumps, self.state_trie_fixture())) + "\n"
+            fake.write_text("#!" + sys.executable + "\nimport json,os,sys\n"
+                            "with open(os.environ['CALLS'],'a') as f: f.write(json.dumps(sys.argv[1:])+'\\n')\n"
+                            "sys.stdout.write(" + repr(raw) + ")\nsys.exit(1)\n")
+            fake.chmod(0o700)
+            target = root / "output"
+            calls = root / "calls"
+            env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"], CALLS=str(calls))
+            run = subprocess.run([sys.executable, "-B", str(script), "--output", str(target), STATE_TRIE],
+                                 env=env, capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(list(map(json.loads, calls.read_text().splitlines())),
+                             [["test", "-race", "-json", "-count=1", STATE_TRIE]])
+            self.assertEqual((target / "default-race.jsonl").read_text(), raw)
+            self.assertEqual((target / "default-race.stderr").read_bytes(), b"")
+            summary = json.loads((target / "summary.json").read_text())
+            self.assertEqual(summary["default"]["exit"], 1)
+            self.assertIsNone(summary["checkptr_disabled_race"])
+            self.assertEqual(summary["classification"]["known_inherited_statetrie_failures"],
+                             [{"package": MODULE + STATE_TRIE[2:],
+                               "failed_tests": ["TestTriePruningWhenBlockIsFinal"]}])
 
     def test_driver_runs_both_labels_and_rejects_adjusted_failure(self):
         # An independent executable fixture records actual subprocess arguments.

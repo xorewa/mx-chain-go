@@ -25,9 +25,19 @@ func (cache *DisabledCache) AddTx(_ *WrappedTransaction) (ok bool, added bool) {
 	return false, false
 }
 
+// AddTxWithValidationReceipt does nothing.
+func (cache *DisabledCache) AddTxWithValidationReceipt(_ *WrappedTransaction, _ interface{}) (bool, bool) {
+	return false, false
+}
+
 // GetByTxHash returns no transaction
 func (cache *DisabledCache) GetByTxHash(_ []byte) (*WrappedTransaction, bool) {
 	return nil, false
+}
+
+// GetByTxHashWithValidationReceipt returns no entry.
+func (cache *DisabledCache) GetByTxHashWithValidationReceipt(_ []byte) (*WrappedTransaction, interface{}, bool) {
+	return nil, nil, false
 }
 
 // SelectTransactions returns an empty slice
@@ -57,6 +67,10 @@ func (cache *DisabledCache) NumBytes() int {
 
 // ForEachTransaction does nothing
 func (cache *DisabledCache) ForEachTransaction(_ ForEachTransaction) {
+}
+
+// ForEachTransactionWithValidationReceipt does nothing.
+func (cache *DisabledCache) ForEachTransactionWithValidationReceipt(_ ForEachTransactionWithValidationReceipt) {
 }
 
 // Clear does nothing

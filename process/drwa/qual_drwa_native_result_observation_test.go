@@ -140,21 +140,9 @@ func TestQualDRWANativeResultObservation_MissingNativeReader(t *testing.T) {
 	}
 }
 
-// The historical entry returned the payload without a provenance receipt. Keep
-// this bridge test-only so the same assertions expose that missing boundary.
 func qualReadNativeCarrierObservation(f *qualNativeCarrierFixture) (*nativeSCRCarrierObservation, error) {
-	if reader, ok := interface{}(f.r).(interface {
-		readNativeSCRObservation(*canonicalResultReader, []byte, uint32, uint32, []byte,
-			canonicalResultWitness, []byte, []byte, int) (*nativeSCRCarrierObservation, error)
-	}); ok {
-		return reader.readNativeSCRObservation(f.reader, f.bHash, f.consumer, f.producer,
-			f.items[0].candidate.origin, f.w, f.miniBlockRaw, f.scrRaw, f.carrierLimit())
-	}
-	value, result, err := f.readCarrier(f.carrierLimit())
-	if err != nil {
-		return nil, err
-	}
-	return &nativeSCRCarrierObservation{originCommitment: value, result: result}, nil
+	return f.r.readNativeSCRObservation(f.reader, f.bHash, f.consumer, f.producer,
+		f.items[0].candidate.origin, f.w, f.miniBlockRaw, f.scrRaw, f.carrierLimit())
 }
 
 // Use the existing unit sibling fixture pattern without changing B's anchor.

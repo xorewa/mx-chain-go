@@ -333,11 +333,42 @@ func TestQualDRWANativeOriginBodies_Refusal(t *testing.T) {
 			tc.change(t, f)
 			root, err := f.s.RootHash()
 			require.NoError(t, err)
+			var wantDecodes []qualOriginDecode
+			switch tc.name {
+			case "transaction repeated across fragments", "duplicate source fragment":
+				// Both fixtures first visit the two members of the first fragment,
+				// then the second fragment. A repeated member stops here.
+				wantDecodes = []qualOriginDecode{
+					{kind: "miniblock", hash: string(f.hash(f.mbs[0]))},
+					{kind: "SCR", hash: string(f.hash(f.txs[0]))},
+					{kind: "SCR", hash: string(f.hash(f.txs[1]))},
+					{kind: "miniblock", hash: string(f.hash(f.mbs[1]))},
+				}
+			}
+			if tc.name == "duplicate source fragment" {
+				// Both fragments finish before the repeated reference.
+				wantDecodes = append(wantDecodes,
+					qualOriginDecode{kind: "SCR", hash: string(f.hash(f.txs[2]))},
+					qualOriginDecode{kind: "SCR", hash: string(f.hash(f.txs[3]))},
+				)
+			}
+			original := f.reader.accounts.args.Marshaller
+			var decodes *qualOriginDecodeObserver
+			if len(wantDecodes) != 0 {
+				decodes = &qualOriginDecodeObserver{
+					Marshalizer: original, t: t, hash: f.hash, seen: make(map[qualOriginDecode]struct{}),
+				}
+				f.reader.accounts.args.Marshaller = decodes
+			}
 			value, body, scrs, err := f.readBodies()
+			f.reader.accounts.args.Marshaller = original
 			require.ErrorIs(t, err, ErrInvalidAccountWitness)
 			require.Nil(t, value)
 			require.Nil(t, body)
 			require.Nil(t, scrs)
+			if decodes != nil {
+				require.Equal(t, wantDecodes, decodes.order)
+			}
 			after, err := f.s.RootHash()
 			require.NoError(t, err)
 			require.Equal(t, root, after)

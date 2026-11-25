@@ -82,10 +82,11 @@ func (bpm *BlockProcessorMock) DiscardStateAccessesForHeader(headerHash []byte) 
 }
 
 // RevertBlockProposalState -
-func (bpm *BlockProcessorMock) RevertBlockProposalState() {
+func (bpm *BlockProcessorMock) RevertBlockProposalState() error {
 	if bpm.RevertBlockProposalStateCalled != nil {
 		bpm.RevertBlockProposalStateCalled()
 	}
+	return nil
 }
 
 // ProcessScheduledBlock mocks processing a scheduled block

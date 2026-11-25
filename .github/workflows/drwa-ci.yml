@@ -40,6 +40,7 @@ env:
     ./dataRetriever/resolvers
     ./dataRetriever/txpool
     ./dblookupext
+    ./dblookupext/esdtSupply
     ./dblookupext/factory
     ./debug/handler
     ./epochStart/bootstrap
@@ -71,6 +72,9 @@ env:
     ./node/external/transactionAPI
     ./node/metrics
     ./node/mock
+    ./outport/process/alteredaccounts
+    ./outport/process/factory
+    ./outport/process/transactionsfee
     ./process
     ./process/asyncExecution
     ./process/block
@@ -78,6 +82,7 @@ env:
     ./process/coordinator
     ./process/drwa
     ./process/drwa/headertime
+    ./process/economics
     ./process/factory/metachain
     ./process/factory/shard
     ./process/interceptors
@@ -107,9 +112,11 @@ env:
     ./storage/mock
     ./storage/pruning
     ./testscommon
+    ./testscommon/processMocks
     ./testscommon/round
     ./testscommon/trie
     ./testscommon/txDataBuilder
+    ./testscommon/txcachemocks
     ./trie
     ./trie/leavesRetriever
     ./txcache
@@ -196,6 +203,7 @@ jobs:
               ./config
               ./consensus/round
               ./dataRetriever/resolvers
+              ./dblookupext/esdtSupply
               ./dblookupext/factory
               ./epochStart/bootstrap
               ./facade
@@ -211,6 +219,8 @@ jobs:
               ./node/chainSimulator
               ./node/external/transactionAPI
               ./node/metrics
+              ./outport/process/alteredaccounts
+              ./outport/process/transactionsfee
               ./process
               ./process/block/preprocess
               ./process/drwa
@@ -260,10 +270,12 @@ jobs:
               ./node
               ./node/chainSimulator/components
               ./node/mock
+              ./outport/process/factory
               ./process/asyncExecution
               ./process/block
               ./process/coordinator
               ./process/drwa/headertime
+              ./process/economics
               ./process/interceptors
               ./process/interceptors/processor
               ./process/peer
@@ -278,7 +290,9 @@ jobs:
               ./statusHandler
               ./storage/factory
               ./storage/pruning
+              ./testscommon/processMocks
               ./testscommon/round
+              ./testscommon/txcachemocks
               ./trie
               ./txcache
               ./update/genesis

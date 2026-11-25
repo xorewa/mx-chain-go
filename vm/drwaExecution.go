@@ -10,10 +10,34 @@ import (
 	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
 
-// ErrDRWAExecution identifies a DRWA classifier/context failure, rather than a
-// token-policy denial. Consumers must preserve its error channel and cause.
-// Part A 5.1 and P-05 require node processing to stop on an unavailable view.
+// ErrDRWAExecution identifies a DRWA execution failure that must bypass ordinary
+// token-policy denial handling. Only retained integrity failures request node
+// stop. See Part A 5.1 and P-05.
 var ErrDRWAExecution = errors.New("DRWA execution context unavailable")
+
+type drwaClassificationUnavailable struct{ cause error }
+
+func (e drwaClassificationUnavailable) Error() string {
+	return ErrDRWAExecution.Error() + ": " + e.cause.Error()
+}
+
+func (e drwaClassificationUnavailable) Unwrap() error { return e.cause }
+
+func (e drwaClassificationUnavailable) Is(target error) bool { return target == ErrDRWAExecution }
+
+// NewDRWAClassificationUnavailable is for the native classifier when it
+// cannot take its read dependency and has not called execute. The returned
+// error still aborts the current attempt through the native error channel.
+func NewDRWAClassificationUnavailable(cause error) error {
+	return drwaClassificationUnavailable{cause: cause}
+}
+
+// IsDirectDRWAClassificationUnavailable only recognizes the classifier's
+// direct result. A wrapped or joined error can carry additional failures.
+func IsDirectDRWAClassificationUnavailable(err error) bool {
+	_, ok := err.(drwaClassificationUnavailable)
+	return ok
+}
 
 // DRWATokenClassifier is the DRWA-defined native read dependency on the existing
 // BlockLocalRegistryView (Part A 5.1). The owner binds the native account store

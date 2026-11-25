@@ -725,6 +725,11 @@ func (pcf *processComponentsFactory) newMetaBlockProcessor(
 
 	argsParser := smartContract.NewArgumentParser()
 
+	headerTimeEnabledAt, err := pcf.drwaHeaderTimeEnabledAt()
+	if err != nil {
+		return nil, err
+	}
+
 	vmFactory, err := pcf.createVMFactoryMeta(
 		pcf.state.AccountsAdapter(),
 		pcf.state.PeerAccounts(),
@@ -733,6 +738,7 @@ func (pcf *processComponentsFactory) newMetaBlockProcessor(
 		builtInFuncFactory.NFTStorageHandler(),
 		builtInFuncFactory.ESDTGlobalSettingsHandler(),
 		epochStartTrigger,
+		headerTimeEnabledAt,
 	)
 	if err != nil {
 		return nil, err
@@ -1528,6 +1534,7 @@ func (pcf *processComponentsFactory) createVMFactoryMeta(
 	nftStorageHandler vmcommon.SimpleESDTNFTStorageHandler,
 	globalSettingsHandler vmcommon.ESDTGlobalSettingsHandler,
 	epochStartTriggerHandler process.EpochStartTriggerHandler,
+	headerTimeEnabledAt func(uint32, uint64) bool,
 ) (process.VirtualMachinesContainerFactory, error) {
 	argsHook := hooks.ArgBlockChainHook{
 		Accounts:                 accounts,
@@ -1537,6 +1544,7 @@ func (pcf *processComponentsFactory) createVMFactoryMeta(
 		ShardCoordinator:         pcf.bootstrapComponents.ShardCoordinator(),
 		Marshalizer:              pcf.coreData.InternalMarshalizer(),
 		Hasher:                   pcf.coreData.Hasher(),
+		DRWAHeaderTimeEnabledAt:  headerTimeEnabledAt,
 		Uint64Converter:          pcf.coreData.Uint64ByteSliceConverter(),
 		BuiltInFunctions:         builtInFuncs,
 		DataPool:                 pcf.data.Datapool(),

@@ -20,13 +20,6 @@ type WrappedTransaction struct {
 	Size            int64
 	ReceivedAt      time.Time
 
-	// DRWAValidationReceipt is opaque, in-memory native validation metadata.
-	// Presence is not authority. Verify the sealed result, exact input and
-	// current native operation owner before use. Native Tx shape is unchanged.
-	// JSON excludes this metadata; there is no wire or durable-record field.
-	// Cache size/eviction accounting and ordinary behavior remain to qualify.
-	DRWAValidationReceipt interface{} `json:"-"`
-
 	// These fields are only set within "precomputeFields".
 	// We don't need to protect them with a mutex, since "precomputeFields" is called only once for each transaction.
 	// Additional note: "WrappedTransaction" objects are created by the Node, in dataRetriever/txpool/shardedTxPool.go.

@@ -39,6 +39,7 @@ type headersExecutor struct {
 	cancelFunc                  context.CancelFunc
 	mutPaused                   sync.Mutex
 	isPaused                    bool
+	rollbackFailed              bool
 	pauseRequested              chan struct{}
 	processingDone              chan struct{}
 	signalProcessCompletionChan chan uint64
@@ -162,7 +163,7 @@ func (he *headersExecutor) start(ctx context.Context) {
 
 		he.acknowledgePause()
 		he.mutPaused.Lock()
-		isPaused := he.isPaused
+		isPaused := he.isPaused || he.rollbackFailed
 		he.mutPaused.Unlock()
 
 		if isPaused {
@@ -211,6 +212,9 @@ func (he *headersExecutor) start(ctx context.Context) {
 
 		err := he.process(headerBodyPair)
 		if err != nil {
+			if he.retainRollbackFailure(err) {
+				continue
+			}
 			if errors.Is(err, ErrContextMismatch) {
 				he.acknowledgePause()
 				time.Sleep(timeToSleep)
@@ -281,6 +285,9 @@ func (he *headersExecutor) handleProcessError(ctx context.Context, pair cache.He
 					"retry_count", retryCount)
 				return
 			}
+			if he.retainRollbackFailure(err) {
+				return
+			}
 
 			retryCount++
 			lastErr = err
@@ -329,14 +336,12 @@ func (he *headersExecutor) process(pair cache.HeaderBodyPair) error {
 	if check.IfNil(executionResult) {
 		log.Warn("headersExecutor.process - nil execution result received",
 			"nonce", pair.Header.GetNonce())
-		he.blockProcessor.RevertBlockProposalState()
-		return ErrNilExecutionResult
+		return he.finishProposalFailure(ErrNilExecutionResult, ErrNilExecutionResult)
 	}
 
 	ok = he.checkLastExecutionResultContext(pair.Header, pair.HeaderHash)
 	if !ok {
-		he.blockProcessor.RevertBlockProposalState()
-		return nil
+		return he.finishProposalFailure(ErrContextMismatch, nil)
 	}
 
 	lastCommittedBlockHeader, lastCommittedBlockHash := he.blockChain.GetCurrentBlockHeaderAndHash()
@@ -348,16 +353,14 @@ func (he *headersExecutor) process(pair cache.HeaderBodyPair) error {
 			"exec_header_hash", executionResult.GetHeaderHash(),
 			"committed_block_hash", lastCommittedBlockHash,
 		)
-		he.blockProcessor.RevertBlockProposalState()
-		return nil
+		return he.finishProposalFailure(ErrContextMismatch, nil)
 	}
 
 	lastExecutionResult := he.blockChain.GetLastExecutionResult()
 	if !check.IfNil(lastExecutionResult) {
 		if !bytes.Equal(lastExecutionResult.GetHeaderHash(), pair.Header.GetPrevHash()) {
 			log.Error("headersExecutor.process - header hash mismatch")
-			he.blockProcessor.RevertBlockProposalState()
-			return nil
+			return he.finishProposalFailure(ErrContextMismatch, nil)
 		}
 	}
 
@@ -368,8 +371,7 @@ func (he *headersExecutor) process(pair cache.HeaderBodyPair) error {
 			"nonce", pair.Header.GetNonce(),
 			"err", err,
 		)
-		he.blockProcessor.RevertBlockProposalState()
-		return err
+		return he.finishProposalFailure(err, err)
 	}
 
 	// Add to execution tracker only after state is committed, so the tracker never
@@ -407,6 +409,32 @@ func (he *headersExecutor) process(pair cache.HeaderBodyPair) error {
 	)
 
 	return nil
+}
+
+type proposalRollbackFailure struct{ error }
+
+func (err proposalRollbackFailure) Unwrap() error { return err.error }
+
+func (proposalRollbackFailure) BlockRollbackFailed() {}
+
+func (he *headersExecutor) finishProposalFailure(trigger, restoredResult error) error {
+	if err := he.blockProcessor.RevertBlockProposalState(); err != nil {
+		return proposalRollbackFailure{errors.Join(trigger, err)}
+	}
+	return restoredResult
+}
+
+func (he *headersExecutor) retainRollbackFailure(err error) bool {
+	var failure interface{ BlockRollbackFailed() }
+	if !errors.As(err, &failure) {
+		return false
+	}
+
+	he.mutPaused.Lock()
+	he.rollbackFailed = true
+	he.mutPaused.Unlock()
+	log.Error("headersExecutor: proposal rollback failed", "err", err)
+	return true
 }
 
 func (he *headersExecutor) signalProcessCompletion(currentNonce uint64) {

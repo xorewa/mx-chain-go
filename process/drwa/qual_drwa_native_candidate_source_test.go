@@ -203,13 +203,13 @@ func TestQualNativeCandidateOriginalTransactionConnection(t *testing.T) {
 					require.True(t, stored)
 				}
 				cache, ok := pool.Transactions().ShardDataStore(route).(interface {
-					GetByTxHash([]byte) (*txcache.WrappedTransaction, bool)
+					GetByTxHashWithValidationReceipt([]byte) (*txcache.WrappedTransaction, interface{}, bool)
 				})
 				require.True(t, ok)
-				wrapped, found := cache.GetByTxHash(intercepted.Hash())
+				wrapped, metadata, found := cache.GetByTxHashWithValidationReceipt(intercepted.Hash())
 				require.True(t, found)
 				require.Equal(t, int64(actual.Size()), wrapped.Size)
-				require.Nil(t, wrapped.DRWAValidationReceipt)
+				require.Nil(t, metadata)
 				require.Nil(t, transport.NativeValidationReceiptFor(intercepted.Hash(), route, actual))
 				code, err = execution.NativeSC.ExecuteSmartContractTransaction(wrapped.Tx, nil, destination.(state.UserAccountHandler))
 			} else {

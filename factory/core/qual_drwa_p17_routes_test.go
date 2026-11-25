@@ -401,7 +401,8 @@ builtin/builtInFunctions/multiESDTNFTTransfer.go/*esdtNFTMultiTransfer.processES
 builtin/builtInFunctions/multiESDTNFTTransfer.go/*esdtNFTMultiTransfer.parseESDTSenderLeg
 builtin/builtInFunctions/multiESDTNFTTransfer.go/*esdtNFTMultiTransfer.parseESDTReceiverLeg
 builtin/builtInFunctions/esdtTransferGate.go/*esdtTransferAdmission.check
-builtin/builtInFunctions/esdtTransferGate.go/.transferIdentifiers
+builtin/builtInFunctions/esdtTransferGate.go/.singleTransferIdentifiers
+builtin/builtInFunctions/multiESDTNFTTransfer.go/*esdtNFTMultiTransfer.multiTransferIdentifiers
 builtin/builtInFunctions/esdtTransferGate.go/.executeWithESDTTransferGate
 builtin/builtInFunctions/esdtTransferGate.go/*esdtTransfer.ProcessBuiltinFunctionWithESDTTransferGate
 builtin/builtInFunctions/esdtTransferGate.go/*esdtNFTTransfer.ProcessBuiltinFunctionWithESDTTransferGate
@@ -493,7 +494,7 @@ builtin/builtInFunctions/esdtNFTBurn.go/*esdtNFTBurn.isAllowedToBurn
 node/node/nodeRunner.go/.loadInitialProgrammeData
 node/factory/processing/drwaNetworkIdentityStartup.go/.cloneDRWAIdentityConfig
 node/process/drwa/initialProgrammeEvidence.go/.CloneInitialProgrammeEvidence
-node/process/drwa/initialProgrammeEvidence.go/*InitialProgrammeLimits.Clone
+node/config/drwaInitialProgramme.go/*DRWAInitialProgrammeLimits.Clone
 node/genesis/parsing/drwaInitialProgrammeInputs.go/.LoadDRWAInitialProgrammeInputs
 `)
 	actual := make(map[string]bool, len(nodes))

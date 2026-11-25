@@ -113,7 +113,7 @@ func (sp *shardProcessor) ProcessBlock(
 	headerHandler data.HeaderHandler,
 	bodyHandler data.BodyHandler,
 	haveTime func() time.Duration,
-) error {
+) (resultErr error) {
 	if err := sp.drwaExecutionError(); err != nil {
 		return err
 	}
@@ -256,9 +256,7 @@ func (sp *shardProcessor) ProcessBlock(
 	}
 
 	defer func() {
-		if err != nil {
-			sp.RevertCurrentBlock()
-		}
+		resultErr = sp.finishBlockFailure(err, resultErr)
 	}()
 
 	mbIndex, err := sp.getIndexOfFirstMiniBlockToBeExecuted(header)
@@ -303,6 +301,23 @@ func (sp *shardProcessor) ProcessBlock(
 	}
 
 	return nil
+}
+
+// finishBlockFailure keeps the native cleanup trigger. A configured owner
+// uses the same restoration policy as post-proposal cleanup even when the
+// original error came from native verification after earlier block effects.
+func (bp *baseProcessor) finishBlockFailure(processingErr, original error) error {
+	var restoreErr error
+	switch {
+	case errors.Is(original, vm.ErrDRWAExecution):
+		restoreErr = bp.restoreBlockAccounts()
+	case processingErr != nil:
+		restoreErr = bp.revertBlockProposalState()
+	}
+	if restoreErr != nil {
+		return errors.Join(original, restoreErr)
+	}
+	return original
 }
 
 func (sp *shardProcessor) shouldEpochStartInfoBeAvailable(header data.ShardHeaderHandler) bool {

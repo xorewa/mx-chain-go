@@ -21,11 +21,16 @@ import (
 // transaction arguments, manager identity, token properties or a public flag.
 func (host *vmContext) ExecuteDRWASystemCall(input *vmcommon.ContractCallInput,
 	execute func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {
+	return host.executeDRWASystemCall(input, execute, true)
+}
+
+func (host *vmContext) executeDRWASystemCall(input *vmcommon.ContractCallInput,
+	execute func() (*vmcommon.VMOutput, error), beforePrelude bool) (*vmcommon.VMOutput, error) {
 	// Preserve native disabled/unknown-name behavior. Qualified protected
 	// dispatch must consume explicit provenance after the native prelude; no
 	// name-only reservation, ambient request or accepting provider is installed.
 	if input != nil && bytes.Equal(input.RecipientAddr, core.ESDTSCAddress) {
-		return host.executeDRWAESDTCall(input, execute)
+		return host.executeDRWAESDTCallAtEntry(input, execute, beforePrelude)
 	}
 	return host.executeWithDRWAErrorCheck(execute)
 }
@@ -50,6 +55,11 @@ func (host *vmContext) executeWithDRWAErrorCheck(execute func() (*vmcommon.VMOut
 
 func (host *vmContext) executeDRWAESDTCall(input *vmcommon.ContractCallInput,
 	execute func() (*vmcommon.VMOutput, error)) (*vmcommon.VMOutput, error) {
+	return host.executeDRWAESDTCallAtEntry(input, execute, false)
+}
+
+func (host *vmContext) executeDRWAESDTCallAtEntry(input *vmcommon.ContractCallInput,
+	execute func() (*vmcommon.VMOutput, error), beforePrelude bool) (*vmcommon.VMOutput, error) {
 	return host.executeWithDRWAErrorCheck(func() (*vmcommon.VMOutput, error) {
 		// The physical VM and nested SystemSC calls share this check before
 		// either applies value. Invalid input follows native user-error handling.
@@ -73,9 +83,13 @@ func (host *vmContext) executeDRWAESDTCall(input *vmcommon.ContractCallInput,
 				return execute()
 			})
 		if err != nil && !entered {
-			// Retain the first classification failure across CleanCache and
-			// nested contexts. Recovery requires reconstruction with a newly
-			// admitted owner; clearing ordinary VM caches is not recovery.
+			// The physical VM has not run its prelude or any effects. A
+			// missing read dependency still aborts this call. Only this
+			// exact classifier result lacks evidence of an integrity fault.
+			// Nested and wrapped failures retain the existing barrier.
+			if beforePrelude && vm.IsDirectDRWAClassificationUnavailable(err) {
+				return nil, err
+			}
 			return nil, host.retainDRWAExecutionError(err)
 		}
 		return output, err

@@ -23,8 +23,8 @@ func TestQualDRWAStartupRecordBindsNativeRoleDatabase(t *testing.T) {
 	makeRole := func(name string) drwaStartupRole {
 		work := filepath.Join(root, name)
 		return drwaStartupRole{
-			WorkingDirectory: work,
-			MainConfig: drwaStartupMember{Path: filepath.Join(root, "config_"+name+".toml")},
+			WorkingDirectory:     work,
+			MainConfig:           drwaStartupMember{Path: filepath.Join(root, "config_"+name+".toml")},
 			OriginalDatabasePath: filepath.Join(work, "db", chainID),
 		}
 	}
@@ -131,6 +131,22 @@ func TestQualDRWAStartupRecordBindsMinimumDeclarations(t *testing.T) {
 		require.Equal(t, sha256.Sum256([]byte(profile)), minimum.ProfileDigest)
 		require.Equal(t, record.Release.SHA256, hex.EncodeToString(minimum.ReleaseDigest[:]))
 	})
+	t.Run("matching zero maximum violates native minimum", func(t *testing.T) {
+		record := makeRecord(t, `{"max_ever_regulated_tokens":0,"registry_proof_bytes":1048576}`)
+		record.MinimumMaxEverTokens = 0
+
+		minimum, err := readDRWAStartupMinimum(record)
+		require.EqualError(t, err, "DRWA provisioning requires an empty native genesis store")
+		require.Equal(t, config.DRWAMinimumGenesis{}, minimum)
+	})
+	t.Run("matching zero proof budget violates native minimum", func(t *testing.T) {
+		record := makeRecord(t, `{"max_ever_regulated_tokens":64,"registry_proof_bytes":0}`)
+		record.MinimumRegistryProofBytes = 0
+
+		minimum, err := readDRWAStartupMinimum(record)
+		require.EqualError(t, err, "DRWA provisioning requires an empty native genesis store")
+		require.Equal(t, config.DRWAMinimumGenesis{}, minimum)
+	})
 	for _, tc := range []struct {
 		name   string
 		body   string
@@ -160,8 +176,12 @@ func TestQualDRWAStartupRecordBindsMinimumDeclarations(t *testing.T) {
 		{name: "release case alias", body: profile, change: func(t *testing.T, record *drwaStartupRecordInput) {
 			record.Release = write(t, "release.json", `{"PROFILE_SHA256":"`+record.Profile.SHA256+`"}`)
 		}},
+		{name: "malformed member name", body: `{"max_ever_regulated_tokens":64,7:0,"registry_proof_bytes":1048576}`},
+		{name: "malformed nested member value", body: `{"max_ever_regulated_tokens":64,"registry_proof_bytes":1048576,"processor_support":{"v2":}}`},
 		{name: "trailing member", body: profile + ` {}`},
 		{name: "malformed object", body: profile[:len(profile)-1]},
+		{name: "missing key after comma", body: `{"max_ever_regulated_tokens":64,}`},
+		{name: "missing declaration value", body: `{"max_ever_regulated_tokens":`},
 		{name: "nonobject declaration", body: "[" + profile + "]"},
 		{name: "missing budget", body: `{"max_ever_regulated_tokens":64}`},
 	} {
@@ -175,9 +195,43 @@ func TestQualDRWAStartupRecordBindsMinimumDeclarations(t *testing.T) {
 			require.Equal(t, config.DRWAMinimumGenesis{}, minimum)
 		})
 	}
+	t.Run("matched zero token cap fails native minimum validation", func(t *testing.T) {
+		record := makeRecord(t, `{"max_ever_regulated_tokens":0,"registry_proof_bytes":1048576}`)
+		record.MinimumMaxEverTokens = 0
+		minimum, err := readDRWAStartupMinimum(record)
+		require.EqualError(t, err, "DRWA provisioning requires an empty native genesis store")
+		require.Equal(t, config.DRWAMinimumGenesis{}, minimum)
+	})
 }
 
 func TestQualDRWAStartupRecordUsesNativeCLI(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		anchor string
+		want   error
+	}{
+		{name: "invalid anchor before missing configuration", anchor: "missing-delimiters", want: errDRWAStartupRecord},
+		{name: "ordinary startup reports missing configuration", want: os.ErrNotExist},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			app := cli.NewApp()
+			app.Flags = getFlags()
+			app.Action = func(ctx *cli.Context) error {
+				return startNodeRunner(ctx, logger.GetOrCreate("qual-startup-preconditions"), "base", "version")
+			}
+			args := []string{"qual-startup", "--" + configurationFile.Name, filepath.Join(dir, "missing.toml"),
+				"--" + workingDirectory.Name, dir, "--" + logSaveFile.Name}
+			if tc.anchor != "" {
+				args = append(args, "--"+drwaStartupRecord.Name, tc.anchor)
+			}
+			require.ErrorIs(t, app.Run(args), tc.want)
+			entries, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			require.Empty(t, entries)
+		})
+	}
+
 	t.Run("ordinary config keeps the startup carrier absent", func(t *testing.T) {
 		cfg, err := qualDRWANativeStartup(t, qualDRWANativeStartupFixtureDir(t))
 		require.NoError(t, err)
@@ -226,9 +280,9 @@ func TestQualDRWAOriginalCLIRefusesBeforeNativeEffects(t *testing.T) {
 		require.Nil(t, cfg.DRWAInitialProgrammeStartup)
 	})
 	for _, tc := range []struct {
-		name        string
-		backing     bool
-		attempts    int
+		name     string
+		backing  bool
+		attempts int
 	}{
 		{name: "no prior store but no provenance", attempts: 1},
 		{name: "selected store exists but no provenance", backing: true, attempts: 1},

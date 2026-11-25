@@ -424,6 +424,7 @@ func TestVmContainerFactory_Create(t *testing.T) {
 	vmInstance, err := container.Get(factory.SystemVirtualMachine)
 	assert.Nil(t, err)
 	assert.NotNil(t, vmInstance)
+	require.Nil(t, vmf.DRWAAccountDeletionGuard(), "unconfigured factory must preserve ordinary deletion")
 
 	acc := vmf.BlockChainHookImpl()
 	assert.NotNil(t, acc)

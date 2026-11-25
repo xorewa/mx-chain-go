@@ -418,6 +418,29 @@ func TestGetAllIssuedESDTs_Error(t *testing.T) {
 	assert.Equal(t, resp.Code, http.StatusInternalServerError)
 }
 
+func TestGetAllIssuedESDTs_MockedSystemBusyResponse(t *testing.T) {
+	facade := mock.FacadeStub{
+		GetAllIssuedESDTsCalled: func(_ context.Context, _ string) ([]string, error) {
+			return nil, common.ErrTrieOperationsBusy
+		},
+	}
+
+	networkGroup, err := groups.NewNetworkGroup(&facade)
+	require.NoError(t, err)
+
+	ws := startWebServer(networkGroup, "network", getNetworkRoutesConfig())
+	req := httptest.NewRequest(http.MethodGet, "/network/esdts", nil)
+	resp := httptest.NewRecorder()
+	ws.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusTooManyRequests, resp.Code)
+	var response shared.GenericAPIResponse
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &response))
+	require.Equal(t, shared.ReturnCodeSystemBusy, response.Code)
+	require.Equal(t, common.ErrTrieOperationsBusy.Error(), response.Error)
+	require.Nil(t, response.Data)
+}
+
 func TestDirectStakedInfo_ShouldWork(t *testing.T) {
 	stakedData1 := api.DirectStakedValue{
 		Address:    "addr1",

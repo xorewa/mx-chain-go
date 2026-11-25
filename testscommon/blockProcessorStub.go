@@ -97,10 +97,11 @@ func (bps *BlockProcessorStub) DiscardStateAccessesForHeader(headerHash []byte) 
 }
 
 // RevertBlockProposalState -
-func (bps *BlockProcessorStub) RevertBlockProposalState() {
+func (bps *BlockProcessorStub) RevertBlockProposalState() error {
 	if bps.RevertBlockProposalStateCalled != nil {
 		bps.RevertBlockProposalStateCalled()
 	}
+	return nil
 }
 
 // ProcessScheduledBlock mocks processing a scheduled block

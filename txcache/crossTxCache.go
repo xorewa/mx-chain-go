@@ -68,22 +68,29 @@ func (cache *CrossTxCache) SetOldestImmuneNonce(nonce uint64) {
 
 // AddTx adds a transaction in the cache
 func (cache *CrossTxCache) AddTx(tx *WrappedTransaction) (has, added bool) {
+	return cache.AddTxWithValidationReceipt(tx, nil)
+}
+
+// AddTxWithValidationReceipt adds a transaction and its optional opaque observation.
+func (cache *CrossTxCache) AddTxWithValidationReceipt(tx *WrappedTransaction, receipt interface{}) (has, added bool) {
 	log.Trace("CrossTxCache.AddTx", "name", cache.config.Name, "txHash", tx.TxHash)
-	return cache.HasOrAdd(tx.TxHash, tx, int(tx.Size))
+	return cache.HasOrAdd(tx.TxHash, cachedTransactionValue(tx, receipt), int(tx.Size))
 }
 
 // GetByTxHash gets the transaction by hash
 func (cache *CrossTxCache) GetByTxHash(txHash []byte) (*WrappedTransaction, bool) {
+	tx, _, ok := cache.GetByTxHashWithValidationReceipt(txHash)
+	return tx, ok
+}
+
+// GetByTxHashWithValidationReceipt reads the native entry and receipt together.
+func (cache *CrossTxCache) GetByTxHashWithValidationReceipt(txHash []byte) (*WrappedTransaction, interface{}, bool) {
 	item, ok := cache.ImmunityCache.Get(txHash)
 	if !ok {
-		return nil, false
-	}
-	tx, ok := item.(*WrappedTransaction)
-	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 
-	return tx, true
+	return unwrapCachedTransaction(item)
 }
 
 // Get returns the unwrapped payload of a TransactionWrapper
@@ -111,13 +118,28 @@ func (cache *CrossTxCache) RemoveTxByHash(txHash []byte) bool {
 
 // ForEachTransaction iterates over the transactions in the cache
 func (cache *CrossTxCache) ForEachTransaction(function ForEachTransaction) {
-	cache.ForEachItem(func(key []byte, item interface{}) {
-		tx, ok := item.(*WrappedTransaction)
-		if !ok {
-			return
-		}
-
+	cache.ForEachTransactionWithValidationReceipt(func(key []byte, tx *WrappedTransaction, _ interface{}) {
 		function(key, tx)
+	})
+}
+
+// ForEachItem preserves the native item representation in ordinary iteration.
+func (cache *CrossTxCache) ForEachItem(function types.ForEachItem) {
+	cache.ImmunityCache.ForEachItem(func(key []byte, item interface{}) {
+		if tx, _, ok := unwrapCachedTransaction(item); ok {
+			item = tx
+		}
+		function(key, item)
+	})
+}
+
+// ForEachTransactionWithValidationReceipt iterates over native entries with their receipts.
+func (cache *CrossTxCache) ForEachTransactionWithValidationReceipt(function ForEachTransactionWithValidationReceipt) {
+	cache.ImmunityCache.ForEachItem(func(key []byte, item interface{}) {
+		tx, receipt, ok := unwrapCachedTransaction(item)
+		if ok {
+			function(key, tx, receipt)
+		}
 	})
 }
 

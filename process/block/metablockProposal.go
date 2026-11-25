@@ -16,6 +16,7 @@ import (
 	"github.com/multiversx/mx-chain-go/dataRetriever"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 // metaArbitrationWindowRounds is the arbitration discovery window: rounds after a contended shard
@@ -342,7 +343,7 @@ func (mp *metaProcessor) ProcessBlockProposal(
 	headerHandler data.HeaderHandler,
 	headerHash []byte,
 	bodyHandler data.BodyHandler,
-) (data.BaseExecutionResultHandler, error) {
+) (result data.BaseExecutionResultHandler, resultErr error) {
 	if err := mp.drwaExecutionError(); err != nil {
 		return nil, err
 	}
@@ -361,7 +362,13 @@ func (mp *metaProcessor) ProcessBlockProposal(
 	}
 	defer mp.processStatusHandler.SetIdle()
 
-	installHeader, endHeaderTime, timeErr := beginEvaluatedHeaderTime(mp.blockChainHook)
+	header, metaHeader := headerHandler.(data.MetaHeaderHandler)
+	body, nativeBody := bodyHandler.(*block.Body)
+	var candidate []data.HeaderHandler
+	if metaHeader && nativeBody && header.GetShardID() == core.MetachainShardId {
+		candidate = []data.HeaderHandler{header}
+	}
+	installHeader, endHeaderTime, timeErr := beginEvaluatedHeaderTime(mp.blockChainHook, candidate...)
 	if timeErr != nil {
 		return nil, timeErr
 	}
@@ -371,13 +378,7 @@ func (mp *metaProcessor) ProcessBlockProposal(
 	mp.epochNotifier.CheckEpoch(headerHandler)
 	mp.requestHandler.SetEpoch(headerHandler.GetEpoch())
 
-	header, ok := headerHandler.(data.MetaHeaderHandler)
-	if !ok {
-		return nil, process.ErrWrongTypeAssertion
-	}
-
-	body, ok := bodyHandler.(*block.Body)
-	if !ok {
+	if !metaHeader || !nativeBody {
 		return nil, process.ErrWrongTypeAssertion
 	}
 
@@ -399,8 +400,9 @@ func (mp *metaProcessor) ProcessBlockProposal(
 
 	var err error
 	defer func() {
-		if err != nil {
-			mp.RevertCurrentBlock()
+		resultErr = mp.finishBlockFailure(err, resultErr)
+		if errors.Is(resultErr, vm.ErrDRWAExecution) {
+			result = nil
 		}
 	}()
 
@@ -521,8 +523,8 @@ func (mp *metaProcessor) CommitBlockProposalState(headerHandler data.HeaderHandl
 }
 
 // RevertBlockProposalState reverts the uncommitted accounts state after a block proposal processing failure
-func (mp *metaProcessor) RevertBlockProposalState() {
-	mp.RevertCurrentBlock()
+func (mp *metaProcessor) RevertBlockProposalState() error {
+	return mp.revertBlockProposalState()
 }
 
 func (mp *metaProcessor) checkNonceGaps(metaHeader data.MetaHeaderHandler) error {

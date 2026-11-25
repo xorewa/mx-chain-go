@@ -3,6 +3,7 @@ package systemSmartContracts
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
 	"github.com/multiversx/mx-chain-go/common"
@@ -734,6 +735,92 @@ func TestVMContext_RetainDRWAExecutionError(t *testing.T) {
 			require.NotErrorIs(t, retained, second)
 		})
 	}
+}
+
+func TestVMContext_PreEffectClassifierUnavailable(t *testing.T) {
+	busy := errors.New("synthetic unavailable dependency")
+	temporary := vm.NewDRWAClassificationUnavailable(busy)
+	rollback := errors.New("synthetic rollback failure")
+	call := createDirectCallInput(core.ESDTSCAddress, nil, big.NewInt(0), "pause", [][]byte{[]byte("TOKEN-abcdef")})
+	nativeOutput := &vmcommon.VMOutput{ReturnCode: vmcommon.Ok, GasRemaining: 17, GasRefund: big.NewInt(0)}
+
+	t.Run("physical prelude has not started", func(t *testing.T) {
+		classifier := &publicClassifier{classifyErr: temporary}
+		host := &vmContext{drwaClassifierConfigured: true, drwaClassifier: classifier}
+		calls := 0
+		execute := func() (*vmcommon.VMOutput, error) {
+			calls++
+			return nativeOutput, nil
+		}
+		out, err := host.ExecuteDRWASystemCall(call, execute)
+		require.Nil(t, out)
+		require.ErrorIs(t, err, vm.ErrDRWAExecution)
+		require.ErrorIs(t, err, busy)
+		require.Zero(t, calls)
+		require.NoError(t, host.DRWAExecutionError())
+
+		// A different ordinary call has its original result and gas.
+		out, err = host.ExecuteDRWASystemCall(nil, execute)
+		require.NoError(t, err)
+		require.Same(t, nativeOutput, out)
+		require.Equal(t, 1, calls)
+	})
+
+	for _, test := range []struct {
+		name    string
+		failure error
+	}{
+		{"equal error text", errors.New(temporary.Error())},
+		{"wrapped temporary error", fmt.Errorf("integrity boundary: %w", temporary)},
+		{"joined rollback failure", errors.Join(temporary, rollback)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			classifier := &publicClassifier{classifyErr: test.failure}
+			host := &vmContext{drwaClassifierConfigured: true, drwaClassifier: classifier}
+			out, err := host.ExecuteDRWASystemCall(call, func() (*vmcommon.VMOutput, error) {
+				t.Fatal("failed classifier entered native work")
+				return nil, nil
+			})
+			require.Nil(t, out)
+			require.ErrorIs(t, err, vm.ErrDRWAExecution)
+			require.ErrorIs(t, err, test.failure)
+			require.ErrorIs(t, host.DRWAExecutionError(), test.failure)
+			if errors.Is(test.failure, rollback) {
+				require.ErrorIs(t, host.DRWAExecutionError(), rollback)
+				require.ErrorIs(t, host.DRWAExecutionError(), busy)
+			}
+		})
+	}
+
+	t.Run("nested failure cannot be swallowed", func(t *testing.T) {
+		args := createDefaultEeiArgs()
+		args.DRWAClassifier = &publicClassifier{classifyErr: temporary}
+		host, err := NewVMContext(args)
+		require.NoError(t, err)
+		require.NoError(t, host.SetSystemSCContainer(&mock.SystemSCContainerStub{}))
+		out, err := host.ExecuteDRWASystemCall(nil, func() (*vmcommon.VMOutput, error) {
+			nested, nestedErr := host.ExecuteOnDestContext(core.ESDTSCAddress, []byte("sender"), big.NewInt(0), []byte("pause@54"))
+			require.Nil(t, nested)
+			require.ErrorIs(t, nestedErr, busy)
+			return nativeOutput, nil
+		})
+		require.Nil(t, out)
+		require.ErrorIs(t, err, vm.ErrDRWAExecution)
+		require.ErrorIs(t, host.DRWAExecutionError(), busy)
+	})
+
+	t.Run("owner failure still prevents entry", func(t *testing.T) {
+		owner := &publicOwner{publicClassifier: &publicClassifier{classifyErr: temporary}, failure: rollback}
+		host := &vmContext{drwaClassifierConfigured: true, drwaClassifier: owner}
+		out, err := host.ExecuteDRWASystemCall(call, func() (*vmcommon.VMOutput, error) {
+			t.Fatal("failed owner entered native work")
+			return nil, nil
+		})
+		require.Nil(t, out)
+		require.ErrorIs(t, err, rollback)
+		require.ErrorIs(t, host.DRWAExecutionError(), rollback)
+		require.Zero(t, owner.calls)
+	})
 }
 
 func TestVMContext_DRWAExecutionError(t *testing.T) {

@@ -83,16 +83,21 @@ func (txPool *shardedTxPool) AddDataWithNativeValidationReceipt(key []byte, valu
 		return
 	}
 	extra := receipt.RetainedSize()
-	if extra < 0 || sizeInBytes < 0 || extra > int64(math.MaxInt)-int64(sizeInBytes)-int64(len(key)) {
+	if extra < 0 || sizeInBytes < 0 {
+		txPool.AddData(key, value, sizeInBytes, cacheID)
+		return
+	}
+	remaining := int64(math.MaxInt) - int64(sizeInBytes) - txcache.ValidationReceiptEntrySize
+	if extra > remaining || int64(len(key)) > remaining-extra {
 		txPool.AddData(key, value, sizeInBytes, cacheID)
 		return
 	}
 	immutableKey := bytes.Clone(key)
-	if int64(cap(immutableKey)) > int64(math.MaxInt)-int64(sizeInBytes)-extra {
+	if int64(cap(immutableKey)) > remaining-extra {
 		txPool.AddData(key, value, sizeInBytes, cacheID)
 		return
 	}
-	extra += int64(cap(immutableKey))
+	extra += int64(cap(immutableKey)) + txcache.ValidationReceiptEntrySize
 	sender, receiver, err := process.ParseShardCacherIdentifier(cacheID)
 	if err != nil {
 		// Keep native invalid-cache behavior, including its diagnostic.
@@ -101,7 +106,7 @@ func (txPool *shardedTxPool) AddDataWithNativeValidationReceipt(key []byte, valu
 	}
 	txPool.addTx(&txcache.WrappedTransaction{Tx: tx, TxHash: immutableKey,
 		SenderShardID: sender, ReceiverShardID: receiver,
-		Size: int64(sizeInBytes) + extra, DRWAValidationReceipt: receipt}, cacheID)
+		Size: int64(sizeInBytes) + extra}, cacheID, receipt)
 }
 
 func (txPool *shardedTxPool) currentNativeValidationSource() *nativeValidation.NativeValidationSource {
@@ -130,11 +135,11 @@ func (txPool *shardedTxPool) NativeValidationReceiptFor(key []byte, cacheID stri
 	if source == nil {
 		return nil
 	}
-	wrapped, found := txPool.getTxCache(cacheID).GetByTxHash(key)
+	wrapped, metadata, found := txPool.getTxCache(cacheID).GetByTxHashWithValidationReceipt(key)
 	if !found || wrapped.Tx != tx || !bytes.Equal(wrapped.TxHash, key) {
 		return nil
 	}
-	receipt, _ := wrapped.DRWAValidationReceipt.(*nativeValidation.NativeValidationReceipt)
+	receipt, _ := metadata.(*nativeValidation.NativeValidationReceipt)
 	if nativeValidation.VerifyNativeValidationReceipt(*source, receipt, tx, key) != nil {
 		return nil
 	}
@@ -320,15 +325,15 @@ func (txPool *shardedTxPool) AddData(key []byte, value interface{}, sizeInBytes 
 		Size:            int64(sizeInBytes),
 	}
 
-	txPool.addTx(wrapper, cacheID)
+	txPool.addTx(wrapper, cacheID, nil)
 }
 
 // addTx adds the transaction to the cache
-func (txPool *shardedTxPool) addTx(tx *txcache.WrappedTransaction, cacheID string) {
+func (txPool *shardedTxPool) addTx(tx *txcache.WrappedTransaction, cacheID string, receipt interface{}) {
 	shard := txPool.getOrCreateShard(cacheID)
 	cache := shard.Cache
 
-	_, added := cache.AddTx(tx)
+	_, added := cache.AddTxWithValidationReceipt(tx, receipt)
 	if added {
 		txPool.onAdded(tx.TxHash, tx)
 	}
@@ -426,8 +431,8 @@ func (txPool *shardedTxPool) MergeShardStores(sourceCacheID, destCacheID string)
 	sourceShard := txPool.getOrCreateShard(sourceCacheID)
 	sourceCache := sourceShard.Cache
 
-	sourceCache.ForEachTransaction(func(txHash []byte, tx *txcache.WrappedTransaction) {
-		txPool.addTx(tx, destCacheID)
+	sourceCache.ForEachTransactionWithValidationReceipt(func(_ []byte, tx *txcache.WrappedTransaction, receipt interface{}) {
+		txPool.addTx(tx, destCacheID, receipt)
 	})
 
 	txPool.mutexBackingMap.Lock()

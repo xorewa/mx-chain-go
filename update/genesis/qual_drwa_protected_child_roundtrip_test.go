@@ -2,6 +2,7 @@ package genesis
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	testStorage "github.com/multiversx/mx-chain-go/testscommon/storage"
 	"github.com/multiversx/mx-chain-go/trie"
 	"github.com/multiversx/mx-chain-go/trie/keyBuilder"
+	"github.com/multiversx/mx-chain-go/update"
 	"github.com/multiversx/mx-chain-go/update/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -46,8 +48,12 @@ func TestQualDRWAA19ProtectedChildHardforkRoundTrip(t *testing.T) {
 		return record, nil
 	}
 	var checkpoint, committedChild []byte
+	var locateErr error
 	selectors := &state.ProtectedChildCheckpoints{
 		Locate: func(ref common.RootHashHolder) ([]state.ProtectedChildLocator, error) {
+			if locateErr != nil {
+				return nil, locateErr
+			}
 			if !bytes.Equal(ref.GetRootHash(), checkpoint) {
 				return nil, fmt.Errorf("unknown synthetic checkpoint")
 			}
@@ -133,6 +139,13 @@ func TestQualDRWAA19ProtectedChildHardforkRoundTrip(t *testing.T) {
 	delete(tries, childID)
 	require.ErrorContains(t, exporter.exportAllTries(), "required protected child absent")
 	require.Empty(t, exported)
+	rootFailure := errors.New("inert physical child root read failure")
+	tries[childID] = &qualSP281CLaneFChildRoot{Trie: physical, err: rootFailure}
+	require.ErrorIs(t, exporter.exportAllTries(), rootFailure)
+	require.Empty(t, exported)
+	tries[childID] = &qualSP281CLaneFChildRoot{Trie: physical, root: checkpoint}
+	require.ErrorContains(t, exporter.exportAllTries(), "protected child export root mismatch")
+	require.Empty(t, exported)
 	tries[childID] = physical
 	require.NoError(t, exporter.exportAllTries())
 
@@ -183,6 +196,27 @@ func TestQualDRWAA19ProtectedChildHardforkRoundTrip(t *testing.T) {
 			got, _, err := physical.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, history, got)
+
+			// Inject private read failures only after establishing the real round
+			// trip. Keep the exact storage manager and identifier for each case.
+			si := importer
+			exact := si.tries[childFile]
+			require.NotNil(t, exact)
+			delete(si.tries, childFile)
+			require.ErrorContains(t, si.checkProtectedImport(), "required protected child missing")
+			si.tries[childFile] = &qualSP281CLaneFChildRoot{Trie: exact, err: rootFailure}
+			require.ErrorIs(t, si.checkProtectedImport(), rootFailure)
+			si.tries[childFile] = &qualSP281CLaneFChildRoot{Trie: exact, root: checkpoint}
+			require.ErrorIs(t, si.checkProtectedImport(), update.ErrImportingData)
+			require.ErrorContains(t, si.checkProtectedImport(), "protected child root mismatch")
+			si.tries[childFile] = exact
+			si.protectedRoots[0] = childRoot
+			require.ErrorContains(t, si.checkProtectedImport(), "protected checkpoint root mismatch")
+			si.protectedRoots[0] = checkpoint
+			locateErr = errors.New("inert checkpoint resolution failure")
+			require.ErrorContains(t, si.checkProtectedImport(), locateErr.Error())
+			locateErr = nil
+			require.NoError(t, si.checkProtectedImport())
 		})
 	}
 }

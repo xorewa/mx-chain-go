@@ -90,6 +90,8 @@ type baseProcessor struct {
 	nodesCoordinator        nodesCoordinator.NodesCoordinator
 	accountsDB              map[state.AccountsDbIdentifier]state.AccountsAdapter
 	accountsProposal        state.AccountsAdapter
+	mutBlockRollback        sync.Mutex
+	blockRollbackErr        error
 	forkDetector            process.ForkDetector
 	hasher                  hashing.Hasher
 	marshalizer             marshal.Marshalizer
@@ -926,10 +928,12 @@ func (bp *baseProcessor) createBlockStarted() error {
 	return nil
 }
 
-// drwaExecutionError consults the existing System VM, rather than retaining a
-// second copy of its failure. Missing/older VMs follow the native path; that
-// fallback is not configuration, classifier or recovery admission (P-05).
+// drwaExecutionError checks the block owner's restoration result and consults
+// the System VM for VM-owned failures (P-05).
 func (bp *baseProcessor) drwaExecutionError() error {
+	if err := bp.blockRollbackError(); err != nil {
+		return err
+	}
 	if check.IfNil(bp.vmContainer) {
 		return nil
 	}
@@ -943,22 +947,37 @@ func (bp *baseProcessor) drwaExecutionError() error {
 	}
 	err = status.DRWAExecutionError()
 	if errors.Is(err, vm.ErrDRWAExecution) {
-		// Read the native endpoint only after poison is recognized. Missing or
-		// unavailable endpoints cannot block the existing failure barrier.
-		if stopper, exists := bp.coreComponents.(interface {
-			ChanStopNodeProcess() chan endProcess.ArgEndProcess
-		}); exists {
-			select {
-			case stopper.ChanStopNodeProcess() <- endProcess.ArgEndProcess{
-				Reason: common.DRWAExecutionFailure, Description: vm.ErrDRWAExecution.Error(),
-			}:
-			default:
-			}
-		}
+		bp.requestDRWAExecutionStop()
 		return err
 	}
 	return nil
 }
+
+func (bp *baseProcessor) requestDRWAExecutionStop() {
+	if stopper, exists := bp.coreComponents.(interface {
+		ChanStopNodeProcess() chan endProcess.ArgEndProcess
+	}); exists {
+		select {
+		case stopper.ChanStopNodeProcess() <- endProcess.ArgEndProcess{
+			Reason: common.DRWAExecutionFailure, Description: vm.ErrDRWAExecution.Error(),
+		}:
+		default:
+		}
+	}
+}
+
+func (bp *baseProcessor) blockRollbackError() error {
+	bp.mutBlockRollback.Lock()
+	defer bp.mutBlockRollback.Unlock()
+
+	return bp.blockRollbackErr
+}
+
+type blockRollbackFailure struct{ error }
+
+func (err blockRollbackFailure) Unwrap() error { return err.error }
+
+func (blockRollbackFailure) BlockRollbackFailed() {}
 
 func (bp *baseProcessor) verifyFees(header data.HeaderHandler) error {
 	if header.GetAccumulatedFees().Cmp(bp.feeHandler.GetAccumulatedFees()) != 0 {
@@ -2567,8 +2586,74 @@ func (bp *baseProcessor) updateStateStorage(
 
 // RevertCurrentBlock reverts the current block for cleanup failed process
 func (bp *baseProcessor) RevertCurrentBlock() {
-	bp.revertAccountState()
-	bp.revertScheduledInfo()
+	_ = bp.revertCurrentBlock(nil)
+}
+
+func (bp *baseProcessor) revertBlockProposalState() error {
+	if err := bp.blockRollbackError(); err != nil {
+		return err
+	}
+	if !check.IfNil(bp.vmContainer) {
+		systemVM, err := bp.vmContainer.Get(processFactory.SystemVirtualMachine)
+		if err == nil && !check.IfNilReflect(systemVM) {
+			configured, ok := systemVM.(interface{ DRWANativeCallConfigured() bool })
+			if ok && configured.DRWANativeCallConfigured() {
+				return bp.restoreBlockAccounts()
+			}
+		}
+	}
+	bp.RevertCurrentBlock()
+	return nil
+}
+
+func (bp *baseProcessor) restoreBlockAccounts() error {
+	if err := bp.blockRollbackError(); err != nil {
+		return err
+	}
+
+	required := [...]state.AccountsDbIdentifier{state.UserAccountsState, state.PeerAccountsState}
+	stores := [len(required)]state.AccountsAdapter{bp.accountsDB[required[0]], bp.accountsDB[required[1]]}
+	resets := make(map[state.AccountsDbIdentifier]accountResetResult, len(required))
+	scheduledErr := bp.revertCurrentBlock(resets)
+
+	var failures []error
+	for i, id := range required {
+		reset, found := resets[id]
+		if !found || check.IfNil(reset.store) || reset.store != stores[i] {
+			failures = append(failures, fmt.Errorf("block rollback: missing or foreign reset for store %d", id))
+		}
+	}
+	if len(resets) > len(required) {
+		failures = append(failures, errors.New("block rollback: unexpected account store roster"))
+	}
+	ids := make([]int, 0, len(resets))
+	for id := range resets {
+		ids = append(ids, int(id))
+	}
+	sort.Ints(ids)
+	for _, id := range ids {
+		if err := resets[state.AccountsDbIdentifier(id)].err; err != nil {
+			failures = append(failures, fmt.Errorf("block rollback: store %d: %w", id, err))
+		}
+	}
+	if scheduledErr != nil {
+		failures = append(failures, fmt.Errorf("block rollback: scheduled execution: %w", scheduledErr))
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+
+	failure := blockRollbackFailure{fmt.Errorf("%w: %w", vm.ErrDRWAExecution, errors.Join(failures...))}
+	bp.mutBlockRollback.Lock()
+	firstFailure := bp.blockRollbackErr == nil
+	if firstFailure {
+		bp.blockRollbackErr = failure
+	}
+	bp.mutBlockRollback.Unlock()
+	if firstFailure {
+		bp.requestDRWAExecutionStop()
+	}
+	return failure
 }
 
 // RevertHeaderV3OnCommit reverts the current block for commit failed
@@ -2583,19 +2668,32 @@ func (bp *baseProcessor) RevertHeaderV3OnCommit(headerHandler data.HeaderHandler
 	}
 }
 
-func (bp *baseProcessor) revertAccountState() {
-	for key := range bp.accountsDB {
-		err := bp.accountsDB[key].RevertToSnapshot(0)
+type accountResetResult struct {
+	store state.AccountsAdapter
+	err   error
+}
+
+// revertCurrentBlock can return each native account reset result in a
+// caller-owned map. An entry records the attempt, even when the reset failed.
+// The caller remains responsible for checking the complete set of stores.
+func (bp *baseProcessor) revertCurrentBlock(results map[state.AccountsDbIdentifier]accountResetResult) error {
+	clear(results)
+	for key, store := range bp.accountsDB {
+		err := store.RevertToSnapshot(0)
 		if err != nil {
 			log.Error("RevertToSnapshot", "error", err.Error())
 		}
+		if results != nil {
+			results[key] = accountResetResult{store: store, err: err}
+		}
 	}
+	return bp.revertScheduledInfo()
 }
 
-func (bp *baseProcessor) revertScheduledInfo() {
+func (bp *baseProcessor) revertScheduledInfo() error {
 	header, headerHash := bp.getLastCommittedHeaderAndHash()
 	if !header.HasScheduledSupport() {
-		return
+		return nil
 	}
 
 	err := bp.scheduledTxsExecutionHandler.RollBackToBlock(headerHash)
@@ -2609,6 +2707,7 @@ func (bp *baseProcessor) revertScheduledInfo() {
 		}
 		bp.scheduledTxsExecutionHandler.SetScheduledInfo(scheduledInfo)
 	}
+	return err
 }
 
 func (bp *baseProcessor) getLastCommittedHeaderAndHash() (data.HeaderHandler, []byte) {

@@ -55,17 +55,8 @@ func qualNativeMetaSCRFixture(t *testing.T,
 
 func qualReadNativeMetaSCR(f *canonicalTestFixture, previous, original, mbRaw, scrRaw []byte,
 	w canonicalResultWitness, limit int) (*nativeSCRCarrierObservation, error) {
-	if reader, ok := interface{}(f.reader).(interface {
-		readNativeMetaSCRObservation([]byte, uint32, []byte, []byte, []byte, canonicalResultWitness,
-			[]byte, []byte, int) (*nativeSCRCarrierObservation, error)
-	}); ok {
-		return reader.readNativeMetaSCRObservation(f.bHash, f.consumer, f.hash(f.w.Account.ExecutedHeader),
-			previous, original, w, mbRaw, scrRaw, limit)
-	}
-	// The old S1 entry deliberately rejects Meta sources. This exposes a missing
-	// Meta outcome consumer, not a defect in the existing S1 import permission.
-	return f.r.readNativeSCRObservation(f.reader, f.bHash, f.consumer, f.producer,
-		f.hash(f.w.Account.ExecutedHeader), w, mbRaw, scrRaw, limit)
+	return f.reader.readNativeMetaSCRObservation(f.bHash, f.consumer, f.hash(f.w.Account.ExecutedHeader),
+		previous, original, w, mbRaw, scrRaw, limit)
 }
 
 type qualMetaProofMutator struct {

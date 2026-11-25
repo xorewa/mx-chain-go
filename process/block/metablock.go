@@ -154,7 +154,7 @@ func (mp *metaProcessor) ProcessBlock(
 	headerHandler data.HeaderHandler,
 	bodyHandler data.BodyHandler,
 	haveTime func() time.Duration,
-) error {
+) (resultErr error) {
 	if err := mp.drwaExecutionError(); err != nil {
 		return err
 	}
@@ -214,9 +214,7 @@ func (mp *metaProcessor) ProcessBlock(
 	mp.updateMetrics(header)
 
 	defer func() {
-		if err != nil {
-			mp.RevertCurrentBlock()
-		}
+		resultErr = mp.finishBlockFailure(err, resultErr)
 	}()
 
 	err = mp.createBlockStarted()

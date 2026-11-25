@@ -14,12 +14,13 @@ import (
 type txCache interface {
 	storage.Cacher
 
-	AddTx(tx *txcache.WrappedTransaction) (ok bool, added bool)
+	AddTxWithValidationReceipt(tx *txcache.WrappedTransaction, receipt interface{}) (ok bool, added bool)
 	GetByTxHash(txHash []byte) (*txcache.WrappedTransaction, bool)
+	GetByTxHashWithValidationReceipt(txHash []byte) (*txcache.WrappedTransaction, interface{}, bool)
 	RemoveTxByHash(txHash []byte) bool
 	ImmunizeTxsAgainstEviction(keys [][]byte, nonce uint64)
 	SetOldestImmuneNonce(nonce uint64)
-	ForEachTransaction(function txcache.ForEachTransaction)
+	ForEachTransactionWithValidationReceipt(function txcache.ForEachTransactionWithValidationReceipt)
 	NumBytes() int
 	Diagnose(deep bool)
 	GetTrackerDiagnosis() txcache.TrackerDiagnosis

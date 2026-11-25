@@ -37,10 +37,11 @@ func (bp *BlockProcessorStub) DiscardStateAccessesForHeader(headerHash []byte) {
 }
 
 // RevertBlockProposalState -
-func (bp *BlockProcessorStub) RevertBlockProposalState() {
+func (bp *BlockProcessorStub) RevertBlockProposalState() error {
 	if bp.RevertBlockProposalStateCalled != nil {
 		bp.RevertBlockProposalStateCalled()
 	}
+	return nil
 }
 
 // PruneTrieAsyncHeader -

@@ -37,20 +37,8 @@ func qualBootstrapIntentOutcomeFixture(t *testing.T, value []byte) (*canonicalTe
 
 func qualReadBootstrapIntent(f *canonicalTestFixture, records *registrationRecords, id []byte,
 	w canonicalResultWitness) (*nativeBootstrapIntentObservation, error) {
-	if reader, ok := interface{}(f.reader).(interface {
-		readBootstrapIntent(*registrationRecords, []byte, uint32, uint32, []byte, []byte,
-			canonicalResultWitness, int) (*nativeBootstrapIntentObservation, error)
-	}); ok {
-		return reader.readBootstrapIntent(records, f.bHash, f.consumer, f.producer, f.hash(f.w.Account.ExecutedHeader), id, w, f.limit)
-	}
-	// Before the class consumer exists, exercise the real canonical byte reader.
-	// A valid trie proof alone supplies bytes, not a decoded BootstrapIntent.
-	raw, err := f.reader.read(f.bHash, f.consumer, f.producer, f.hash(f.w.Account.ExecutedHeader),
-		append([]byte(registrationIntentPrefix), id...), w, f.limit)
-	if err != nil {
-		return nil, err
-	}
-	return &nativeBootstrapIntentObservation{intent: &bootstrapIntentRecord{encoded: raw}}, nil
+	return f.reader.readBootstrapIntent(records, f.bHash, f.consumer, f.producer,
+		f.hash(f.w.Account.ExecutedHeader), id, w, f.limit)
 }
 
 func TestQualDRWANativeBootstrapIntentOutcome(t *testing.T) {

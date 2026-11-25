@@ -1,4 +1,4 @@
-"""Keep default race evidence; narrowly classify the owner's Wasmer2 exception."""
+"""Keep default race evidence; narrowly classify documented owner exceptions."""
 import argparse
 import json
 import pathlib
@@ -16,6 +16,95 @@ FATAL = "fatal error: checkptr: pointer arithmetic result points to invalid allo
 HOOK = "github.com/multiversx/mx-chain-vm-go/wasmer2.getVMHooksFromContextRawPtr("
 
 
+# Owner disposition 2026-11-26: exactly these inherited stateTrie harness
+# failures, not a successful race result. All raw JSON and stderr stay intact.
+STATE_TRIE = "./integrationTests/state/stateTrie"
+MIGRATION = "TestMigrateDataTrieBuiltinFunc"
+STATE_TRIE_LEAVES = {
+    "TestRollbackBlockAndCheckThatPruningIsCancelledOnAccountsTrie",
+    "TestRollbackBlockWithSameRootHashAsPreviousAndCheckThatPruningIsNotDone",
+    "TestTriePruningWhenBlockIsFinal", "TestStatePruningIsNotBuffered",
+    "TestStatePruningIsNotBufferedOnConsecutiveBlocks", "TestSnapshotOnEpochChange",
+    "TestContinuouslyAccountCodeChanges", "TestAccountRemoval",
+    *(MIGRATION + "/migrate_shard_" + shard + "_" + account + "_account"
+      for shard in ("0", "1") for account in ("system", "user")),
+}
+RACE_REPORT = re.compile(r"^==================\nWARNING: DATA RACE\n(.*?)^==================\n", re.M | re.S)
+ACCESS = re.compile(r"^(Previous )?(Read|Write|read|write) at 0x[0-9a-f]+ by goroutine \d+:\n"
+                    r"  ([^\n]+)\n      ([^\n]+):([0-9]+) \+0x[0-9a-f]+$", re.M)
+ACCESS_HEADER = re.compile(r"^(?:Previous )?(?:Read|Write|read|write) at .* by goroutine \d+:$", re.M)
+RACE_NOTICE = re.compile(r"^\s*testing\.go:\d+: race detected during execution of test\s*$", re.M)
+OTHER_FAILURE = re.compile(r"^\s*(?:panic:|fatal error:|Error Trace:|Error:|Error Message:)|"
+                           r"\[build failed\]|test timed out|signal: killed", re.M)
+TEST_DIAGNOSTIC = re.compile(r"^\s+\S+\.go:\d+:.*$", re.M)
+FAIL_LABEL = re.compile(r"^\s*--- FAIL: (\S+) \([^\n]*\)\s*$", re.M)
+
+
+def inherited_state_trie(stream):
+    """Return failed leaves only for complete, attributed harness diagnostics.
+
+    Go test JSON cannot distinguish silent extra Fail calls in the same test;
+    this is a classification of the emitted evidence, not passing race credit.
+    """
+    failures = [e["Test"] for e in stream if e["Action"] == "fail" and e.get("Test")]
+    if not failures or len(failures) != len(set(failures)):
+        return None
+    failed = set(failures)
+    leaves = failed - {MIGRATION}
+    if not leaves or not leaves <= STATE_TRIE_LEAVES:
+        return None
+    if (MIGRATION in failed) != any(t.startswith(MIGRATION + "/") for t in leaves):
+        return None
+    texts = {}
+    for e in stream:
+        if e.get("Action") == "output":
+            texts.setdefault(e.get("Test"), []).append(e.get("Output", ""))
+        if e.get("Test") in failed and e.get("Action") in ("pass", "skip"):
+            return None
+    observed = set()
+    for test, parts in texts.items():
+        text = "".join(parts)
+        reports = list(RACE_REPORT.finditer(text))
+        if reports:
+            if test not in leaves:
+                return None
+            for report in reports:
+                accesses = ACCESS.findall(report[1])
+                if len(accesses) != 2 or len(ACCESS_HEADER.findall(report[1])) != 2:
+                    return None
+                if [a[0] for a in accesses] != ["", "Previous "]:
+                    return None
+                expected = {
+                    ("write", MODULE + "integrationTests.UpdateRound()", "2738"): "integrationTests/testInitializer.go",
+                    ("read", MODULE + "integrationTests/mock.(*RoundHandlerMock).Index()", "30"): "integrationTests/mock/roundHandlerMock.go",
+                }
+                signature = {(kind.lower(), frame, line): path for _, kind, frame, path, line in accesses}
+                if signature.keys() != expected.keys() or any(
+                        signature[k] != suffix and not signature[k].endswith("/" + suffix)
+                        for k, suffix in expected.items()):
+                    return None
+            observed.add(test)
+        residual = RACE_REPORT.sub("", text)
+        if "WARNING: DATA RACE" in residual or OTHER_FAILURE.search(residual):
+            return None
+        notices = RACE_NOTICE.findall(residual)
+        if len(notices) != int(test in leaves):
+            return None
+        residual = RACE_NOTICE.sub("", residual)
+        if "race detected during execution" in residual:
+            return None
+        if test in failed and TEST_DIAGNOSTIC.search(residual):
+            return None
+        labels = FAIL_LABEL.findall(residual)
+        if any(label != test or label not in failed for label in labels):
+            return None
+        if len(labels) != int(test in failed) or "--- FAIL:" in FAIL_LABEL.sub("", residual):
+            return None
+    if observed != leaves or not failed <= texts.keys():
+        return None
+    return sorted(leaves)
+
+
 def classify(raw, stderr, exit_code, packages):
     expected = {MODULE + p[2:] for p in packages}
     events = {p: [] for p in expected}
@@ -30,6 +119,7 @@ def classify(raw, stderr, exit_code, packages):
         except (ValueError, KeyError, TypeError):
             errors.append("malformed or unexpected go test JSON")
     tolerated = []
+    inherited = []
     failed = []
     # Compiler, runtime, test2json or invocation diagnostics must never be waived.
     if stderr.strip():
@@ -49,6 +139,13 @@ def classify(raw, stderr, exit_code, packages):
             continue
         failed.append(package)
         relative = "./" + package[len(MODULE):]
+        if relative == STATE_TRIE:
+            leaves = inherited_state_trie(stream)
+            if leaves is not None:
+                inherited.append({"package": package, "failed_tests": leaves})
+                continue
+            errors.append(package + ": default race failure outside approved inherited stateTrie evidence")
+            continue
         fatal = re.findall(r"^fatal error:.*$", text, re.M)
         # Match the active fatal stack, not a hook name in an unrelated goroutine/log.
         stack = re.search(r"^goroutine \d+(?: gp=\S+ m=\S+(?: mp=\S+)?)? \[running[^\n]*\]:\n(.*?)(?=\n(?:goroutine |created by )|\Z)", text, re.M | re.S)
@@ -64,7 +161,8 @@ def classify(raw, stderr, exit_code, packages):
             errors.append(package + ": default race failure outside known Wasmer2 signature")
     if exit_code not in (0, 1) or bool(failed) != (exit_code == 1):
         errors.append("default race exit/terminal mismatch")
-    return {"default_exit": exit_code, "known_wasmer2_aborts": tolerated, "errors": errors}
+    return {"default_exit": exit_code, "known_wasmer2_aborts": tolerated,
+            "known_inherited_statetrie_failures": inherited, "errors": errors}
 
 
 def race_commands(packages, flags):
@@ -117,7 +215,7 @@ def main():
                "race_only_skips": [{"package": "./node", "test": "^TestWaitForSignal$",
                                     "reason": "owner-authorized known upstream test defect; normal coverage retains test"}]
                                   if "./node" in args.packages else [],
-               "scope": "owner's five-package exception; no default race credit for aborted tests"}
+               "scope": "owner's five-package and inherited stateTrie exceptions; no default race credit for tolerated failures"}
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2))
     return int(bool(policy["errors"]) or (adjusted is not None and adjusted["exit"] != 0))

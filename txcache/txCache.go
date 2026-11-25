@@ -74,6 +74,11 @@ func NewTxCache(config ConfigSourceMe, host MempoolHost, selfShardId uint32) (*T
 // AddTx adds a transaction in the cache
 // Eviction happens if maximum capacity is reached
 func (cache *TxCache) AddTx(tx *WrappedTransaction) (ok bool, added bool) {
+	return cache.AddTxWithValidationReceipt(tx, nil)
+}
+
+// AddTxWithValidationReceipt adds a transaction and its optional opaque observation.
+func (cache *TxCache) AddTxWithValidationReceipt(tx *WrappedTransaction, receipt interface{}) (ok bool, added bool) {
 	if tx == nil || check.IfNil(tx.Tx) {
 		return false, false
 	}
@@ -93,7 +98,7 @@ func (cache *TxCache) AddTx(tx *WrappedTransaction) (ok bool, added bool) {
 	}
 
 	cache.mutTxOperation.Lock()
-	addedInByHash := cache.txByHash.addTx(tx)
+	addedInByHash := cache.txByHash.addTxWithValidationReceipt(tx, receipt)
 	addedInBySender, evicted := cache.txListBySender.addTxReturnEvicted(tx, cache.tracker)
 	cache.mutTxOperation.Unlock()
 	if addedInByHash != addedInBySender {
@@ -119,6 +124,11 @@ func (cache *TxCache) AddTx(tx *WrappedTransaction) (ok bool, added bool) {
 func (cache *TxCache) GetByTxHash(txHash []byte) (*WrappedTransaction, bool) {
 	tx, ok := cache.txByHash.getTx(string(txHash))
 	return tx, ok
+}
+
+// GetByTxHashWithValidationReceipt reads the native entry and receipt together.
+func (cache *TxCache) GetByTxHashWithValidationReceipt(txHash []byte) (*WrappedTransaction, interface{}, bool) {
+	return cache.txByHash.getTxWithValidationReceipt(string(txHash))
 }
 
 // SelectTransactions selects the best transactions to be included in the next miniblock.
@@ -313,6 +323,11 @@ func (cache *TxCache) CountSenders() uint64 {
 // ForEachTransaction iterates over the transactions in the cache
 func (cache *TxCache) ForEachTransaction(function ForEachTransaction) {
 	cache.txByHash.forEach(function)
+}
+
+// ForEachTransactionWithValidationReceipt iterates over native entries with their receipts.
+func (cache *TxCache) ForEachTransactionWithValidationReceipt(function ForEachTransactionWithValidationReceipt) {
+	cache.txByHash.forEachWithValidationReceipt(function)
 }
 
 // getAllTransactions returns all transactions in the cache

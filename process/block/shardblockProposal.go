@@ -16,6 +16,7 @@ import (
 	"github.com/multiversx/mx-chain-go/common"
 	"github.com/multiversx/mx-chain-go/process"
 	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 type pendingBlocksAfterSelection struct {
@@ -311,7 +312,7 @@ func (sp *shardProcessor) ProcessBlockProposal(
 	headerHandler data.HeaderHandler,
 	headerHash []byte,
 	bodyHandler data.BodyHandler,
-) (data.BaseExecutionResultHandler, error) {
+) (result data.BaseExecutionResultHandler, resultErr error) {
 	if err := sp.drwaExecutionError(); err != nil {
 		return nil, err
 	}
@@ -399,8 +400,9 @@ func (sp *shardProcessor) ProcessBlockProposal(
 	}
 
 	defer func() {
-		if err != nil {
-			sp.RevertCurrentBlock()
+		resultErr = sp.finishBlockFailure(err, resultErr)
+		if errors.Is(resultErr, vm.ErrDRWAExecution) {
+			result = nil
 		}
 	}()
 
@@ -469,8 +471,8 @@ func (sp *shardProcessor) CommitBlockProposalState(headerHandler data.HeaderHand
 }
 
 // RevertBlockProposalState reverts the uncommitted accounts state after a block proposal processing failure
-func (sp *shardProcessor) RevertBlockProposalState() {
-	sp.RevertCurrentBlock()
+func (sp *shardProcessor) RevertBlockProposalState() error {
+	return sp.revertBlockProposalState()
 }
 
 func computeTxTotalTxCount(miniBlockHeaders []data.MiniBlockHeaderHandler) uint32 {

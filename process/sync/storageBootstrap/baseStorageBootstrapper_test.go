@@ -404,6 +404,28 @@ func TestBaseStorageBootstrapper_GetBlockBodyShouldWork(t *testing.T) {
 	assert.Equal(t, expectedBody, body)
 }
 
+func TestBaseStorageBootstrapper_GetBlockBodyReadsMockedHeaderFixture(t *testing.T) {
+	t.Parallel()
+
+	hash := []byte("ordinary-fixture")
+	header := &block.Header{
+		MiniBlockHeaders: []block.MiniBlockHeader{{Hash: hash}},
+	}
+	miniBlock := &block.MiniBlock{}
+	bootstrapper := &storageBootstrapper{
+		miniBlocksProvider: &mock.MiniBlocksProviderStub{
+			GetMiniBlocksFromStorerCalled: func(hashes [][]byte) ([]*block.MiniblockAndHash, [][]byte) {
+				require.Equal(t, [][]byte{hash}, hashes)
+				return []*block.MiniblockAndHash{{Hash: hash, Miniblock: miniBlock}}, nil
+			},
+		},
+	}
+
+	body, err := bootstrapper.getBlockBody(header)
+	require.NoError(t, err)
+	require.Equal(t, &block.Body{MiniBlocks: []*block.MiniBlock{miniBlock}}, body)
+}
+
 func TestBaseStorageBootstrapper_GetRootHashForBlock(t *testing.T) {
 	t.Parallel()
 

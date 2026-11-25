@@ -222,6 +222,15 @@ func (cache *TxCacheMock) AddTx(tx *txcache.WrappedTransaction) (ok bool, added 
 	return false, false
 }
 
+// AddTxWithValidationReceipt supports ordinary entries in this mock.
+func (cache *TxCacheMock) AddTxWithValidationReceipt(tx *txcache.WrappedTransaction, receipt interface{}) (bool, bool) {
+	if receipt != nil {
+		return false, false
+	}
+
+	return cache.AddTx(tx)
+}
+
 // GetByTxHash -
 func (cache *TxCacheMock) GetByTxHash(txHash []byte) (*txcache.WrappedTransaction, bool) {
 	if cache.GetByTxHashCalled != nil {
@@ -229,6 +238,13 @@ func (cache *TxCacheMock) GetByTxHash(txHash []byte) (*txcache.WrappedTransactio
 	}
 
 	return nil, false
+}
+
+// GetByTxHashWithValidationReceipt returns the mock's ordinary entry.
+func (cache *TxCacheMock) GetByTxHashWithValidationReceipt(txHash []byte) (*txcache.WrappedTransaction, interface{}, bool) {
+	tx, found := cache.GetByTxHash(txHash)
+
+	return tx, nil, found
 }
 
 // RemoveTxByHash -
@@ -259,6 +275,13 @@ func (cache *TxCacheMock) ForEachTransaction(fn txcache.ForEachTransaction) {
 	if cache.ForEachTransactionCalled != nil {
 		cache.ForEachTransactionCalled(fn)
 	}
+}
+
+// ForEachTransactionWithValidationReceipt iterates the mock's ordinary entries.
+func (cache *TxCacheMock) ForEachTransactionWithValidationReceipt(fn txcache.ForEachTransactionWithValidationReceipt) {
+	cache.ForEachTransaction(func(hash []byte, tx *txcache.WrappedTransaction) {
+		fn(hash, tx, nil)
+	})
 }
 
 // NumBytes -
