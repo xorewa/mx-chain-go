@@ -1,0 +1,11 @@
+[
+  {"name":"available-empty","expected_valid":true,"document":{"schemaVersion":"drwa-observation-v1","availability":"AVAILABLE","subject":null,"observations":[],"reportedAtMs":null}},
+  {"name":"unknown-null","expected_valid":true,"document":{"schemaVersion":"drwa-observation-v1","availability":"UNKNOWN","subject":null,"observations":null,"reportedAtMs":null}},
+  {"name":"unknown-optional-display","expected_valid":true,"document":{"schemaVersion":"drwa-observation-v1","availability":"UNKNOWN","subject":null,"observations":null,"reportedAtMs":null,"displayLabel":"Example report"}},
+  {"name":"timestamp-string","expected_valid":true,"document":{"schemaVersion":"drwa-observation-v1","availability":"UNKNOWN","subject":null,"observations":null,"reportedAtMs":"0"}},
+  {"name":"future-version","expected_valid":false,"document":{"schemaVersion":"future-display","availability":"UNKNOWN","subject":null,"observations":null,"reportedAtMs":null}},
+  {"name":"missing-required-field","expected_valid":false,"document":{"schemaVersion":"drwa-observation-v1","availability":"UNKNOWN","subject":null,"observations":null}},
+  {"name":"available-null-list","expected_valid":false,"document":{"schemaVersion":"drwa-observation-v1","availability":"AVAILABLE","subject":null,"observations":null,"reportedAtMs":null}},
+  {"name":"unknown-array","expected_valid":false,"document":{"schemaVersion":"drwa-observation-v1","availability":"UNKNOWN","subject":null,"observations":[],"reportedAtMs":null}},
+  {"name":"timestamp-number","expected_valid":false,"document":{"schemaVersion":"drwa-observation-v1","availability":"UNKNOWN","subject":null,"observations":null,"reportedAtMs":0}}
+]
