@@ -1,0 +1,856 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DRWA public observation v1",
+  "description": "Structural wire schema for the adopted R86 v1 presentation object within data. Unknown optional extensions are permitted. The existing codec checks additional presentation semantics, including kind-specific state, canonical address and semantic field relationships. Schema validation is not source or outcome admission.",
+  "$ref": "#/$defs/ObservationReportV1",
+  "$defs": {
+    "HashHex32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "not": {
+        "pattern": "[^0-9a-f]"
+      }
+    },
+    "TokenId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Address": {
+      "type": "string",
+      "pattern": "^erd1[023456789acdefghjklmnpqrstuvwxyz]{58}$",
+      "not": {
+        "pattern": "[^023456789acdefghjklmnpqrstuvwxyz1]"
+      },
+      "description": "Structural lowercase Bech32 shape for the adopted public profile. Canonical checksum and public-key encoding are checked by the existing Go codec."
+    },
+    "UInt32": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "UInt64Dec": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "not": {
+        "pattern": "[^0-9]"
+      }
+    },
+    "UInt": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "not": {
+        "pattern": "[^0-9]"
+      }
+    },
+    "UnixMs": {
+      "$ref": "#/$defs/UInt64Dec"
+    },
+    "PublicLabel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "OpaqueRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Approved public surrogate only; a string does not establish source or disclosure authority."
+    },
+    "Availability": {
+      "type": "string",
+      "enum": [
+        "AVAILABLE",
+        "UNKNOWN",
+        "UNAVAILABLE",
+        "STALE",
+        "MALFORMED",
+        "CONFLICTING",
+        "UNSUPPORTED"
+      ]
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "SUBMISSION",
+        "PROVISIONAL_EXECUTION",
+        "CANONICAL_FINALITY",
+        "VALUE_SETTLEMENT",
+        "VALUE_RETURN",
+        "ECONOMIC_GAS_REFUND",
+        "SOURCE_COMPLETION",
+        "PREFLIGHT_ADVISORY"
+      ]
+    },
+    "State": {
+      "type": "string",
+      "enum": [
+        "ACKNOWLEDGED",
+        "SOURCE_ACCEPTED",
+        "OBSERVED",
+        "FINALIZED",
+        "SETTLED",
+        "GENERATED",
+        "IN_TRANSIT",
+        "CREDITED",
+        "REPORTED",
+        "COMPLETED",
+        "ADVISORY",
+        "INDETERMINATE",
+        "UNKNOWN",
+        "UNAVAILABLE"
+      ]
+    },
+    "MembershipKind": {
+      "type": "string",
+      "enum": [
+        "BLOCK_MINIBLOCK_TRANSACTION",
+        "EXECUTION_RESULT_MINIBLOCK_TRANSACTION",
+        "UNKNOWN",
+        "UNAVAILABLE"
+      ]
+    },
+    "RefundClass": {
+      "type": "string",
+      "enum": [
+        "INFORMATIONAL",
+        "EXECUTABLE",
+        "UNKNOWN",
+        "UNAVAILABLE"
+      ]
+    },
+    "ObservationReportV1": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "drwa-observation-v1"
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicSubject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observations": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PublicObservation"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reportedAtMs": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UnixMs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "availability",
+        "subject",
+        "observations",
+        "reportedAtMs"
+      ],
+      "additionalProperties": true,
+      "if": {
+        "properties": {
+          "availability": {
+            "const": "AVAILABLE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "observations": {
+            "type": "array"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "observations": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "PublicSubject": {
+      "type": "object",
+      "properties": {
+        "recordRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpaqueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effectRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpaqueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contextRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpaqueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transactionHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originalTransactionHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originalBatchId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicLabel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originalBatchRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpaqueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tokenId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TokenId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tokenNonce": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "holderAddress": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Address"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "beneficiaryAddress": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Address"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policyVersionRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicLabel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policyEpoch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "recordRef",
+        "effectRef",
+        "contextRef",
+        "transactionHash",
+        "originalTransactionHash",
+        "originalBatchId",
+        "originalBatchRef",
+        "tokenId",
+        "tokenNonce",
+        "holderAddress",
+        "beneficiaryAddress",
+        "policyVersionRef",
+        "policyEpoch"
+      ],
+      "additionalProperties": true
+    },
+    "PublicObservation": {
+      "type": "object",
+      "properties": {
+        "observationRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpaqueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "state": {
+          "$ref": "#/$defs/State"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicSubject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provenance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicProvenance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finalityBasis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicFinalityBasis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "values": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PublicValue"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originalValues": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PublicValue"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gasRefund": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicGasRefund"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "observationRef",
+        "kind",
+        "availability",
+        "state",
+        "subject",
+        "provenance",
+        "finalityBasis",
+        "values",
+        "originalValues",
+        "gasRefund"
+      ],
+      "additionalProperties": true,
+      "if": {
+        "properties": {
+          "availability": {
+            "const": "AVAILABLE"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "finalityBasis": {
+            "type": "null"
+          },
+          "values": {
+            "type": "null"
+          },
+          "originalValues": {
+            "type": "null"
+          },
+          "gasRefund": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "PublicProvenance": {
+      "type": "object",
+      "properties": {
+        "producerId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicLabel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "producerVersion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicLabel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "producerCommitId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicLabel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "basisRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OpaqueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionObjectHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionShard": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "asOfBlockHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "asOfBlockNonce": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "asOfBlockRound": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "asOfShard": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observedAtMs": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UnixMs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "producerId",
+        "producerVersion",
+        "producerCommitId",
+        "basisRef",
+        "executionObjectHash",
+        "executionShard",
+        "asOfBlockHash",
+        "asOfBlockNonce",
+        "asOfBlockRound",
+        "asOfShard",
+        "observedAtMs"
+      ],
+      "additionalProperties": true
+    },
+    "PublicFinalityBasis": {
+      "type": "object",
+      "properties": {
+        "membershipKind": {
+          "$ref": "#/$defs/MembershipKind"
+        },
+        "blockHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blockNonce": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blockRound": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blockEpoch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blockShard": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "miniblockHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transactionHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subjectResultHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionHeaderHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionHeaderNonce": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionHeaderRound": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionHeaderEpoch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finalityAtBlockHash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashHex32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "membershipKind",
+        "blockHash",
+        "blockNonce",
+        "blockRound",
+        "blockEpoch",
+        "blockShard",
+        "miniblockHash",
+        "transactionHash",
+        "subjectResultHash",
+        "executionHeaderHash",
+        "executionHeaderNonce",
+        "executionHeaderRound",
+        "executionHeaderEpoch",
+        "finalityAtBlockHash"
+      ],
+      "additionalProperties": true
+    },
+    "PublicValue": {
+      "type": "object",
+      "properties": {
+        "tokenId": {
+          "$ref": "#/$defs/TokenId"
+        },
+        "tokenNonce": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt64Dec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quantityAtomic": {
+          "$ref": "#/$defs/UInt"
+        },
+        "unit": {
+          "type": "string",
+          "const": "ASSET_ATOMIC"
+        }
+      },
+      "required": [
+        "tokenId",
+        "tokenNonce",
+        "quantityAtomic",
+        "unit"
+      ],
+      "additionalProperties": true
+    },
+    "PublicGasRefund": {
+      "type": "object",
+      "properties": {
+        "tokenId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TokenId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amountAtomic": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amountUnit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "ASSET_ATOMIC"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gasUnits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UInt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gasUnit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "GAS_UNIT"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "presentationClass": {
+          "$ref": "#/$defs/RefundClass"
+        }
+      },
+      "required": [
+        "tokenId",
+        "amountAtomic",
+        "amountUnit",
+        "gasUnits",
+        "gasUnit",
+        "presentationClass"
+      ],
+      "additionalProperties": true
+    }
+  }
+}
