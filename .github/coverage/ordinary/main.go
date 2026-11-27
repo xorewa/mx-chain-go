@@ -66,6 +66,24 @@ func packageList(value string) ([]string, error) {
 	return packages, nil
 }
 
+// parseCoverageProfiles preserves the Go parser's duplicate-block semantics
+// and rejects invalid source coordinates before either report counts a block.
+func parseCoverageProfiles(data []byte) ([]*cover.Profile, error) {
+	profiles, err := cover.ParseProfilesFromReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	for _, profile := range profiles {
+		for _, b := range profile.Blocks {
+			if b.StartLine < 1 || b.StartCol < 1 || b.EndLine < 1 || b.EndCol < 1 ||
+				b.StartLine > b.EndLine || (b.StartLine == b.EndLine && b.StartCol > b.EndCol) {
+				return nil, fmt.Errorf("invalid coverage block coordinates in %q", profile.FileName)
+			}
+		}
+	}
+	return profiles, nil
+}
+
 func aggregate(profilePath, packagesArg string) (report, error) {
 	return aggregateWithManifest(profilePath, packagesArg, "")
 }
@@ -147,7 +165,7 @@ func aggregateWithManifest(profilePath, packagesArg, manifestPath string) (repor
 	default:
 		return report{}, fmt.Errorf("expected a Go coverage profile mode header")
 	}
-	profiles, err := cover.ParseProfilesFromReader(bytes.NewReader(data))
+	profiles, err := parseCoverageProfiles(data)
 	if err != nil {
 		return report{}, err
 	}
@@ -212,18 +230,29 @@ func run(args []string, out io.Writer) error {
 	profile := flags.String("profile", "", "Go coverage profile (optional)")
 	packages := flags.String("packages", "", "explicit space-separated package import paths")
 	manifest := flags.String("manifest", "", "explicit expected Go profile filename list (optional)")
+	functions := flags.String("functions", "", "explicit source-bound JSON function manifest (optional)")
+	sourceRoot := flags.String("source-root", "", "source root for the function manifest")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected positional arguments")
 	}
-	manifestSupplied := false
-	flags.Visit(func(f *flag.Flag) {
-		if f.Name == "manifest" {
-			manifestSupplied = true
+	supplied := map[string]bool{}
+	flags.Visit(func(f *flag.Flag) { supplied[f.Name] = true })
+	if supplied["functions"] || supplied["source-root"] {
+		if *functions == "" || *sourceRoot == "" || supplied["packages"] || supplied["manifest"] {
+			return fmt.Errorf("function mode requires -functions and -source-root, without package or file-manifest mode")
 		}
-	})
+		result, err := aggregateFunctions(*profile, *functions, *sourceRoot)
+		if err != nil {
+			return err
+		}
+		encoder := json.NewEncoder(out)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(result)
+	}
+	manifestSupplied := supplied["manifest"]
 	if manifestSupplied && *manifest == "" {
 		return fmt.Errorf("manifest path must not be empty when supplied")
 	}

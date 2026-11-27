@@ -363,8 +363,13 @@ func (sp *shardProcessor) ProcessBlockProposal(
 		return nil, process.ErrAccountStateDirty
 	}
 
+	err := sp.beginDRWAExecution()
+	if err != nil {
+		return nil, err
+	}
+
 	// this is used now to reset the context for processing not creation of blocks
-	err := sp.createBlockStarted()
+	err = sp.createBlockStarted()
 	if err != nil {
 		return nil, err
 	}

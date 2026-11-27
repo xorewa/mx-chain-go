@@ -1,6 +1,7 @@
 package drwa
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -118,4 +119,37 @@ func programmeAuthorityPublicKeys(members [][]byte) ([]crypto.PublicKey, error) 
 		publicKeys[i] = key
 	}
 	return publicKeys, nil
+}
+
+// validateProgrammeAuthorityIndependentPair checks only the distinct-set and
+// disjoint-full-roster requirement in Part A L1180-1187/L1335-1336. Both rosters
+// and stable IDs must already have been resolved from the lawful constitution;
+// neither requester-provided material nor separation itself appoints a role.
+// Roster bounds, native key parsing, within-set uniqueness, thresholds and every
+// supplied signature remain separate verifyProgrammeAuthoritySignatures checks.
+// This read-only primitive selects no purpose, pair, fallback, codec or authority
+// version. A new version of the same stable set cannot fill an independent slot.
+func validateProgrammeAuthorityIndependentPair(leftID, rightID []byte, leftMembers, rightMembers [][]byte) error {
+	if len(leftID) == 0 || len(rightID) == 0 || bytes.Equal(leftID, rightID) ||
+		len(leftMembers) == 0 || len(rightMembers) == 0 {
+		return errInvalidAuthoritySignatures
+	}
+	for _, member := range leftMembers {
+		if len(member) == 0 {
+			return errInvalidAuthoritySignatures
+		}
+	}
+	for _, member := range rightMembers {
+		if len(member) == 0 {
+			return errInvalidAuthoritySignatures
+		}
+	}
+	for _, left := range leftMembers {
+		for _, right := range rightMembers {
+			if bytes.Equal(left, right) {
+				return errInvalidAuthoritySignatures
+			}
+		}
+	}
+	return nil
 }

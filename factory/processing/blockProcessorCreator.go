@@ -34,6 +34,7 @@ import (
 	"github.com/multiversx/mx-chain-go/process/block/postprocess"
 	"github.com/multiversx/mx-chain-go/process/block/preprocess"
 	"github.com/multiversx/mx-chain-go/process/coordinator"
+	"github.com/multiversx/mx-chain-go/process/drwa"
 	"github.com/multiversx/mx-chain-go/process/estimator"
 	"github.com/multiversx/mx-chain-go/process/factory"
 	"github.com/multiversx/mx-chain-go/process/factory/metachain"
@@ -730,21 +731,13 @@ func (pcf *processComponentsFactory) newMetaBlockProcessor(
 		return nil, err
 	}
 
-	vmFactory, err := pcf.createVMFactoryMeta(
-		pcf.state.AccountsAdapter(),
-		pcf.state.PeerAccounts(),
+	vmFactory, vmContainer, drwaClassification, err := pcf.createProcessingVMMeta(
 		builtInFuncFactory.BuiltInFunctionContainer(),
-		pcf.config.SmartContractsStorage,
 		builtInFuncFactory.NFTStorageHandler(),
 		builtInFuncFactory.ESDTGlobalSettingsHandler(),
 		epochStartTrigger,
 		headerTimeEnabledAt,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	vmContainer, err := vmFactory.Create()
 	if err != nil {
 		return nil, err
 	}
@@ -1249,6 +1242,7 @@ func (pcf *processComponentsFactory) newMetaBlockProcessor(
 		HistoryRepository:                  pcf.historyRepo,
 		VMContainersFactory:                vmFactory,
 		VmContainer:                        vmContainer,
+		DRWAClassification:                 drwaClassificationHandlerOf(drwaClassification),
 		GasHandler:                         gasHandler,
 		ScheduledTxsExecutionHandler:       scheduledTxsExecutionHandler,
 		ProcessedMiniBlocksTracker:         processedMiniBlocksTracker,
@@ -1488,6 +1482,8 @@ func (pcf *processComponentsFactory) createVMFactoryShard(
 		RoundHandler:             pcf.coreData.RoundHandler(),
 	}
 
+	pcf.setDRWABuiltInAdmission(&argsHook, pcf.drwaShardTokenClassifier())
+
 	blockChainHookImpl, err := hooks.NewBlockChainHookImpl(argsHook)
 	if err != nil {
 		return nil, err
@@ -1536,6 +1532,25 @@ func (pcf *processComponentsFactory) createVMFactoryMeta(
 	epochStartTriggerHandler process.EpochStartTriggerHandler,
 	headerTimeEnabledAt func(uint32, uint64) bool,
 ) (process.VirtualMachinesContainerFactory, error) {
+	return pcf.createVMFactoryMetaWithClassifier(accounts, peerAccounts, builtInFuncs, configSCStorage, nftStorageHandler,
+		globalSettingsHandler, epochStartTriggerHandler, headerTimeEnabledAt, nil, nil)
+}
+
+// createVMFactoryMetaWithClassifier is the native metachain VM factory with
+// the DRWA classifier of the given stores. A nil classifier is the native
+// factory.
+func (pcf *processComponentsFactory) createVMFactoryMetaWithClassifier(
+	accounts state.AccountsAdapter,
+	peerAccounts state.AccountsAdapter,
+	builtInFuncs vmcommon.BuiltInFunctionContainer,
+	configSCStorage config.StorageConfig,
+	nftStorageHandler vmcommon.SimpleESDTNFTStorageHandler,
+	globalSettingsHandler vmcommon.ESDTGlobalSettingsHandler,
+	epochStartTriggerHandler process.EpochStartTriggerHandler,
+	headerTimeEnabledAt func(uint32, uint64) bool,
+	drwaClassifier vm.DRWATokenClassifier,
+	drwaBuiltInClassifier drwa.TokenClassifier,
+) (process.VirtualMachinesContainerFactory, error) {
 	argsHook := hooks.ArgBlockChainHook{
 		Accounts:                 accounts,
 		PubkeyConv:               pcf.coreData.AddressPubKeyConverter(),
@@ -1563,6 +1578,8 @@ func (pcf *processComponentsFactory) createVMFactoryMeta(
 		RoundHandler:             pcf.coreData.RoundHandler(), // TODO: @laurci - this needs to be replaced when changing the round duration
 	}
 
+	pcf.setDRWABuiltInAdmission(&argsHook, drwaBuiltInClassifier)
+
 	blockChainHookImpl, err := hooks.NewBlockChainHookImpl(argsHook)
 	if err != nil {
 		return nil, err
@@ -1585,6 +1602,7 @@ func (pcf *processComponentsFactory) createVMFactoryMeta(
 		EnableEpochsHandler: pcf.coreData.EnableEpochsHandler(),
 		EnableRoundsHandler: pcf.coreData.EnableRoundsHandler(),
 		NodesCoordinator:    pcf.nodesCoordinator,
+		DRWAClassifier:      drwaClassifier,
 	}
 	return metachain.NewVMContainerFactory(argsNewVMContainer)
 }

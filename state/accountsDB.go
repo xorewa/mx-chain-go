@@ -97,6 +97,7 @@ type AccountsDB struct {
 	protectedCheckpoints   *ProtectedChildCheckpoints
 	protectedChildren      map[protectedChildKey]*stagedProtectedChild
 	protectedCommitFailure error
+	rollbackFailure        error
 
 	stackDebug []byte
 }
@@ -1298,7 +1299,7 @@ func (adb *AccountsDB) loadCode(accountHandler baseAccountHandler) error {
 
 // RevertToSnapshot apply Revert method over accounts object and removes entries from the list
 // Calling with 0 will revert everything. If the snapshot value is out of bounds, an err will be returned
-func (adb *AccountsDB) RevertToSnapshot(snapshot int) error {
+func (adb *AccountsDB) RevertToSnapshot(snapshot int) (result error) {
 	log.Trace("accountsDB.RevertToSnapshot started",
 		"snapshot", snapshot,
 	)
@@ -1306,6 +1307,7 @@ func (adb *AccountsDB) RevertToSnapshot(snapshot int) error {
 	adb.mutOp.Lock()
 
 	defer func() {
+		adb.retainRollbackFailure(result)
 		log.Trace("accountsDB.RevertToSnapshot ended")
 		adb.mutOp.Unlock()
 	}()
@@ -1396,6 +1398,9 @@ func (adb *AccountsDB) commit() (_ []byte, result error) {
 	log.Trace("accountsDB.Commit started")
 	if adb.protectedCommitFailure != nil {
 		return nil, adb.protectedCommitFailure
+	}
+	if adb.rollbackFailure != nil {
+		return nil, adb.rollbackFailure
 	}
 	if len(adb.protectedChildren) != 0 {
 		defer func() {
@@ -1593,6 +1598,7 @@ func (adb *AccountsDB) recreateTrie(options common.RootHashHolder) error {
 	adb.mainTrie = newTrie
 	adb.protectedChildren = nil
 	adb.protectedCommitFailure = nil
+	adb.rollbackFailure = nil
 	return nil
 }
 

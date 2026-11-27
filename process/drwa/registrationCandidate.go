@@ -41,6 +41,10 @@ type registrationCandidate struct {
 	view            *registryCandidate
 	nativeCommitted bool
 	committedRoot   []byte
+	// rebased is set only by committedRegistry.rebase, after the native block
+	// owner reconstructed the projection at another committed root. The next
+	// candidate then continues the reconstructed anchor, not this one's.
+	rebased bool
 }
 
 // reconstructRegistrationCandidate is only for startup/state-sync/integrity
@@ -185,8 +189,8 @@ func (r *registrationCandidate) WithDRWAClassifierReplacement(classifier vm.DRWA
 		return oldOwner.failure
 	}
 	if oldOwner.recovered || !oldOwner.closed || oldOwner.running || r.view.ready || r.view.added != nil ||
-		c.active != next.view || !next.view.ready || next.nativeCommitted || newOwner.recovered ||
-		r.writer.maxEver != next.writer.maxEver || r.writer.state.accounts != next.writer.state.accounts ||
+		c.active != next.view || !next.view.ready || next.nativeCommitted || newOwner.recovered || next.rebased ||
+		(!r.rebased && r.writer.maxEver != next.writer.maxEver) || r.writer.state.accounts != next.writer.state.accounts ||
 		len(oldOwner.stores) != len(newOwner.stores) {
 		return errInvalidMetaContext
 	}
@@ -197,6 +201,15 @@ func (r *registrationCandidate) WithDRWAClassifierReplacement(classifier vm.DRWA
 		if store != newOwner.stores[i] {
 			return errInvalidMetaContext
 		}
+	}
+	if r.rebased {
+		// The owner replaced the projection under this registry's lock; only
+		// the reconstructed anchor can be continued.
+		if !sameRegistryAnchor(&c.anchor, &next.view.before) {
+			return errInvalidMetaContext
+		}
+		replace()
+		return nil
 	}
 	previous := &r.view.before
 	if r.nativeCommitted {
@@ -210,6 +223,132 @@ func (r *registrationCandidate) WithDRWAClassifierReplacement(classifier vm.DRWA
 	}
 	replace()
 	return nil
+}
+
+// The three operations below serve the native block owner (MetaClassification),
+// which alone persists, resets and moves the participating stores. They never
+// touch a store: they only check it and close this handle.
+
+// nativeReusable reports whether this open candidate can serve another block
+// execution unchanged: healthy, ready, without tentative additions, and with
+// every participating store still at its captured committed root.
+func (r *registrationCandidate) nativeReusable(roots [][]byte) (bool, error) {
+	c := r.view.parent
+	if !c.mut.TryRLock() {
+		return false, ErrExecutionBusy
+	}
+	defer c.mut.RUnlock()
+	owner := r.writer.boundary
+	owner.mut.Lock()
+	defer owner.mut.Unlock()
+	if owner.failure != nil {
+		return false, owner.failure
+	}
+	if owner.running {
+		return false, ErrExecutionBusy
+	}
+	if owner.closed || owner.recovered || c.active != r.view || !r.view.ready || r.nativeCommitted ||
+		len(r.view.added) != 0 || len(roots) != len(owner.roots) {
+		return false, nil
+	}
+	for i := range roots {
+		if !bytes.Equal(roots[i], owner.roots[i]) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// closeNative closes a healthy candidate whose block the native owner reset,
+// abandoned or moved away from. Its tentative additions are discarded. Every
+// participating store must be committed (empty journal). A failed or recovered
+// owner cannot take this path.
+func (r *registrationCandidate) closeNative() error {
+	c := r.view.parent
+	if !c.mut.TryLock() {
+		return ErrExecutionBusy
+	}
+	defer c.mut.Unlock()
+	owner := r.writer.boundary
+	owner.mut.Lock()
+	defer owner.mut.Unlock()
+	if owner.failure != nil {
+		return owner.failure
+	}
+	if owner.running {
+		return ErrExecutionBusy
+	}
+	if owner.recovered {
+		return errInvalidMetaContext
+	}
+	for _, store := range owner.stores {
+		if store.JournalLen() != 0 {
+			return ErrUncommittedState
+		}
+	}
+	owner.closed, owner.outputs = true, nil
+	if c.active == r.view {
+		c.active = nil
+	}
+	r.view.ready, r.view.added = false, nil
+	return nil
+}
+
+// commitNative follows the native owner's successful commit of EVERY
+// participating store. It advances the committed projection by exactly this
+// candidate's additions and closes the handle; it persists nothing. admitted
+// names the committed user-store root the next candidate continues from.
+func (r *registrationCandidate) commitNative(admitted *metaRegistryAnchor) (int, error) {
+	c := r.view.parent
+	if !c.mut.TryLock() {
+		return 0, ErrExecutionBusy
+	}
+	defer c.mut.Unlock()
+	owner := r.writer.boundary
+	owner.mut.Lock()
+	defer owner.mut.Unlock()
+	if owner.failure != nil {
+		return 0, owner.failure
+	}
+	if owner.running {
+		return 0, ErrExecutionBusy
+	}
+	if owner.closed || c.active != r.view || !r.view.ready || r.nativeCommitted || !validRegistrationAnchor(admitted) {
+		return 0, errInvalidMetaContext
+	}
+	for _, store := range owner.stores {
+		if store.JournalLen() != 0 {
+			return 0, ErrUncommittedState
+		}
+	}
+	root, err := owner.stores[0].RootHash()
+	if err != nil {
+		return 0, err
+	}
+	if !bytes.Equal(root, admitted.root) {
+		return 0, errInvalidMetaContext
+	}
+	added := len(r.view.added)
+	for id := range r.view.added {
+		c.members[id] = struct{}{}
+	}
+	owner.closed, owner.outputs = true, nil
+	r.nativeCommitted, r.committedRoot = true, bytes.Clone(root)
+	c.anchor = copyRegistryAnchor(admitted)
+	r.view.after = copyRegistryAnchor(admitted)
+	c.active, r.view.ready, r.view.added = nil, false, nil
+	return added, nil
+}
+
+// classifyOwn answers from this candidate's own selected identity. It is the
+// same memory-only read as WithTokenClassification, for the native built-in
+// dispatch of the store this candidate is bound to.
+func (r *registrationCandidate) classifyOwn(tokenID []byte) (bool, error) {
+	if !r.view.parent.mut.TryRLock() {
+		return false, ErrExecutionBusy
+	}
+	defer r.view.parent.mut.RUnlock()
+	return r.view.classifyLocked(r.view.after.candidateHash, tokenID)
 }
 
 func (r *registrationCandidate) registerTokenForIntent(records *registrationRecords,

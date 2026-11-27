@@ -9,6 +9,13 @@ import tempfile
 import time
 
 
+def publish_report(path, value):
+    # Keep the last complete report available if the trial is interrupted.
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(value, indent=2) + "\n")
+    temporary.replace(path)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True)
@@ -19,6 +26,8 @@ def main():
     output = pathlib.Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     results = []
+    publish_report(output / "plan.json", {"packages": args.packages})
+    publish_report(output / "summary.json", results)
     for number, package in enumerate(args.packages):
         if not package.startswith("./"):
             parser.error("./ package path required")
@@ -42,8 +51,8 @@ def main():
                         "seconds": time.monotonic() - started,
                         "branches": {"covered": int(match[1]), "total": int(match[2])} if match else None,
                         "status": "measured" if match and run.returncode == 0 else "UNKNOWN: tool/test failure or missing branch report"})
+        publish_report(output / "summary.json", results)
         print(json.dumps(results[-1]), flush=True)
-    (output / "summary.json").write_text(json.dumps(results, indent=2) + "\n")
     # Missing measurements remain visible as trial failure, never counted as zero/100%.
     return int(any(r["exit"] != 0 or r["branches"] is None for r in results))
 

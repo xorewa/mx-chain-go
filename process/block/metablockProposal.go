@@ -398,7 +398,11 @@ func (mp *metaProcessor) ProcessBlockProposal(
 		return nil, fmt.Errorf("%w for peer accounts", process.ErrAccountStateDirty)
 	}
 
-	var err error
+	err := mp.beginDRWAExecution()
+	if err != nil {
+		return nil, err
+	}
+
 	defer func() {
 		resultErr = mp.finishBlockFailure(err, resultErr)
 		if errors.Is(resultErr, vm.ErrDRWAExecution) {

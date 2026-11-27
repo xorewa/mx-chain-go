@@ -1,0 +1,3601 @@
+{
+  "artifact_kind": "SP2 synthetic policy binding draft; data only, no canonical wire schema",
+  "fixture_format_revision": 1,
+  "bound_rows": [
+    "SP2-03"
+  ],
+  "synthetic_only": true,
+  "owner_policy_source": {
+    "grant": "SP2-INPUTS-001",
+    "ledger": "NewArc/3m/controls/OWNER_GRANTS.md",
+    "ledger_sha256": "330d8f1dd16433533d0a2848d58713259068e939ca21d27f753099a74e591454",
+    "accepted_copy": "NewArc/3m/evidence/owner_rulings_2026-10-21/sp2_inputs/SP2_Synthetic_Policy_Options_ACCEPTED_COPY.md",
+    "accepted_copy_sha256": "b1e6fe717860912ca75e3e08e4569abe02b70072ebf779ceadd1bd837d24ced0",
+    "selected_options": {
+      "D3.1": {
+        "choice": "A",
+        "verbatim": "**D3.1 Synthetic programme set.**\n- **A (recommended).** Six synthetic programmes: the three asset models (property equity, property-backed debt, receivables; PPR §4) each run as one accredited-only and one retail-permitted programme (PPR §2 \"Support accredited-only and retail-permitted offerings separately\").\n  - The closure plans split so that both are exercised for every asset model: the accredited programmes use burn-and-retire, and the retail programmes use preserve-and-close (PPR §2 closure-plan rules).\n  - Effect: every entitlement model, both investor classes and both closure plans are covered."
+      },
+      "D3.2": {
+        "choice": "A",
+        "verbatim": "**D3.2 Synthetic jurisdictions.**\n- **A (recommended).** Adopt the ten proposed state labels of PPR §2 (US-CA, US-NY, US-TX, US-FL, US-DE, US-IL, US-MA, US-NJ, US-WA, US-CO) as synthetic fixture labels only.\n  - The producer sets each programme's allowed and disallowed labels per test, as labelled experimental values.\n  - Tests cover allowed and disallowed states, conflicting evidence, state changes, policy versions and evasion attempts (PPR §2).\n  - No state law is asserted."
+      },
+      "D3.3": {
+        "choice": "A",
+        "verbatim": "**D3.3 Synthetic actors and authority rosters.**\n- **A (recommended).** One synthetic actor per required function in PPR §10: compliance/admission, SPV management, ownership-record administration, custody/payment operations, independent approvers, auditor, and technical incident/release owner.\n  - Rosters are sized at the adopted D01 floors, plus one spare member per class for rotation, loss and compromise tests.\n  - All keys and identities are synthetic. As Plan L610 says, \"a synthetic signature cannot establish real signer independence\"; real OD-02 appointments stay separate (SP2-03 Notes)."
+      }
+    }
+  },
+  "experimental_register_rows": [
+    "XV-SP2-03-ROSTER",
+    "XV-SP2-03-JURISDICTION",
+    "XV-SP2-03-LAYOUT"
+  ],
+  "jurisdiction_labels": [
+    "US-CA",
+    "US-NY",
+    "US-TX",
+    "US-FL",
+    "US-DE",
+    "US-IL",
+    "US-MA",
+    "US-NJ",
+    "US-WA",
+    "US-CO"
+  ],
+  "programmes": [
+    {
+      "fixture_programme_id": "synthetic-sp2-03-programme-1",
+      "asset_model": "property equity",
+      "investor_policy": "accredited-only",
+      "closure_plan": "burn-and-retire",
+      "initial_business_jurisdiction": "USA",
+      "function_actor_ids": [
+        "synthetic-sp2-03-programme-1-function-1",
+        "synthetic-sp2-03-programme-1-function-2",
+        "synthetic-sp2-03-programme-1-function-3",
+        "synthetic-sp2-03-programme-1-function-4",
+        "synthetic-sp2-03-programme-1-function-5",
+        "synthetic-sp2-03-programme-1-function-6",
+        "synthetic-sp2-03-programme-1-function-7",
+        "synthetic-sp2-03-programme-1-function-8"
+      ],
+      "available_roster_ids": [
+        "synthetic-sp2-03-programme-1-roster-1",
+        "synthetic-sp2-03-programme-1-roster-2",
+        "synthetic-sp2-03-programme-1-roster-3",
+        "synthetic-sp2-03-programme-1-roster-4",
+        "synthetic-sp2-03-programme-1-roster-5",
+        "synthetic-sp2-03-programme-1-roster-6",
+        "synthetic-sp2-03-programme-1-roster-7",
+        "synthetic-sp2-03-programme-1-roster-8",
+        "synthetic-sp2-03-programme-1-roster-9",
+        "synthetic-sp2-03-programme-1-roster-10"
+      ],
+      "jurisdiction_policy_versions": [
+        {
+          "experimental_policy_version": 1,
+          "allowed_investor_states": [
+            "US-CA",
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE"
+          ],
+          "disallowed_investor_states": [
+            "US-IL",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        },
+        {
+          "experimental_policy_version": 2,
+          "allowed_investor_states": [
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE",
+            "US-IL"
+          ],
+          "disallowed_investor_states": [
+            "US-CA",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        }
+      ],
+      "jurisdiction_fields": [
+        "investor_state",
+        "issuer_jurisdiction",
+        "asset_jurisdiction",
+        "service_provider_jurisdiction"
+      ],
+      "case_inputs": {
+        "allowed": "Use an allowed investor_state with otherwise valid synthetic eligibility evidence.",
+        "disallowed": "Use a disallowed investor_state; do not issue a positive under this policy.",
+        "conflicting_evidence": "Conflicting investor-state evidence is not an eligibility positive; reconcile off chain and preserve existing rights.",
+        "state_change": "US-CA is allowed in the first fixture version and disallowed in the second; reevaluate fresh decisions under the applicable policy.",
+        "version_change": "Retain the explicit policy version; do not treat an old decision as current-policy approval.",
+        "evasion": "Changing wallet or issuer/asset/service-provider jurisdiction does not change the investor-state policy or investor identity."
+      }
+    },
+    {
+      "fixture_programme_id": "synthetic-sp2-03-programme-2",
+      "asset_model": "property equity",
+      "investor_policy": "retail-permitted",
+      "closure_plan": "preserve-and-close",
+      "initial_business_jurisdiction": "USA",
+      "function_actor_ids": [
+        "synthetic-sp2-03-programme-2-function-1",
+        "synthetic-sp2-03-programme-2-function-2",
+        "synthetic-sp2-03-programme-2-function-3",
+        "synthetic-sp2-03-programme-2-function-4",
+        "synthetic-sp2-03-programme-2-function-5",
+        "synthetic-sp2-03-programme-2-function-6",
+        "synthetic-sp2-03-programme-2-function-7",
+        "synthetic-sp2-03-programme-2-function-8"
+      ],
+      "available_roster_ids": [
+        "synthetic-sp2-03-programme-2-roster-1",
+        "synthetic-sp2-03-programme-2-roster-2",
+        "synthetic-sp2-03-programme-2-roster-3",
+        "synthetic-sp2-03-programme-2-roster-4",
+        "synthetic-sp2-03-programme-2-roster-5",
+        "synthetic-sp2-03-programme-2-roster-6",
+        "synthetic-sp2-03-programme-2-roster-7",
+        "synthetic-sp2-03-programme-2-roster-8",
+        "synthetic-sp2-03-programme-2-roster-9",
+        "synthetic-sp2-03-programme-2-roster-10"
+      ],
+      "jurisdiction_policy_versions": [
+        {
+          "experimental_policy_version": 1,
+          "allowed_investor_states": [
+            "US-CA",
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE"
+          ],
+          "disallowed_investor_states": [
+            "US-IL",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        },
+        {
+          "experimental_policy_version": 2,
+          "allowed_investor_states": [
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE",
+            "US-IL"
+          ],
+          "disallowed_investor_states": [
+            "US-CA",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        }
+      ],
+      "jurisdiction_fields": [
+        "investor_state",
+        "issuer_jurisdiction",
+        "asset_jurisdiction",
+        "service_provider_jurisdiction"
+      ],
+      "case_inputs": {
+        "allowed": "Use an allowed investor_state with otherwise valid synthetic eligibility evidence.",
+        "disallowed": "Use a disallowed investor_state; do not issue a positive under this policy.",
+        "conflicting_evidence": "Conflicting investor-state evidence is not an eligibility positive; reconcile off chain and preserve existing rights.",
+        "state_change": "US-CA is allowed in the first fixture version and disallowed in the second; reevaluate fresh decisions under the applicable policy.",
+        "version_change": "Retain the explicit policy version; do not treat an old decision as current-policy approval.",
+        "evasion": "Changing wallet or issuer/asset/service-provider jurisdiction does not change the investor-state policy or investor identity."
+      }
+    },
+    {
+      "fixture_programme_id": "synthetic-sp2-03-programme-3",
+      "asset_model": "property-backed debt",
+      "investor_policy": "accredited-only",
+      "closure_plan": "burn-and-retire",
+      "initial_business_jurisdiction": "USA",
+      "function_actor_ids": [
+        "synthetic-sp2-03-programme-3-function-1",
+        "synthetic-sp2-03-programme-3-function-2",
+        "synthetic-sp2-03-programme-3-function-3",
+        "synthetic-sp2-03-programme-3-function-4",
+        "synthetic-sp2-03-programme-3-function-5",
+        "synthetic-sp2-03-programme-3-function-6",
+        "synthetic-sp2-03-programme-3-function-7",
+        "synthetic-sp2-03-programme-3-function-8"
+      ],
+      "available_roster_ids": [
+        "synthetic-sp2-03-programme-3-roster-1",
+        "synthetic-sp2-03-programme-3-roster-2",
+        "synthetic-sp2-03-programme-3-roster-3",
+        "synthetic-sp2-03-programme-3-roster-4",
+        "synthetic-sp2-03-programme-3-roster-5",
+        "synthetic-sp2-03-programme-3-roster-6",
+        "synthetic-sp2-03-programme-3-roster-7",
+        "synthetic-sp2-03-programme-3-roster-8",
+        "synthetic-sp2-03-programme-3-roster-9",
+        "synthetic-sp2-03-programme-3-roster-10"
+      ],
+      "jurisdiction_policy_versions": [
+        {
+          "experimental_policy_version": 1,
+          "allowed_investor_states": [
+            "US-CA",
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE"
+          ],
+          "disallowed_investor_states": [
+            "US-IL",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        },
+        {
+          "experimental_policy_version": 2,
+          "allowed_investor_states": [
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE",
+            "US-IL"
+          ],
+          "disallowed_investor_states": [
+            "US-CA",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        }
+      ],
+      "jurisdiction_fields": [
+        "investor_state",
+        "issuer_jurisdiction",
+        "asset_jurisdiction",
+        "service_provider_jurisdiction"
+      ],
+      "case_inputs": {
+        "allowed": "Use an allowed investor_state with otherwise valid synthetic eligibility evidence.",
+        "disallowed": "Use a disallowed investor_state; do not issue a positive under this policy.",
+        "conflicting_evidence": "Conflicting investor-state evidence is not an eligibility positive; reconcile off chain and preserve existing rights.",
+        "state_change": "US-CA is allowed in the first fixture version and disallowed in the second; reevaluate fresh decisions under the applicable policy.",
+        "version_change": "Retain the explicit policy version; do not treat an old decision as current-policy approval.",
+        "evasion": "Changing wallet or issuer/asset/service-provider jurisdiction does not change the investor-state policy or investor identity."
+      }
+    },
+    {
+      "fixture_programme_id": "synthetic-sp2-03-programme-4",
+      "asset_model": "property-backed debt",
+      "investor_policy": "retail-permitted",
+      "closure_plan": "preserve-and-close",
+      "initial_business_jurisdiction": "USA",
+      "function_actor_ids": [
+        "synthetic-sp2-03-programme-4-function-1",
+        "synthetic-sp2-03-programme-4-function-2",
+        "synthetic-sp2-03-programme-4-function-3",
+        "synthetic-sp2-03-programme-4-function-4",
+        "synthetic-sp2-03-programme-4-function-5",
+        "synthetic-sp2-03-programme-4-function-6",
+        "synthetic-sp2-03-programme-4-function-7",
+        "synthetic-sp2-03-programme-4-function-8"
+      ],
+      "available_roster_ids": [
+        "synthetic-sp2-03-programme-4-roster-1",
+        "synthetic-sp2-03-programme-4-roster-2",
+        "synthetic-sp2-03-programme-4-roster-3",
+        "synthetic-sp2-03-programme-4-roster-4",
+        "synthetic-sp2-03-programme-4-roster-5",
+        "synthetic-sp2-03-programme-4-roster-6",
+        "synthetic-sp2-03-programme-4-roster-7",
+        "synthetic-sp2-03-programme-4-roster-8",
+        "synthetic-sp2-03-programme-4-roster-9",
+        "synthetic-sp2-03-programme-4-roster-10"
+      ],
+      "jurisdiction_policy_versions": [
+        {
+          "experimental_policy_version": 1,
+          "allowed_investor_states": [
+            "US-CA",
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE"
+          ],
+          "disallowed_investor_states": [
+            "US-IL",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        },
+        {
+          "experimental_policy_version": 2,
+          "allowed_investor_states": [
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE",
+            "US-IL"
+          ],
+          "disallowed_investor_states": [
+            "US-CA",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        }
+      ],
+      "jurisdiction_fields": [
+        "investor_state",
+        "issuer_jurisdiction",
+        "asset_jurisdiction",
+        "service_provider_jurisdiction"
+      ],
+      "case_inputs": {
+        "allowed": "Use an allowed investor_state with otherwise valid synthetic eligibility evidence.",
+        "disallowed": "Use a disallowed investor_state; do not issue a positive under this policy.",
+        "conflicting_evidence": "Conflicting investor-state evidence is not an eligibility positive; reconcile off chain and preserve existing rights.",
+        "state_change": "US-CA is allowed in the first fixture version and disallowed in the second; reevaluate fresh decisions under the applicable policy.",
+        "version_change": "Retain the explicit policy version; do not treat an old decision as current-policy approval.",
+        "evasion": "Changing wallet or issuer/asset/service-provider jurisdiction does not change the investor-state policy or investor identity."
+      }
+    },
+    {
+      "fixture_programme_id": "synthetic-sp2-03-programme-5",
+      "asset_model": "receivables",
+      "investor_policy": "accredited-only",
+      "closure_plan": "burn-and-retire",
+      "initial_business_jurisdiction": "USA",
+      "function_actor_ids": [
+        "synthetic-sp2-03-programme-5-function-1",
+        "synthetic-sp2-03-programme-5-function-2",
+        "synthetic-sp2-03-programme-5-function-3",
+        "synthetic-sp2-03-programme-5-function-4",
+        "synthetic-sp2-03-programme-5-function-5",
+        "synthetic-sp2-03-programme-5-function-6",
+        "synthetic-sp2-03-programme-5-function-7",
+        "synthetic-sp2-03-programme-5-function-8"
+      ],
+      "available_roster_ids": [
+        "synthetic-sp2-03-programme-5-roster-1",
+        "synthetic-sp2-03-programme-5-roster-2",
+        "synthetic-sp2-03-programme-5-roster-3",
+        "synthetic-sp2-03-programme-5-roster-4",
+        "synthetic-sp2-03-programme-5-roster-5",
+        "synthetic-sp2-03-programme-5-roster-6",
+        "synthetic-sp2-03-programme-5-roster-7",
+        "synthetic-sp2-03-programme-5-roster-8",
+        "synthetic-sp2-03-programme-5-roster-9",
+        "synthetic-sp2-03-programme-5-roster-10"
+      ],
+      "jurisdiction_policy_versions": [
+        {
+          "experimental_policy_version": 1,
+          "allowed_investor_states": [
+            "US-CA",
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE"
+          ],
+          "disallowed_investor_states": [
+            "US-IL",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        },
+        {
+          "experimental_policy_version": 2,
+          "allowed_investor_states": [
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE",
+            "US-IL"
+          ],
+          "disallowed_investor_states": [
+            "US-CA",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        }
+      ],
+      "jurisdiction_fields": [
+        "investor_state",
+        "issuer_jurisdiction",
+        "asset_jurisdiction",
+        "service_provider_jurisdiction"
+      ],
+      "case_inputs": {
+        "allowed": "Use an allowed investor_state with otherwise valid synthetic eligibility evidence.",
+        "disallowed": "Use a disallowed investor_state; do not issue a positive under this policy.",
+        "conflicting_evidence": "Conflicting investor-state evidence is not an eligibility positive; reconcile off chain and preserve existing rights.",
+        "state_change": "US-CA is allowed in the first fixture version and disallowed in the second; reevaluate fresh decisions under the applicable policy.",
+        "version_change": "Retain the explicit policy version; do not treat an old decision as current-policy approval.",
+        "evasion": "Changing wallet or issuer/asset/service-provider jurisdiction does not change the investor-state policy or investor identity."
+      }
+    },
+    {
+      "fixture_programme_id": "synthetic-sp2-03-programme-6",
+      "asset_model": "receivables",
+      "investor_policy": "retail-permitted",
+      "closure_plan": "preserve-and-close",
+      "initial_business_jurisdiction": "USA",
+      "function_actor_ids": [
+        "synthetic-sp2-03-programme-6-function-1",
+        "synthetic-sp2-03-programme-6-function-2",
+        "synthetic-sp2-03-programme-6-function-3",
+        "synthetic-sp2-03-programme-6-function-4",
+        "synthetic-sp2-03-programme-6-function-5",
+        "synthetic-sp2-03-programme-6-function-6",
+        "synthetic-sp2-03-programme-6-function-7",
+        "synthetic-sp2-03-programme-6-function-8"
+      ],
+      "available_roster_ids": [
+        "synthetic-sp2-03-programme-6-roster-1",
+        "synthetic-sp2-03-programme-6-roster-2",
+        "synthetic-sp2-03-programme-6-roster-3",
+        "synthetic-sp2-03-programme-6-roster-4",
+        "synthetic-sp2-03-programme-6-roster-5",
+        "synthetic-sp2-03-programme-6-roster-6",
+        "synthetic-sp2-03-programme-6-roster-7",
+        "synthetic-sp2-03-programme-6-roster-8",
+        "synthetic-sp2-03-programme-6-roster-9",
+        "synthetic-sp2-03-programme-6-roster-10"
+      ],
+      "jurisdiction_policy_versions": [
+        {
+          "experimental_policy_version": 1,
+          "allowed_investor_states": [
+            "US-CA",
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE"
+          ],
+          "disallowed_investor_states": [
+            "US-IL",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        },
+        {
+          "experimental_policy_version": 2,
+          "allowed_investor_states": [
+            "US-NY",
+            "US-TX",
+            "US-FL",
+            "US-DE",
+            "US-IL"
+          ],
+          "disallowed_investor_states": [
+            "US-CA",
+            "US-MA",
+            "US-NJ",
+            "US-WA",
+            "US-CO"
+          ],
+          "synthetic_only": true
+        }
+      ],
+      "jurisdiction_fields": [
+        "investor_state",
+        "issuer_jurisdiction",
+        "asset_jurisdiction",
+        "service_provider_jurisdiction"
+      ],
+      "case_inputs": {
+        "allowed": "Use an allowed investor_state with otherwise valid synthetic eligibility evidence.",
+        "disallowed": "Use a disallowed investor_state; do not issue a positive under this policy.",
+        "conflicting_evidence": "Conflicting investor-state evidence is not an eligibility positive; reconcile off chain and preserve existing rights.",
+        "state_change": "US-CA is allowed in the first fixture version and disallowed in the second; reevaluate fresh decisions under the applicable policy.",
+        "version_change": "Retain the explicit policy version; do not treat an old decision as current-policy approval.",
+        "evasion": "Changing wallet or issuer/asset/service-provider jurisdiction does not change the investor-state policy or investor identity."
+      }
+    }
+  ],
+  "function_actors": [
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-1",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "compliance/admission",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-2",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "SPV management",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-3",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "ownership-record administration",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-4",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "custody/payment operations",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-5",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "independent approvals",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-6",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "auditors",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-7",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "technical incident/release ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-1-function-8",
+      "programme": "synthetic-sp2-03-programme-1",
+      "function": "platform incident ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-1",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "compliance/admission",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-2",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "SPV management",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-3",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "ownership-record administration",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-4",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "custody/payment operations",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-5",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "independent approvals",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-6",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "auditors",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-7",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "technical incident/release ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-2-function-8",
+      "programme": "synthetic-sp2-03-programme-2",
+      "function": "platform incident ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-1",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "compliance/admission",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-2",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "SPV management",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-3",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "ownership-record administration",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-4",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "custody/payment operations",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-5",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "independent approvals",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-6",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "auditors",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-7",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "technical incident/release ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-3-function-8",
+      "programme": "synthetic-sp2-03-programme-3",
+      "function": "platform incident ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-1",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "compliance/admission",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-2",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "SPV management",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-3",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "ownership-record administration",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-4",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "custody/payment operations",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-5",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "independent approvals",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-6",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "auditors",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-7",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "technical incident/release ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-4-function-8",
+      "programme": "synthetic-sp2-03-programme-4",
+      "function": "platform incident ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-1",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "compliance/admission",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-2",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "SPV management",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-3",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "ownership-record administration",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-4",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "custody/payment operations",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-5",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "independent approvals",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-6",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "auditors",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-7",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "technical incident/release ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-5-function-8",
+      "programme": "synthetic-sp2-03-programme-5",
+      "function": "platform incident ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-1",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "compliance/admission",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-2",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "SPV management",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-3",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "ownership-record administration",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-4",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "custody/payment operations",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-5",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "independent approvals",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-6",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "auditors",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-7",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "technical incident/release ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    },
+    {
+      "fixture_actor_id": "synthetic-sp2-03-programme-6-function-8",
+      "programme": "synthetic-sp2-03-programme-6",
+      "function": "platform incident ownership",
+      "synthetic": true,
+      "authority": "No native role or appointment from this label; technical and platform incident owners are distinct."
+    }
+  ],
+  "programme_authority_roster_fixtures": [
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-1",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "programme-scoped Issuer/Program Admission Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-1-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-1-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-1-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-1-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-1-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-1-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-1-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-1-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-1-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-1-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-1-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-1-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-2",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Program Administration Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-2-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-2-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-2-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-2-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-2-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-2-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-2-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-2-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-2-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-2-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-2-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-2-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-3",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Supply Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-3-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-3-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-3-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-3-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-3-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-3-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-3-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-3-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-3-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-3-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-3-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-3-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-4",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Compliance Decision Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-4-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-4-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-4-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-4-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-4-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-4-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-4-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-4-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-4-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-4-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-4-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-4-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-5",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Financial-Crime Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-5-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-5-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-5-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-5-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-5-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-5-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-5-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-5-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-5-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-5-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-5-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-5-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-6",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Emergency Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-6-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-6-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-6-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-6-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-6-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-6-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-6-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-6-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-6-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-6-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-6-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-6-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-7",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Transfer-Authorization Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-7-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-7-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-7-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-7-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-7-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-7-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-7-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-7-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-7-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-7-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-7-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-7-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-8",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Administrative-Transfer Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-8-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-8-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-8-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-8-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-8-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-8-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-8-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-8-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-8-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-8-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-8-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-8-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-9",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Independent Reconciliation Authority",
+      "optional_role_fixture_only": true,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-9-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-9-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-9-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-9-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-9-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-9-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-9-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-9-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-9-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-9-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-9-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-9-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-1-roster-10",
+      "programme": "synthetic-sp2-03-programme-1",
+      "role_name": "Program Recovery Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-10-member-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-10-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-10-member-2",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-10-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-10-member-3",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-10-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-10-member-4",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-10-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-10-member-5",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-10-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-1-roster-10-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-1-roster-10-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-1",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "programme-scoped Issuer/Program Admission Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-1-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-1-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-1-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-1-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-1-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-1-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-1-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-1-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-1-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-1-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-1-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-1-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-2",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Program Administration Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-2-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-2-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-2-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-2-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-2-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-2-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-2-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-2-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-2-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-2-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-2-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-2-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-3",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Supply Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-3-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-3-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-3-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-3-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-3-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-3-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-3-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-3-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-3-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-3-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-3-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-3-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-4",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Compliance Decision Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-4-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-4-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-4-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-4-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-4-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-4-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-4-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-4-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-4-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-4-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-4-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-4-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-5",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Financial-Crime Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-5-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-5-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-5-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-5-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-5-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-5-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-5-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-5-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-5-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-5-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-5-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-5-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-6",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Emergency Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-6-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-6-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-6-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-6-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-6-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-6-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-6-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-6-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-6-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-6-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-6-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-6-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-7",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Transfer-Authorization Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-7-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-7-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-7-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-7-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-7-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-7-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-7-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-7-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-7-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-7-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-7-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-7-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-8",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Administrative-Transfer Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-8-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-8-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-8-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-8-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-8-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-8-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-8-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-8-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-8-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-8-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-8-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-8-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-9",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Independent Reconciliation Authority",
+      "optional_role_fixture_only": true,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-9-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-9-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-9-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-9-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-9-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-9-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-9-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-9-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-9-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-9-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-9-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-9-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-2-roster-10",
+      "programme": "synthetic-sp2-03-programme-2",
+      "role_name": "Program Recovery Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-10-member-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-10-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-10-member-2",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-10-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-10-member-3",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-10-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-10-member-4",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-10-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-10-member-5",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-10-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-2-roster-10-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-2-roster-10-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-1",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "programme-scoped Issuer/Program Admission Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-1-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-1-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-1-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-1-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-1-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-1-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-1-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-1-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-1-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-1-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-1-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-1-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-2",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Program Administration Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-2-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-2-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-2-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-2-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-2-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-2-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-2-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-2-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-2-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-2-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-2-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-2-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-3",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Supply Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-3-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-3-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-3-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-3-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-3-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-3-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-3-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-3-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-3-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-3-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-3-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-3-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-4",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Compliance Decision Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-4-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-4-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-4-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-4-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-4-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-4-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-4-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-4-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-4-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-4-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-4-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-4-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-5",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Financial-Crime Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-5-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-5-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-5-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-5-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-5-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-5-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-5-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-5-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-5-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-5-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-5-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-5-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-6",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Emergency Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-6-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-6-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-6-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-6-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-6-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-6-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-6-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-6-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-6-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-6-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-6-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-6-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-7",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Transfer-Authorization Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-7-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-7-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-7-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-7-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-7-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-7-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-7-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-7-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-7-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-7-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-7-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-7-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-8",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Administrative-Transfer Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-8-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-8-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-8-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-8-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-8-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-8-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-8-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-8-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-8-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-8-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-8-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-8-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-9",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Independent Reconciliation Authority",
+      "optional_role_fixture_only": true,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-9-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-9-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-9-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-9-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-9-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-9-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-9-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-9-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-9-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-9-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-9-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-9-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-3-roster-10",
+      "programme": "synthetic-sp2-03-programme-3",
+      "role_name": "Program Recovery Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-10-member-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-10-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-10-member-2",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-10-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-10-member-3",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-10-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-10-member-4",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-10-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-10-member-5",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-10-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-3-roster-10-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-3-roster-10-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-1",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "programme-scoped Issuer/Program Admission Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-1-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-1-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-1-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-1-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-1-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-1-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-1-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-1-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-1-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-1-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-1-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-1-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-2",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Program Administration Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-2-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-2-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-2-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-2-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-2-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-2-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-2-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-2-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-2-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-2-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-2-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-2-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-3",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Supply Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-3-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-3-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-3-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-3-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-3-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-3-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-3-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-3-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-3-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-3-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-3-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-3-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-4",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Compliance Decision Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-4-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-4-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-4-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-4-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-4-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-4-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-4-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-4-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-4-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-4-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-4-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-4-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-5",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Financial-Crime Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-5-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-5-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-5-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-5-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-5-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-5-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-5-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-5-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-5-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-5-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-5-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-5-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-6",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Emergency Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-6-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-6-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-6-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-6-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-6-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-6-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-6-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-6-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-6-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-6-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-6-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-6-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-7",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Transfer-Authorization Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-7-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-7-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-7-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-7-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-7-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-7-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-7-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-7-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-7-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-7-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-7-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-7-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-8",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Administrative-Transfer Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-8-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-8-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-8-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-8-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-8-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-8-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-8-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-8-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-8-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-8-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-8-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-8-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-9",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Independent Reconciliation Authority",
+      "optional_role_fixture_only": true,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-9-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-9-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-9-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-9-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-9-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-9-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-9-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-9-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-9-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-9-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-9-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-9-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-4-roster-10",
+      "programme": "synthetic-sp2-03-programme-4",
+      "role_name": "Program Recovery Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-10-member-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-10-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-10-member-2",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-10-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-10-member-3",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-10-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-10-member-4",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-10-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-10-member-5",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-10-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-4-roster-10-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-4-roster-10-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-1",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "programme-scoped Issuer/Program Admission Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-1-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-1-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-1-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-1-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-1-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-1-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-1-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-1-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-1-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-1-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-1-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-1-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-2",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Program Administration Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-2-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-2-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-2-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-2-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-2-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-2-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-2-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-2-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-2-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-2-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-2-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-2-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-3",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Supply Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-3-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-3-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-3-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-3-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-3-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-3-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-3-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-3-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-3-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-3-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-3-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-3-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-4",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Compliance Decision Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-4-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-4-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-4-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-4-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-4-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-4-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-4-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-4-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-4-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-4-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-4-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-4-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-5",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Financial-Crime Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-5-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-5-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-5-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-5-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-5-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-5-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-5-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-5-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-5-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-5-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-5-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-5-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-6",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Emergency Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-6-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-6-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-6-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-6-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-6-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-6-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-6-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-6-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-6-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-6-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-6-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-6-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-7",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Transfer-Authorization Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-7-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-7-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-7-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-7-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-7-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-7-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-7-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-7-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-7-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-7-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-7-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-7-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-8",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Administrative-Transfer Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-8-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-8-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-8-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-8-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-8-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-8-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-8-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-8-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-8-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-8-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-8-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-8-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-9",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Independent Reconciliation Authority",
+      "optional_role_fixture_only": true,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-9-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-9-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-9-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-9-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-9-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-9-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-9-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-9-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-9-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-9-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-9-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-9-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-5-roster-10",
+      "programme": "synthetic-sp2-03-programme-5",
+      "role_name": "Program Recovery Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-10-member-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-10-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-10-member-2",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-10-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-10-member-3",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-10-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-10-member-4",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-10-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-10-member-5",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-10-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-5-roster-10-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-5-roster-10-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-1",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "programme-scoped Issuer/Program Admission Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-1-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-1-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-1-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-1-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-1-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-1-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-1-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-1-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-1-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-1-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-1-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-1-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-2",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Program Administration Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-2-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-2-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-2-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-2-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-2-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-2-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-2-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-2-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-2-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-2-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-2-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-2-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-3",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Supply Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-3-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-3-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-3-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-3-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-3-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-3-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-3-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-3-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-3-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-3-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-3-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-3-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-4",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Compliance Decision Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-4-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-4-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-4-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-4-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-4-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-4-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-4-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-4-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-4-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-4-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-4-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-4-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-5",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Financial-Crime Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-5-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-5-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-5-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-5-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-5-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-5-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-5-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-5-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-5-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-5-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-5-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-5-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-6",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Emergency Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-6-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-6-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-6-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-6-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-6-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-6-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-6-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-6-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-6-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-6-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-6-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-6-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-7",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Transfer-Authorization Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-7-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-7-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-7-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-7-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-7-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-7-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-7-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-7-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-7-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-7-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-7-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-7-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-8",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Administrative-Transfer Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-8-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-8-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-8-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-8-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-8-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-8-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-8-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-8-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-8-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-8-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-8-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-8-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-9",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Independent Reconciliation Authority",
+      "optional_role_fixture_only": true,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-9-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-9-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-9-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-9-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-9-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-9-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-9-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-9-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-9-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-9-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-9-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-9-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    },
+    {
+      "fixture_roster_id": "synthetic-sp2-03-programme-6-roster-10",
+      "programme": "synthetic-sp2-03-programme-6",
+      "role_name": "Program Recovery Authority",
+      "optional_role_fixture_only": false,
+      "eligible_member_count": 5,
+      "configured_threshold": 3,
+      "registered_members": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-10-member-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-10-key-1",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-10-member-2",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-10-key-2",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-10-member-3",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-10-key-3",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-10-member-4",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-10-key-4",
+          "synthetic": true
+        },
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-10-member-5",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-10-key-5",
+          "synthetic": true
+        }
+      ],
+      "unregistered_standby": [
+        {
+          "fixture_member_id": "synthetic-sp2-03-programme-6-roster-10-standby-1",
+          "key_handle": "synthetic-sp2-03-programme-6-roster-10-standby-key-1",
+          "synthetic": true,
+          "current_eligible": false
+        }
+      ],
+      "denominator_rule": "Exact registered roster/version, unchanged by unavailable members; standby has no current vote. Any lawful replacement needs a distinct successor version, its approvals and key-control proof.",
+      "authority_status": "Uninstalled symbolic fixture only. Purpose/operation constitution and lawful scoped appointment are required before use. This does not allocate an unresolved independent approval role."
+    }
+  ],
+  "key_handle_boundary": "Every key_handle is an opaque synthetic fixture identifier, NOT public/private key material, a native address, a signature or proof. Before any corresponding certificate oracle, bind exact native key generation/scheme and actual public keys with distinct material for required pairs. No key generation or signing occurs in SP2-03.",
+  "root_holder_guardian_boundary": "Programme roster numbers do not apply to technical roots, holder/issuer native authentication, guardians or possession proofs; retain their independent native/approved rules.",
+  "fixed_guarantees": [
+    "Full investor-claim fulfilment before every burn; absent or partial evidence is not fulfilment.",
+    "Qualified secondary buyers and separate accredited-only/retail-permitted programmes.",
+    "USA business scope and synthetic state labels are off-chain programme facts, never US law hardcoded into consensus.",
+    "Closure-plan equality, liveness, flag, native guardian semantics, D19 purpose classification and all other native guards remain.",
+    "Real signer/controller independence and OD-02 appointments are not proven by synthetic IDs or signatures."
+  ],
+  "downstream_gates": {
+    "SP2-04": "Bind D4.1 recovery declarations and their evidence/destination policy before dependent oracles.",
+    "SP2-05": "Bind D5.1/D5.2 supply/claim-unit/no-resale inputs; OPEN redemption remains unadmitted until its construction.",
+    "SP2-06": "Bind D6.1/D6.2 settlement and investor-wide ownership policy before dependent oracles.",
+    "SP2-07": "Bind D7.1/D7.2/D7.3 custody/change/availability details.",
+    "SP2-08": "Bind D8.1/D8.2/D8.3 deployment/trust/restart/incident/runbook inputs.",
+    "SP2-09": "Bind D9.1 workload and independent acceptance criteria.",
+    "SP2-27": "Exact D01/D02 class/purpose mapping, required independent pairs, lawful unavailable-role alternatives and key material before affected proof/oracle. No placeholder roster fills an unknown role.",
+    "SP2-31": "Actual canonical scoped admission/enrollment/appointment and key-control proof; documentary actors are not authority.",
+    "IA-16/D14": "Actual O-02 and O-04..O-12 records remain due at F.1 deadlines; no live legal/provider/programme admission."
+  },
+  "counts": {
+    "programmes": 6,
+    "function_actors": 48,
+    "rosters": 60,
+    "registered_member_handles": 300,
+    "standby_handles": 60
+  }
+}

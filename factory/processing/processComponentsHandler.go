@@ -15,9 +15,12 @@ import (
 	"github.com/multiversx/mx-chain-go/factory"
 	"github.com/multiversx/mx-chain-go/genesis"
 	"github.com/multiversx/mx-chain-go/process"
+	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
 	"github.com/multiversx/mx-chain-go/sharding"
 	"github.com/multiversx/mx-chain-go/sharding/nodesCoordinator"
+	"github.com/multiversx/mx-chain-go/state"
 	"github.com/multiversx/mx-chain-go/update"
+	"github.com/multiversx/mx-chain-go/vm"
 )
 
 var _ factory.ComponentHandler = (*managedProcessComponents)(nil)
@@ -758,4 +761,30 @@ func (m *managedProcessComponents) IsInterfaceNil() bool {
 // String returns the name of the component
 func (m *managedProcessComponents) String() string {
 	return factory.ProcessComponentsName
+}
+
+// DRWAQueryClassification returns what a VM that never commits (the API
+// query VM) needs on a DRWA deployment: on the metachain the read-only
+// System-SC classifier; on every shard the admission of built-in calls and its
+// enforcement predicate. All results are nil on a node without DRWA.
+func (m *managedProcessComponents) DRWAQueryClassification(user, validator state.AccountsAdapter) (vm.DRWATokenClassifier,
+	hooks.DRWABuiltInAdmission, func(uint32, uint64) bool) {
+	m.mutProcessComponents.RLock()
+	defer m.mutProcessComponents.RUnlock()
+
+	if m.processComponents == nil {
+		return nil, nil, nil
+	}
+	components := m.processComponents
+	if components.drwaMetaClassification != nil {
+		classifier := components.drwaMetaClassification.ReadOnlyClassifier(user, validator)
+		admission, enforcedAt := drwaBuiltInAdmission(components.drwaConfigurationCandidate, classifier)
+		return classifier, admission, enforcedAt
+	}
+	if components.drwaShardClassification != nil {
+		admission, enforcedAt := drwaBuiltInAdmission(components.drwaConfigurationCandidate, components.drwaShardClassification)
+		return nil, admission, enforcedAt
+	}
+
+	return nil, nil, nil
 }

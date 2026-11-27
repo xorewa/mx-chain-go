@@ -233,6 +233,11 @@ func (mp *metaProcessor) ProcessBlock(
 		return process.ErrAccountStateDirty
 	}
 
+	err = mp.beginDRWAExecution()
+	if err != nil {
+		return err
+	}
+
 	err = mp.blockChainHook.SetCurrentHeader(header)
 	if err != nil {
 		return err
@@ -816,7 +821,12 @@ func (mp *metaProcessor) CreateBlock(
 		return nil, nil, process.ErrAccountStateDirty
 	}
 
-	err := mp.processIfFirstBlockAfterEpochStart()
+	err := mp.beginDRWAExecution()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = mp.processIfFirstBlockAfterEpochStart()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -832,6 +842,11 @@ func (mp *metaProcessor) CreateBlock(
 	}
 
 	body, err = mp.createBody(metaHdr, haveTime)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = mp.containAccountsRollbackFailure()
 	if err != nil {
 		return nil, nil, err
 	}

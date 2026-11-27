@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -13,6 +15,10 @@ import (
 
 func TestEndToEndHybridGateAndNoIgnoreRules(t *testing.T) {
 	dir := t.TempDir()
+	reporter := filepath.Join(dir, "coverage-report")
+	if _, err := command("go", "build", "-o", reporter, "."); err != nil {
+		t.Fatal(err)
+	}
 	t.Chdir(dir)
 	write := func(name, text string) {
 		t.Helper()
@@ -70,6 +76,48 @@ func TestEndToEndHybridGateAndNoIgnoreRules(t *testing.T) {
 	r, e = analyze(base, base, "full.out", "./")
 	if e != nil || len(r.Errors) > 0 {
 		t.Fatalf("full fixture: %v, %v", e, r.Errors)
+	}
+	// Exercise the real reporter CLI on the existing successful toy profile.
+	// Check the published JSON field names independently of the Go report type.
+	args := []string{reporter, "-base", base, "-upstream", base, "-profile", "full.out", "-packages", "./", "-output", "positive.json"}
+	summary := run(args...)
+	wantSummary := "diff statements 4/4; function entries 2/2; see positive.json for exclusions and package totals\n"
+	if summary != wantSummary {
+		t.Fatalf("successful summary = %q, want %q", summary, wantSummary)
+	}
+	first, e := os.ReadFile("positive.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var fields map[string]json.RawMessage
+	if e = json.Unmarshal(first, &fields); e != nil {
+		t.Fatal(e)
+	}
+	checkField := func(name, want string) {
+		t.Helper()
+		var actual, expected any
+		if e := json.Unmarshal(fields[name], &actual); e != nil {
+			t.Fatalf("report field %s: %v", name, e)
+		}
+		if e := json.Unmarshal([]byte(want), &expected); e != nil {
+			t.Fatal(e)
+		}
+		if !reflect.DeepEqual(actual, expected) {
+			t.Fatalf("report field %s = %s, want %s", name, fields[name], want)
+		}
+	}
+	checkField("base", fmt.Sprintf("%q", base))
+	checkField("ownership_upstream", fmt.Sprintf("%q", base))
+	checkField("diff_statements", `{"covered":4,"total":4}`)
+	checkField("upstream_changed_block_statements", `{"covered":1,"total":1}`)
+	checkField("diff_functions", `{"covered":2,"total":2}`)
+	checkField("packages", `[{"package":"example.com/fixture","statements":{"covered":5,"total":6},"functions":{"covered":2,"total":2}}]`)
+	checkField("changed_functions", `[{"file":"f.go","name":"Existing","policy":"changed_blocks","statements":{"covered":1,"total":1},"entered":true},{"file":"f.go","name":"New","policy":"whole_function","statements":{"covered":3,"total":3},"entered":true}]`)
+	checkField("errors", "null")
+	run(args...)
+	second, e := os.ReadFile("positive.json")
+	if e != nil || !bytes.Equal(first, second) {
+		t.Fatalf("same-input successful report was not deterministic: %v", e)
 	}
 	write("missing.out", "mode: atomic\n")
 	r, e = analyze(base, base, "missing.out", "./")
@@ -419,5 +467,177 @@ func TestAnalyze_ChangedExceptionStopsGate(t *testing.T) {
 	}
 	if !found || result.DiffStatements != (counts{7, 8}) {
 		t.Fatalf("changed source did not stop the exception: %+v", result)
+	}
+}
+
+func TestCurrentBaselinePreservesCarriedChangesAndSeparatesUpstreamOnly(t *testing.T) {
+	t.Chdir(t.TempDir())
+	write := func(name, text string) {
+		t.Helper()
+		if err := os.WriteFile(name, []byte(text), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func(args ...string) string {
+		t.Helper()
+		b, err := command(args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.TrimSpace(string(b))
+	}
+	commit := func() {
+		t.Helper()
+		run("git", "add", ".")
+		run("git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "coverage baseline fixture")
+	}
+	run("git", "init", "-q")
+	write("go.mod", "module example.com/fixture\n\ngo 1.26\n")
+	write("inherited.go", "package fixture\nfunc Inherited() int { return 1 }\n")
+	write("modified.go", "package fixture\nfunc Modified() int { return 10 }\n")
+	commit()
+	historical := run("git", "rev-parse", "HEAD")
+	write("inherited.go", "package fixture\nfunc Inherited() int { return 2 }\n")
+	commit()
+	upstream := run("git", "rev-parse", "HEAD")
+	// Carried SP1 functionality and a later DRWA modification are both
+	// present in the exact current tree; neither can disappear from the gate.
+	write("carried.go", "package fixture\nfunc Carried() int { return 3 }\n")
+	write("modified.go", "package fixture\nfunc Modified() int { return 11 }\n")
+	write("f_test.go", "package fixture\nimport \"testing\"\nfunc TestModified(t *testing.T){ if Modified()!=11 { t.Fatal(\"fixture\") } }\n")
+	commit()
+	run("go", "test", "-count=1", "-covermode=atomic", "-coverprofile=fixture.out", "./")
+	for _, tc := range []struct {
+		base           string
+		want           map[string]string
+		wantStatements counts
+		wantUpstream   counts
+		wantEntries    counts
+		wantErrors     []string
+	}{
+		{
+			historical, map[string]string{"Inherited": "changed_blocks", "Carried": "whole_function", "Modified": "changed_blocks"},
+			counts{1, 3}, counts{1, 2}, counts{1, 3},
+			[]string{"new function below 90% statements: carried.go:Carried", "diff statements below 90%", "upstream changed-block statements below 90%", "diff function entries below 90%"},
+		},
+		{
+			upstream, map[string]string{"Carried": "whole_function", "Modified": "changed_blocks"},
+			counts{1, 2}, counts{1, 1}, counts{1, 2},
+			[]string{"new function below 90% statements: carried.go:Carried", "diff statements below 90%", "diff function entries below 90%"},
+		},
+	} {
+		r, err := analyze(tc.base, upstream, "fixture.out", "./")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := make(map[string]string)
+		for _, f := range r.Changed {
+			got[f.Name] = f.Policy
+		}
+		if len(got) != len(tc.want) {
+			t.Fatalf("base %s: got %+v, want %+v", tc.base, got, tc.want)
+		}
+		for name, policy := range tc.want {
+			if got[name] != policy {
+				t.Fatalf("base %s: function %s policy %q, want %q", tc.base, name, got[name], policy)
+			}
+		}
+		// Both baselines read the same profile. Removing the upstream-only
+		// change must change the relevant denominators, not the covered hits.
+		if r.DiffStatements != tc.wantStatements || r.UpstreamStatements != tc.wantUpstream || r.DiffFunctions != tc.wantEntries {
+			t.Fatalf("base %s: statements/upstream/entries = %+v/%+v/%+v, want %+v/%+v/%+v",
+				tc.base, r.DiffStatements, r.UpstreamStatements, r.DiffFunctions, tc.wantStatements, tc.wantUpstream, tc.wantEntries)
+		}
+		gotErrors := make(map[string]int)
+		for _, message := range r.Errors {
+			gotErrors[message]++
+		}
+		if len(r.Errors) != len(tc.wantErrors) {
+			t.Fatalf("base %s: errors = %q, want %q", tc.base, r.Errors, tc.wantErrors)
+		}
+		for _, message := range tc.wantErrors {
+			if gotErrors[message] != 1 {
+				t.Fatalf("base %s: expected exactly one %q in %q", tc.base, message, r.Errors)
+			}
+		}
+	}
+}
+
+func TestAnalyzePositiveMultiPackageProfile(t *testing.T) {
+	t.Chdir(t.TempDir())
+	write := func(path, content string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func(args ...string) string {
+		t.Helper()
+		b, err := command(args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.TrimSpace(string(b))
+	}
+	commit := func() {
+		t.Helper()
+		run("git", "add", ".")
+		run("git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "-qm", "multi-package coverage fixture")
+	}
+	run("git", "init", "-q")
+	write("go.mod", "module example.com/display\n\ngo 1.26\n")
+	write("alpha/f.go", "package alpha\nfunc Display(flag bool) int {\n if flag {\n  return 1\n }\n return 0\n}\nfunc Spare() int { return 10 }\n")
+	write("beta/f.go", "package beta\nfunc Display() int { return 5 }\n")
+	commit()
+	base := run("git", "rev-parse", "HEAD")
+	// Identical file basenames and function names across packages must
+	// retain their individual, deliberately different coverage totals.
+	write("alpha/f.go", "package alpha\nfunc Display(flag bool) int {\n if flag {\n  return 2\n }\n return 0\n}\nfunc Spare() int { return 10 }\n")
+	write("beta/f.go", "package beta\nfunc Display() int { return 6 }\nfunc Extra() int { return 7 }\n")
+	write("alpha/f_test.go", "package alpha\nimport \"testing\"\nfunc TestDisplay(t *testing.T) { if Display(true)!=2 { t.Fatal(\"fixture\") } }\n")
+	write("beta/f_test.go", "package beta\nimport \"testing\"\nfunc TestDisplay(t *testing.T) { if Display()!=6 || Extra()!=7 { t.Fatal(\"fixture\") } }\n")
+	commit()
+	run("go", "test", "-count=1", "-covermode=atomic", "-coverprofile=both.out", "./alpha", "./beta")
+	r, err := analyze(base, base, "both.out", "./alpha ./beta")
+	if err != nil || len(r.Errors) != 0 {
+		t.Fatalf("positive multi-package fixture: %v, %v", err, r.Errors)
+	}
+	if r.DiffStatements != (counts{3, 3}) || r.UpstreamStatements != (counts{2, 2}) || r.DiffFunctions != (counts{3, 3}) {
+		t.Fatalf("combined diff/upstream/entries = %+v/%+v/%+v", r.DiffStatements, r.UpstreamStatements, r.DiffFunctions)
+	}
+	want := map[string]packageResult{
+		"example.com/display/alpha": {Package: "example.com/display/alpha", Statements: counts{2, 4}, Functions: counts{1, 2}},
+		"example.com/display/beta":  {Package: "example.com/display/beta", Statements: counts{2, 2}, Functions: counts{2, 2}},
+	}
+	if len(r.Packages) != len(want) {
+		t.Fatalf("package reports = %+v", r.Packages)
+	}
+	for _, got := range r.Packages {
+		expected, ok := want[got.Package]
+		if !ok || !reflect.DeepEqual(got, expected) {
+			t.Fatalf("package report = %+v, want %+v", got, expected)
+		}
+		delete(want, got.Package)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing package reports = %+v", want)
+	}
+	changed := map[string]string{
+		"alpha/f.go:Display": "changed_blocks",
+		"beta/f.go:Display":  "changed_blocks",
+		"beta/f.go:Extra":    "whole_function",
+	}
+	for _, f := range r.Changed {
+		key := f.File + ":" + f.Name
+		if changed[key] != f.Policy || !f.Entered || f.Statements != (counts{1, 1}) {
+			t.Fatalf("unexpected changed function report: %+v", f)
+		}
+		delete(changed, key)
+	}
+	if len(changed) != 0 {
+		t.Fatalf("missing changed functions = %+v", changed)
 	}
 }

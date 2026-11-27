@@ -100,6 +100,9 @@ var timeSpanForBadHeaders = time.Minute * 2
 // processComponents struct holds the process components
 type processComponents struct {
 	drwaNetworkIdentity              *drwaIdentityUnit
+	drwaMetaClassification           *drwa.MetaClassification
+	drwaShardClassification          *drwa.ShardClassification
+	drwaConfigurationCandidate       *factoryCore.DRWAConfigurationCandidate
 	nodesCoordinator                 nodesCoordinator.NodesCoordinator
 	shardCoordinator                 sharding.Coordinator
 	mainInterceptorsContainer        process.InterceptorsContainer
@@ -206,6 +209,10 @@ type processComponentsFactory struct {
 	drwaInitialProgrammeStartup *config.DRWAInitialProgrammeStartup
 	drwaOriginalGenesisStarted  atomic.Bool
 	drwaConfigurationCandidate *factoryCore.DRWAConfigurationCandidate
+	drwaMetaClassification     *drwa.MetaClassification
+	drwaShardClassification    *drwa.ShardClassification
+	drwaShardRegistrySource    drwa.ShardRegistrySource
+	drwaNativeValidationSource *nativeValidation.NativeValidationSource
 	miniBlockTracker           process.MiniBlockTracker
 	config                     config.Config
 	roundConfig                config.RoundConfig
@@ -889,6 +896,9 @@ func (pcf *processComponentsFactory) Create() (components *processComponents, re
 
 	return &processComponents{
 		drwaNetworkIdentity:              identity,
+		drwaMetaClassification:           pcf.drwaMetaClassification,
+		drwaShardClassification:          pcf.drwaShardClassification,
+		drwaConfigurationCandidate:       pcf.drwaConfigurationCandidate,
 		nodesCoordinator:                 pcf.nodesCoordinator,
 		shardCoordinator:                 pcf.bootstrapComponents.ShardCoordinator(),
 		mainInterceptorsContainer:        mainInterceptorsContainer,
@@ -2037,7 +2047,7 @@ func (pcf *processComponentsFactory) configureNativeValidationSource(args interc
 	if !ok {
 		return vm.ErrDRWAExecution
 	}
-	return pool.ConfigureNativeValidationSource(&nativeValidation.NativeValidationSource{
+	source := &nativeValidation.NativeValidationSource{
 		ProtoMarshalizer: args.CoreComponents.InternalMarshalizer(), SignMarshalizer: args.CoreComponents.TxMarshalizer(),
 		Hasher: args.CoreComponents.Hasher(), TxSignHasher: args.CoreComponents.TxSignHasher(),
 		KeyGen: args.CryptoComponents.TxSignKeyGen(), Signer: args.CryptoComponents.TxSingleSigner(),
@@ -2045,7 +2055,14 @@ func (pcf *processComponentsFactory) configureNativeValidationSource(args interc
 		Coordinator: args.ShardCoordinator, FeeHandler: args.TxFeeHandler,
 		VerifiedTransactions: args.WhiteListerVerifiedTxs, ArgsParser: args.ArgumentsParser,
 		EnableEpochsHandler: args.CoreComponents.EnableEpochsHandler(), ChainID: args.CoreComponents.ChainID(),
-	})
+	}
+	if err := pool.ConfigureNativeValidationSource(source); err != nil {
+		return err
+	}
+	// The classifier owner verifies receipts against these same instances.
+	retained := *source
+	pcf.drwaNativeValidationSource = &retained
+	return nil
 }
 
 func (pcf *processComponentsFactory) newForkDetector(

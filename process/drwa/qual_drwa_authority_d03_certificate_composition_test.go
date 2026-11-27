@@ -1,7 +1,6 @@
 package drwa
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"testing"
@@ -99,15 +98,9 @@ func w03D03CompositionVerify(c w03D03CertificateContext, rosters [6]w03D03RoleRo
 			if needed&(1<<j) == 0 {
 				continue
 			}
-			if rosters[i].authority.id == rosters[j].authority.id {
+			if validateProgrammeAuthorityIndependentPair(rosters[i].authority.id[:], rosters[j].authority.id[:],
+				rosters[i].members, rosters[j].members) != nil {
 				return w03ErrD03Certificate
-			}
-			for _, left := range rosters[i].members {
-				for _, right := range rosters[j].members {
-					if bytes.Equal(left, right) {
-						return w03ErrD03Certificate
-					}
-				}
 			}
 		}
 	}

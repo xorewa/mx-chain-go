@@ -1,0 +1,1610 @@
+{
+  "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "functions": [
+    {
+      "source": "common/tokensParser.go",
+      "source_sha256": "a66a745af2c8e342a9f609f7836640558a91bf80fd4747b3a6b147b73a302c48",
+      "profile_file": "github.com/multiversx/mx-chain-go/common/tokensParser.go",
+      "name": "ExtractTokenIDAndNonceFromTokenStorageKey",
+      "span": [
+        25,
+        1,
+        62,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            25,
+            82
+          ],
+          "end": [
+            32,
+            28
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            32,
+            28
+          ],
+          "end": [
+            34,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            36,
+            2
+          ],
+          "end": [
+            46,
+            39
+          ],
+          "statements": 5
+        },
+        {
+          "start": [
+            46,
+            39
+          ],
+          "end": [
+            48,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            50,
+            2
+          ],
+          "end": [
+            50,
+            61
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            50,
+            61
+          ],
+          "end": [
+            52,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            55,
+            2
+          ],
+          "end": [
+            61,
+            46
+          ],
+          "statements": 5
+        }
+      ]
+    },
+    {
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "name": "GetSupply",
+      "span": [
+        66,
+        1,
+        71,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            66,
+            48
+          ],
+          "end": [
+            67,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            67,
+            14
+          ],
+          "end": [
+            69,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            70,
+            2
+          ],
+          "end": [
+            70,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "name": "GetBurned",
+      "span": [
+        73,
+        1,
+        78,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            73,
+            48
+          ],
+          "end": [
+            74,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            74,
+            14
+          ],
+          "end": [
+            76,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            77,
+            2
+          ],
+          "end": [
+            77,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "name": "GetMinted",
+      "span": [
+        80,
+        1,
+        85,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            80,
+            48
+          ],
+          "end": [
+            81,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            81,
+            14
+          ],
+          "end": [
+            83,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            84,
+            2
+          ],
+          "end": [
+            84,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "name": "GetRecomputedSupply",
+      "span": [
+        87,
+        1,
+        92,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            87,
+            49
+          ],
+          "end": [
+            88,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            88,
+            14
+          ],
+          "end": [
+            90,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            91,
+            2
+          ],
+          "end": [
+            91,
+            14
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "name": "Equal",
+      "span": [
+        125,
+        1,
+        166,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            125,
+            54
+          ],
+          "end": [
+            126,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            126,
+            17
+          ],
+          "end": [
+            128,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            130,
+            2
+          ],
+          "end": [
+            131,
+            9
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            131,
+            9
+          ],
+          "end": [
+            133,
+            9
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            133,
+            9
+          ],
+          "end": [
+            135,
+            4
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            135,
+            9
+          ],
+          "end": [
+            137,
+            4
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            139,
+            2
+          ],
+          "end": [
+            139,
+            18
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            139,
+            18
+          ],
+          "end": [
+            141,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            141,
+            8
+          ],
+          "end": [
+            141,
+            24
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            141,
+            24
+          ],
+          "end": [
+            143,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            144,
+            2
+          ],
+          "end": [
+            146,
+            49
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            146,
+            49
+          ],
+          "end": [
+            148,
+            4
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            150,
+            2
+          ],
+          "end": [
+            152,
+            49
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            152,
+            49
+          ],
+          "end": [
+            154,
+            4
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            156,
+            2
+          ],
+          "end": [
+            158,
+            49
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            158,
+            49
+          ],
+          "end": [
+            160,
+            4
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            162,
+            2
+          ],
+          "end": [
+            162,
+            53
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            162,
+            53
+          ],
+          "end": [
+            164,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            165,
+            2
+          ],
+          "end": [
+            165,
+            13
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "name": "GoString",
+      "span": [
+        167,
+        1,
+        179,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            167,
+            43
+          ],
+          "end": [
+            168,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            168,
+            17
+          ],
+          "end": [
+            170,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            171,
+            2
+          ],
+          "end": [
+            178,
+            28
+          ],
+          "statements": 8
+        }
+      ]
+    },
+    {
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "name": "String",
+      "span": [
+        298,
+        1,
+        310,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            298,
+            41
+          ],
+          "end": [
+            299,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            299,
+            17
+          ],
+          "end": [
+            301,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            302,
+            2
+          ],
+          "end": [
+            309,
+            10
+          ],
+          "statements": 2
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetTokenName",
+      "span": [
+        89,
+        1,
+        94,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            89,
+            44
+          ],
+          "end": [
+            90,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            90,
+            14
+          ],
+          "end": [
+            92,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            93,
+            2
+          ],
+          "end": [
+            93,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetTickerName",
+      "span": [
+        96,
+        1,
+        101,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            96,
+            45
+          ],
+          "end": [
+            97,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            97,
+            14
+          ],
+          "end": [
+            99,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            100,
+            2
+          ],
+          "end": [
+            100,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetTokenType",
+      "span": [
+        103,
+        1,
+        108,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            103,
+            44
+          ],
+          "end": [
+            104,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            104,
+            14
+          ],
+          "end": [
+            106,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            107,
+            2
+          ],
+          "end": [
+            107,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetMintedValue",
+      "span": [
+        166,
+        1,
+        171,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            166,
+            53
+          ],
+          "end": [
+            167,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            167,
+            14
+          ],
+          "end": [
+            169,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            170,
+            2
+          ],
+          "end": [
+            170,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetBurntValue",
+      "span": [
+        173,
+        1,
+        178,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            173,
+            52
+          ],
+          "end": [
+            174,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            174,
+            14
+          ],
+          "end": [
+            176,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            177,
+            2
+          ],
+          "end": [
+            177,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetNumDecimals",
+      "span": [
+        180,
+        1,
+        185,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            180,
+            46
+          ],
+          "end": [
+            181,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            181,
+            14
+          ],
+          "end": [
+            183,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            184,
+            2
+          ],
+          "end": [
+            184,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetTokenName",
+      "span": [
+        281,
+        1,
+        286,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            281,
+            44
+          ],
+          "end": [
+            282,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            282,
+            14
+          ],
+          "end": [
+            284,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            285,
+            2
+          ],
+          "end": [
+            285,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetTickerName",
+      "span": [
+        288,
+        1,
+        293,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            288,
+            45
+          ],
+          "end": [
+            289,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            289,
+            14
+          ],
+          "end": [
+            291,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            292,
+            2
+          ],
+          "end": [
+            292,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetTokenType",
+      "span": [
+        295,
+        1,
+        300,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            295,
+            44
+          ],
+          "end": [
+            296,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            296,
+            14
+          ],
+          "end": [
+            298,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            299,
+            2
+          ],
+          "end": [
+            299,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetMintedValue",
+      "span": [
+        358,
+        1,
+        363,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            358,
+            53
+          ],
+          "end": [
+            359,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            359,
+            14
+          ],
+          "end": [
+            361,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            362,
+            2
+          ],
+          "end": [
+            362,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetBurntValue",
+      "span": [
+        365,
+        1,
+        370,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            365,
+            52
+          ],
+          "end": [
+            366,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            366,
+            14
+          ],
+          "end": [
+            368,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            369,
+            2
+          ],
+          "end": [
+            369,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetNumDecimals",
+      "span": [
+        372,
+        1,
+        377,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            372,
+            46
+          ],
+          "end": [
+            373,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            373,
+            14
+          ],
+          "end": [
+            375,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            376,
+            2
+          ],
+          "end": [
+            376,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "outport/process/alteredaccounts/alteredAccountsProvider.go",
+      "source_sha256": "0f5b4b7c0b614c73fec896510c0df81656c41fc687aa339c585fce4c7d116722",
+      "profile_file": "github.com/multiversx/mx-chain-go/outport/process/alteredaccounts/alteredAccountsProvider.go",
+      "name": "getTokenType",
+      "span": [
+        242,
+        1,
+        250,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            242,
+            63
+          ],
+          "end": [
+            245,
+            21
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            245,
+            21
+          ],
+          "end": [
+            247,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            249,
+            2
+          ],
+          "end": [
+            249,
+            42
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetBaseIssuingCost",
+      "span": [
+        510,
+        1,
+        515,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            510,
+            57
+          ],
+          "end": [
+            511,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            511,
+            14
+          ],
+          "end": [
+            513,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            514,
+            2
+          ],
+          "end": [
+            514,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetMinTokenNameLength",
+      "span": [
+        517,
+        1,
+        522,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            517,
+            53
+          ],
+          "end": [
+            518,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            518,
+            14
+          ],
+          "end": [
+            520,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            521,
+            2
+          ],
+          "end": [
+            521,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "vm/systemSmartContracts/esdt.pb.go",
+      "source_sha256": "9cb4e8a9ba696e0c0293275369d953ae92d1c056fb7992ef11ea7bad60f2f9ae",
+      "profile_file": "github.com/multiversx/mx-chain-go/vm/systemSmartContracts/esdt.pb.go",
+      "name": "GetMaxTokenNameLength",
+      "span": [
+        524,
+        1,
+        529,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            524,
+            53
+          ],
+          "end": [
+            525,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            525,
+            14
+          ],
+          "end": [
+            527,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            528,
+            2
+          ],
+          "end": [
+            528,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "outport/process/alteredaccounts/alteredAccountsProvider.go",
+      "source_sha256": "0f5b4b7c0b614c73fec896510c0df81656c41fc687aa339c585fce4c7d116722",
+      "profile_file": "github.com/multiversx/mx-chain-go/outport/process/alteredaccounts/alteredAccountsProvider.go",
+      "name": "convertMetaData",
+      "span": [
+        252,
+        1,
+        267,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            252,
+            108
+          ],
+          "end": [
+            253,
+            21
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            253,
+            21
+          ],
+          "end": [
+            255,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            257,
+            2
+          ],
+          "end": [
+            266,
+            3
+          ],
+          "statements": 2
+        }
+      ]
+    },
+    {
+      "source": "api/groups/addressGroup.go",
+      "source_sha256": "58d43418fe15d29c797ebc05400f68c1f5f20ebcaf6f541d89c7836eaea7abf4",
+      "profile_file": "github.com/multiversx/mx-chain-go/api/groups/addressGroup.go",
+      "name": "getTokenType",
+      "span": [
+        564,
+        1,
+        572,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            564,
+            63
+          ],
+          "end": [
+            567,
+            21
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            567,
+            21
+          ],
+          "end": [
+            569,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            571,
+            2
+          ],
+          "end": [
+            571,
+            42
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "node/node.go",
+      "source_sha256": "9b86f1c3b9ae14bd6680296777ede12a9b3b1ffadc204a3afa73124e05a62342",
+      "profile_file": "github.com/multiversx/mx-chain-go/node/node.go",
+      "name": "tokenTypeEquals",
+      "span": [
+        261,
+        1,
+        272,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            261,
+            71
+          ],
+          "end": [
+            263,
+            45
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            263,
+            45
+          ],
+          "end": [
+            265,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            267,
+            2
+          ],
+          "end": [
+            267,
+            48
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            267,
+            48
+          ],
+          "end": [
+            269,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            271,
+            2
+          ],
+          "end": [
+            271,
+            58
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "api/groups/addressGroup.go",
+      "source_sha256": "58d43418fe15d29c797ebc05400f68c1f5f20ebcaf6f541d89c7836eaea7abf4",
+      "profile_file": "github.com/multiversx/mx-chain-go/api/groups/addressGroup.go",
+      "name": "buildTokenDataApiResponse",
+      "span": [
+        539,
+        1,
+        562,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            539,
+            105
+          ],
+          "end": [
+            547,
+            35
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            547,
+            35
+          ],
+          "end": [
+            557,
+            3
+          ],
+          "statements": 8
+        },
+        {
+          "start": [
+            559,
+            2
+          ],
+          "end": [
+            561,
+            18
+          ],
+          "statements": 2
+        }
+      ]
+    },
+    {
+      "source": "node/node.go",
+      "source_sha256": "9b86f1c3b9ae14bd6680296777ede12a9b3b1ffadc204a3afa73124e05a62342",
+      "profile_file": "github.com/multiversx/mx-chain-go/node/node.go",
+      "name": "bigToString",
+      "span": [
+        593,
+        1,
+        598,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            593,
+            44
+          ],
+          "end": [
+            594,
+            21
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            594,
+            21
+          ],
+          "end": [
+            596,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            597,
+            2
+          ],
+          "end": [
+            597,
+            26
+          ],
+          "statements": 1
+        }
+      ]
+    }
+  ]
+}

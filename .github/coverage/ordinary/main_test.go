@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -41,6 +43,55 @@ func TestAggregateToyPackages(t *testing.T) {
 		got.AggregateStatements == nil || *got.AggregateStatements != (counts{6, 10}) || got.ObservedStatements != (counts{6, 10}) ||
 		got.ProfileStatus != "present" || got.ProfileMode != "atomic" || len(got.ProfileSHA256) != 64 {
 		t.Fatalf("unexpected report: %+v", got)
+	}
+}
+
+func TestAggregateGoGeneratedVersionedPackageProfile(t *testing.T) {
+	root := t.TempDir()
+	const pkg = "example.invalid/display/v2/labels"
+	if err := os.Mkdir(filepath.Join(root, "labels"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	// A versioned, nested module with multiple ordinary source files.
+	// The expected file list comes from the fixture, not from its profile.
+	files := map[string]string{
+		"go.mod":                 "module example.invalid/display/v2\n\ngo 1.26\n",
+		"labels/label.go":        "package labels\nfunc Label(short bool) string {\n if short {\n  return \"OK\"\n }\n return \"Ordinary\"\n}\n",
+		"labels/count.go":        "package labels\nfunc Count() int { return 2 }\n",
+		"labels/display_test.go": "package labels\nimport \"testing\"\nfunc TestDisplay(t *testing.T) { if Label(true)!=\"OK\" || Count()!=2 { t.Fatal(\"fixture\") } }\n",
+	}
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifest := toyProfile(t, pkg+"/label.go\n"+pkg+"/count.go\n")
+	profile := filepath.Join(root, "toy.cover")
+	cmd := exec.Command("go", "test", "-count=1", "-covermode=atomic", "-coverprofile=toy.cover", "./labels")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off", "GOVCS=*:off")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("generated toy profile: %v: %s", err, output)
+	}
+	got, err := aggregateWithManifest(profile, pkg, manifest)
+	want := counts{3, 4}
+	if err != nil || got.ProfileStatus != "present" || got.ProfileMode != "atomic" ||
+		!got.AllRequestedPackagesPresent || got.Manifest == nil || !got.Manifest.AllExpectedFilesPresent ||
+		got.Manifest.ExpectedFiles != 2 || len(got.Manifest.MissingFiles) != 0 ||
+		got.ObservedStatements != want || got.AggregateStatements == nil || *got.AggregateStatements != want ||
+		!reflect.DeepEqual(got.Packages, []packageResult{{pkg, "measured", &want}}) {
+		t.Fatalf("unexpected generated profile report: %+v, %v", got, err)
+	}
+	raw, err := os.ReadFile(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profiles, err := parseCoverageProfiles(raw)
+	if err != nil || len(profiles) != 2 {
+		t.Fatalf("unexpected Go file roster: %+v, %v", profiles, err)
+	}
+	if profiles[0].FileName != pkg+"/count.go" || profiles[1].FileName != pkg+"/label.go" {
+		t.Fatalf("versioned import-path filenames not retained: %q, %q", profiles[0].FileName, profiles[1].FileName)
 	}
 }
 
@@ -94,6 +145,46 @@ func TestAggregateToyRepeatedBlock(t *testing.T) {
 	got, err := aggregate(name, alpha)
 	if err != nil || got.AggregateStatements == nil || *got.AggregateStatements != (counts{2, 2}) {
 		t.Fatalf("repeated profile region: %+v, %v", got, err)
+	}
+}
+
+func TestAggregateToyRepeatedCountersAcrossModes(t *testing.T) {
+	for _, tc := range []struct {
+		mode              string
+		first, next, want int
+	}{
+		{"set", 1, 1, 1},
+		{"count", 2, 3, 5},
+		{"atomic", 2, 3, 5},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			// Repeated positive hits merge according to the Go profile
+			// mode, while repeated untouched blocks contribute their
+			// statement denominator once. Hit magnitude is not coverage.
+			data := fmt.Sprintf("mode: %s\n", tc.mode) +
+				fmt.Sprintf("%s/one.go:3.1,3.4 3 0\n%s/one.go:2.1,2.4 2 %d\n", alpha, alpha, tc.first) +
+				fmt.Sprintf("%s/one.go:3.1,3.4 3 0\n%s/one.go:2.1,2.4 2 %d\n", alpha, alpha, tc.next)
+			profiles, err := parseCoverageProfiles([]byte(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(profiles) != 1 || profiles[0].Mode != tc.mode || len(profiles[0].Blocks) != 2 {
+				t.Fatalf("unexpected parsed profile: %+v", profiles)
+			}
+			blocks := profiles[0].Blocks
+			if blocks[0].StartLine != 2 || blocks[0].NumStmt != 2 || blocks[0].Count != tc.want ||
+				blocks[1].StartLine != 3 || blocks[1].NumStmt != 3 || blocks[1].Count != 0 {
+				t.Fatalf("unexpected merged blocks: %+v", blocks)
+			}
+			got, err := aggregate(toyProfile(t, data), alpha)
+			wantCounts := counts{2, 5}
+			if err != nil || got.ProfileMode != tc.mode || got.ProfileStatus != "present" ||
+				!got.AllRequestedPackagesPresent || got.ObservedStatements != wantCounts ||
+				got.AggregateStatements == nil || *got.AggregateStatements != wantCounts ||
+				!reflect.DeepEqual(got.Packages, []packageResult{{alpha, "measured", &wantCounts}}) {
+				t.Fatalf("unexpected merged statement report: %+v, %v", got, err)
+			}
+		})
 	}
 }
 
@@ -169,6 +260,45 @@ func TestToyManifestCompleteIncludingMeasuredZero(t *testing.T) {
 	if got.Manifest.SHA256 != expectedManifestSHA256 {
 		t.Fatalf("manifest digest = %q, want %q", got.Manifest.SHA256, expectedManifestSHA256)
 	}
+
+	// Check the successful wire representation independently of the Go
+	// report struct: measured zero is an object, and no missing files is
+	// an empty array rather than null. Requested order differs from profile order.
+	args := []string{"-profile", name, "-packages", beta + " " + alpha, "-manifest", manifest}
+	var first, second bytes.Buffer
+	if err := run(args, &first); err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(first.Bytes(), &fields); err != nil {
+		t.Fatal(err)
+	}
+	checkField := func(name, expectedJSON string) {
+		t.Helper()
+		var actual, expected any
+		if err := json.Unmarshal(fields[name], &actual); err != nil {
+			t.Fatalf("report field %s: %v", name, err)
+		}
+		if err := json.Unmarshal([]byte(expectedJSON), &expected); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(actual, expected) {
+			t.Fatalf("report field %s = %s, want %s", name, fields[name], expectedJSON)
+		}
+	}
+	checkField("profile_status", `"present"`)
+	checkField("profile_mode", `"atomic"`)
+	checkField("all_requested_packages_present", "true")
+	checkField("packages", `[{"package":"`+beta+`","status":"measured","statements":{"covered":0,"total":0}},{"package":"`+alpha+`","status":"measured","statements":{"covered":3,"total":5}}]`)
+	checkField("observed_statements", `{"covered":3,"total":5}`)
+	checkField("aggregate_statements", `{"covered":3,"total":5}`)
+	checkField("manifest", `{"sha256":"`+expectedManifestSHA256+`","expected_files":2,"missing_files":[],"all_expected_files_present":true}`)
+	if err := run(args, &second); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first.Bytes(), second.Bytes()) {
+		t.Fatal("identical input produced different JSON")
+	}
 }
 
 func TestToyManifestMissingFileInPresentPackage(t *testing.T) {
@@ -242,5 +372,37 @@ func TestRunToyManifestJSON(t *testing.T) {
 	if got.Manifest == nil || !reflect.DeepEqual(got.Manifest.MissingFiles, []string{alpha + "/one.go"}) ||
 		got.AggregateStatements != nil || got.Manifest.AllExpectedFilesPresent {
 		t.Fatalf("manifest JSON did not preserve absent state: %s", out.String())
+	}
+}
+
+func TestAggregateToyBlockCoordinates(t *testing.T) {
+	for _, tc := range []struct {
+		name, row string
+	}{
+		{"zero start line", "0.1,2.4 1 1"},
+		{"zero start column", "2.0,2.4 1 1"},
+		{"zero end line", "2.1,0.4 1 1"},
+		{"zero end column", "2.1,3.0 1 1"},
+		{"reversed lines", "3.1,2.4 1 1"},
+		{"reversed columns", "2.4,2.1 1 1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := toyProfile(t, "mode: atomic\n"+alpha+"/one.go:"+tc.row+"\n")
+			if _, err := aggregate(p, alpha); err == nil {
+				t.Fatal("invalid block coordinates accepted")
+			}
+		})
+	}
+	p := toyProfile(t, "mode: atomic\n"+alpha+"/one.go:2.1,2.1 0 1\n")
+	got, err := aggregate(p, alpha)
+	if err != nil || got.AggregateStatements == nil || *got.AggregateStatements != (counts{}) {
+		t.Fatalf("equal-coordinate zero-statement block: %+v, %v", got, err)
+	}
+}
+
+func TestAggregateToyConflictingDuplicate(t *testing.T) {
+	p := toyProfile(t, "mode: atomic\n"+alpha+"/one.go:2.1,2.4 2 0\n"+alpha+"/one.go:2.1,2.4 3 1\n")
+	if _, err := aggregate(p, alpha); err == nil {
+		t.Fatal("conflicting statement counts accepted")
 	}
 }

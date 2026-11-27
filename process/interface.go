@@ -1745,3 +1745,14 @@ type ShardInfoCreator interface {
 	CreateShardInfoFromLegacyMeta(metaHeader data.MetaHeaderHandler, shardHeaders []data.ShardHeaderHandler, shardHeaderHashes [][]byte) ([]data.ShardDataHandler, error)
 	IsInterfaceNil() bool
 }
+
+// DRWAClassificationHandler is the native owner of the DRWA classifier of a
+// block processor (Part A 5.1 rules 1-5). BeginExecution precedes the first
+// native effect of every block execution, with every account store committed;
+// Committed follows the successful native commit of every account store. An
+// absent handler leaves block processing as it is without DRWA.
+type DRWAClassificationHandler interface {
+	BeginExecution() error
+	Committed() error
+	IsInterfaceNil() bool
+}

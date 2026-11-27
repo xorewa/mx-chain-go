@@ -140,6 +140,17 @@ func (r *RegistryRegistration) prepareRegistration(create func(state.AccountsAda
 		if err = account.SaveKeyValue(key, []byte{1}); err != nil {
 			return nil, err
 		}
+		entry := registryEntryKey(count)
+		occupied, _, err := account.RetrieveValue(entry)
+		if err != nil {
+			return nil, err
+		}
+		if len(occupied) != 0 {
+			return nil, ErrInvalidRegistryRegistration
+		}
+		if err = account.SaveKeyValue(entry, bytes.Clone(tokenID)); err != nil {
+			return nil, err
+		}
 		encoded := make([]byte, 8)
 		binary.BigEndian.PutUint64(encoded, count+1)
 		if err = account.SaveKeyValue([]byte(registryCountKey), encoded); err != nil {
@@ -156,6 +167,20 @@ func (r *RegistryRegistration) prepareRegistration(create func(state.AccountsAda
 		}
 		return operation()
 	}, nil
+}
+
+// registryEntryPrefix is the ordinal index of the global registry: entry n holds
+// the n-th registered identifier. It is written only here, in the same native
+// journal step as the member marker and the count, so that the owning node can
+// enumerate exactly count members at startup without walking unrelated leaves
+// of the system account (Part A 5.1 rule 5). Experimental layout, as the count.
+const registryEntryPrefix = core.ProtectedKeyPrefix + "DRWA@registry@entry@"
+
+func registryEntryKey(ordinal uint64) []byte {
+	key := make([]byte, len(registryEntryPrefix)+8)
+	copy(key, registryEntryPrefix)
+	binary.BigEndian.PutUint64(key[len(registryEntryPrefix):], ordinal)
+	return key
 }
 
 // IsInterfaceNil follows the native interface nil convention for construction.

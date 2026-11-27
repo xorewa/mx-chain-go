@@ -429,11 +429,23 @@ func createScQueryElement(
 		RoundHandler:             args.processComponents.RoundHandler(),
 	}
 
+	// Queries never commit. On a DRWA deployment they classify System-SC and
+	// built-in calls from the committed registry projection, through objects
+	// that cannot mutate, register or hand off.
+	var drwaClassifier vm.DRWATokenClassifier
+	if source, ok := args.processComponents.(interface {
+		DRWAQueryClassification(user, validator state.AccountsAdapter) (vm.DRWATokenClassifier,
+			hooks.DRWABuiltInAdmission, func(uint32, uint64) bool)
+	}); ok {
+		drwaClassifier, argsHook.DRWABuiltInAdmission, argsHook.DRWABuiltInEnforcedAt = source.DRWAQueryClassification(
+			accountsAdapterApi, args.stateComponents.PeerAccounts())
+	}
+
 	var vmFactory process.VirtualMachinesContainerFactory
 	maxGasForVmQueries := args.generalConfig.VirtualMachine.GasConfig.ShardMaxGasPerVmQuery
 	if selfShardID == core.MetachainShardId {
 		maxGasForVmQueries = args.generalConfig.VirtualMachine.GasConfig.MetaMaxGasPerVmQuery
-		vmFactory, err = createMetaVmContainerFactory(args, argsHook)
+		vmFactory, err = createMetaVmContainerFactory(args, argsHook, drwaClassifier)
 	} else {
 		vmFactory, err = createShardVmContainerFactory(args, argsHook)
 	}
@@ -491,13 +503,20 @@ func createBlockchainForScQuery(selfShardID uint32) (data.ChainHandler, error) {
 	return blockchain.NewBlockChain(disabled.NewAppStatusHandler())
 }
 
-func createMetaVmContainerFactory(args scQueryElementArgs, argsHook hooks.ArgBlockChainHook) (process.VirtualMachinesContainerFactory, error) {
+func createMetaVmContainerFactory(args scQueryElementArgs, argsHook hooks.ArgBlockChainHook, drwaClassifier vm.DRWATokenClassifier) (process.VirtualMachinesContainerFactory, error) {
 	blockChainHookImpl, errBlockChainHook := hooks.NewBlockChainHookImpl(argsHook)
 	if errBlockChainHook != nil {
 		return nil, errBlockChainHook
 	}
 
+	userAccounts := args.stateComponents.AccountsAdapterAPI()
+	if drwaClassifier != nil {
+		// A classified System VM and its hook read the same account adapter.
+		userAccounts = argsHook.Accounts
+	}
+
 	argsNewVmFactory := metachain.ArgsNewVMContainerFactory{
+		DRWAClassifier:      drwaClassifier,
 		BlockChainHook:      blockChainHookImpl,
 		PubkeyConv:          argsHook.PubkeyConv,
 		Economics:           args.coreComponents.EconomicsData(),
@@ -508,7 +527,7 @@ func createMetaVmContainerFactory(args scQueryElementArgs, argsHook hooks.ArgBlo
 		Marshalizer:         args.coreComponents.InternalMarshalizer(),
 		SystemSCConfig:      args.systemSCConfig,
 		ValidatorAccountsDB: args.stateComponents.PeerAccounts(),
-		UserAccountsDB:      args.stateComponents.AccountsAdapterAPI(),
+		UserAccountsDB:      userAccounts,
 		ChanceComputer:      args.coreComponents.Rater(),
 		ShardCoordinator:    args.processComponents.ShardCoordinator(),
 		EnableEpochsHandler: args.coreComponents.EnableEpochsHandler(),

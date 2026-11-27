@@ -226,6 +226,11 @@ func (sp *shardProcessor) ProcessBlock(
 		return process.ErrAccountStateDirty
 	}
 
+	err = sp.beginDRWAExecution()
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		go sp.checkAndRequestIfMetaHeadersMissing()
 	}()
@@ -307,6 +312,14 @@ func (sp *shardProcessor) ProcessBlock(
 // uses the same restoration policy as post-proposal cleanup even when the
 // original error came from native verification after earlier block effects.
 func (bp *baseProcessor) finishBlockFailure(processingErr, original error) error {
+	if failure := bp.accountsRollbackFailure(); failure != nil {
+		log.Error("account state rollback failed, block state is discarded", "error", failure.Error())
+		if original == nil {
+			original = failure
+		} else {
+			original = errors.Join(original, failure)
+		}
+	}
 	var restoreErr error
 	switch {
 	case errors.Is(original, vm.ErrDRWAExecution):
@@ -1147,6 +1160,11 @@ func (sp *shardProcessor) CreateBlock(
 	}
 
 	body, processedMiniBlocksDestMeInfo, err := sp.createBlockBody(shardHdr, haveTime)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = sp.containAccountsRollbackFailure()
 	if err != nil {
 		return nil, nil, err
 	}

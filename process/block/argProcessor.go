@@ -112,6 +112,10 @@ type ArgBaseProcessor struct {
 	ExecutionManager                   process.ExecutionManager
 	TxExecutionOrderHandler            common.TxExecutionOrderHandler
 	AOTSelector                        process.AOTTransactionSelector
+
+	// DRWAClassification is set only on a node whose VM container carries the
+	// DRWA classifier. Nil keeps native block processing.
+	DRWAClassification process.DRWAClassificationHandler
 }
 
 // ArgShardProcessor holds all dependencies required by the process data factory in order to create

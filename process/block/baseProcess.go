@@ -137,6 +137,7 @@ type baseProcessor struct {
 	enableRoundsHandler           common.EnableRoundsHandler
 	vmContainerFactory            process.VirtualMachinesContainerFactory
 	vmContainer                   process.VirtualMachinesContainer
+	drwaClassification            process.DRWAClassificationHandler
 	coreComponents                coreComponentsHolder
 	gasConsumedProvider           gasConsumedProvider
 	economicsData                 process.EconomicsDataHandler
@@ -242,6 +243,7 @@ func NewBaseProcessor(arguments ArgBaseProcessor) (*baseProcessor, error) {
 		epochChangeGracePeriodHandler:      arguments.CoreComponents.EpochChangeGracePeriodHandler(),
 		vmContainerFactory:                 arguments.VMContainersFactory,
 		vmContainer:                        arguments.VmContainer,
+		drwaClassification:                 arguments.DRWAClassification,
 		coreComponents:                     arguments.CoreComponents,
 		processDataTriesOnCommitEpoch:      arguments.Config.Debug.EpochStart.ProcessDataTrieOnCommitEpoch,
 		gasConsumedProvider:                arguments.GasHandler,
@@ -934,6 +936,9 @@ func (bp *baseProcessor) drwaExecutionError() error {
 	if err := bp.blockRollbackError(); err != nil {
 		return err
 	}
+	if err := bp.containAccountsRollbackFailure(); err != nil {
+		return err
+	}
 	if check.IfNil(bp.vmContainer) {
 		return nil
 	}
@@ -951,6 +956,55 @@ func (bp *baseProcessor) drwaExecutionError() error {
 		return err
 	}
 	return nil
+}
+
+// accountsRollbackFailure reads the separate rollback status of every account
+// store. A failed RevertToSnapshot keeps its native result at the call site;
+// this owner must not continue with or commit that store (P-05).
+func (bp *baseProcessor) accountsRollbackFailure() error {
+	ids := make([]int, 0, len(bp.accountsDB))
+	for id := range bp.accountsDB {
+		ids = append(ids, int(id))
+	}
+	sort.Ints(ids)
+
+	var failures []error
+	for _, id := range ids {
+		store := bp.accountsDB[state.AccountsDbIdentifier(id)]
+		if check.IfNil(store) {
+			continue
+		}
+		status, ok := store.(state.RollbackStatusHandler)
+		if !ok {
+			continue
+		}
+		if err := status.RollbackFailure(); err != nil {
+			failures = append(failures, fmt.Errorf("account store %d: %w", id, err))
+		}
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("%w: %w", vm.ErrDRWAExecution, errors.Join(failures...))
+}
+
+// containAccountsRollbackFailure refuses the current operation after a failed
+// revert and restores every store to the last committed root, so the next
+// operation starts from committed state. A failed restoration stops the node.
+func (bp *baseProcessor) containAccountsRollbackFailure() error {
+	failure := bp.accountsRollbackFailure()
+	if failure == nil {
+		return nil
+	}
+
+	log.Error("account state rollback failed, block state is discarded", "error", failure.Error())
+	restoreErr := bp.restoreBlockAccounts()
+	if restoreErr != nil {
+		return errors.Join(failure, restoreErr)
+	}
+
+	return failure
 }
 
 func (bp *baseProcessor) requestDRWAExecutionStop() {
@@ -2754,11 +2808,45 @@ func (bp *baseProcessor) commitState(headerHandler data.HeaderHandler) error {
 		)
 	}()
 
+	var err error
 	if headerHandler.IsStartOfEpochBlock() {
-		return bp.commitInLastEpoch(headerHandler.GetEpoch())
+		err = bp.commitInLastEpoch(headerHandler.GetEpoch())
+	} else {
+		err = bp.commit()
+	}
+	if err != nil {
+		return err
+	}
+	bp.drwaStateCommitted()
+
+	return nil
+}
+
+// beginDRWAExecution lets the classifier owner verify its projection against
+// the committed stores and install an open candidate before the first native
+// effect of a block execution (Part A 5.1 rule 5). The caller has checked that
+// the account journal is empty.
+func (bp *baseProcessor) beginDRWAExecution() error {
+	if check.IfNil(bp.drwaClassification) {
+		return nil
 	}
 
-	return bp.commit()
+	return bp.drwaClassification.BeginExecution()
+}
+
+// drwaStateCommitted follows the successful native commit of every account
+// store. The stores are committed whatever the owner answers: an error only
+// makes it reconstruct its projection from the committed store at the next
+// execution, or surfaces through the System VM status when it is a failure.
+func (bp *baseProcessor) drwaStateCommitted() {
+	if check.IfNil(bp.drwaClassification) {
+		return
+	}
+
+	err := bp.drwaClassification.Committed()
+	if err != nil {
+		log.Error("DRWA classification after commit", "error", err.Error())
+	}
 }
 
 func (bp *baseProcessor) commitStateForHeader(headerHandler data.HeaderHandler, headerHash []byte) error {
@@ -3225,6 +3313,11 @@ func (bp *baseProcessor) ProcessScheduledBlock(headerHandler data.HeaderHandler,
 	log.Debug("elapsed time to execute all scheduled transactions",
 		"time [s]", elapsedTime,
 	)
+	if err != nil {
+		return err
+	}
+
+	err = bp.accountsRollbackFailure()
 	if err != nil {
 		return err
 	}

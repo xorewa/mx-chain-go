@@ -23,22 +23,36 @@ env:
   # git diff --name-only 06c383cf316ab391d60695a4eeb7c085fb40232b HEAD
   # Exclude CI tooling under .github/ (tested explicitly), which go list ./... omits.
   # Qualification packages are included even when they add no production Go file.
+  # Owner 26 Nov: include the upstream txpool memory regression package explicitly.
   DRWA_PACKAGES: >-
     ./api/errors
     ./api/gin
     ./api/groups
+    ./api/logs
     ./api/middleware
     ./api/mock
     ./api/shared
+    ./cmd/assessment/benchmarks
     ./cmd/node
+    ./cmd/termui/presenter
+    ./cmd/termui/view/termuic/termuiRenders
     ./common
+    ./common/compatibility
     ./common/enablers
+    ./common/errChan
+    ./common/hostParameters
+    ./common/logging
+    ./common/statistics
+    ./common/statistics/disabled
+    ./common/statistics/machine
+    ./common/statistics/osLevel
     ./config
     ./consensus
     ./consensus/round
     ./dataRetriever/blockchain
     ./dataRetriever/resolvers
     ./dataRetriever/txpool
+    ./dataRetriever/txpool/memorytests
     ./dblookupext
     ./dblookupext/esdtSupply
     ./dblookupext/factory
@@ -57,6 +71,7 @@ env:
     ./genesis/parsing
     ./genesis/process
     ./genesis/process/disabled
+    ./heartbeat
     ./integrationTests
     ./integrationTests/chainSimulator
     ./integrationTests/chainSimulator/vm
@@ -69,20 +84,24 @@ env:
     ./node
     ./node/chainSimulator
     ./node/chainSimulator/components
+    ./node/chainSimulator/components/heartbeat
     ./node/external/transactionAPI
     ./node/metrics
     ./node/mock
+    ./ntp
     ./outport/process/alteredaccounts
     ./outport/process/factory
     ./outport/process/transactionsfee
     ./process
     ./process/asyncExecution
     ./process/block
+    ./process/block/postprocess
     ./process/block/preprocess
     ./process/coordinator
     ./process/drwa
     ./process/drwa/headertime
     ./process/economics
+    ./process/factory/containers
     ./process/factory/metachain
     ./process/factory/shard
     ./process/interceptors
@@ -103,14 +122,17 @@ env:
     ./process/transaction
     ./process/transactionEvaluator
     ./state
+    ./state/accounts
     ./state/storagePruningManager
     ./state/syncer
     ./state/trackableDataTrie
     ./statusHandler
     ./storage
+    ./storage/database
     ./storage/factory
     ./storage/mock
     ./storage/pruning
+    ./storage/storageunit
     ./testscommon
     ./testscommon/processMocks
     ./testscommon/round
@@ -176,6 +198,7 @@ jobs:
           qualifiers = subprocess.check_output(['git', 'ls-files', '-z', '--', '**/qual_*_test.go']).decode().split('\0')
           expected |= {'./' + pathlib.PurePosixPath(p).parent.as_posix() for p in qualifiers if p}
           expected &= available
+          expected.add("./dataRetriever/txpool/memorytests")
           actual = set(os.environ['DRWA_PACKAGES'].split())
           missing, excess = sorted(expected - actual), sorted(actual - expected)
           print(json.dumps({'missing': missing, 'excess': excess, 'package_count': len(actual)}))
@@ -187,8 +210,8 @@ jobs:
 
   race:
     name: DRWA race (${{ matrix.shard }})
-    # Newly selected native Wasmer2 packages txsFee and wasm/wasmer remain excluded
-    # under the owner 2026-11-06 restriction; race.py and KNOWN are unchanged.
+    # Owner 26 Nov: restore the two upstream VM integration packages;
+    # race.py retains scoped VM compatibility flags and inherited race evidence.
     strategy:
       fail-fast: false
       matrix:
@@ -197,9 +220,17 @@ jobs:
             packages: >-
               ./api/errors
               ./api/groups
+              ./api/logs
               ./api/mock
+              ./cmd/assessment/benchmarks
               ./cmd/node
+              ./cmd/termui/presenter
               ./common
+              ./common/compatibility
+              ./common/hostParameters
+              ./common/logging
+              ./common/statistics
+              ./common/statistics/machine
               ./config
               ./consensus/round
               ./dataRetriever/resolvers
@@ -213,9 +244,11 @@ jobs:
               ./factory/processing
               ./genesis/parsing
               ./genesis/process/disabled
+              ./heartbeat
               ./integrationTests/chainSimulator
               ./integrationTests/mock
               ./integrationTests/vm
+              ./integrationTests/vm/wasm/wasmer
               ./node/chainSimulator
               ./node/external/transactionAPI
               ./node/metrics
@@ -237,6 +270,7 @@ jobs:
               ./state/syncer
               ./state/trackableDataTrie
               ./storage
+              ./storage/database
               ./storage/mock
               ./testscommon
               ./testscommon/trie
@@ -251,10 +285,15 @@ jobs:
               ./api/gin
               ./api/middleware
               ./api/shared
+              ./cmd/termui/view/termuic/termuiRenders
               ./common/enablers
+              ./common/errChan
+              ./common/statistics/disabled
+              ./common/statistics/osLevel
               ./consensus
               ./dataRetriever/blockchain
               ./dataRetriever/txpool
+              ./dataRetriever/txpool/memorytests
               ./dblookupext
               ./debug/handler
               ./epochStart/shardchain
@@ -267,15 +306,20 @@ jobs:
               ./integrationTests/chainSimulator/vm
               ./integrationTests/realcomponents
               ./integrationTests/state/stateTrie
+              ./integrationTests/vm/txsFee
               ./node
               ./node/chainSimulator/components
+              ./node/chainSimulator/components/heartbeat
               ./node/mock
+              ./ntp
               ./outport/process/factory
               ./process/asyncExecution
               ./process/block
+              ./process/block/postprocess
               ./process/coordinator
               ./process/drwa/headertime
               ./process/economics
+              ./process/factory/containers
               ./process/interceptors
               ./process/interceptors/processor
               ./process/peer
@@ -286,10 +330,12 @@ jobs:
               ./process/track
               ./process/transaction
               ./state
+              ./state/accounts
               ./state/storagePruningManager
               ./statusHandler
               ./storage/factory
               ./storage/pruning
+              ./storage/storageunit
               ./testscommon/processMocks
               ./testscommon/round
               ./testscommon/txcachemocks
@@ -322,19 +368,20 @@ jobs:
         run: python3 -B .github/ci/check_isolation.py
       - name: Download pinned dependencies
         run: go mod download
-      - name: DRWA race — default plus owner-approved Wasmer2 diagnostic run
+      - name: DRWA race — VM module scoped compatibility
         env:
           GOPROXY: 'off'
-        # Retain default -race results. Only the five named Wasmer2 checkptr aborts
-        # are tolerated; all other failures and every checkptr=0 failure reject.
-        # No coverage profiles are collected by either race run.
+        # Preserve node and DRWA pointer checking. Only the four approved VM
+        # module trees have compatibility flags. Keep raw race failures and
+        # exact inherited test classifications; all other failures reject.
+        # No coverage profiles are collected by the race run.
         # Node alone skips ^TestWaitForSignal$ (known upstream test defect,
         # owner-authorized); normal coverage retains it. No upstream file edit.
         run: >-
           unshare --user --map-root-user --net -- bash -euc
           'ip link set lo up; exec "$@"' --
           python3 -B .github/ci/race.py --output race-results $DRWA_PACKAGES
-      - name: Upload both labelled race runs and exception classification
+      - name: Upload scoped race run and exception classification
         if: always() && steps.isolation-preflight.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -370,8 +417,17 @@ jobs:
           GOPROXY: 'off'
         run: |
           python3 -B -m unittest discover -s .github/ci -p 'test_*.py' -v
-          go test -json -count=1 ./.github/coverage > coverage-helper-tests.json
+          go test -json -count=1 ./.github/coverage ./.github/coverage/ordinary > coverage-helper-tests.json
+      - name: Observe optional normal coverage input before primary
+        id: ordinary-normal-before
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          status=present
+          if [ ! -e coverage.out ] && [ ! -L coverage.out ]; then status=absent; fi
+          printf 'profile_status=%s\n' "$status" >> "${GITHUB_OUTPUT:?}"
       - name: DRWA coverage without race — all selected packages
+        id: ordinary-normal-primary
         env:
           GOPROXY: 'off'
         run: >-
@@ -391,6 +447,37 @@ jobs:
           -base 06c383cf316ab391d60695a4eeb7c085fb40232b
           -profile coverage.out -packages "$DRWA_PACKAGES"
           -output diff-coverage.json
+      - name: Measure SP2 v2.1.9 hybrid diff coverage (diagnostic only)
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          GOPROXY: 'off'
+        # SP2-BASELINE-V219-001 selects v2.1.9. All changes relative to that
+        # upstream include carried SP1 work but exclude baseline-only changes.
+        # The historical gate, package selection, profile and thresholds stay
+        # unchanged. Keep the exact diagnostic exit even on a failing metric.
+        run: |
+          mkdir -p v219-coverage-diagnostic
+          helper="$RUNNER_TEMP/drwa-coverage-v219"
+          set +e
+          go build -o "$helper" ./.github/coverage > v219-coverage-diagnostic/build.stdout 2> v219-coverage-diagnostic/build.stderr
+          build_exit=$?
+          printf '%s\n' "$build_exit" > v219-coverage-diagnostic/build.exit
+          set -e
+          if [ "$build_exit" -ne 0 ]; then
+            exit "$build_exit"
+          fi
+          set +e
+          "$helper" \
+            -base 5123176d1fa9237e52df2680d4e8bbcdc3ceb11a \
+            -upstream 5123176d1fa9237e52df2680d4e8bbcdc3ceb11a \
+            -profile coverage.out -packages "$DRWA_PACKAGES" \
+            -output v219-coverage-diagnostic/diff-coverage.json \
+            > v219-coverage-diagnostic/measurement.stdout 2> v219-coverage-diagnostic/measurement.stderr
+          measurement_exit=$?
+          printf '%s\n' "$measurement_exit" > v219-coverage-diagnostic/measurement.exit
+          cat v219-coverage-diagnostic/measurement.stdout v219-coverage-diagnostic/measurement.stderr
+          exit "$measurement_exit"
       - name: Upload coverage profile, raw tests and hybrid report
         if: always() && steps.isolation-preflight.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -401,11 +488,388 @@ jobs:
             coverage-helper-tests.json
             coverage.out
             diff-coverage.json
+            v219-coverage-diagnostic/
+          if-no-files-found: error
+      - name: Allocate current ordinary normal diagnostic output
+        id: ordinary-normal-output
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          ORDINARY_PROFILE_BEFORE: ${{ steps.ordinary-normal-before.outputs.profile_status }}
+          ORDINARY_PRIMARY_OUTCOME: ${{ steps.ordinary-normal-primary.outcome }}
+        run: |
+          report_dir=$(mktemp -d "${RUNNER_TEMP:?}/ordinary-coverage-report.XXXXXXXX")
+          python3 -B - "$report_dir" <<'PYCODE'
+          import hashlib, json, os, pathlib, sys
+          out = pathlib.Path(sys.argv[1])
+          before = os.environ.get('ORDINARY_PROFILE_BEFORE', '')
+          outcome = os.environ.get('ORDINARY_PRIMARY_OUTCOME', '')
+          source = pathlib.Path('coverage.out')
+          result = {'profile_before': before or 'unknown', 'primary_outcome': outcome or 'unknown',
+                    'status': 'unavailable', 'reason': 'input_unbound', 'profile_sha256': None}
+          if before != 'absent':
+              result['reason'] = 'prior_absence_not_established'
+          elif outcome != 'success':
+              result['reason'] = 'primary_not_successful'
+          elif not source.is_file() or source.is_symlink():
+              result['reason'] = 'current_profile_absent'
+          else:
+              temporary = out / 'coverage-input.cover.tmp'
+              try:
+                  raw = source.read_bytes()
+                  temporary.write_bytes(raw)
+                  temporary.replace(out / 'coverage-input.cover')
+                  result.update(status='bound', reason=None, profile_sha256=hashlib.sha256(raw).hexdigest())
+              except OSError:
+                  temporary.unlink(missing_ok=True)
+                  result['reason'] = 'current_profile_unreadable'
+          (out / 'input.json').write_text(json.dumps(result, indent=2) + '\n')
+          PYCODE
+          printf 'directory=%s\n' "$report_dir" >> "${GITHUB_OUTPUT:?}"
+      - name: Report standard-token roster package coverage (diagnostic only)
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.ordinary-normal-output.outputs.directory != ''
+        continue-on-error: true
+        env:
+          ORDINARY_REPORT_DIRECTORY: ${{ steps.ordinary-normal-output.outputs.directory }}
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+          GOVCS: '*:off'
+          # Explicit 34 Node and five Common package paths; no test selection.
+          NODE_REPORT_PACKAGES: >-
+            github.com/multiversx/mx-chain-go/vm/systemSmartContracts
+            github.com/multiversx/mx-chain-go/vm/factory
+            github.com/multiversx/mx-chain-go/vm/process
+            github.com/multiversx/mx-chain-go/factory/processing
+            github.com/multiversx/mx-chain-go/process/factory/shard
+            github.com/multiversx/mx-chain-go/process/factory/metachain
+            github.com/multiversx/mx-chain-go/process/smartContract/builtInFunctions
+            github.com/multiversx/mx-chain-go/process/transaction
+            github.com/multiversx/mx-chain-go/process/coordinator
+            github.com/multiversx/mx-chain-go/process/smartContract
+            github.com/multiversx/mx-chain-go/process/smartContract/processorV2
+            github.com/multiversx/mx-chain-go/process/smartContract/processProxy
+            github.com/multiversx/mx-chain-go/process/smartContract/scrCommon
+            github.com/multiversx/mx-chain-go/process/smartContract/hooks
+            github.com/multiversx/mx-chain-go/process/smartContract/hooks/counters
+            github.com/multiversx/mx-chain-go/process/economics
+            github.com/multiversx/mx-chain-go/process/block/preprocess
+            github.com/multiversx/mx-chain-go/state
+            github.com/multiversx/mx-chain-go/state/trackableDataTrie
+            github.com/multiversx/mx-chain-go/common
+            github.com/multiversx/mx-chain-go/dblookupext/esdtSupply
+            github.com/multiversx/mx-chain-go/dblookupext
+            github.com/multiversx/mx-chain-go/dblookupext/factory
+            github.com/multiversx/mx-chain-go/process/sync/trieIterators
+            github.com/multiversx/mx-chain-go/node
+            github.com/multiversx/mx-chain-go/facade
+            github.com/multiversx/mx-chain-go/api/groups
+            github.com/multiversx/mx-chain-go/node/external/transactionAPI
+            github.com/multiversx/mx-chain-go/outport/process/alteredaccounts
+            github.com/multiversx/mx-chain-go/outport/process/transactionsfee
+            github.com/multiversx/mx-chain-go/outport/process/factory
+            github.com/multiversx/mx-chain-go/genesis/process
+            github.com/multiversx/mx-chain-go/process/sync
+            github.com/multiversx/mx-chain-go/state/accounts
+          COMMON_REPORT_PACKAGES: >-
+            github.com/multiversx/mx-chain-vm-common-go/builtInFunctions
+            github.com/multiversx/mx-chain-vm-common-go/parsers
+            github.com/multiversx/mx-chain-vm-common-go/parsers/dataField
+            github.com/multiversx/mx-chain-vm-common-go/dataTrieMigrator
+            github.com/multiversx/mx-chain-vm-common-go
+        run: |
+          cat > "$ORDINARY_REPORT_DIRECTORY/scope.txt" <<'SCOPE'
+          Diagnostic only: both JSON reports read a bound snapshot of current Node coverage.out; provenance in input.json.
+          Package counts include all recorded blocks, including mixed ordinary and DRWA code.
+          Ordinary-only statement attribution and source-census completeness are not established.
+          The Common roster is not a standalone Common test run or profile.
+          Missing packages/profiles have null counts, not measured zero.
+          These reports do not establish standard-token coverage or threshold compliance.
+          SCOPE
+          profile="$ORDINARY_REPORT_DIRECTORY/coverage-input.cover"
+          status=0
+          for roster in node common; do
+            case "$roster" in
+              node) packages="$NODE_REPORT_PACKAGES" ;;
+              common) packages="$COMMON_REPORT_PACKAGES" ;;
+            esac
+            report="$ORDINARY_REPORT_DIRECTORY/$roster.json"
+            if [ ! -f "$profile" ]; then
+              python3 -B - "$report.tmp" "$packages" <<'PYCODE'
+          import json, pathlib, sys
+          rows = [{'package': p, 'status': 'profile_absent', 'statements': None}
+                  for p in sys.argv[2].split()]
+          pathlib.Path(sys.argv[1]).write_text(json.dumps(
+              {'profile_status': 'not_supplied', 'packages': rows,
+               'all_requested_packages_present': False, 'observed_statements': None,
+               'aggregate_statements': None, 'status': 'unavailable'}, indent=2) + '\n')
+          PYCODE
+              mv "$report.tmp" "$report"
+              printf '%s input unavailable; see input.json\n' "$roster" >> "$ORDINARY_REPORT_DIRECTORY/scope.txt"
+              status=1
+            elif go run ./.github/coverage/ordinary -profile "$profile" -packages "$packages" > "$report.tmp"; then
+              mv "$report.tmp" "$report"
+            else
+              rm -f "$report.tmp"
+              printf '%s reporter failed; no JSON result\n' "$roster" >> "$ORDINARY_REPORT_DIRECTORY/scope.txt"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Report reviewed Node direct ordinary subset (partial diagnostic only)
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.ordinary-normal-output.outputs.directory != ''
+        continue-on-error: true
+        env:
+          ORDINARY_REPORT_DIRECTORY: ${{ steps.ordinary-normal-output.outputs.directory }}
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+          GOVCS: '*:off'
+        run: |
+          cat > "$ORDINARY_REPORT_DIRECTORY/node-direct-scope.txt" <<'SCOPE'
+          Partial diagnostic only: R25 reviewed Node direct ordinary reporting subset.
+          The independent static census has 29 functions and 147 statements; it is not the full standard-token denominator.
+          The bound snapshot of current Node coverage.out is the only measured input. Missing blocks/profiles have null complete counts, not measured zero.
+          Mixed/generic Node code and standalone Common coverage are not included. No threshold or qualification is inferred.
+          SCOPE
+          report="$ORDINARY_REPORT_DIRECTORY/node-direct-r25.json"
+          manifest="$ORDINARY_REPORT_DIRECTORY/node-direct-r25-bound-manifest.json"
+          profile="$ORDINARY_REPORT_DIRECTORY/coverage-input.cover"
+          if [ -f "$profile" ] && python3 -B - "$manifest.tmp" "$profile" <<'PYCODE'
+          import hashlib, json, pathlib, sys
+
+          template = pathlib.Path('.github/coverage/ordinary/node-direct-r25.json')
+          census = json.loads(template.read_text())
+          profile = pathlib.Path(sys.argv[2])
+          if profile.is_file():
+              with profile.open('rb') as stream:
+                  census['profile_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
+          pathlib.Path(sys.argv[1]).write_text(json.dumps(census, indent=2) + '\n')
+          PYCODE
+          then
+            mv "$manifest.tmp" "$manifest"
+            if go run ./.github/coverage/ordinary -profile "$profile" -functions "$manifest" -source-root . > "$report.tmp"; then
+              mv "$report.tmp" "$report"
+              exit 0
+            fi
+          fi
+          rm -f "$report.tmp" "$manifest.tmp"
+          printf '%s\n' '{"scope":"partial Node direct R25 diagnostic only","status":"unavailable","aggregate_statements":null}' > "$report"
+          printf '%s\n' 'Reporter unavailable; no complete-count result.' >> "$ORDINARY_REPORT_DIRECTORY/node-direct-scope.txt"
+          exit 1
+      - name: Upload diagnostic standard-token roster reports
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.ordinary-normal-output.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standard-token-package-diagnostic-${{ github.sha }}
+          path: |
+            ${{ steps.ordinary-normal-output.outputs.directory }}/input.json
+            ${{ steps.ordinary-normal-output.outputs.directory }}/scope.txt
+            ${{ steps.ordinary-normal-output.outputs.directory }}/node.json
+            ${{ steps.ordinary-normal-output.outputs.directory }}/common.json
+            ${{ steps.ordinary-normal-output.outputs.directory }}/node-direct-scope.txt
+            ${{ steps.ordinary-normal-output.outputs.directory }}/node-direct-r25.json
+            ${{ steps.ordinary-normal-output.outputs.directory }}/node-direct-r25-bound-manifest.json
+          if-no-files-found: warn
+      - name: Allocate current Node direct race input directory
+        id: node-direct-race-input
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
+          parent=$(mktemp -d "$RUNNER_TEMP/node-direct-race-input.XXXXXXXX") || exit 1
+          printf 'directory=%s\n' "$parent/input" >> "$GITHUB_OUTPUT" || exit 1
+      - name: Produce reviewed Node direct race input (partial diagnostic only)
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.node-direct-race-input.outcome == 'success' && steps.node-direct-race-input.outputs.directory != ''
+        continue-on-error: true
+        timeout-minutes: 20
+        env:
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+          GOVCS: '*:off'
+          NODE_DIRECT_RACE_INPUT: ${{ steps.node-direct-race-input.outcome == 'success' && steps.node-direct-race-input.outputs.directory || '' }}
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          python3 -B .github/coverage/ordinary/node-direct-race/diagnostic.py --output "$NODE_DIRECT_RACE_INPUT"
+      - name: Read source-bound Node direct race diagnostic (partial, no test execution)
+        id: node-direct-race-report
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+          GOVCS: '*:off'
+          NODE_DIRECT_RACE_INPUT: ${{ steps.node-direct-race-input.outcome == 'success' && steps.node-direct-race-input.outputs.directory || '' }}
+        run: |
+          output=$(mktemp -d "$RUNNER_TEMP/ordinary-node-race-report.XXXXXXXX") || exit 1
+          printf 'directory=%s\n' "$output" >> "$GITHUB_OUTPUT" || exit 1
+          cat > "$output/scope.txt" <<'SCOPE'
+          Partial read-only Node race diagnostic: R25 static census of 29 functions/147 statements.
+          R28 reviewed only 12 nominal roots in five packages, covering 28 functions/130 expected statements; the remaining parser root is not admitted for this diagnostic.
+          The separate optional producer uses only the reviewed nominal roots; this reader executes no tests and does not change existing normal or race selectors.
+          Only its explicitly race-labelled input with matching source/census/selector provenance is eligible. No normal-profile substitution.
+          Missing data has null complete counts; no full standard-token denominator or qualification is inferred.
+          SCOPE
+          profile="${NODE_DIRECT_RACE_INPUT:+$NODE_DIRECT_RACE_INPUT/coverage.out}"
+          manifest="$output/bound-manifest.json"
+          report="$output/report.json"
+          if python3 -B - "$manifest" "$output/provenance.json" <<'PYCODE'
+          import hashlib, json, os, pathlib, sys
+
+          template = pathlib.Path('.github/coverage/ordinary/node-direct-r25.json')
+          raw = template.read_bytes()
+          census = json.loads(raw)
+          reviewed_raw = pathlib.Path('.github/coverage/ordinary/node-direct-race/selectors-r28.json').read_bytes()
+          selectors = hashlib.sha256(reviewed_raw).hexdigest()
+          if selectors != 'c91ecacc58d955517f538f9f27a58ffc39fd91353c1b06fcc07a6d8eb30d0384':
+              raise ValueError('reviewed selector manifest mismatch')
+          input_directory = os.environ.get('NODE_DIRECT_RACE_INPUT')
+          origin = pathlib.Path(input_directory) if input_directory else None
+          profile = origin / 'coverage.out' if origin is not None else None
+          receipt = origin / 'provenance.json' if origin is not None else None
+          review = '8bd94f4dd795da74a2522c6d5b006bca1310fa352c9d1b1c818b678f449b7554'
+          provenance = {'run_mode': 'race', 'selector_review_sha256': review,
+                        'selector_manifest_sha256': selectors,
+                        'census_sha256': hashlib.sha256(raw).hexdigest(), 'status': 'not_supplied'}
+          if origin is not None and (origin.is_symlink() or profile.is_symlink() or receipt.is_symlink()):
+              raise ValueError('race input must not use symlinks')
+          if origin is not None and (profile.exists() or receipt.exists()):
+              if not profile.is_file() or not receipt.is_file():
+                  raise ValueError('race input requires both profile and provenance')
+              claimed = json.loads(receipt.read_text())
+              with profile.open('rb') as stream:
+                  observed = hashlib.file_digest(stream, 'sha256').hexdigest()
+              prefixes = ['github.com/multiversx/mx-chain-go/' + entry['package'] + '/'
+                          for entry in json.loads(reviewed_raw)['packages']]
+              with profile.open(encoding='utf-8') as stream:
+                  if stream.readline().rstrip('\n') != 'mode: atomic':
+                      raise ValueError('race input must be atomic')
+                  for row in stream:
+                      filename = row.rsplit(' ', 2)[0].rsplit(':', 1)[0]
+                      if not any(filename.startswith(prefix) and '/' not in filename[len(prefix):]
+                                 for prefix in prefixes):
+                          raise ValueError('race input contains an unreviewed package')
+              expected = {'run_mode': 'race', 'subject': os.environ['GITHUB_SHA'],
+                          'selector_review_sha256': review, 'selector_manifest_sha256': selectors,
+                          'census_sha256': provenance['census_sha256'],
+                          'profile_sha256': observed, 'test_exit': 0}
+              if claimed != expected or type(claimed['test_exit']) is not int:
+                  raise ValueError('race input provenance mismatch')
+              census['profile_sha256'] = observed
+              provenance = dict(expected, status='caller_receipt_matched')
+          pathlib.Path(sys.argv[1]).write_text(json.dumps(census, indent=2) + '\n')
+          pathlib.Path(sys.argv[2]).write_text(json.dumps(provenance, indent=2) + '\n')
+          PYCODE
+          then
+            if [[ -n "$profile" && -f "$profile" ]] && unshare --user --map-root-user --net -- bash -euc \
+              'ip link set lo up; exec "$@"' -- \
+              go run ./.github/coverage/ordinary -profile "$profile" -functions "$manifest" -source-root . > "$report.tmp" 2>/dev/null; then
+              mv "$report.tmp" "$report"
+              exit 0
+            fi
+          fi
+          rm -f "$report.tmp" "$manifest" "$output/provenance.json"
+          printf '%s\n' '{"scope":"partial Node direct race read-only diagnostic","status":"unavailable","aggregate_statements":null}' > "$report"
+          printf '%s\n' '{"run_mode":"race","status":"unavailable"}' > "$output/provenance.json"
+          printf '%s\n' 'No valid race-input result; complete counts unavailable.' >> "$output/scope.txt"
+          exit 1
+      - name: Upload read-only Node direct race diagnostic
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.node-direct-race-report.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standard-token-node-direct-race-diagnostic-${{ github.sha }}
+          path: |
+            ${{ steps.node-direct-race-report.outputs.directory }}/scope.txt
+            ${{ steps.node-direct-race-report.outputs.directory }}/provenance.json
+            ${{ steps.node-direct-race-report.outputs.directory }}/bound-manifest.json
+            ${{ steps.node-direct-race-report.outputs.directory }}/report.json
+          if-no-files-found: warn
+      - name: Report Common65 direct display subset (partial diagnostic only)
+        id: common-direct-report
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+          GOVCS: '*:off'
+        run: |
+          bash .github/coverage/ordinary/common-direct/run-portable.sh \
+            unshare --user --map-root-user --net -- bash -euc \
+            'ip link set lo up; exec "$@"' -- \
+            python3 -B .github/coverage/ordinary/common-direct/diagnostic.py
+      - name: Upload portable Common65 direct subset diagnostic
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.common-direct-report.outputs.portable != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standard-token-common-direct-diagnostic-${{ github.sha }}
+          path: |
+            ${{ steps.common-direct-report.outputs.portable }}/summary.json
+            ${{ steps.common-direct-report.outputs.portable }}/normal.cover
+            ${{ steps.common-direct-report.outputs.portable }}/normal.manifest.json
+            ${{ steps.common-direct-report.outputs.portable }}/normal.report.json
+            ${{ steps.common-direct-report.outputs.portable }}/race.cover
+            ${{ steps.common-direct-report.outputs.portable }}/race.manifest.json
+            ${{ steps.common-direct-report.outputs.portable }}/race.report.json
+          if-no-files-found: warn
+
+  ordinary-named:
+    name: DRWA focused ordinary qualifiers (${{ matrix.mode }})
+    if: github.repository == 'xorewa/mx-chain-go'
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, race]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: '1.26.2'
+          check-latest: false
+          cache: false
+      - name: Allow unprivileged user namespaces (hosted runner, this run only)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Check test network namespace (infrastructure preflight)
+        id: isolation-preflight
+        run: python3 -B .github/ci/check_isolation.py
+      - name: Download pinned dependencies
+        run: go mod download
+      - name: Allocate current ordinary receipt directory
+        id: ordinary-output
+        run: |
+          set -euo pipefail
+          parent=$(mktemp -d "$RUNNER_TEMP/ordinary-named.XXXXXXXX")
+          printf 'directory=%s\n' "$parent/results" >> "$GITHUB_OUTPUT"
+      - name: Check only reviewed ordinary qualifier roots
+        env:
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+          GOVCS: '*:off'
+          ORDINARY_NAMED_OUTPUT: ${{ steps.ordinary-output.outputs.directory }}
+        run: >-
+          unshare --user --map-root-user --net -- bash -euc
+          'ip link set lo up; exec "$@"' --
+          bash .github/ci/ordinary_named.sh ${{ matrix.mode }} "$ORDINARY_NAMED_OUTPUT"
+      - name: Upload focused ordinary qualifier receipts
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.ordinary-output.outcome == 'success' && steps.ordinary-output.outputs.directory != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ordinary-named-${{ matrix.mode }}-${{ github.sha }}
+          path: ${{ steps.ordinary-output.outputs.directory }}/portable/
           if-no-files-found: error
 
   branch-trial:
-    name: DRWA gobco branch coverage trial (non-blocking)
+    name: DRWA gobco branch coverage trial (non-blocking, shard ${{ matrix.shard }})
     if: github.repository == 'xorewa/mx-chain-go'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     continue-on-error: true
@@ -440,19 +904,33 @@ jobs:
       - name: Trial branch coverage — each DRWA package, no threshold
         env:
           GOPROXY: 'off'
+          GOB_COVERAGE_SHARD: ${{ matrix.shard }}
         # v1.3.4 supports only one package per invocation; the runner retains
         # failures/missing metrics as UNKNOWN and continues through all packages.
         # -branch counts true/false whole controlling conditions, not MC/DC;
         # select and unused functions without conditions are outside its metric.
-        run: >-
-          unshare --user --map-root-user --net -- bash -euc
-          'ip link set lo up; exec "$@"' --
-          python3 -B .github/ci/gobco.py --binary "$RUNNER_TEMP/gobco"
-          --output gobco-results $DRWA_PACKAGES
+        # Partition the unchanged ordered package list between independent jobs.
+        run: |
+          case "$GOB_COVERAGE_SHARD" in
+            0|1) ;;
+            *) exit 1 ;;
+          esac
+          read -r -d '' -a packages < <(printf '%s\0' "$DRWA_PACKAGES")
+          selected=()
+          for index in "${!packages[@]}"; do
+            if (( index % 2 == GOB_COVERAGE_SHARD )); then
+              selected+=("${packages[index]}")
+            fi
+          done
+          test "${#selected[@]}" -gt 0
+          unshare --user --map-root-user --net -- bash -euc \
+            'ip link set lo up; exec "$@"' -- \
+            python3 -B .github/ci/gobco.py --binary "$RUNNER_TEMP/gobco" \
+            --output gobco-results "${selected[@]}"
       - name: Upload branch trial reports including tool failures
         if: always() && steps.isolation-preflight.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: drwa-gobco-trial-${{ github.sha }}
+          name: drwa-gobco-trial-${{ github.sha }}-${{ matrix.shard }}
           path: gobco-results/
           if-no-files-found: error

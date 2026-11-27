@@ -151,7 +151,11 @@ func (pcf *processComponentsFactory) createArgsTxSimulatorProcessorForMeta(
 		return args, nil, nil, nil, err
 	}
 
-	vmContainerFactory, err := pcf.createVMFactoryMeta(
+	// Simulation never commits: it classifies from the committed registry
+	// projection through a classifier that cannot mutate or hand off.
+	drwaClassifier, drwaBuiltInClassifier := pcf.drwaReadOnlyClassifier(accountsAdapter, peerAccounts)
+
+	vmContainerFactory, err := pcf.createVMFactoryMetaWithClassifier(
 		accountsAdapter,
 		peerAccounts,
 		builtInFuncFactory.BuiltInFunctionContainer(),
@@ -160,6 +164,8 @@ func (pcf *processComponentsFactory) createArgsTxSimulatorProcessorForMeta(
 		builtInFuncFactory.ESDTGlobalSettingsHandler(),
 		epochStartTrigger,
 		nil,
+		drwaClassifier,
+		drwaBuiltInClassifier,
 	)
 	if err != nil {
 		return args, nil, nil, nil, err

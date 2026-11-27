@@ -1,0 +1,123 @@
+{
+  "common_commit": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
+  "source_sha256": "30e6c6bc390b0ae6cbd07da596845885aee959c1f425bc55db75eb7d3805c5ad",
+  "compiler_census_sha256": "5672c6a8daba49ba30324de5bf57b82850909649672afd33d6ad15276f8d4be8",
+  "functions": [
+    {
+      "source": "parsers/dataField/utils.go",
+      "source_sha256": "30e6c6bc390b0ae6cbd07da596845885aee959c1f425bc55db75eb7d3805c5ad",
+      "profile_file": "github.com/multiversx/mx-chain-vm-common-go/parsers/dataField/utils.go",
+      "name": "computeTokenIdentifier",
+      "span": [
+        78,
+        1,
+        86,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            78,
+            64
+          ],
+          "end": [
+            79,
+            31
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            79,
+            31
+          ],
+          "end": [
+            81,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            83,
+            2
+          ],
+          "end": [
+            85,
+            53
+          ],
+          "statements": 3
+        }
+      ]
+    },
+    {
+      "source": "parsers/dataField/utils.go",
+      "source_sha256": "30e6c6bc390b0ae6cbd07da596845885aee959c1f425bc55db75eb7d3805c5ad",
+      "profile_file": "github.com/multiversx/mx-chain-vm-common-go/parsers/dataField/utils.go",
+      "name": "extractTokenAndNonce",
+      "span": [
+        88,
+        1,
+        103,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            88,
+            56
+          ],
+          "end": [
+            90,
+            19
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            90,
+            19
+          ],
+          "end": [
+            92,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            94,
+            2
+          ],
+          "end": [
+            95,
+            31
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            95,
+            31
+          ],
+          "end": [
+            97,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            99,
+            2
+          ],
+          "end": [
+            102,
+            35
+          ],
+          "statements": 3
+        }
+      ]
+    }
+  ]
+}

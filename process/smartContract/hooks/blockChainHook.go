@@ -61,6 +61,11 @@ type ArgBlockChainHook struct {
 	// predicate. An omitted predicate leaves ordinary header installation alone.
 	// It is a constructor dependency, never supplied by transaction input.
 	DRWAHeaderTimeEnabled func() bool
+	// DRWABuiltInAdmission classifies built-in token identifiers before the
+	// native dispatch while DRWABuiltInEnforcedAt holds for the current header.
+	// Both are constructor dependencies; omitting both keeps the native hook.
+	DRWABuiltInAdmission  DRWABuiltInAdmission
+	DRWABuiltInEnforcedAt func(epoch uint32, round uint64) bool
 	// DRWAHeaderTimeEnabledAt binds the actual native candidate coordinate to
 	// the configured joint activation predicate. It grants no policy authority.
 	DRWAHeaderTimeEnabledAt  func(epoch uint32, round uint64) bool
@@ -103,6 +108,9 @@ type BlockChainHookImpl struct {
 	mutCurrentHdr sync.RWMutex
 	currentHdr    data.HeaderHandler
 	drwaTime      *evaluatedHeaderTime
+
+	drwaBuiltInAdmission  DRWABuiltInAdmission
+	drwaBuiltInEnforcedAt func(epoch uint32, round uint64) bool
 
 	mutEpochStartHdr sync.RWMutex
 	epochStartHdr    data.HeaderHandler
@@ -170,6 +178,9 @@ func NewBlockChainHookImpl(
 	if blockChainHookImpl.drwaTime != nil {
 		blockChainHookImpl.drwaTime.enabled = args.DRWAHeaderTimeEnabled
 		blockChainHookImpl.drwaTime.enabledAt = args.DRWAHeaderTimeEnabledAt
+	}
+	if err = blockChainHookImpl.initializeDRWABuiltInAdmission(args.DRWABuiltInAdmission, args.DRWABuiltInEnforcedAt); err != nil {
+		return nil, err
 	}
 
 	args.EpochNotifier.RegisterNotifyHandler(blockChainHookImpl)
@@ -611,6 +622,11 @@ func (bh *BlockChainHookImpl) ProcessBuiltInFunction(input *vmcommon.ContractCal
 		return nil, err
 	}
 
+	err = bh.admitDRWABuiltIn(function, input)
+	if err != nil {
+		return nil, err
+	}
+
 	sndAccount, dstAccount, err := bh.getUserAccounts(input)
 	if err != nil {
 		return nil, err
@@ -660,6 +676,11 @@ func (bh *BlockChainHookImpl) processMaxBuiltInCounters(input *vmcommon.Contract
 
 // SaveNFTMetaDataToSystemAccount will save NFT meta-data to system account for the given transaction
 func (bh *BlockChainHookImpl) SaveNFTMetaDataToSystemAccount(tx data.TransactionHandler) error {
+	err := bh.checkDRWAMetaDataSave()
+	if err != nil {
+		return err
+	}
+
 	return bh.nftStorageHandler.SaveNFTMetaData(tx)
 }
 

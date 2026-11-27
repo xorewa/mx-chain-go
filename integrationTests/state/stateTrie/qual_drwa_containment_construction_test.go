@@ -15,8 +15,8 @@ import (
 // projection experiment. Native AccountsDB really mutates and returns the
 // rollback error. The test-local coordinator preserves both diagnostics and
 // denies guarded commit/read until explicit reconstruction. This does not
-// wire containment through native processors, results, logs or gas; direct
-// adapter access remains a bypass that production ownership must eliminate.
+// wire containment through native processors, results, logs or gas. Since
+// SP2-21 the native adapter itself refuses to commit after a failed rollback.
 func TestQualDRWARollbackContainmentConstruction(t *testing.T) {
 	for _, fails := range []bool{false, true} {
 		name := "restored"
@@ -145,7 +145,7 @@ func TestQualDRWARollbackContainmentConstruction(t *testing.T) {
 			require.Equal(t, committed, recovered)
 		})
 	}
-	t.Run("direct_adapter_bypass_is_not_contained", func(t *testing.T) {
+	t.Run("direct_adapter_commit_is_refused", func(t *testing.T) {
 		p := qualNewLocalProjection(t)
 		before, err := p.adb.RootHash()
 		require.NoError(t, err)
@@ -153,12 +153,17 @@ func TestQualDRWARollbackContainmentConstruction(t *testing.T) {
 		require.ErrorIs(t, p.rollback(-1), state.ErrSnapshotValueOutOfBounds)
 		_, err = p.commit()
 		require.ErrorIs(t, err, qualProjectionUnavailable)
-		// Deliberate counterexample: the unwrapped native adapter does not know
-		// that a separate projection coordinator is poisoned.
+		// SP2-21: this was the recorded bypass. The unwrapped native adapter
+		// now retains its own failed rollback and refuses to commit it.
 		bypassed, err := p.adb.Commit()
-		require.NoError(t, err)
-		require.NotEqual(t, before, bypassed)
+		require.ErrorIs(t, err, state.ErrRollbackFailed)
+		require.ErrorIs(t, err, state.ErrSnapshotValueOutOfBounds)
+		require.Nil(t, bypassed)
 		require.NoError(t, p.reconstruct(before))
+		require.NoError(t, p.adb.RollbackFailure())
 		qualAssertLocalMembership(t, p)
+		recovered, err := p.adb.Commit()
+		require.NoError(t, err)
+		require.Equal(t, before, recovered)
 	})
 }

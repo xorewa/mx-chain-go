@@ -1,0 +1,2297 @@
+{
+  "version": 1,
+  "source_census_commit": "5ff1b1fd1714b11f7fc2bebc004f14e431a1b131",
+  "source_census_sha256": "13690c5f6f4da677f6b6522996f19dfa5ad10ede8476ffd8ec2d3e4186f205b6",
+  "common_commit": "65fdfdd8ff11f6b98489b60efd35e9c682979dd0",
+  "package": "github.com/multiversx/mx-chain-go/state/accounts",
+  "selector": "^(TestQualSP281COrdinaryPeerDTODisplay|TestQualSP281COrdinaryPeerDTOSize|TestQualSP281COrdinaryPeerNestedDTOGetters|TestQualSP281COrdinaryPeerScalarGetters|TestQualSP281COrdinarySignRateDisplay|TestQualSP281COrdinaryUserReportingDTOGetters|TestQualSP281COrdinaryUserViewDTOGetters|TestQualSP281COrdinaryUserViewDisplay|TestQualSP281COrdinaryUserViewEncodedSize|TestQualSP281COrdinaryUserViewLabelGetters|TestQualSP281COrdinaryUserViewLabelSizes)$",
+  "roots": [
+    "TestQualSP281COrdinaryPeerDTODisplay",
+    "TestQualSP281COrdinaryPeerDTOSize",
+    "TestQualSP281COrdinaryPeerNestedDTOGetters",
+    "TestQualSP281COrdinaryPeerScalarGetters",
+    "TestQualSP281COrdinarySignRateDisplay",
+    "TestQualSP281COrdinaryUserReportingDTOGetters",
+    "TestQualSP281COrdinaryUserViewDTOGetters",
+    "TestQualSP281COrdinaryUserViewDisplay",
+    "TestQualSP281COrdinaryUserViewEncodedSize",
+    "TestQualSP281COrdinaryUserViewLabelGetters",
+    "TestQualSP281COrdinaryUserViewLabelSizes"
+  ],
+  "expected_passes": [
+    "TestQualSP281COrdinaryPeerDTODisplay",
+    "TestQualSP281COrdinaryPeerDTOSize",
+    "TestQualSP281COrdinaryPeerDTOSize/peer_scalar_size",
+    "TestQualSP281COrdinaryPeerDTOSize/sign_rate_scalar_size",
+    "TestQualSP281COrdinaryPeerNestedDTOGetters",
+    "TestQualSP281COrdinaryPeerScalarGetters",
+    "TestQualSP281COrdinaryPeerScalarGetters/peer_report_scalars",
+    "TestQualSP281COrdinaryPeerScalarGetters/sign_rate_scalar",
+    "TestQualSP281COrdinarySignRateDisplay",
+    "TestQualSP281COrdinaryUserReportingDTOGetters",
+    "TestQualSP281COrdinaryUserViewDTOGetters",
+    "TestQualSP281COrdinaryUserViewDisplay",
+    "TestQualSP281COrdinaryUserViewEncodedSize",
+    "TestQualSP281COrdinaryUserViewLabelGetters",
+    "TestQualSP281COrdinaryUserViewLabelSizes"
+  ],
+  "source_test_lock_sha256": {
+    "go.mod": "af742013b828d9b62ccf5cccaa0f75e57504ded97657583d12be5fb9237109d2",
+    "go.sum": "6a465b12ce343d58fcc31b95e13a8839c0ac89e3e08ec5f40e2f06e609b8397a",
+    "state/accounts/interface.go": "0e77875eed07cccb782b9031e49e5281ec7c63655d0cec39da0be6d70ce33d7a",
+    "state/accounts/peerAccount.go": "8ac545212ef18247aabf953701e18c433ed636db9068c5c31a1917506513c0fb",
+    "state/accounts/peerAccountData.pb.go": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+    "state/accounts/peerAccountData.proto": "2b131a82fe1f1bc75eff346128a041b73a4b7d73c8f9e4ae0ef0cb28ce488dbd",
+    "state/accounts/qual_sp281c_lane_b_ordinary_user_display_test.go": "eb29de83ced2f21957735ad3caeccb86625a34d21970744fa8b7184a019c8f2b",
+    "state/accounts/qual_sp281c_lane_b_ordinary_user_label_getters_test.go": "12fafa012e050f1a0e1854f3397a17630560905de9526fb6c4c74e4b5dc06dab",
+    "state/accounts/qual_sp281c_lane_b_ordinary_user_label_size_test.go": "3500a1ae465c0b739e4c1c2558446e8d23beade9b33b6d35d4ecbcb4f9fa9a47",
+    "state/accounts/qual_sp281c_lane_b_ordinary_user_reporting_dto_test.go": "fad86514767789c6552b9e58b60e47239d12b297babe7b2733954299c77f4ee8",
+    "state/accounts/qual_sp281c_lane_b_ordinary_user_size_test.go": "573605bde062cf1404c62fa9084b780e9049805900d40e0600742a993fff9bd6",
+    "state/accounts/qual_sp281c_lane_b_ordinary_user_view_dto_test.go": "e68034bd37414779d941a8c1f7fcc4fe348da4a1fec748f30c63a74cf14c8ff6",
+    "state/accounts/qual_sp281c_lane_c_peer_display_test.go": "e76a61aef757ef65a2c5cda73e65670952c1199acfc28e6679bdc99a993e224c",
+    "state/accounts/qual_sp281c_lane_c_peer_getters_test.go": "197bd04a4decdf8237b4359d246629fd9265e5a83aab89065ae43c7099513de8",
+    "state/accounts/qual_sp281c_lane_c_peer_nested_test.go": "8b75e1b3bd7548774a47b1bf7dbef69b2c23a3d9cc92e65375cd26743ea0c522",
+    "state/accounts/qual_sp281c_lane_c_peer_size_test.go": "aa5daea5a960f652405dc0e132703173cdb33974cc3f9ee2475ccd662fd2bf77",
+    "state/accounts/qual_sp281c_lane_c_signrate_display_test.go": "6d3554c007a9c76037cd427ea8d9c3fa6c2b68c49745092880654ea4222cfc8b",
+    "state/accounts/userAccount.go": "5346e5b060a1693e6e4b46379c2c48f3b37052f12e1e56fc7d04589cda00038a",
+    "state/accounts/userAccountData.pb.go": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+    "state/accounts/userAccountData.proto": "347dd47298eddfd0c79e0812de1283ac73c8c9a3f776ca176780c3ca8f94e56c"
+  },
+  "functions": [
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetNonce",
+      "span": [
+        71,
+        1,
+        76,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            71,
+            45
+          ],
+          "end": [
+            72,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            72,
+            14
+          ],
+          "end": [
+            74,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            75,
+            2
+          ],
+          "end": [
+            75,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetBalance",
+      "span": [
+        78,
+        1,
+        83,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            78,
+            54
+          ],
+          "end": [
+            79,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            79,
+            14
+          ],
+          "end": [
+            81,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            82,
+            2
+          ],
+          "end": [
+            82,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetCodeHash",
+      "span": [
+        85,
+        1,
+        90,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            85,
+            48
+          ],
+          "end": [
+            86,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            86,
+            14
+          ],
+          "end": [
+            88,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            89,
+            2
+          ],
+          "end": [
+            89,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetRootHash",
+      "span": [
+        92,
+        1,
+        97,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            92,
+            48
+          ],
+          "end": [
+            93,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            93,
+            14
+          ],
+          "end": [
+            95,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            96,
+            2
+          ],
+          "end": [
+            96,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetAddress",
+      "span": [
+        99,
+        1,
+        104,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            99,
+            47
+          ],
+          "end": [
+            100,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            100,
+            14
+          ],
+          "end": [
+            102,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            103,
+            2
+          ],
+          "end": [
+            103,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetDeveloperReward",
+      "span": [
+        106,
+        1,
+        111,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            106,
+            62
+          ],
+          "end": [
+            107,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            107,
+            14
+          ],
+          "end": [
+            109,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            110,
+            2
+          ],
+          "end": [
+            110,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetOwnerAddress",
+      "span": [
+        113,
+        1,
+        118,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            113,
+            52
+          ],
+          "end": [
+            114,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            114,
+            14
+          ],
+          "end": [
+            116,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            117,
+            2
+          ],
+          "end": [
+            117,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetUserName",
+      "span": [
+        120,
+        1,
+        125,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            120,
+            48
+          ],
+          "end": [
+            121,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            121,
+            14
+          ],
+          "end": [
+            123,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            124,
+            2
+          ],
+          "end": [
+            124,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GetCodeMetadata",
+      "span": [
+        127,
+        1,
+        132,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            127,
+            52
+          ],
+          "end": [
+            128,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            128,
+            14
+          ],
+          "end": [
+            130,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            131,
+            2
+          ],
+          "end": [
+            131,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "GoString",
+      "span": [
+        227,
+        1,
+        244,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            227,
+            48
+          ],
+          "end": [
+            228,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            228,
+            17
+          ],
+          "end": [
+            230,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            231,
+            2
+          ],
+          "end": [
+            243,
+            28
+          ],
+          "statements": 13
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "String",
+      "span": [
+        408,
+        1,
+        425,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            408,
+            46
+          ],
+          "end": [
+            409,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            409,
+            17
+          ],
+          "end": [
+            411,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            412,
+            2
+          ],
+          "end": [
+            424,
+            10
+          ],
+          "statements": 2
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "Size",
+      "span": [
+        356,
+        1,
+        400,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            356,
+            42
+          ],
+          "end": [
+            357,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            357,
+            14
+          ],
+          "end": [
+            359,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            360,
+            2
+          ],
+          "end": [
+            362,
+            18
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            362,
+            18
+          ],
+          "end": [
+            364,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            365,
+            2
+          ],
+          "end": [
+            369,
+            3
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            370,
+            2
+          ],
+          "end": [
+            371,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            371,
+            11
+          ],
+          "end": [
+            373,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            374,
+            2
+          ],
+          "end": [
+            375,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            375,
+            11
+          ],
+          "end": [
+            377,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            378,
+            2
+          ],
+          "end": [
+            379,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            379,
+            11
+          ],
+          "end": [
+            381,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            382,
+            2
+          ],
+          "end": [
+            386,
+            3
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            387,
+            2
+          ],
+          "end": [
+            388,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            388,
+            11
+          ],
+          "end": [
+            390,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            391,
+            2
+          ],
+          "end": [
+            392,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            392,
+            11
+          ],
+          "end": [
+            394,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            395,
+            2
+          ],
+          "end": [
+            396,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            396,
+            11
+          ],
+          "end": [
+            398,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            399,
+            2
+          ],
+          "end": [
+            399,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/userAccountData.pb.go",
+      "source_sha256": "15c50efe7533fb0931b990c7fdf3cd51de11cb31f1f3e0e482219021ca95cfc1",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/userAccountData.pb.go",
+      "name": "XXX_Size",
+      "span": [
+        62,
+        1,
+        64,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            62,
+            42
+          ],
+          "end": [
+            64,
+            2
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GoString",
+      "span": [
+        445,
+        1,
+        455,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            445,
+            41
+          ],
+          "end": [
+            446,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            446,
+            17
+          ],
+          "end": [
+            448,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            449,
+            2
+          ],
+          "end": [
+            454,
+            28
+          ],
+          "statements": 6
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "String",
+      "span": [
+        796,
+        1,
+        806,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            796,
+            39
+          ],
+          "end": [
+            797,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            797,
+            17
+          ],
+          "end": [
+            799,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            800,
+            2
+          ],
+          "end": [
+            805,
+            10
+          ],
+          "statements": 2
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "Size",
+      "span": [
+        704,
+        1,
+        717,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            704,
+            35
+          ],
+          "end": [
+            705,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            705,
+            14
+          ],
+          "end": [
+            707,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            708,
+            2
+          ],
+          "end": [
+            710,
+            23
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            710,
+            23
+          ],
+          "end": [
+            712,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            713,
+            2
+          ],
+          "end": [
+            713,
+            23
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            713,
+            23
+          ],
+          "end": [
+            715,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            716,
+            2
+          ],
+          "end": [
+            716,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "XXX_Size",
+      "span": [
+        56,
+        1,
+        58,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            56,
+            35
+          ],
+          "end": [
+            58,
+            2
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetNumSuccess",
+      "span": [
+        65,
+        1,
+        70,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            65,
+            43
+          ],
+          "end": [
+            66,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            66,
+            14
+          ],
+          "end": [
+            68,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            69,
+            2
+          ],
+          "end": [
+            69,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetNumFailure",
+      "span": [
+        72,
+        1,
+        77,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            72,
+            43
+          ],
+          "end": [
+            73,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            73,
+            14
+          ],
+          "end": [
+            75,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            76,
+            2
+          ],
+          "end": [
+            76,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GoString",
+      "span": [
+        456,
+        1,
+        484,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            456,
+            48
+          ],
+          "end": [
+            457,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            457,
+            17
+          ],
+          "end": [
+            459,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            460,
+            2
+          ],
+          "end": [
+            483,
+            28
+          ],
+          "statements": 24
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "String",
+      "span": [
+        807,
+        1,
+        835,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            807,
+            46
+          ],
+          "end": [
+            808,
+            17
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            808,
+            17
+          ],
+          "end": [
+            810,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            811,
+            2
+          ],
+          "end": [
+            834,
+            10
+          ],
+          "statements": 2
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "Size",
+      "span": [
+        719,
+        1,
+        788,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            719,
+            42
+          ],
+          "end": [
+            720,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            720,
+            14
+          ],
+          "end": [
+            722,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            723,
+            2
+          ],
+          "end": [
+            726,
+            11
+          ],
+          "statements": 4
+        },
+        {
+          "start": [
+            726,
+            11
+          ],
+          "end": [
+            728,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            729,
+            2
+          ],
+          "end": [
+            730,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            730,
+            11
+          ],
+          "end": [
+            732,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            733,
+            2
+          ],
+          "end": [
+            733,
+            20
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            733,
+            20
+          ],
+          "end": [
+            735,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            736,
+            2
+          ],
+          "end": [
+            740,
+            43
+          ],
+          "statements": 5
+        },
+        {
+          "start": [
+            740,
+            43
+          ],
+          "end": [
+            742,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            743,
+            2
+          ],
+          "end": [
+            743,
+            19
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            743,
+            19
+          ],
+          "end": [
+            745,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            746,
+            2
+          ],
+          "end": [
+            746,
+            23
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            746,
+            23
+          ],
+          "end": [
+            748,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            749,
+            2
+          ],
+          "end": [
+            753,
+            3
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            754,
+            2
+          ],
+          "end": [
+            754,
+            39
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            754,
+            39
+          ],
+          "end": [
+            756,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            757,
+            2
+          ],
+          "end": [
+            757,
+            24
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            757,
+            24
+          ],
+          "end": [
+            759,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            760,
+            2
+          ],
+          "end": [
+            761,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            761,
+            11
+          ],
+          "end": [
+            763,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            764,
+            2
+          ],
+          "end": [
+            764,
+            38
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            764,
+            38
+          ],
+          "end": [
+            766,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            767,
+            2
+          ],
+          "end": [
+            771,
+            48
+          ],
+          "statements": 5
+        },
+        {
+          "start": [
+            771,
+            48
+          ],
+          "end": [
+            773,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            774,
+            2
+          ],
+          "end": [
+            774,
+            18
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            774,
+            18
+          ],
+          "end": [
+            776,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            777,
+            2
+          ],
+          "end": [
+            777,
+            26
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            777,
+            26
+          ],
+          "end": [
+            779,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            780,
+            2
+          ],
+          "end": [
+            781,
+            11
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            781,
+            11
+          ],
+          "end": [
+            783,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            784,
+            2
+          ],
+          "end": [
+            784,
+            32
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            784,
+            32
+          ],
+          "end": [
+            786,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            787,
+            2
+          ],
+          "end": [
+            787,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "XXX_Size",
+      "span": [
+        122,
+        1,
+        124,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            122,
+            42
+          ],
+          "end": [
+            124,
+            2
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetShardId",
+      "span": [
+        145,
+        1,
+        150,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            145,
+            47
+          ],
+          "end": [
+            146,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            146,
+            14
+          ],
+          "end": [
+            148,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            149,
+            2
+          ],
+          "end": [
+            149,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetValidatorIgnoredSignaturesRate",
+      "span": [
+        166,
+        1,
+        171,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            166,
+            70
+          ],
+          "end": [
+            167,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            167,
+            14
+          ],
+          "end": [
+            169,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            170,
+            2
+          ],
+          "end": [
+            170,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetRating",
+      "span": [
+        173,
+        1,
+        178,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            173,
+            46
+          ],
+          "end": [
+            174,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            174,
+            14
+          ],
+          "end": [
+            176,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            177,
+            2
+          ],
+          "end": [
+            177,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetTempRating",
+      "span": [
+        180,
+        1,
+        185,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            180,
+            50
+          ],
+          "end": [
+            181,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            181,
+            14
+          ],
+          "end": [
+            183,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            184,
+            2
+          ],
+          "end": [
+            184,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetNumSelectedInSuccessBlocks",
+      "span": [
+        194,
+        1,
+        199,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            194,
+            66
+          ],
+          "end": [
+            195,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            195,
+            14
+          ],
+          "end": [
+            197,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            198,
+            2
+          ],
+          "end": [
+            198,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetConsecutiveProposerMisses",
+      "span": [
+        215,
+        1,
+        220,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            215,
+            65
+          ],
+          "end": [
+            216,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            216,
+            14
+          ],
+          "end": [
+            218,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            219,
+            2
+          ],
+          "end": [
+            219,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetTotalValidatorIgnoredSignaturesRate",
+      "span": [
+        236,
+        1,
+        241,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            236,
+            75
+          ],
+          "end": [
+            237,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            237,
+            14
+          ],
+          "end": [
+            239,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            240,
+            2
+          ],
+          "end": [
+            240,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetNonce",
+      "span": [
+        243,
+        1,
+        248,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            243,
+            45
+          ],
+          "end": [
+            244,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            244,
+            14
+          ],
+          "end": [
+            246,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            247,
+            2
+          ],
+          "end": [
+            247,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetUnStakedEpoch",
+      "span": [
+        250,
+        1,
+        255,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            250,
+            53
+          ],
+          "end": [
+            251,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            251,
+            14
+          ],
+          "end": [
+            253,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            254,
+            2
+          ],
+          "end": [
+            254,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetValidatorSuccessRate",
+      "span": [
+        152,
+        1,
+        157,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            152,
+            62
+          ],
+          "end": [
+            153,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            153,
+            14
+          ],
+          "end": [
+            155,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            156,
+            2
+          ],
+          "end": [
+            156,
+            19
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetLeaderSuccessRate",
+      "span": [
+        159,
+        1,
+        164,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            159,
+            59
+          ],
+          "end": [
+            160,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            160,
+            14
+          ],
+          "end": [
+            162,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            163,
+            2
+          ],
+          "end": [
+            163,
+            19
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetAccumulatedFees",
+      "span": [
+        187,
+        1,
+        192,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            187,
+            62
+          ],
+          "end": [
+            188,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            188,
+            14
+          ],
+          "end": [
+            190,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            191,
+            2
+          ],
+          "end": [
+            191,
+            12
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetTotalValidatorSuccessRate",
+      "span": [
+        222,
+        1,
+        227,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            222,
+            67
+          ],
+          "end": [
+            223,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            223,
+            14
+          ],
+          "end": [
+            225,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            226,
+            2
+          ],
+          "end": [
+            226,
+            19
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "source": "state/accounts/peerAccountData.pb.go",
+      "source_sha256": "bfe47080d3247c7bcd9a960b85c44620eec3ae30991bb432ce6f6f98c33255ba",
+      "profile_file": "github.com/multiversx/mx-chain-go/state/accounts/peerAccountData.pb.go",
+      "name": "GetTotalLeaderSuccessRate",
+      "span": [
+        229,
+        1,
+        234,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            229,
+            64
+          ],
+          "end": [
+            230,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            230,
+            14
+          ],
+          "end": [
+            232,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            233,
+            2
+          ],
+          "end": [
+            233,
+            19
+          ],
+          "statements": 1
+        }
+      ]
+    }
+  ],
+  "expected_statements": 229
+}
