@@ -131,6 +131,33 @@ class RunnerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate.load_validator(root, "toy")
 
+    def test_public_fixture_roster_matches_adopted_structural_vocabulary(self):
+        schema = json.loads(validate.SCHEMA.read_text())
+        fixtures = json.loads(validate.FIXTURES.read_text())
+        self.assertEqual(len(fixtures), 48)
+        self.assertEqual(len({case["name"] for case in fixtures}), 48)
+        self.assertEqual(sum(case["expected_valid"] for case in fixtures), 33)
+        self.assertEqual(len({json.dumps(case["document"], sort_keys=True) for case in fixtures}), 48)
+        observations = [observation
+                        for case in fixtures if case["expected_valid"]
+                        for observation in case["document"]["observations"] or []]
+        definitions = schema["$defs"]
+        for field, definition in (("kind", "Kind"), ("state", "State"),
+                                  ("availability", "Availability")):
+            self.assertEqual({obs[field] for obs in observations},
+                             set(definitions[definition]["enum"]))
+        self.assertEqual({obs["gasRefund"]["presentationClass"]
+                          for obs in observations if obs["gasRefund"] is not None},
+                         set(definitions["RefundClass"]["enum"]))
+        unknown_kinds = {obs["kind"] for obs in observations
+                         if obs["availability"] == "UNKNOWN"}
+        self.assertEqual(unknown_kinds, set(definitions["Kind"]["enum"]))
+        for obs in observations:
+            self.assertEqual(set(definitions["PublicObservation"]["required"]) - obs.keys(), set())
+            if obs["availability"] != "AVAILABLE":
+                for field in ("finalityBasis", "values", "originalValues", "gasRefund"):
+                    self.assertIsNone(obs[field])
+
     def test_mocked_outcomes_distinguish_compile_validation_and_pass(self):
         # Pure harness unit test. The fake class only echoes predeclared
         # outcomes; it does not perform, or claim, schema conformance.
@@ -149,7 +176,7 @@ class RunnerTests(unittest.TestCase):
         code, report = self.invoke(lambda *_: Fake)
         self.assertEqual((code, report["status"]), (0, "pass"))
         self.assertTrue(report["schema_compilation"])
-        self.assertEqual(len(report["cases"]), 9)
+        self.assertEqual(len(report["cases"]), 48)
         self.assertTrue(all(row["matches"] for row in report["cases"]))
 
         class Mismatch(Fake):

@@ -12,7 +12,7 @@ SCHEMA = HERE.parents[3] / "api/shared/observation-v1.schema.json"
 FIXTURES = HERE / "fixtures.json"
 DRAFT = "https://json-schema.org/draft/2020-12/schema"
 ADOPTED_SCHEMA_SHA256 = "f2018331d7c86c2daa1c2b3d34003c8d10d3403381cd0cb8a6ddb7c26ba1c617"
-FIXTURES_SHA256 = "7facf7ca775372684c91d792da6d4b10bc666eaf4207fdcb7666b43b15d55a1d"
+FIXTURES_SHA256 = "410be51bc5fe0dab12b2e94354290ce9d8e3270d45ec311009a7d11f28ba38c1"
 
 
 def sha256(data):

@@ -3,9 +3,14 @@
 This standalone diagnostic checks the adopted R86 v1 **structural** public display
 schema using the standard `python-jsonschema` Draft202012Validator API. It is
 not a replacement for the Go codec tests or a source/admission check. It installs
-nothing and does not change CI or any existing response. Nine fixed public
-display documents exercise version, required keys, null versus empty arrays,
-optional extensions and timestamp representation.
+nothing and does not change CI or any existing response. Forty-eight fixed public
+display documents (33 expected structurally valid, 15 expected structurally
+invalid) exercise version, required keys, null versus
+empty arrays, optional extensions, eight observation kinds, public identifier
+shapes, decimal-string bounds, unit labels and closed vocabulary. The additional
+label specimens are artificial structural examples only: they have no actual
+producer, source or outcome meaning and may not satisfy the codec's separate
+semantic checks (including canonical address checks and kind-specific basis).
 
 ## Supplier intake
 
