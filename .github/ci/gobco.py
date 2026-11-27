@@ -16,6 +16,68 @@ def publish_report(path, value):
     temporary.replace(path)
 
 
+def classify_diagnostic(returncode, has_report, stdout, stderr):
+    """Summarize evidence, not the cause of a product failure.
+
+    Class labels can overlap (for example, a tool panic with a compiler
+    diagnostic and no branch report). Only a structured Go test fail event
+    with a test name contributes to the named-failure count. Raw log text
+    is deliberately absent from the summary.
+    """
+    named_failures = package_failures = 0
+    compile_setup = False
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if (not isinstance(event, dict)
+                or not isinstance(event.get("Package"), str)
+                or not event["Package"]):
+            continue
+        name = event.get("Test")
+        if event.get("Action") == "fail":
+            if isinstance(name, str) and name:
+                named_failures += 1
+            elif name is None:
+                package_failures += 1
+        if event.get("Action") == "output" and name is None:
+            output = event.get("Output")
+            if isinstance(output, str) and re.search(r"\[(?:build|setup) failed\]\s*$", output):
+                compile_setup = True
+
+    # A panic in an attributed instrumenter stack is tool evidence, not
+    # a named test failure. Do not classify arbitrary nonzero exits as tool
+    # errors or an unattributed panic as a product failure.
+    tool_error = returncode != 0 and bool(
+        re.search(r"^panic:", stderr, re.M)
+        and re.search(r"^[ \t]+[^\n]*[/\\]gobco-source[/\\][^\n]*\.go:\d+", stderr, re.M)
+    )
+    if tool_error and re.search(
+        r"^panic: [^\n]*\.go:\d+:\d+: [^\n]*(?:undefined|redeclared in this block)",
+        stderr, re.M
+    ):
+        compile_setup = True
+
+    classes = []
+    if tool_error:
+        classes.append("tool_error")
+    if compile_setup:
+        classes.append("compile_or_setup")
+    if named_failures:
+        classes.append("named_test_failure")
+    if returncode != 0 and not classes:
+        classes.append("unknown_failure")
+    if not has_report:
+        classes.append("missing_report")
+    return {
+        "measurement": "measured" if has_report and returncode == 0 else "unknown",
+        "evidence_classes": classes,
+        "named_test_failure_events": named_failures,
+        "package_failure_events": package_failures,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True)
@@ -47,10 +109,13 @@ def main():
                 run = subprocess.run(argv, env=env, stdout=out, stderr=err)
         text = (target / "stdout").read_text()
         match = re.search(r"^Branch coverage: (\d+)/(\d+)$", text, re.M)
+        diagnostic = classify_diagnostic(run.returncode, match is not None, text,
+                                         (target / "stderr").read_text(errors="replace"))
         results.append({"package": package, "argv": argv, "exit": run.returncode,
                         "seconds": time.monotonic() - started,
                         "branches": {"covered": int(match[1]), "total": int(match[2])} if match else None,
-                        "status": "measured" if match and run.returncode == 0 else "UNKNOWN: tool/test failure or missing branch report"})
+                        "status": "measured" if match and run.returncode == 0 else "UNKNOWN: tool/test failure or missing branch report",
+                        "diagnostic": diagnostic})
         publish_report(output / "summary.json", results)
         print(json.dumps(results[-1]), flush=True)
     # Missing measurements remain visible as trial failure, never counted as zero/100%.
