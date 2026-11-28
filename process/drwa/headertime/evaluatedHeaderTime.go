@@ -102,6 +102,12 @@ func (p *EvaluatedHeaderTime) begin(header data.HeaderHandler,
 	if err != nil {
 		return nil, err
 	}
+	// Owner decision SP2-24 D-1 (b): a header whose millisecond field is zero
+	// gives no typed coordinate. Only this view refuses it; the native header
+	// installation and the ordinary timestamp accessors are not touched.
+	if milliseconds == 0 {
+		return nil, ErrUnavailableHeaderTime
+	}
 	context := &HeaderTimeContext{owner: p, headerHash: bytes.Clone(identity), epoch: header.GetEpoch(),
 		shard: header.GetShardID(), timestamp: milliseconds, acquire: acquire, validate: validate}
 	p.current = context

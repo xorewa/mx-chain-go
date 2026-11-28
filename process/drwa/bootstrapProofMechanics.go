@@ -413,7 +413,7 @@ func (c *registrationApprovalCodec) verifyBootstrapProofAt(provider bootstrapPro
 		if err = c.bindBootstrapAuthorityMessage(&b, envelope[0], bodies, authority, intent, id, digest); err != nil {
 			return err
 		}
-	} else if _, err = registrationBoundedFields(c.codec, b.message, 1, c.bounds.bytes/2, c.bounds.fieldBytes); err != nil {
+	} else if err = c.bindSignedBootstrapWindow(&b, envelope[0]); err != nil {
 		return err
 	}
 	if !bytes.Equal(envelope[0], b.message) || !c.bootstrapWindowValid(b.notBefore, b.notAfter, at, intent.expiry) {
@@ -427,6 +427,30 @@ func (c *registrationApprovalCodec) verifyBootstrapProofAt(provider bootstrapPro
 		b.signerIndices = positions
 	}
 	return provider.VerifyBootstrapBinding(cloneBootstrapProofBinding(b), bytes.Clone(id), bytes.Clone(digest), at, epoch)
+}
+
+// bindSignedBootstrapWindow takes the validity window of a generic bootstrap
+// proof from the signed bytes: the last two fields of the signed message are
+// its not-before and not-after, eight bytes each, as in the A126 message. A
+// caller binding may leave its window absent (zero); a window it states must
+// be exactly the signed one. The caller never widens, narrows or supplies the
+// window of a certificate (Part A L1234-1237: certificates bind their
+// validity; AR-05: not_before <= t <= valid_until).
+func (c *registrationApprovalCodec) bindSignedBootstrapWindow(b *bootstrapProofBinding, signed []byte) error {
+	fields, err := registrationBoundedFields(c.codec, signed, 2, c.bounds.bytes/2, c.bounds.fieldBytes)
+	if err != nil {
+		return err
+	}
+	notBefore, notAfter := fields[len(fields)-2], fields[len(fields)-1]
+	if len(notBefore) != 8 || len(notAfter) != 8 {
+		return errInvalidRegistrationRecord
+	}
+	signedBefore, signedAfter := binary.BigEndian.Uint64(notBefore), binary.BigEndian.Uint64(notAfter)
+	if (b.notBefore != 0 || b.notAfter != 0) && (b.notBefore != signedBefore || b.notAfter != signedAfter) {
+		return errInvalidRegistrationRecord
+	}
+	b.notBefore, b.notAfter = signedBefore, signedAfter
+	return nil
 }
 
 func (c *registrationApprovalCodec) bootstrapWindowValid(nb, na uint64, at, expiry HeaderMilliseconds) bool {

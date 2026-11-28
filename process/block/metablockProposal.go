@@ -415,6 +415,11 @@ func (mp *metaProcessor) ProcessBlockProposal(
 		return nil, err
 	}
 
+	err = mp.beginDRWAFinalityImport(header, headerHash)
+	if err != nil {
+		return nil, err
+	}
+
 	err = mp.createBlockStarted()
 	if err != nil {
 		return nil, err
@@ -517,6 +522,7 @@ func (mp *metaProcessor) CommitBlockProposalState(headerHandler data.HeaderHandl
 	if err != nil {
 		return err
 	}
+	mp.endDRWAFinalityImport(true)
 
 	metaHeader, ok := headerHandler.(data.MetaHeaderHandler)
 	if ok {

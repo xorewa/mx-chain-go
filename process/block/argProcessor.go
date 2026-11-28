@@ -116,6 +116,9 @@ type ArgBaseProcessor struct {
 	// DRWAClassification is set only on a node whose VM container carries the
 	// DRWA classifier. Nil keeps native block processing.
 	DRWAClassification process.DRWAClassificationHandler
+	// DRWAFinalityImport is set only on a DRWA deployment. Nil keeps native
+	// block processing.
+	DRWAFinalityImport process.DRWAFinalityImportHandler
 }
 
 // ArgShardProcessor holds all dependencies required by the process data factory in order to create

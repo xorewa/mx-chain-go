@@ -118,9 +118,28 @@ func (txProc *metaTxProcessor) ProcessTransactionWithDRWA(tx *transaction.Transa
 	if !ok {
 		return vmcommon.ExecutionFailed, vm.ErrDRWAExecution
 	}
-	return native.WithDRWANativeTransaction(tx, validation, func(execute vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error) {
+	entered := false
+	code, err := native.WithDRWANativeTransaction(tx, validation, func(execute vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error) {
+		entered = true
 		return txProc.processTransaction(tx, execute)
 	})
+	if entered || !errors.Is(err, process.ErrTransactionNotExecutable) ||
+		txProc.shardCoordinator.ComputeId(tx.SndAddr) == txProc.shardCoordinator.SelfId() {
+		return code, err
+	}
+	// The installed owner admits no native operation for this request and
+	// opened nothing. The transaction was already charged in its sender's
+	// shard, so it is answered here as every cross-shard transaction that
+	// cannot be executed at its destination: an error would hold back the
+	// sender shard's miniblock at this transaction on every attempt.
+	txHash, hashErr := core.CalculateHash(txProc.marshalizer, txProc.hasher, tx)
+	if hashErr != nil {
+		return 0, hashErr
+	}
+	if denialErr := txProc.processIfTxErrorCrossShard(tx, txHash, err.Error()); denialErr != nil {
+		return 0, denialErr
+	}
+	return vmcommon.UserError, nil
 }
 
 func (txProc *metaTxProcessor) processTransaction(tx *transaction.Transaction, native vm.DRWANativeSCExecutor) (vmcommon.ReturnCode, error) {

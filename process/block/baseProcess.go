@@ -139,6 +139,7 @@ type baseProcessor struct {
 	vmContainer                   process.VirtualMachinesContainer
 	drwaClassification            process.DRWAClassificationHandler
 	coreComponents                coreComponentsHolder
+	drwaFinalityImport            process.DRWAFinalityImportHandler
 	gasConsumedProvider           gasConsumedProvider
 	economicsData                 process.EconomicsDataHandler
 	epochChangeGracePeriodHandler common.EpochChangeGracePeriodHandler
@@ -245,6 +246,7 @@ func NewBaseProcessor(arguments ArgBaseProcessor) (*baseProcessor, error) {
 		vmContainer:                        arguments.VmContainer,
 		drwaClassification:                 arguments.DRWAClassification,
 		coreComponents:                     arguments.CoreComponents,
+		drwaFinalityImport:                 arguments.DRWAFinalityImport,
 		processDataTriesOnCommitEpoch:      arguments.Config.Debug.EpochStart.ProcessDataTrieOnCommitEpoch,
 		gasConsumedProvider:                arguments.GasHandler,
 		economicsData:                      arguments.CoreComponents.EconomicsData(),
@@ -2731,6 +2733,7 @@ type accountResetResult struct {
 // caller-owned map. An entry records the attempt, even when the reset failed.
 // The caller remains responsible for checking the complete set of stores.
 func (bp *baseProcessor) revertCurrentBlock(results map[state.AccountsDbIdentifier]accountResetResult) error {
+	bp.endDRWAFinalityImport(false)
 	clear(results)
 	for key, store := range bp.accountsDB {
 		err := store.RevertToSnapshot(0)

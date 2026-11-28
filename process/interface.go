@@ -1733,6 +1733,18 @@ type BlockDataRequester interface {
 	IsInterfaceNil() bool
 }
 
+// DRWAFinalityImportHandler is the owner of the DRWA pending/final heads of a
+// block processor (Part A 6.1, AR-01). BeginBlock is the import phase of a V3
+// block execution: it follows the positioning of the account stores at the
+// parent's executed root and precedes every other effect of the block. EndBlock
+// closes that execution, committed or reverted. An absent handler leaves block
+// processing as it is without DRWA.
+type DRWAFinalityImportHandler interface {
+	BeginBlock(header data.HeaderHandler, headerHash []byte) error
+	EndBlock(committed bool)
+	IsInterfaceNil() bool
+}
+
 // InclusionEstimator decides how many execution results can be included in the next block
 type InclusionEstimator interface {
 	Decide(lastNotarised *common.LastExecutionResultForInclusion, pending []data.BaseExecutionResultHandler, currentHeaderRound uint64) (allowed int)

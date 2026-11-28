@@ -62,7 +62,7 @@ func TestQualNativeCandidateOriginalTransactionConnection(t *testing.T) {
 		Fees, DeveloperFees *big.Int
 	}
 	ordinaryBaselines := make(map[bool]ordinaryOutcome)
-	for _, scenario := range []string{"bootstrap_denied", "bootstrap_denied_v1", "registration_denied", "registration_denied_v1", "pool_baseline", "pool_off", "pool_on", "pool_baseline_v1", "pool_off_v1", "pool_on_v1", "ordinary", "regulated", "ordinary_v1", "regulated_v1", "gas", "caller", "arguments", "callback", "foreign_vm", "missing_receipt", "changed_original", "foreign_store", "ended_header", "source_removed", "wrong_provider"} {
+	for _, scenario := range []string{"bootstrap_denied", "bootstrap_denied_v1", "registration_denied", "registration_denied_v1", "pool_baseline", "pool_off", "pool_on", "pool_baseline_v1", "pool_off_v1", "pool_on_v1", "ordinary", "regulated", "ordinary_v1", "regulated_v1", "gas", "caller", "arguments", "callback", "foreign_vm", "missing_receipt", "changed_original", "foreign_store", "ended_header", "source_removed", "wrong_provider", "relayed", "bind_DRWARegisterToken", "bind_DRWARegisterBootstrapIntent", "bind_control"} {
 		t.Run(scenario, func(t *testing.T) {
 			regulated := scenario == "regulated" || scenario == "regulated_v1"
 			count := make([]byte, 8)
@@ -138,11 +138,35 @@ func TestQualNativeCandidateOriginalTransactionConnection(t *testing.T) {
 			if registrationDenied {
 				tx.Data = []byte("DRWARegisterToken@01@02")
 			}
+			// SP2-23, TA-SP2-23-1-2: a relayed original, and a reserved name
+			// under an authentic receipt at a contract other than the ESDT one.
+			relayed, bind := scenario == "relayed", strings.HasPrefix(scenario, "bind_")
+			relayerKey := key
+			if relayed {
+				for {
+					candidateKey, candidatePub := qualNativeAccountKeyGen.GeneratePair()
+					address, e := candidatePub.ToByteArray()
+					require.NoError(t, e)
+					if coordinator.SameShard(address, sender) {
+						relayerKey, tx.RelayerAddr = candidateKey, address
+						break
+					}
+				}
+			}
+			if bind {
+				tx.RcvAddr = bytes.Clone(vm.GovernanceSCAddress)
+				tx.Data = []byte(strings.TrimPrefix(scenario, "bind_") + "@01@02")
+				require.False(t, nativeValidation.RequiresDRWANativeValidationReceipt(tx))
+			}
 			require.NoError(t, execution.EconomicsHandler.CheckValidityTxValues(tx))
 			message, err := tx.GetDataForSigning(qualNativeHexConverter, qualNativeTxSignMarshalizer, qualNativeTxSignHasher)
 			require.NoError(t, err)
 			tx.Signature, err = qualNativeSingleSigner.Sign(key, message)
 			require.NoError(t, err)
+			if relayed {
+				tx.RelayerSignature, err = qualNativeSingleSigner.Sign(relayerKey, message)
+				require.NoError(t, err)
+			}
 			encoded, err := proto.Marshal(tx)
 			require.NoError(t, err)
 			intercepted, err := nativeValidation.NewInterceptedTransaction(encoded, proto, qualNativeTxSignMarshalizer, hasher, qualNativeAccountKeyGen, qualNativeSingleSigner, qualNativeHexConverter, coordinator, execution.EconomicsHandler, whitelist, parser, tx.ChainID, flags.IsFlagEnabled(common.TransactionSignedWithTxHashFlag), qualNativeTxSignHasher, version, flags)
@@ -174,6 +198,54 @@ func TestQualNativeCandidateOriginalTransactionConnection(t *testing.T) {
 				require.Len(t, candidate.writer.boundary.outputs, outputs)
 				require.Empty(t, candidate.view.added)
 				require.Empty(t, trace, "neither reserved registration route can reach the prelude without its provider")
+				return
+			}
+			if relayed {
+				require.True(t, common.IsRelayedTxV3(actual))
+				verifying := candidate.native.source
+				verifying.EnableSignedTxWithHash = flags.IsFlagEnabled(common.TransactionSignedWithTxHashFlag)
+				require.NoError(t, nativeValidation.VerifyNativeValidationReceipt(verifying, receipt, actual, intercepted.Hash()),
+					"the receipt itself is authentic: the refusal below is the relay rule")
+				entered := false
+				code, e := candidate.WithDRWANativeCall(actual, receipt, store, physical.runtime, func(vm.DRWANativeCallLease) (vmcommon.ReturnCode, error) {
+					entered = true
+					return vmcommon.Ok, nil
+				})
+				require.ErrorIs(t, e, vm.ErrDRWAExecution)
+				require.Equal(t, vmcommon.ExecutionFailed, code)
+				require.False(t, entered, "a relayed original opens no native operation")
+				require.Empty(t, trace)
+				return
+			}
+			if bind {
+				target, e := store.LoadAccount(actual.RcvAddr)
+				require.NoError(t, e)
+				function, arguments, e := parser.ParseCallData(string(actual.Data))
+				require.NoError(t, e)
+				entered := false
+				var bound error
+				_, e = candidate.WithDRWANativeCall(actual, receipt, store, physical.runtime, func(lease vm.DRWANativeCallLease) (vmcommon.ReturnCode, error) {
+					entered = true
+					require.NoError(t, lease.VerifyTransaction(actual, store, nil, target.(state.UserAccountHandler)))
+					input := &vmcommon.ContractCallInput{VMInput: vmcommon.VMInput{CallerAddr: bytes.Clone(actual.SndAddr), CallValue: big.NewInt(0),
+						CallType: vmData.DirectCall, GasPrice: actual.GasPrice, GasProvided: 1, Arguments: arguments,
+						CurrentTxHash: intercepted.Hash(), OriginalTxHash: intercepted.Hash(), PrevTxHash: intercepted.Hash()},
+						RecipientAddr: bytes.Clone(actual.RcvAddr), Function: function}
+					bound = lease.(vm.DRWANativePreparedCallLease).BindCall(input)
+					if bound != nil {
+						return vmcommon.ExecutionFailed, bound
+					}
+					return vmcommon.Ok, nil
+				})
+				require.True(t, entered)
+				if scenario == "bind_control" {
+					require.NoError(t, bound, "the same call under another name is bound")
+					require.NoError(t, e)
+				} else {
+					require.ErrorIs(t, bound, vm.ErrDRWAExecution, "a reserved registration name is never bound to a lease")
+					require.ErrorIs(t, e, vm.ErrDRWAExecution)
+				}
+				require.Empty(t, trace)
 				return
 			}
 			var code vmcommon.ReturnCode

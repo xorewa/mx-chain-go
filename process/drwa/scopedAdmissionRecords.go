@@ -216,6 +216,42 @@ func (s *scopedAdmissionRecords) retain(account state.UserAccountHandler, epoch 
 	return s.retainRecords(account, epoch, false, writes...)
 }
 
+// retainedUsage contains only the aggregate arithmetic inputs; it holds no
+// record identities or storage references.
+type retainedUsage struct {
+	count, size, rate uint64
+}
+
+// chargeRetainedUsage computes the prospective aggregate usage without changing
+// its input. The owning writer continues to validate and persist its own state.
+func chargeRetainedUsage(usage retainedUsage, limits scopedAdmissionLimits,
+	keyBytes, oldBytes, newBytes uint64, allowGrowth bool) (retainedUsage, error) {
+	if usage.count > limits.records || usage.rate > limits.newRecordsPerEpoch || usage.size > limits.retainedBytes {
+		return usage, errScopedAdmission
+	}
+	next := usage
+	remaining := limits.retainedBytes - usage.size
+	if oldBytes == 0 {
+		if usage.count == limits.records || usage.rate == limits.newRecordsPerEpoch ||
+			keyBytes > remaining || newBytes > remaining-keyBytes {
+			return usage, errScopedAdmission
+		}
+		next.count++
+		next.rate++
+		next.size += keyBytes + newBytes
+		return next, nil
+	}
+	if oldBytes != newBytes && (!allowGrowth || newBytes < oldBytes) {
+		return usage, errScopedAdmission
+	}
+	delta := newBytes - oldBytes
+	if delta > remaining {
+		return usage, errScopedAdmission
+	}
+	next.size += delta
+	return next, nil
+}
+
 // The same chain-global budget also accounts for registration's permanent
 // intent/association/activation records. Only its explicitly selected writer
 // permits positive retained-byte growth on OPEN -> CONSUMED; ordinary scope
@@ -235,10 +271,10 @@ func (s *scopedAdmissionRecords) retainRecords(account state.UserAccountHandler,
 	if err != nil {
 		return err
 	}
-	count, size := binary.BigEndian.Uint64(encoded), binary.BigEndian.Uint64(encoded[8:])
-	rateEpoch, rate := binary.BigEndian.Uint64(encoded[16:]), binary.BigEndian.Uint64(encoded[24:])
+	usage := retainedUsage{count: binary.BigEndian.Uint64(encoded), size: binary.BigEndian.Uint64(encoded[8:]), rate: binary.BigEndian.Uint64(encoded[24:])}
+	rateEpoch := binary.BigEndian.Uint64(encoded[16:])
 	if uint64(epoch) > rateEpoch {
-		rateEpoch, rate = uint64(epoch), 0
+		rateEpoch, usage.rate = uint64(epoch), 0
 	}
 	seen := make(map[string]struct{}, len(writes))
 	for _, write := range writes {
@@ -252,24 +288,11 @@ func (s *scopedAdmissionRecords) retainRecords(account state.UserAccountHandler,
 		}
 		// Updates are only fixed-size current-version pointers. Their actual
 		// retained byte delta is still charged; new immutable keys count once.
-		delta := uint64(len(write.value))
-		if len(old) == 0 {
-			if count == s.limits.records || rate == s.limits.newRecordsPerEpoch {
-				return errScopedAdmission
-			}
-			count++
-			rate++
-			delta += uint64(len(write.key))
-		} else {
-			if len(old) != len(write.value) && (!allowGrowth || len(write.value) < len(old)) {
-				return errScopedAdmission
-			}
-			delta = uint64(len(write.value) - len(old))
+		usage, err = chargeRetainedUsage(usage, s.limits, uint64(len(write.key)),
+			uint64(len(old)), uint64(len(write.value)), allowGrowth)
+		if err != nil {
+			return err
 		}
-		if delta > s.limits.retainedBytes-size {
-			return errScopedAdmission
-		}
-		size += delta
 	}
 	for _, write := range writes {
 		if err = account.SaveKeyValue(write.key, bytes.Clone(write.value)); err != nil {
@@ -277,11 +300,41 @@ func (s *scopedAdmissionRecords) retainRecords(account state.UserAccountHandler,
 		}
 	}
 	budget := make([]byte, 32)
-	binary.BigEndian.PutUint64(budget, count)
-	binary.BigEndian.PutUint64(budget[8:], size)
+	binary.BigEndian.PutUint64(budget, usage.count)
+	binary.BigEndian.PutUint64(budget[8:], usage.size)
 	binary.BigEndian.PutUint64(budget[16:], rateEpoch)
-	binary.BigEndian.PutUint64(budget[24:], rate)
+	binary.BigEndian.PutUint64(budget[24:], usage.rate)
 	if err = account.SaveKeyValue(budgetKey, budget); err != nil {
+		return err
+	}
+	return s.codec.state.accounts.SaveAccount(account)
+}
+
+// reserve charges one new retained record of the given complete size (key and
+// largest value) whose owner writes it in the same journal operation. The
+// same count, byte and per-epoch limits apply; nothing is ever returned.
+func (s *scopedAdmissionRecords) reserve(account state.UserAccountHandler, epoch uint32, retainedBytes uint64) error {
+	encoded, err := s.retainedBudget(account, epoch)
+	if err != nil {
+		return err
+	}
+	if retainedBytes == 0 {
+		return errScopedAdmission
+	}
+	usage := retainedUsage{count: binary.BigEndian.Uint64(encoded), size: binary.BigEndian.Uint64(encoded[8:]), rate: binary.BigEndian.Uint64(encoded[24:])}
+	rateEpoch := binary.BigEndian.Uint64(encoded[16:])
+	if uint64(epoch) > rateEpoch {
+		rateEpoch, usage.rate = uint64(epoch), 0
+	}
+	if usage, err = chargeRetainedUsage(usage, s.limits, 0, 0, retainedBytes, false); err != nil {
+		return err
+	}
+	budget := make([]byte, 32)
+	binary.BigEndian.PutUint64(budget, usage.count)
+	binary.BigEndian.PutUint64(budget[8:], usage.size)
+	binary.BigEndian.PutUint64(budget[16:], rateEpoch)
+	binary.BigEndian.PutUint64(budget[24:], usage.rate)
+	if err = account.SaveKeyValue([]byte(scopedAdmissionPrefix+"budget"), budget); err != nil {
 		return err
 	}
 	return s.codec.state.accounts.SaveAccount(account)

@@ -127,13 +127,24 @@ func TestQualDRWAT42NativeLifecycle(t *testing.T) {
 					require.Error(t, err)
 					return
 				}
+				if name == "zero" {
+					// Owner decision SP2-24 D-1 (b), 28 November 2026. The native
+					// installation above succeeded and the ordinary accessors
+					// answer from the installed header; only the typed view refuses.
+					require.ErrorIs(t, err, ErrUnavailableHeaderTime)
+					require.Nil(t, context)
+					require.Equal(t, uint64(0), hook.CurrentTimeStampMs())
+					require.Equal(t, header.GetRound(), hook.CurrentRound())
+					require.Equal(t, header.GetNonce(), hook.CurrentNonce())
+					return
+				}
 				require.NoError(t, err)
 				time, err := context.Milliseconds()
 				require.NoError(t, err)
 				require.Equal(t, HeaderMilliseconds(header.GetTimeStamp()), time)
 				require.Equal(t, header.GetTimeStamp(), hook.CurrentTimeStampMs())
 				switch name {
-				case "valid", "zero", "max":
+				case "valid", "max":
 					return
 				case "close":
 					require.NoError(t, hook.Close())

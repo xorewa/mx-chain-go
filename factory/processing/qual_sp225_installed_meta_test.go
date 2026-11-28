@@ -133,7 +133,9 @@ func qualSP225Factory(t *testing.T, shard uint32, deployment bool, user, peer st
 	pcf.config.VirtualMachine.Execution.TransferAndExecuteByUserAddresses = []string{"0101010101010101010101010101010101010101010101010101010101010101"}
 	if deployment {
 		pcf.drwaConfigurationCandidate, _, _ = qualS1OverlayCandidate(t, 12)
-		pcf.drwaInitialProgrammeStartup = &config.DRWAInitialProgrammeStartup{}
+		// A deployment has a record bound (SP2-32: the shard's admin-effect
+		// destination requires it, as the metachain owners do).
+		pcf.drwaInitialProgrammeStartup = &config.DRWAInitialProgrammeStartup{Limits: config.DRWAInitialProgrammeLimits{RecordBytes: 4096}}
 	}
 	return pcf
 }

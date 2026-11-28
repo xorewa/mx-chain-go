@@ -53,6 +53,15 @@ func TestQualDRWAProductionHeaderTime(t *testing.T) {
 					require.NoError(t, header.SetTimeStamp(^uint64(0)))
 				}
 				context, err := p.Begin(header)
+				if name == "zero" {
+					// Owner decision SP2-24 D-1 (b), 28 November 2026: a header
+					// whose time field is zero gives no typed coordinate.
+					require.ErrorIs(t, err, ErrUnavailableHeaderTime)
+					require.Nil(t, context)
+					_, err = p.EvaluatedHeaderTimeContext()
+					require.ErrorIs(t, err, ErrInactiveHeaderTime)
+					return
+				}
 				require.NoError(t, err)
 				value, err := context.Milliseconds()
 				require.NoError(t, err)
@@ -66,7 +75,7 @@ func TestQualDRWAProductionHeaderTime(t *testing.T) {
 				identity, _ = context.HeaderIdentity()
 				require.Equal(t, expectedIdentity, identity, "identity ownership cannot leak through returned bytes")
 				switch name {
-				case "valid", "zero", "max_uint64":
+				case "valid", "max_uint64":
 					return
 				case "end":
 					p.End(context)

@@ -56,6 +56,7 @@ type currentLocalView struct {
 	token, hash, pointer, body []byte
 	epoch                      uint64
 	keys, materials            [][]byte
+	references                 []currentLocalReference
 }
 
 func newCurrentLocalDependencies(accounts state.AccountsAdapter, marshaller marshal.Marshalizer,
@@ -205,6 +206,7 @@ func (r *currentLocalDependencies) resolve(token []byte, epoch uint64, hash []by
 			return nil, err
 		}
 	}
+	view.references = ownedRefs
 	return view, nil
 }
 

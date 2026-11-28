@@ -133,6 +133,9 @@ func (r *ResultAccountReader) readRegistryItem(anchor *metaRegistryAnchor,
 // bounds. Both native result paths reuse exactly the same proof/account decoder.
 func (r *ResultAccountReader) readAccountItem(root, address, itemKey []byte,
 	w AccountItemWitness) ([]byte, error) {
+	if r.proofTrie == nil || r.accountFactory == nil {
+		return nil, ErrInvalidAccountWitness
+	}
 	valid, err := r.proofTrie.VerifyProof(root, address, w.AccountProof)
 	if err != nil || !valid {
 		return nil, ErrInvalidAccountWitness

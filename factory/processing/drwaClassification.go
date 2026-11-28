@@ -115,9 +115,9 @@ func (pcf *processComponentsFactory) bindDRWAMetaClassification(owner *drwa.Meta
 	if err != nil {
 		return err
 	}
-	headers, ok := hook.(drwa.HeaderTimeSource)
-	if !ok {
-		return vm.ErrDRWAExecution
+	headers, err := drwaHeaderTimeSource(hook, pcf.state.AccountsAdapter())
+	if err != nil {
+		return err
 	}
 	source := pcf.drwaNativeValidationSource
 	if source == nil {

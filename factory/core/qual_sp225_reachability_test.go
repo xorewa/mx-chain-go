@@ -43,6 +43,12 @@ func TestQualSP225TokenEffectCallSitesAreClosed(t *testing.T) {
 		"process/drwa/routeAdmission.go":        {"ProcessBuiltinFunctionWithESDTTransferGate"},
 		"process/drwa/supplyNativeOperation.go": {"ProcessBuiltinFunctionWithDRWASupplyGate"},
 		"process/drwa/burnForAllAbsence.go":     {"ProcessBuiltinFunction"},
+		// SP2-32: the protected admin leg. The native role, setting and type
+		// built-ins of a regulated token run only from the verified context of
+		// a metachain ESDT system contract result (Part A L3242-3246); the
+		// function is in the processing container and classified by the gate
+		// as carrying no public identifier (builtInIdentifiers).
+		"process/drwa/adminEffectDestination.go": {"ProcessBuiltinFunction"},
 	}
 	root := filepath.Join("..", "..")
 	actual := make(map[string][]string)

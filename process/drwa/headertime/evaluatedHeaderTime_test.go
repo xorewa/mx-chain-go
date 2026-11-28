@@ -249,3 +249,34 @@ func TestWithHeaderTime(t *testing.T) {
 		})
 	}
 }
+
+// Owner decision SP2-24 D-1 (b), 28 November 2026: a header whose millisecond
+// field is zero gives no typed coordinate; the first coordinate is 1. A refused
+// header also replaces the earlier context, as every failed begin does.
+func TestEvaluatedHeaderTime_ZeroTimeIsNoCoordinate(t *testing.T) {
+	lease := func() (func(), error) { return func() {}, nil }
+	valid := func() error { return nil }
+	for _, shard := range []bool{true, false} {
+		header := func(time uint64) data.HeaderHandler {
+			if shard {
+				return &block.HeaderV3{Epoch: 10, ShardID: 1, TimestampMs: time}
+			}
+			return &block.MetaBlockV3{Epoch: 10, TimestampMs: time}
+		}
+		p := clock(t)
+		earlier := begin(t, p)
+		c, err := p.BeginBound(header(0), lease, valid)
+		require.ErrorIs(t, err, ht.ErrUnavailableHeaderTime)
+		require.Nil(t, c)
+		_, err = p.EvaluatedHeaderTimeContext()
+		require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
+		_, err = earlier.Milliseconds()
+		require.ErrorIs(t, err, ht.ErrInactiveHeaderTime)
+
+		c, err = p.BeginBound(header(1), lease, valid)
+		require.NoError(t, err)
+		at, err := c.Milliseconds()
+		require.NoError(t, err)
+		require.Equal(t, ht.HeaderMilliseconds(1), at)
+	}
+}

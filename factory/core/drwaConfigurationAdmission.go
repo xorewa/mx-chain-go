@@ -317,7 +317,13 @@ func (c *DRWAConfigurationCandidate) checkPrerequisites(epoch uint32) error {
 	required := []nativeCore.EnableEpochFlag{common.SupernovaFlag, common.DynamicESDTFlag,
 		common.ESDTFlag, common.NFTStopCreateFlag, common.SetGuardianFlag,
 		common.EGLDInESDTMultiTransferFlag, common.ManagedCryptoAPIsFlag,
-		common.ESDTNFTImprovementV1Flag}
+		common.ESDTNFTImprovementV1Flag,
+		// The registry member of a new token reaches each shard as the first
+		// result of its registration. That order exists only while created
+		// results keep their execution order in the outgoing miniblocks
+		// (process/block/postprocess/intermediateResults.go); otherwise they are
+		// ordered by hash (Part A 5.1, before-first-effect).
+		common.KeepExecOrderOnCreatedSCRsFlag}
 	if c.support.RegisterMetaESDTPath {
 		required = append(required, common.MetaESDTSetFlag)
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/multiversx/mx-chain-core-go/marshal"
 	"github.com/multiversx/mx-chain-go/process/drwa"
 	"io"
+	"math"
 	"math/big"
 	"os"
 	"os/signal"
@@ -86,9 +87,9 @@ const (
 
 // nodeRunner holds the node runner configuration and controls running of a node
 type nodeRunner struct {
-	configs                     *config.Configs
-	drwaOriginalCycleStarted     atomic.Bool
-	drwaOriginal                 *acquiredDRWAOriginal
+	configs                  *config.Configs
+	drwaOriginalCycleStarted atomic.Bool
+	drwaOriginal             *acquiredDRWAOriginal
 }
 
 // NewNodeRunner creates a nodeRunner instance
@@ -101,7 +102,14 @@ func NewNodeRunner(cfgs *config.Configs) (*nodeRunner, error) {
 	}
 
 	runner := &nodeRunner{configs: cfgs}
-	if cfgs.DRWAInitialProgrammeStartup != nil {
+	if startup := cfgs.DRWAInitialProgrammeStartup; startup != nil && startup.Persisted {
+		if err := validateDRWARestartStore(cfgs); err != nil {
+			return nil, err
+		}
+	} else if startup != nil {
+		if err := processComp.CheckDRWAStartupHistory(startup, cfgs.GeneralConfig); err != nil {
+			return nil, err
+		}
 		acquired, err := acquireDRWAOriginal(cfgs)
 		if err != nil {
 			return nil, err
@@ -111,21 +119,53 @@ func NewNodeRunner(cfgs *config.Configs) (*nodeRunner, error) {
 	return runner, nil
 }
 
-// ValidateDRWAStartupMode refuses configured persisted startup before native
-// providers can write during discovery. A configured identity without a
-// startup carrier reaches the persisted identity loader at processing.
+// ValidateDRWAStartupMode refuses unqualified modes and checks the loaded
+// configuration before native providers can write during discovery.
 func ValidateDRWAStartupMode(configs *config.Configs) error {
 	if configs == nil {
 		return drwa.ErrDeploymentIdentity
 	}
 	startup := configs.DRWAInitialProgrammeStartup
-	if startup != nil && startup.Persisted {
-		return drwa.ErrDeploymentIdentity
-	}
 	if startup == nil && configs.GeneralConfig != nil && configs.GeneralConfig.GeneralSettings.DRWADeploymentIdentity != nil {
 		return drwa.ErrDeploymentIdentity
 	}
+	if startup != nil {
+		if configs.GeneralConfig != nil && (configs.GeneralConfig.Hardfork.AfterHardFork || configs.GeneralConfig.HardforkRecoveryCheckpoint.Enabled) ||
+			configs.ImportDbConfig != nil && configs.ImportDbConfig.IsImportDBMode ||
+			configs.FlagsConfig != nil && (configs.FlagsConfig.CleanupStorage || configs.FlagsConfig.ForceStartFromNetwork || configs.FlagsConfig.EnableGops || configs.FlagsConfig.RepopulateTokensSupplies) {
+			return drwa.ErrDeploymentIdentity
+		}
+		if startup.Persisted || startup.SelectedConfiguration != nil {
+			if configs.FlagsConfig == nil || configs.FlagsConfig.BootstrapRoundIndex != math.MaxUint64 {
+				return drwa.ErrDeploymentIdentity
+			}
+			return processComp.CheckDRWAStartupHistory(startup, configs.GeneralConfig)
+		}
+		if err := coreComp.CheckDRWAExclusionHistory(nil, configs.GeneralConfig, coreComp.DRWAExclusionHistoryOriginalGenesis); err != nil {
+			return fmt.Errorf("%w: %w", drwa.ErrDeploymentIdentity, err)
+		}
+	}
 	return nil
+}
+
+func validateDRWARestartStore(configs *config.Configs) error {
+	if configs.FlagsConfig == nil || configs.GeneralConfig == nil || configs.ImportDbConfig == nil {
+		return drwa.ErrDeploymentIdentity
+	}
+	flags := configs.FlagsConfig
+	if !filepath.IsAbs(flags.WorkingDir) || filepath.Clean(flags.WorkingDir) != flags.WorkingDir || flags.WorkingDir != flags.DbDir {
+		return drwa.ErrDeploymentIdentity
+	}
+	paths, err := storageFactory.CreatePathManager(storageFactory.ArgCreatePathManager{WorkingDir: configs.FlagsConfig.DbDir, ChainID: configs.GeneralConfig.GeneralSettings.ChainID})
+	if err != nil {
+		return err
+	}
+	path := paths.DatabasePath()
+	// Retain the original role's exact backing-layout boundary on restart.
+	if filepath.Dir(filepath.Dir(path)) != flags.WorkingDir {
+		return drwa.ErrDeploymentIdentity
+	}
+	return processComp.CheckDRWARestartIdentity(path, configs.GeneralConfig.GeneralSettings.DRWADeploymentIdentity, configs.DRWAInitialProgrammeStartup, configs.GeneralConfig)
 }
 
 // Start creates and starts the managed components
@@ -133,6 +173,11 @@ func (nr *nodeRunner) Start() error {
 	configs := nr.configs
 	if err := ValidateDRWAStartupMode(configs); err != nil {
 		return err
+	}
+	if startup := configs.DRWAInitialProgrammeStartup; startup != nil && startup.Persisted {
+		if err := validateDRWARestartStore(configs); err != nil {
+			return err
+		}
 	}
 	flagsConfig := configs.FlagsConfig
 	if configs.DRWAInitialProgrammeStartup != nil && flagsConfig.CleanupStorage {
@@ -317,7 +362,11 @@ func (nr *nodeRunner) executeOneComponentCreationCycle(
 	}
 	// A new process factory must not reuse an original-genesis input on shuffle-out.
 	startup := nr.configs.DRWAInitialProgrammeStartup
-	if startup != nil {
+	if startup != nil && startup.Persisted {
+		if err := validateDRWARestartStore(nr.configs); err != nil {
+			return true, err
+		}
+	} else if startup != nil {
 		if !nr.drwaOriginalCycleStarted.CompareAndSwap(false, true) || nr.drwaOriginal.consume() != nil {
 			return true, drwa.ErrDeploymentIdentity
 		}
@@ -1376,39 +1425,39 @@ func (nr *nodeRunner) CreateManagedProcessComponents(
 	txExecutionOrderHandler := ordering.NewOrderedCollection()
 
 	processArgs := processComp.ProcessComponentsFactoryArgs{
-		DRWAConfigurationOverlay: configurationPaths.DRWA,
-		DRWAEffectiveConfigs:     configs,
-		DRWAInitialProgrammes:    drwa.CloneInitialProgrammeEvidence(initialProgrammes),
-		DRWAInitialProgrammeLimits: initialProgrammeLimits,
+		DRWAConfigurationOverlay:    configurationPaths.DRWA,
+		DRWAEffectiveConfigs:        configs,
+		DRWAInitialProgrammes:       drwa.CloneInitialProgrammeEvidence(initialProgrammes),
+		DRWAInitialProgrammeLimits:  initialProgrammeLimits,
 		DRWAInitialProgrammeStartup: startup,
-		DRWAResolvedConfiguration: drwaCandidate,
-		Config:                   *configs.GeneralConfig,
-		EpochConfig:              *configs.EpochConfig,
-		RoundConfig:              *configs.RoundConfig,
-		PrefConfigs:              *configs.PreferencesConfig,
-		ImportDBConfig:           *configs.ImportDbConfig,
-		EconomicsConfig:          *configs.EconomicsConfig,
-		AccountsParser:           accountsParser,
-		SmartContractParser:      smartContractParser,
-		GasSchedule:              gasScheduleNotifier,
-		NodesCoordinator:         nodesCoordinator,
-		Data:                     dataComponents,
-		CoreData:                 coreComponents,
-		Crypto:                   cryptoComponents,
-		State:                    stateComponents,
-		Network:                  networkComponents,
-		BootstrapComponents:      bootstrapComponents,
-		StatusComponents:         statusComponents,
-		StatusCoreComponents:     statusCoreComponents,
-		RequestedItemsHandler:    requestedItemsHandler,
-		WhiteListHandler:         whiteListRequest,
-		WhiteListerVerifiedTxs:   whiteListerVerifiedTxs,
-		MaxRating:                configs.RatingsConfig.General.MaxRating,
-		SystemSCConfig:           configs.SystemSCConfig,
-		ImportStartHandler:       importStartHandler,
-		HistoryRepo:              historyRepository,
-		FlagsConfig:              *configs.FlagsConfig,
-		TxExecutionOrderHandler:  txExecutionOrderHandler,
+		DRWAResolvedConfiguration:   drwaCandidate,
+		Config:                      *configs.GeneralConfig,
+		EpochConfig:                 *configs.EpochConfig,
+		RoundConfig:                 *configs.RoundConfig,
+		PrefConfigs:                 *configs.PreferencesConfig,
+		ImportDBConfig:              *configs.ImportDbConfig,
+		EconomicsConfig:             *configs.EconomicsConfig,
+		AccountsParser:              accountsParser,
+		SmartContractParser:         smartContractParser,
+		GasSchedule:                 gasScheduleNotifier,
+		NodesCoordinator:            nodesCoordinator,
+		Data:                        dataComponents,
+		CoreData:                    coreComponents,
+		Crypto:                      cryptoComponents,
+		State:                       stateComponents,
+		Network:                     networkComponents,
+		BootstrapComponents:         bootstrapComponents,
+		StatusComponents:            statusComponents,
+		StatusCoreComponents:        statusCoreComponents,
+		RequestedItemsHandler:       requestedItemsHandler,
+		WhiteListHandler:            whiteListRequest,
+		WhiteListerVerifiedTxs:      whiteListerVerifiedTxs,
+		MaxRating:                   configs.RatingsConfig.General.MaxRating,
+		SystemSCConfig:              configs.SystemSCConfig,
+		ImportStartHandler:          importStartHandler,
+		HistoryRepo:                 historyRepository,
+		FlagsConfig:                 *configs.FlagsConfig,
+		TxExecutionOrderHandler:     txExecutionOrderHandler,
 	}
 	processComponentsFactory, err := processComp.NewProcessComponentsFactory(processArgs)
 	if err != nil {

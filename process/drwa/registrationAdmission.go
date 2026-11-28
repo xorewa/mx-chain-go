@@ -48,6 +48,7 @@ type RegistrationAdmission struct {
 	verifier    RegistrationVerifier
 	proofs      [][]byte
 	limits      RegistrationResourceLimits
+	admission   *admissionConsumption
 }
 
 // RegistrationResourceLimits binds the existing GLOBAL scoped/intent budget,
@@ -173,6 +174,11 @@ func (a *RegistrationAdmission) bindCreationGuard(bodyDigest []byte, expected *H
 			if epoch < a.enableEpoch || intent.status != "OPEN" || at > intent.body.expiry ||
 				!bytes.Equal(intent.digest, bound.digest) || !bytes.Equal(intent.body.networkDomain, a.domain) {
 				return nil, errInvalidRegistrationRecord
+			}
+			// F04: an effective withdrawal of the intent-bound admission refuses
+			// the registration before any proof is looked at.
+			if err = a.coveredAdmission(context, intent.body); err != nil {
+				return nil, err
 			}
 			for i, purpose := range purposes {
 				if err = verifyRegistrationState(stores, func() error {

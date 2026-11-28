@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,21 +37,22 @@ type drwaStartupMember struct {
 
 type drwaStartupRole struct {
 	WorkingDirectory, OriginalDatabasePath string
-	MainConfig drwaStartupMember
+	MainConfig                             drwaStartupMember
 }
 
 type drwaStartupRecordInput struct {
-	OriginalReleaseWaitMilliseconds int64
-	OriginalReleaseMaxBytes        int64
-	recordDigest [32]byte
-	Mode, ChainID                     string
-	GenesisEpoch                      *uint32
-	Nodes, Overlay, Profile, Release         drwaStartupMember
-	Roles                             []drwaStartupRole
+	OriginalReleaseWaitMilliseconds                 int64
+	OriginalReleaseMaxBytes                         int64
+	recordDigest                                    [32]byte
+	Mode, ChainID                                   string
+	GenesisEpoch                                    *uint32
+	Nodes, Overlay, Profile, Release                drwaStartupMember
+	Predecessor                                     drwaStartupMember
+	Roles                                           []drwaStartupRole
 	MinimumMaxEverTokens, MinimumRegistryProofBytes uint64
-	Limits config.DRWAInitialProgrammeLimits
-	Programmes []config.DRWAInitialProgrammeInput
-	Identity config.DRWADeploymentIdentityConfig
+	Limits                                          config.DRWAInitialProgrammeLimits
+	Programmes                                      []config.DRWAInitialProgrammeInput
+	Identity                                        config.DRWADeploymentIdentityConfig
 }
 
 func drwaStartupDigest(text string) ([32]byte, error) {
@@ -238,7 +242,7 @@ func readDRWAStartupRecord(anchor string) (*drwaStartupRecordInput, error) {
 	switch record.Mode {
 	case "original":
 		const maxMillis = int64(1<<63-1) / int64(time.Millisecond)
-		if record.OriginalReleaseWaitMilliseconds <= 0 || record.OriginalReleaseWaitMilliseconds > maxMillis ||
+		if record.Predecessor != (drwaStartupMember{}) || record.OriginalReleaseWaitMilliseconds <= 0 || record.OriginalReleaseWaitMilliseconds > maxMillis ||
 			record.OriginalReleaseMaxBytes <= 0 || record.OriginalReleaseMaxBytes == int64(1<<63-1) {
 			return nil, errDRWAOriginalProvenance
 		}
@@ -248,10 +252,58 @@ func readDRWAStartupRecord(anchor string) (*drwaStartupRecordInput, error) {
 		if record.OriginalReleaseWaitMilliseconds != 0 || record.OriginalReleaseMaxBytes != 0 {
 			return nil, errDRWAStartupRecord
 		}
+		record.recordDigest = digest
 		return &record, nil
 	default:
 		return nil, errDRWAStartupRecord
 	}
+}
+
+// startupConfiguration decodes the exact pinned role member using the same
+// TOML configuration type as native loading. This is not a default history.
+func startupConfiguration(record *drwaStartupRecordInput, role *drwaStartupRole) (*config.DRWAStartupConfiguration, error) {
+	raw, pin, err := readDRWAStartupMember(role.MainConfig)
+	if err != nil {
+		return nil, err
+	}
+	var main config.Config
+	if err = toml.Unmarshal(raw, &main); err != nil || main.Hardfork.AfterHardFork || main.HardforkRecoveryCheckpoint.Enabled {
+		return nil, errDRWAStartupRecord
+	}
+	if !slices.Equal(main.GeneralSettings.DRWAInitialProgrammeInputs, record.Programmes) {
+		return nil, errDRWAStartupRecord
+	}
+	// The restart may omit only the genesis-only input list. Pin the full
+	// original bytes independently and compare the remaining typed config.
+	main.GeneralSettings.DRWAInitialProgrammeInputs = nil
+	canonical, err := json.Marshal(&main)
+	if err != nil {
+		return nil, errDRWAStartupRecord
+	}
+	return &config.DRWAStartupConfiguration{RecordDigest: record.recordDigest, MainConfigDigest: pin,
+		RestartConfigDigest: sha256.Sum256(canonical), Exclusions: main.HardforkRoundExclusions}, nil
+}
+
+func predecessorConfiguration(cfg *config.Configs, record *drwaStartupRecordInput) (*config.DRWAStartupConfiguration, error) {
+	member := record.Predecessor
+	prior, err := readDRWAStartupRecord(fmt.Sprintf("%s:%d:%s", member.SHA256, member.Bytes, member.Path))
+	if err != nil || prior == nil || prior.Mode != "original" || len(prior.Programmes) == 0 || prior.ChainID != record.ChainID ||
+		prior.GenesisEpoch == nil || record.GenesisEpoch == nil || *prior.GenesisEpoch != *record.GenesisEpoch || !reflect.DeepEqual(prior.Identity, record.Identity) ||
+		!reflect.DeepEqual(prior.Limits, record.Limits) || prior.Profile != record.Profile || prior.Release != record.Release || prior.Overlay != record.Overlay || prior.Nodes != record.Nodes ||
+		prior.MinimumMaxEverTokens != record.MinimumMaxEverTokens || prior.MinimumRegistryProofBytes != record.MinimumRegistryProofBytes {
+		return nil, errDRWAStartupRecord
+	}
+	for _, role := range prior.Roles {
+		if role.WorkingDirectory != cfg.FlagsConfig.WorkingDir {
+			continue
+		}
+		selected, e := selectDRWAStartupRole(prior.Roles, cfg.FlagsConfig, record.ChainID, role.MainConfig.Path)
+		if e != nil {
+			return nil, e
+		}
+		return startupConfiguration(prior, selected)
+	}
+	return nil, errDRWAStartupRecord
 }
 
 func bindDRWAStartupRecord(cfg *config.Configs, record *drwaStartupRecordInput) error {
@@ -270,7 +322,7 @@ func bindDRWAStartupRecord(cfg *config.Configs, record *drwaStartupRecordInput) 
 		record.GenesisEpoch == nil || *record.GenesisEpoch != cfg.GeneralConfig.EpochStartConfig.GenesisEpoch ||
 		record.Overlay.Path != cfg.ConfigurationPathsHolder.DRWA ||
 		!reflect.DeepEqual(&record.Identity, cfg.GeneralConfig.GeneralSettings.DRWADeploymentIdentity) ||
-		!reflect.DeepEqual(record.Programmes, cfg.GeneralConfig.GeneralSettings.DRWAInitialProgrammeInputs) {
+		!slices.Equal(record.Programmes, cfg.GeneralConfig.GeneralSettings.DRWAInitialProgrammeInputs) {
 		return errDRWAStartupRecord
 	}
 	if err := matchDRWAStartupNodes(cfg, record.Nodes); err != nil {
@@ -296,12 +348,28 @@ func bindDRWAStartupRecord(cfg *config.Configs, record *drwaStartupRecordInput) 
 	if err = record.Limits.Validate(); err != nil {
 		return err
 	}
+	var proposed, predecessor *config.DRWAStartupConfiguration
+	// Real CLI inputs always carry the independently verified record digest.
+	// A detached syntax fixture without it cannot grant any startup mode.
+	if record.recordDigest != ([32]byte{}) {
+		proposed, err = startupConfiguration(record, selected)
+		if err != nil || !slices.Equal(proposed.Exclusions, cfg.GeneralConfig.HardforkRoundExclusions) {
+			return errDRWAStartupRecord
+		}
+		if !original {
+			predecessor, err = predecessorConfiguration(cfg, record)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	cfg.DRWAInitialProgrammeStartup = &config.DRWAInitialProgrammeStartup{
 		OverlaySHA256: overlayPin, OverlayMaxBytes: record.Overlay.Bytes,
 		Limits: record.Limits, Minimum: minimum,
 		OriginalDatabasePath: selected.OriginalDatabasePath, Persisted: !original,
 		RecordDigest: record.recordDigest, ReleaseWait: time.Duration(record.OriginalReleaseWaitMilliseconds) * time.Millisecond,
-		ReleaseMaxBytes: record.OriginalReleaseMaxBytes,
+		ReleaseMaxBytes:       record.OriginalReleaseMaxBytes,
+		SelectedConfiguration: proposed, PredecessorConfiguration: predecessor,
 	}
 	return nil
 }

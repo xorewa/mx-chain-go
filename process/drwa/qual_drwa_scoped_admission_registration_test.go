@@ -51,6 +51,11 @@ func qualScopedRegistration(t *testing.T) (*qualScopedFixture, *RegistrationInte
 func qualScopedRegister(t *testing.T, f *qualScopedFixture, owner *RegistrationIntentOwner,
 	create func(state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error)) error {
 	t.Helper()
+	// SP2-29: this store carries the chain-global retained budget, so the
+	// registration records are charged to it, as the admission-bound owner does.
+	owner.records.retain = func(account state.UserAccountHandler, writes ...scopedAdmissionWrite) error {
+		return f.records.retainRecords(account, 10, true, writes...)
+	}
 	return owner.RegisterTokenForCreation(f.d.issuer, bytes.Repeat([]byte{0x22}, 32), []byte(core.FungibleESDT),
 		func(accounts state.AccountsAdapter) ([]byte, *vmcommon.VMOutput, error) {
 			intent, err := owner.records.intent(owner.id)

@@ -245,6 +245,14 @@ func (operation *evaluatedHeaderOperation) validateLocked(context *drwa.HeaderTi
 	return nil
 }
 
+// DRWAHeaderTimeBound reports whether this hook owns the typed evaluated-header
+// view together with the per-header activation predicate, that is, whether a
+// block processor that installs a candidate header in it can issue a context.
+// A hook built without a hasher or without that predicate never issues one.
+func (bh *BlockChainHookImpl) DRWAHeaderTimeBound() bool {
+	return bh != nil && bh.drwaTime != nil && bh.drwaTime.enabledAt != nil
+}
+
 // EvaluatedHeaderTimeContext exposes no native installer or clock alias.
 // Genesis/query/simulation and plain raw installations have no owning proposal
 // operation and therefore return an explicit error rather than authorizing zero.

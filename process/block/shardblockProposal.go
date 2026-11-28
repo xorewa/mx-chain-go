@@ -416,6 +416,11 @@ func (sp *shardProcessor) ProcessBlockProposal(
 		return nil, err
 	}
 
+	err = sp.beginDRWAFinalityImport(header, headerHash)
+	if err != nil {
+		return nil, err
+	}
+
 	startTime := time.Now()
 	err = sp.txCoordinator.ProcessBlockTransaction(header, body, haveTime)
 	elapsedTime := time.Since(startTime)
@@ -466,6 +471,7 @@ func (sp *shardProcessor) CommitBlockProposalState(headerHandler data.HeaderHand
 	if err != nil {
 		return err
 	}
+	sp.endDRWAFinalityImport(true)
 
 	header, ok := headerHandler.(data.ShardHeaderHandler)
 	if ok {

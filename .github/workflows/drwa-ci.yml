@@ -58,6 +58,7 @@ env:
     ./dblookupext/factory
     ./debug/handler
     ./epochStart/bootstrap
+    ./epochStart/metachain
     ./epochStart/shardchain
     ./facade
     ./facade/initial
@@ -89,6 +90,7 @@ env:
     ./node/metrics
     ./node/mock
     ./ntp
+    ./outport/process
     ./outport/process/alteredaccounts
     ./outport/process/factory
     ./outport/process/transactionsfee
@@ -237,6 +239,7 @@ jobs:
               ./dblookupext/esdtSupply
               ./dblookupext/factory
               ./epochStart/bootstrap
+              ./epochStart/metachain
               ./facade
               ./factory/api
               ./factory/consensus
@@ -312,6 +315,7 @@ jobs:
               ./node/chainSimulator/components/heartbeat
               ./node/mock
               ./ntp
+              ./outport/process
               ./outport/process/factory
               ./process/asyncExecution
               ./process/block
@@ -678,6 +682,7 @@ jobs:
           parent=$(mktemp -d "$RUNNER_TEMP/node-direct-race-input.XXXXXXXX") || exit 1
           printf 'directory=%s\n' "$parent/input" >> "$GITHUB_OUTPUT" || exit 1
       - name: Produce reviewed Node direct race input (partial diagnostic only)
+        id: node-direct-race-producer
         if: always() && steps.isolation-preflight.outcome == 'success' && steps.node-direct-race-input.outcome == 'success' && steps.node-direct-race-input.outputs.directory != ''
         continue-on-error: true
         timeout-minutes: 20
@@ -811,6 +816,90 @@ jobs:
             ${{ steps.common-direct-report.outputs.portable }}/race.cover
             ${{ steps.common-direct-report.outputs.portable }}/race.manifest.json
             ${{ steps.common-direct-report.outputs.portable }}/race.report.json
+          if-no-files-found: warn
+
+
+      - name: Reconcile provisional standard-token statement roster (diagnostic only)
+        id: standard-token-diagnostic
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          NORMAL_DIR: ${{ steps.ordinary-normal-output.outputs.directory }}
+          RACE_INPUT: ${{ steps.node-direct-race-input.outputs.directory }}
+          RACE_REPORT: ${{ steps.node-direct-race-report.outputs.directory }}
+          COMMON_DIR: ${{ steps.common-direct-report.outputs.portable }}
+        run: |
+          set -euo pipefail
+          report_dir=$(mktemp -d "${RUNNER_TEMP:?}/standard-token-diagnostic.XXXXXXXX")
+          printf 'directory=%s\n' "$report_dir" >> "$GITHUB_OUTPUT"
+          python3 -B .github/coverage/ordinary/standard-token/report.py \
+            --checkout . --subject "$GITHUB_SHA" \
+            --normal-dir "$NORMAL_DIR" --race-input "$RACE_INPUT" \
+            --race-report "$RACE_REPORT" --common-dir "$COMMON_DIR" \
+            --output "$report_dir/report.json"
+      - name: Upload provisional standard-token statement roster
+        if: always() && steps.standard-token-diagnostic.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standard-token-attributed-diagnostic-${{ github.sha }}
+          path: ${{ steps.standard-token-diagnostic.outputs.directory }}/report.json
+          if-no-files-found: warn
+
+      - name: Produce source-bound provisional compiler roster (metadata only)
+        id: standard-token-compiler-roster
+        if: always() && steps.isolation-preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          NORMAL_DIR: ${{ steps.ordinary-normal-output.outputs.directory }}
+          RACE_INPUT: ${{ steps.node-direct-race-input.outputs.directory }}
+          RACE_REPORT: ${{ steps.node-direct-race-report.outputs.directory }}
+          COMMON_DIR: ${{ steps.common-direct-report.outputs.portable }}
+        run: |
+          set -euo pipefail
+          parent=$(mktemp -d "${RUNNER_TEMP:?}/standard-token-compiler.XXXXXXXX")
+          printf 'directory=%s\n' "$parent/result" >> "$GITHUB_OUTPUT"
+          python3 -B -m unittest discover -s .github/coverage/ordinary/standard-token -p 'test_*.py'
+          python3 -B .github/coverage/ordinary/standard-token/producer.py \
+            --checkout . --subject "$GITHUB_SHA" \
+            --normal-dir "$NORMAL_DIR" --race-input "$RACE_INPUT" \
+            --race-report "$RACE_REPORT" --common-dir "$COMMON_DIR" \
+            --output "$parent/result"
+      - name: Upload provisional compiler roster and measurements
+        if: always() && steps.standard-token-compiler-roster.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standard-token-compiler-roster-${{ github.sha }}
+          path: |
+            ${{ steps.standard-token-compiler-roster.outputs.directory }}/compiler-manifest.json
+            ${{ steps.standard-token-compiler-roster.outputs.directory }}/compiler-report.json
+            ${{ steps.standard-token-compiler-roster.outputs.directory }}/reviewed-attribution.json
+          if-no-files-found: warn
+
+      - name: Retain current Node direct race producer inputs
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.node-direct-race-input.outcome == 'success' && steps.node-direct-race-producer.outcome == 'success' && steps.node-direct-race-input.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # Only the finished aggregate profile and its receipt. Never upload raw per-test output.
+          name: standard-token-node-direct-race-input-${{ github.sha }}
+          path: |
+            ${{ steps.node-direct-race-input.outputs.directory }}/coverage.out
+            ${{ steps.node-direct-race-input.outputs.directory }}/provenance.json
+          if-no-files-found: warn
+
+      - name: Retain current ordinary normal bound input
+        if: always() && steps.isolation-preflight.outcome == 'success' && steps.ordinary-normal-output.outcome == 'success' && steps.ordinary-normal-output.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # The primary coverage artifact already retains coverage.out. Replay it only
+          # when this current receipt is bound and the profile SHA-256 matches.
+          # Keep this receipt even when the snapshot is unavailable.
+          name: standard-token-node-normal-input-${{ github.sha }}
+          path: |
+            ${{ steps.ordinary-normal-output.outputs.directory }}/input.json
           if-no-files-found: warn
 
   ordinary-named:

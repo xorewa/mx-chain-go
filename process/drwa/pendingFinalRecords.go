@@ -103,6 +103,10 @@ func (r *pendingFinalRecords) read(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	v, _, err := a.RetrieveValue(bytes.Clone(key))
+	if errors.Is(err, state.ErrNilTrie) && len(a.GetRootHash()) == 0 {
+		// The account has no data trie in this state: the key is absent.
+		return nil, nil
+	}
 	if err != nil || len(v) > r.codec.maxBytes {
 		if err != nil {
 			return nil, err

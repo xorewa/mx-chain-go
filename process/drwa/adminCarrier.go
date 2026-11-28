@@ -209,24 +209,38 @@ func (c *adminCarrier) checkApplied(key, expected []byte) error {
 // and completion funding before a consumer; maxBytes is only a per-record bound.
 // No TTL, erase/compaction, retry timer or implicit redrive authority is supplied.
 func (c *adminCarrier) apply(encoded, proof []byte) error {
-	if len(proof) == 0 || len(proof) > c.codec.maxBytes {
+	if c.boundary == nil {
 		return errAdminCarrier
+	}
+	operation, err := c.prepareApply(encoded, proof)
+	if err != nil {
+		return err
+	}
+	return c.boundary.Execute(operation)
+}
+
+// prepareApply is the bounded immutable preparation of apply. The returned
+// body runs inside its caller's native journal operation: the containment
+// owner above, or the native built-in call of the destination shard, whose
+// processor reverts everything the body wrote when it returns an error.
+func (c *adminCarrier) prepareApply(encoded, proof []byte) (func() (*vmcommon.VMOutput, error), error) {
+	if len(proof) == 0 || len(proof) > c.codec.maxBytes {
+		return nil, errAdminCarrier
 	}
 	e, err := c.decode(encoded)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	encoded, proof = bytes.Clone(encoded), bytes.Clone(proof)
-	id, err := c.digest("APPLIED_ID", e.effectID, e.legID)
+	key, err := c.appliedKey(e.effectID, e.legID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	key := append([]byte(adminAppliedPrefix), id...)
 	// All exact identity/terminal-policy/target/result fields are present in the
 	// candidate ACK, rather than inferred from an equal local state hash.
 	ack, err := c.codec.frame([]byte("DRWA/ADMIN_ACK/candidate1"), encoded)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fresh := e.copy
 	acknowledge := func(output *vmcommon.VMOutput) (*vmcommon.VMOutput, error) {
@@ -252,7 +266,7 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 		}
 		return acked, nil
 	}
-	return c.boundary.Execute(func() (*vmcommon.VMOutput, error) {
+	return func() (*vmcommon.VMOutput, error) {
 		applied, err := c.readApplied(key)
 		if err != nil {
 			return nil, err
@@ -324,5 +338,16 @@ func (c *adminCarrier) apply(encoded, proof []byte) error {
 			return nil, err
 		}
 		return acknowledge(output)
-	})
+	}, nil
+}
+
+// appliedKey is the durable applied-leg identity item of one leg (A L3267-3275):
+// the destination writes the exact envelope under it in the journal step of the
+// baseline mutation, and the origin reads it as that leg's acknowledgement.
+func (c *adminCarrier) appliedKey(effectID, legID []byte) ([]byte, error) {
+	id, err := c.digest("APPLIED_ID", effectID, legID)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(adminAppliedPrefix), id...), nil
 }

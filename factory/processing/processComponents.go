@@ -162,30 +162,30 @@ type processComponents struct {
 type ProcessComponentsFactoryArgs struct {
 	// DRWAConfigurationOverlay is an explicit experimental path, with no default.
 	// Effective inputs are the final native objects after startup overrides.
-	DRWAConfigurationOverlay   string
-	DRWAEffectiveConfigs       *config.Configs
-	DRWAInitialProgrammes      []drwa.InitialProgrammeEvidence
-	DRWAInitialProgrammeLimits *drwa.InitialProgrammeLimits
+	DRWAConfigurationOverlay    string
+	DRWAEffectiveConfigs        *config.Configs
+	DRWAInitialProgrammes       []drwa.InitialProgrammeEvidence
+	DRWAInitialProgrammeLimits  *drwa.InitialProgrammeLimits
 	DRWAInitialProgrammeStartup *config.DRWAInitialProgrammeStartup
-	DRWAResolvedConfiguration *factoryCore.DRWAConfigurationCandidate
-	Config                     config.Config
-	RoundConfig                config.RoundConfig
-	EpochConfig                config.EpochConfig
-	PrefConfigs                config.Preferences
-	ImportDBConfig             config.ImportDbConfig
-	EconomicsConfig            config.EconomicsConfig
-	AccountsParser             genesis.AccountsParser
-	SmartContractParser        genesis.InitialSmartContractParser
-	GasSchedule                core.GasScheduleNotifier
-	NodesCoordinator           nodesCoordinator.NodesCoordinator
-	RequestedItemsHandler      dataRetriever.RequestedItemsHandler
-	WhiteListHandler           process.WhiteListHandler
-	WhiteListerVerifiedTxs     process.WhiteListHandler
-	MaxRating                  uint32
-	SystemSCConfig             *config.SystemSmartContractsConfig
-	ImportStartHandler         update.ImportStartHandler
-	HistoryRepo                dblookupext.HistoryRepository
-	FlagsConfig                config.ContextFlagsConfig
+	DRWAResolvedConfiguration   *factoryCore.DRWAConfigurationCandidate
+	Config                      config.Config
+	RoundConfig                 config.RoundConfig
+	EpochConfig                 config.EpochConfig
+	PrefConfigs                 config.Preferences
+	ImportDBConfig              config.ImportDbConfig
+	EconomicsConfig             config.EconomicsConfig
+	AccountsParser              genesis.AccountsParser
+	SmartContractParser         genesis.InitialSmartContractParser
+	GasSchedule                 core.GasScheduleNotifier
+	NodesCoordinator            nodesCoordinator.NodesCoordinator
+	RequestedItemsHandler       dataRetriever.RequestedItemsHandler
+	WhiteListHandler            process.WhiteListHandler
+	WhiteListerVerifiedTxs      process.WhiteListHandler
+	MaxRating                   uint32
+	SystemSCConfig              *config.SystemSmartContractsConfig
+	ImportStartHandler          update.ImportStartHandler
+	HistoryRepo                 dblookupext.HistoryRepository
+	FlagsConfig                 config.ContextFlagsConfig
 
 	Data                    factory.DataComponentsHolder
 	CoreData                factory.CoreComponentsHolder
@@ -202,42 +202,45 @@ type ProcessComponentsFactoryArgs struct {
 }
 
 type processComponentsFactory struct {
-	drwaDeploymentIdentity     *config.DRWADeploymentIdentityConfig
-	drwaIdentityOwner          drwaIdentityLifecycle
-	drwaInitialProgrammes      []drwa.InitialProgrammeEvidence
-	drwaInitialProgrammeLimits *drwa.InitialProgrammeLimits
+	drwaDeploymentIdentity      *config.DRWADeploymentIdentityConfig
+	drwaIdentityOwner           drwaIdentityLifecycle
+	drwaInitialProgrammes       []drwa.InitialProgrammeEvidence
+	drwaInitialProgrammeLimits  *drwa.InitialProgrammeLimits
 	drwaInitialProgrammeStartup *config.DRWAInitialProgrammeStartup
 	drwaOriginalGenesisStarted  atomic.Bool
-	drwaConfigurationCandidate *factoryCore.DRWAConfigurationCandidate
-	drwaMetaClassification     *drwa.MetaClassification
-	drwaShardClassification    *drwa.ShardClassification
-	drwaShardRegistrySource    drwa.ShardRegistrySource
-	drwaNativeValidationSource *nativeValidation.NativeValidationSource
-	miniBlockTracker           process.MiniBlockTracker
-	config                     config.Config
-	roundConfig                config.RoundConfig
-	epochConfig                config.EpochConfig
-	prefConfigs                config.Preferences
-	importDBConfig             config.ImportDbConfig
-	economicsConfig            config.EconomicsConfig
-	accountsParser             genesis.AccountsParser
-	smartContractParser        genesis.InitialSmartContractParser
-	gasSchedule                core.GasScheduleNotifier
-	nodesCoordinator           nodesCoordinator.NodesCoordinator
-	requestedItemsHandler      dataRetriever.RequestedItemsHandler
-	whiteListHandler           process.WhiteListHandler
-	whiteListerVerifiedTxs     process.WhiteListHandler
-	maxRating                  uint32
-	systemSCConfig             *config.SystemSmartContractsConfig
-	txLogsProcessor            process.TransactionLogProcessor
-	importStartHandler         update.ImportStartHandler
-	historyRepo                dblookupext.HistoryRepository
-	epochNotifier              process.EpochNotifier
-	importHandler              update.ImportHandler
-	flagsConfig                config.ContextFlagsConfig
-	esdtNftStorage             vmcommon.ESDTNFTStorageHandler
-	stakingDataProviderAPI     peer.StakingDataProviderAPI
-	auctionListSelectorAPI     epochStart.AuctionListSelector
+	drwaConfigurationCandidate  *factoryCore.DRWAConfigurationCandidate
+	drwaMetaClassification      *drwa.MetaClassification
+	drwaShardClassification     *drwa.ShardClassification
+	drwaShardRegistrySource     drwa.ShardRegistrySource
+	drwaNativeValidationSource  *nativeValidation.NativeValidationSource
+	// Set while the components are created; used only on a DRWA deployment.
+	drwaHeaderProofVerifier process.InterceptedHeaderSigVerifier
+	drwaFinalityImport      *drwa.FinalityImport
+	miniBlockTracker        process.MiniBlockTracker
+	config                  config.Config
+	roundConfig             config.RoundConfig
+	epochConfig             config.EpochConfig
+	prefConfigs             config.Preferences
+	importDBConfig          config.ImportDbConfig
+	economicsConfig         config.EconomicsConfig
+	accountsParser          genesis.AccountsParser
+	smartContractParser     genesis.InitialSmartContractParser
+	gasSchedule             core.GasScheduleNotifier
+	nodesCoordinator        nodesCoordinator.NodesCoordinator
+	requestedItemsHandler   dataRetriever.RequestedItemsHandler
+	whiteListHandler        process.WhiteListHandler
+	whiteListerVerifiedTxs  process.WhiteListHandler
+	maxRating               uint32
+	systemSCConfig          *config.SystemSmartContractsConfig
+	txLogsProcessor         process.TransactionLogProcessor
+	importStartHandler      update.ImportStartHandler
+	historyRepo             dblookupext.HistoryRepository
+	epochNotifier           process.EpochNotifier
+	importHandler           update.ImportHandler
+	flagsConfig             config.ContextFlagsConfig
+	esdtNftStorage          vmcommon.ESDTNFTStorageHandler
+	stakingDataProviderAPI  peer.StakingDataProviderAPI
+	auctionListSelectorAPI  epochStart.AuctionListSelector
 
 	data                    factory.DataComponentsHolder
 	coreData                factory.CoreComponentsHolder
@@ -359,15 +362,22 @@ func (pcf *processComponentsFactory) Create() (components *processComponents, re
 	var freshIdentity *drwa.DeploymentIdentity
 	var err error
 	if pcf.drwaInitialProgrammeStartup == nil {
+		if pcf.drwaDeploymentIdentity != nil {
+			return nil, drwa.ErrDeploymentIdentity
+		}
 		identity, err = pcf.openConfiguredDRWAIdentity()
 	} else if pcf.drwaInitialProgrammeStartup.Persisted {
 		if pcf.config.Hardfork.AfterHardFork || pcf.config.HardforkRecoveryCheckpoint.Enabled ||
 			pcf.importDBConfig.IsImportDBMode ||
+			pcf.flagsConfig.CleanupStorage || pcf.flagsConfig.ForceStartFromNetwork || pcf.flagsConfig.RepopulateTokensSupplies ||
 			check.IfNil(pcf.bootstrapComponents) || check.IfNil(pcf.bootstrapComponents.EpochBootstrapParams()) ||
 			pcf.bootstrapComponents.EpochBootstrapParams().Epoch() <= pcf.config.EpochStartConfig.GenesisEpoch ||
 			check.IfNil(pcf.coreData) || check.IfNil(pcf.coreData.PathHandler()) ||
 			pcf.coreData.PathHandler().DatabasePath() != pcf.drwaInitialProgrammeStartup.OriginalDatabasePath {
 			return nil, drwa.ErrDeploymentIdentity
+		}
+		if err = CheckDRWARestartIdentity(pcf.coreData.PathHandler().DatabasePath(), pcf.drwaDeploymentIdentity, pcf.drwaInitialProgrammeStartup, &pcf.config); err != nil {
+			return nil, err
 		}
 		// Native later-epoch bootstrap already uses the non-provisioning path.
 		identity, err = pcf.openConfiguredDRWAIdentity()
@@ -439,6 +449,7 @@ func (pcf *processComponentsFactory) Create() (components *processComponents, re
 	if err != nil {
 		return nil, err
 	}
+	pcf.drwaHeaderProofVerifier = headerSigVerifier
 
 	mainPeerShardMapper, err := pcf.prepareNetworkShardingCollectorForMessenger(pcf.network.NetworkMessenger())
 	if err != nil {

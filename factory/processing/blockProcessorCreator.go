@@ -226,6 +226,11 @@ func (pcf *processComponentsFactory) newShardBlockProcessor(
 		return nil, err
 	}
 
+	drwaShardRegistry, err := pcf.installDRWAShardRegistry(pcf.state.AccountsAdapter(), builtInFuncFactory.BuiltInFunctionContainer())
+	if err != nil {
+		return nil, err
+	}
+
 	log.Debug("blockProcessorCreator: enable epoch for sc deploy", "epoch", pcf.epochConfig.EnableEpochs.SCDeployEnableEpoch)
 	log.Debug("blockProcessorCreator: enable epoch for ahead of time gas usage", "epoch", pcf.epochConfig.EnableEpochs.AheadOfTimeGasUsageEnableEpoch)
 	log.Debug("blockProcessorCreator: enable epoch for repair callback", "epoch", pcf.epochConfig.EnableEpochs.RepairCallbackEnableEpoch)
@@ -629,6 +634,11 @@ func (pcf *processComponentsFactory) newShardBlockProcessor(
 		return nil, err
 	}
 
+	drwaFinalityImport, err := pcf.newDRWAFinalityImport(pcf.state.AccountsAdapter(), headerValidator)
+	if err != nil {
+		return nil, err
+	}
+
 	argumentsBaseProcessor := block.ArgBaseProcessor{
 		CoreComponents:                     pcf.coreData,
 		DataComponents:                     pcf.data,
@@ -674,6 +684,8 @@ func (pcf *processComponentsFactory) newShardBlockProcessor(
 		TxExecutionOrderHandler:            pcf.txExecutionOrderHandler,
 		AOTSelector:                        aotSelector,
 	}
+	argumentsBaseProcessor.DRWAFinalityImport = drwaFinalityImport
+	argumentsBaseProcessor.DRWAClassification = drwaShardRegistry
 	arguments := block.ArgShardProcessor{
 		ArgBaseProcessor: argumentsBaseProcessor,
 	}
@@ -1216,6 +1228,11 @@ func (pcf *processComponentsFactory) newMetaBlockProcessor(
 	}
 
 	aotSelector := aotSelection.NewDisabledAOTSelector() // Metachain doesn't use AOT selection
+	drwaFinalityImport, err := pcf.newDRWAFinalityImport(pcf.state.AccountsAdapter(), headerValidator)
+	if err != nil {
+		return nil, err
+	}
+
 	argumentsBaseProcessor := block.ArgBaseProcessor{
 		CoreComponents:                     pcf.coreData,
 		DataComponents:                     pcf.data,
@@ -1262,6 +1279,7 @@ func (pcf *processComponentsFactory) newMetaBlockProcessor(
 		TxExecutionOrderHandler:            pcf.txExecutionOrderHandler,
 		AOTSelector:                        aotSelector,
 	}
+	argumentsBaseProcessor.DRWAFinalityImport = drwaFinalityImport
 
 	esdtOwnerAddress, err := pcf.coreData.AddressPubKeyConverter().Decode(pcf.systemSCConfig.ESDTSystemSCConfig.OwnerAddress)
 	if err != nil {

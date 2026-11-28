@@ -7,12 +7,28 @@ import (
 	"github.com/multiversx/mx-chain-go/config"
 )
 
+// DRWAExclusionHistoryMode distinguishes an explicitly selected original genesis
+// from a deployment with a predecessor. The zero/default mode requires one.
+type DRWAExclusionHistoryMode uint8
+
+const DRWAExclusionHistoryOriginalGenesis DRWAExclusionHistoryMode = 1
+
 // CheckDRWAExclusionHistory checks only E11's predecessor-record retention.
 // Both snapshots must be actual loaded immutable inputs whose approved identity
-// and applicability the deployment admission owner establishes separately. Nil
-// never means approved empty history. This unwired check grants no deployment,
-// recovery mode, checkpoint, changed history or new-interval approval.
-func CheckDRWAExclusionHistory(predecessor, proposed *config.Config) error {
+// and applicability the deployment admission owner establishes separately.
+// Only the explicitly selected original genesis has no predecessor; nil alone
+// never means approved empty history. This check grants no deployment, recovery
+// mode, checkpoint, changed history or new-interval approval.
+func CheckDRWAExclusionHistory(predecessor, proposed *config.Config, mode ...DRWAExclusionHistoryMode) error {
+	if len(mode) != 0 {
+		if len(mode) != 1 || mode[0] != DRWAExclusionHistoryOriginalGenesis || predecessor != nil || proposed == nil {
+			return fmt.Errorf("DRWA invalid original genesis exclusion history inputs")
+		}
+		if _, err := common.NewConfiguredRoundExclusionHandler(proposed); err != nil {
+			return fmt.Errorf("DRWA proposed configuration: %w", err)
+		}
+		return nil
+	}
 	if predecessor == nil || proposed == nil {
 		return fmt.Errorf("DRWA exclusion history requires predecessor and proposed configuration")
 	}

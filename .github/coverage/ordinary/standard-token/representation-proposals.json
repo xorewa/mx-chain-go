@@ -1,0 +1,259 @@
+{
+  "schema": "detached-token-representation-proposals-v1",
+  "functions": [
+    {
+      "name": "SupplyESDT.XXX_Size",
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "span": [
+        57,
+        1,
+        59,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            57,
+            37
+          ],
+          "end": [
+            59,
+            2
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "name": "SupplyESDT.Size",
+      "source": "dblookupext/esdtSupply/supplyESDT.pb.go",
+      "profile_file": "github.com/multiversx/mx-chain-go/dblookupext/esdtSupply/supplyESDT.pb.go",
+      "source_sha256": "7f7af5f6924a64632cdf92306c95651f52ff4f05585db66476663bd3d6f60fa6",
+      "span": [
+        265,
+        1,
+        290,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            265,
+            37
+          ],
+          "end": [
+            266,
+            14
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            266,
+            14
+          ],
+          "end": [
+            268,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            269,
+            2
+          ],
+          "end": [
+            271,
+            2
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            271,
+            2
+          ],
+          "end": [
+            275,
+            3
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            276,
+            2
+          ],
+          "end": [
+            280,
+            3
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            281,
+            2
+          ],
+          "end": [
+            285,
+            3
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            286,
+            2
+          ],
+          "end": [
+            286,
+            24
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            286,
+            24
+          ],
+          "end": [
+            288,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            289,
+            2
+          ],
+          "end": [
+            289,
+            10
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "name": "addESDTEntryInVMOutput",
+      "source": "builtInFunctions/logsAndEvents.go",
+      "profile_file": "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions/logsAndEvents.go",
+      "source_sha256": "bed0abd824b4827ed5ce64de92fbfbfd128816e181c09c81ccddff054e9a92a8",
+      "span": [
+        52,
+        1,
+        60,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            52,
+            139
+          ],
+          "end": [
+            55,
+            26
+          ],
+          "statements": 2
+        },
+        {
+          "start": [
+            55,
+            26
+          ],
+          "end": [
+            57,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            59,
+            2
+          ],
+          "end": [
+            59,
+            46
+          ],
+          "statements": 1
+        }
+      ]
+    },
+    {
+      "name": "newEntryForESDT",
+      "source": "builtInFunctions/logsAndEvents.go",
+      "profile_file": "github.com/multiversx/mx-chain-vm-common-go/builtInFunctions/logsAndEvents.go",
+      "source_sha256": "bed0abd824b4827ed5ce64de92fbfbfd128816e181c09c81ccddff054e9a92a8",
+      "span": [
+        62,
+        1,
+        79,
+        2
+      ],
+      "blocks": [
+        {
+          "start": [
+            62,
+            115
+          ],
+          "end": [
+            70,
+            19
+          ],
+          "statements": 3
+        },
+        {
+          "start": [
+            70,
+            19
+          ],
+          "end": [
+            72,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            74,
+            2
+          ],
+          "end": [
+            74,
+            19
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            74,
+            19
+          ],
+          "end": [
+            76,
+            3
+          ],
+          "statements": 1
+        },
+        {
+          "start": [
+            78,
+            2
+          ],
+          "end": [
+            78,
+            17
+          ],
+          "statements": 1
+        }
+      ]
+    }
+  ]
+}

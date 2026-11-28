@@ -206,6 +206,11 @@ func (a *activationRecords) writeActivationInHeader(context *HeaderTimeContext, 
 		!bytes.Equal(intent.body.networkDomain, a.registration.domain) {
 		return nil, errActivationRecord
 	}
+	// F04: the intent-bound admission must still be current, unexpired and
+	// unwithdrawn at activation (Part A L2390-2395).
+	if err = a.registration.coveredAdmission(context, intent.body); err != nil {
+		return nil, err
+	}
 	var decoded activationGenesis
 	err = verifyRegistrationState(a.registration.owner.boundary.stores, func() error {
 		var verifyError error

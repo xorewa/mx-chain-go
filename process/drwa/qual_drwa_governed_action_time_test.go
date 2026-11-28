@@ -41,11 +41,23 @@ func TestQualDRWAGovernedActionTimeGeometry(t *testing.T) {
 		{"lower_overflow", math.MaxUint64 - 1, 2, 2, math.MaxUint64, math.MaxUint64, core.ErrAdditionOverflow},
 		{"lower_only_overflow_hostile_bounds", math.MaxUint64 - 1, 2, 1, math.MaxUint64, math.MaxUint64, core.ErrAdditionOverflow},
 		{"upper_overflow", math.MaxUint64 - 10, 1, 11, math.MaxUint64 - 9, math.MaxUint64, core.ErrAdditionOverflow},
-		{"zero_coordinate", 0, 5, 20, 5, 20, nil},
+		// Owner decision SP2-24 D-1 (b): time zero is no coordinate; the first
+		// usable one is 1.
+		{"zero_coordinate", 0, 5, 20, 5, 20, ErrUnavailableHeaderTime},
+		{"first_coordinate", 1, 5, 20, 6, 21, nil},
 		{"last_representable", math.MaxUint64 - 20, 5, 20, math.MaxUint64 - 15, math.MaxUint64, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			if c.proposed == 0 {
+				context, err := qualHeaderTimeOwner(t).Begin(&block.MetaBlockV3{Epoch: 10, TimestampMs: 0})
+				require.ErrorIs(t, err, c.wantError)
+				require.Nil(t, context)
+				window, err := newGovernedActionWindow(context, HeaderMilliseconds(c.min), HeaderMilliseconds(c.max), HeaderMilliseconds(c.earliest), HeaderMilliseconds(c.until))
+				require.Error(t, err)
+				require.Nil(t, window)
+				return
+			}
 			context := qualGovernedContext(t, qualHeaderTimeOwner(t), core.MetachainShardId, c.proposed)
 			window, err := newGovernedActionWindow(context, HeaderMilliseconds(c.min), HeaderMilliseconds(c.max), HeaderMilliseconds(c.earliest), HeaderMilliseconds(c.until))
 			if c.wantError != nil {
@@ -111,7 +123,7 @@ func TestQualDRWAGovernedActionTimeSource(t *testing.T) {
 		want bool
 	}{
 		{"before", 111, true}, {"equal", 112, false}, {"after", 113, false},
-		{"validated_zero", 0, true}, {"last_representable", math.MaxUint64, false},
+		{"first_coordinate", 1, true}, {"last_representable", math.MaxUint64, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			context := qualGovernedContext(t, qualHeaderTimeOwner(t), 1, c.time)
@@ -121,6 +133,16 @@ func TestQualDRWAGovernedActionTimeSource(t *testing.T) {
 			// !before is time eligibility only, never canonical UNUSED evidence.
 		})
 	}
+	// Owner decision SP2-24 D-1 (b): a header with time zero gives no context,
+	// so the source decision has nothing to read and refuses.
+	t.Run("zero_is_no_coordinate", func(t *testing.T) {
+		context, err := qualHeaderTimeOwner(t).Begin(&block.HeaderV3{Epoch: 10, ShardID: 1, TimestampMs: 0})
+		require.ErrorIs(t, err, ErrUnavailableHeaderTime)
+		require.Nil(t, context)
+		before, err := sourceProjectionBeforeExpiry(context, 1, 112)
+		require.Error(t, err)
+		require.False(t, before)
+	})
 }
 
 func TestQualDRWAGovernedActionTimeInvalidContext(t *testing.T) {

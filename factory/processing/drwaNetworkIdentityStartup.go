@@ -95,7 +95,17 @@ func (pcf *processComponentsFactory) openConfiguredDRWAIdentity() (*drwaIdentity
 	if err != nil || !info.IsDir() {
 		return nil, drwa.ErrDeploymentIdentity
 	}
-	return pcf.drwaIdentityOwner.open(pcf.coreData.PathHandler().DatabasePath(), pcf.drwaDeploymentIdentity.DB, identity, drwaIdentityMode{})
+	mode := drwaIdentityMode{}
+	if startup := pcf.drwaInitialProgrammeStartup; startup != nil && startup.Persisted {
+		if err = CheckDRWAStartupHistory(startup, &pcf.config); err != nil {
+			return nil, err
+		}
+		mode.startupCommitment = startupCommitment(startup.PredecessorConfiguration, identity.Raw(), pcf.coreData.PathHandler().DatabasePath())
+		if mode.startupCommitment == nil {
+			return nil, drwa.ErrDeploymentIdentity
+		}
+	}
+	return pcf.drwaIdentityOwner.open(pcf.coreData.PathHandler().DatabasePath(), pcf.drwaDeploymentIdentity.DB, identity, mode)
 }
 
 // prepareOriginalDRWAGenesis checks the independently supplied original
@@ -110,6 +120,9 @@ func (pcf *processComponentsFactory) prepareOriginalDRWAGenesis() (*drwa.Deploym
 		return nil, drwa.ErrDeploymentIdentity
 	}
 	if err := drwa.ValidateInitialProgrammeMinimum(startup.Minimum); err != nil {
+		return nil, err
+	}
+	if err := CheckDRWAStartupHistory(startup, &pcf.config); err != nil {
 		return nil, err
 	}
 	identity, err := pcf.readConfiguredDRWAIdentity()
@@ -170,8 +183,16 @@ func (pcf *processComponentsFactory) openFinalizedDRWAGenesis(identity *drwa.Dep
 	if err = checkAbsentDRWAIdentity(path); err != nil {
 		return nil, err
 	}
+	if err = CheckDRWAStartupHistory(pcf.drwaInitialProgrammeStartup, &pcf.config); err != nil {
+		return nil, err
+	}
+	commitment := startupCommitment(pcf.drwaInitialProgrammeStartup.SelectedConfiguration, identity.Raw(), path)
+	if commitment == nil {
+		return nil, drwa.ErrDeploymentIdentity
+	}
 	return pcf.drwaIdentityOwner.open(path, pcf.drwaDeploymentIdentity.DB, identity, drwaIdentityMode{
 		freshGenesis: true, startEpoch: pcf.bootstrapComponents.EpochBootstrapParams().Epoch(),
 		genesisEpoch: pcf.config.EpochStartConfig.GenesisEpoch, finalizedMetachainHeader: canonical,
+		startupCommitment: commitment,
 	})
 }

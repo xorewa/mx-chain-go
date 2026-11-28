@@ -96,6 +96,25 @@ func (r *currentLifecycleReader) withCurrent(context *HeaderTimeContext, token [
 // keep the nil tail and their existing immutable dependency contract.
 func (r *currentLifecycleReader) withCurrentAndApply(context *HeaderTimeContext, token []byte, epoch uint64, hash []byte,
 	execute func(lifecycleReadView) (*vmcommon.VMOutput, error), apply func() error) (*vmcommon.VMOutput, error) {
+	return r.withCurrentAndApplyBound(context, token, epoch, hash, nil, execute, apply)
+}
+
+// withBoundCurrentAndApply is the local gate for a current-CEB consumer whose
+// authenticated transition context also commits the complete dependency set.
+// It does not construct an ACK, authorize a transition or replace the family's
+// local-state and canonical finality checks. The native owner supplies the
+// admitted commitment decoder and the original containing rollback operation.
+func (r *currentLifecycleReader) withBoundCurrentAndApply(context *HeaderTimeContext, token []byte, epoch uint64, hash, dependencyHash []byte,
+	execute func(lifecycleReadView) (*vmcommon.VMOutput, error), apply func() error) (*vmcommon.VMOutput, error) {
+	if r == nil || r.current == nil || r.current.codec == nil || check.IfNil(r.current.codec.hasher) ||
+		len(dependencyHash) == 0 || len(dependencyHash) != r.current.codec.hasher.Size() {
+		return nil, errCurrentLocalDependency
+	}
+	return r.withCurrentAndApplyBound(context, token, epoch, hash, bytes.Clone(dependencyHash), execute, apply)
+}
+
+func (r *currentLifecycleReader) withCurrentAndApplyBound(context *HeaderTimeContext, token []byte, epoch uint64, hash, dependencyHash []byte,
+	execute func(lifecycleReadView) (*vmcommon.VMOutput, error), apply func() error) (*vmcommon.VMOutput, error) {
 	if r == nil || execute == nil || epoch == 0 {
 		return nil, errCurrentLifecycle
 	}
@@ -246,6 +265,17 @@ func (r *currentLifecycleReader) withCurrentAndApply(context *HeaderTimeContext,
 		if err = unchanged(); err != nil {
 			return nil, err
 		}
+		if dependencyHash != nil {
+			err = verifyRegistrationState(r.boundary.stores, func() error {
+				return r.current.verifyDependencyCommitment(base, dependencyHash)
+			})
+			if err != nil {
+				return nil, err
+			}
+			if err = unchanged(); err != nil {
+				return nil, err
+			}
+		}
 		consumer := view
 		consumer.token, consumer.cebHash = bytes.Clone(view.token), bytes.Clone(view.cebHash)
 		consumer.closurePlan, consumer.supplyOrigin = bytes.Clone(view.closurePlan), bytes.Clone(view.supplyOrigin)
@@ -286,6 +316,17 @@ func (r *currentLifecycleReader) withCurrentAndApply(context *HeaderTimeContext,
 		}
 		if err = unchanged(); err != nil {
 			return nil, err
+		}
+		if dependencyHash != nil {
+			err = verifyRegistrationState(r.boundary.stores, func() error {
+				return r.current.verifyDependencyCommitment(base, dependencyHash)
+			})
+			if err != nil {
+				return nil, err
+			}
+			if err = unchanged(); err != nil {
+				return nil, err
+			}
 		}
 		if apply != nil {
 			if err = apply(); err != nil {

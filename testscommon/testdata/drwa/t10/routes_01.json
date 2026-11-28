@@ -375,17 +375,17 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "0506648b23f6b4b61571293739477c599b9a6164",
+      "repo_revision": "fb784f689a9990a3cb7d8dccd0d159104ab79952",
       "source_file": "process/drwa/registryRegistration.go",
-      "source_sha256": "9c292c8eb0b01f0e1badd8a800a9ac65dd8c52c1655f64984e2a58bf5577dbd7",
+      "source_sha256": "398bb5f0da9511f6d04f5aefd8d5065542cb3646f1fef457a46ffa7cfad80141",
       "function": "RegisterToken",
       "receiver": "*RegistryRegistration",
-      "start": 77,
-      "end": 79,
+      "start": 183,
+      "end": 185,
       "body_sha256": "f383221b67ade2679689b6d1b4725798b0e6cbb07b38c0ae8554e473ba0dff0d",
       "calls": [
         {
-          "line": 78,
+          "line": 184,
           "expression": "r.registerToken"
         }
       ]
@@ -11541,161 +11541,161 @@
       "body_sha256": "781b6abffd91e6076b990cf6b339fedbf92c08d711deac60fed650f614ab3086",
       "calls": [
         {
-          "line": 1449,
+          "line": 1467,
           "expression": "pcf.drwaHeaderTimeEnabledAt"
         },
         {
-          "line": 1453,
+          "line": 1471,
           "expression": "counters.NewUsageCounter"
         },
         {
-          "line": 1453,
+          "line": 1471,
           "expression": "pcf.coreData.EnableEpochsHandler"
         },
         {
-          "line": 1460,
+          "line": 1478,
           "expression": "pcf.coreData.AddressPubKeyConverter"
         },
         {
-          "line": 1461,
+          "line": 1479,
           "expression": "pcf.data.StorageService"
         },
         {
-          "line": 1462,
+          "line": 1480,
           "expression": "pcf.data.Blockchain"
         },
         {
-          "line": 1463,
+          "line": 1481,
           "expression": "pcf.bootstrapComponents.ShardCoordinator"
-        },
-        {
-          "line": 1464,
-          "expression": "pcf.coreData.InternalMarshalizer"
-        },
-        {
-          "line": 1465,
-          "expression": "pcf.coreData.Hasher"
-        },
-        {
-          "line": 1467,
-          "expression": "pcf.coreData.Uint64ByteSliceConverter"
-        },
-        {
-          "line": 1469,
-          "expression": "pcf.data.Datapool"
-        },
-        {
-          "line": 1470,
-          "expression": "pcf.data.Datapool().SmartContracts"
-        },
-        {
-          "line": 1470,
-          "expression": "pcf.data.Datapool"
-        },
-        {
-          "line": 1474,
-          "expression": "pcf.coreData.EpochNotifier"
-        },
-        {
-          "line": 1475,
-          "expression": "pcf.coreData.EnableEpochsHandler"
         },
         {
           "line": 1482,
-          "expression": "pcf.coreData.RoundHandler"
+          "expression": "pcf.coreData.InternalMarshalizer"
         },
         {
-          "line": 1485,
-          "expression": "pcf.setDRWABuiltInAdmission"
-        },
-        {
-          "line": 1485,
-          "expression": "pcf.drwaShardTokenClassifier"
-        },
-        {
-          "line": 1487,
-          "expression": "hooks.NewBlockChainHookImpl"
-        },
-        {
-          "line": 1496,
-          "expression": "pcf.coreData.EconomicsData().MaxGasLimitPerBlock"
-        },
-        {
-          "line": 1496,
-          "expression": "pcf.coreData.EconomicsData"
-        },
-        {
-          "line": 1496,
-          "expression": "pcf.bootstrapComponents.ShardCoordinator().SelfId"
-        },
-        {
-          "line": 1496,
-          "expression": "pcf.bootstrapComponents.ShardCoordinator"
-        },
-        {
-          "line": 1498,
-          "expression": "pcf.coreData.EpochNotifier"
-        },
-        {
-          "line": 1499,
-          "expression": "pcf.coreData.EnableEpochsHandler"
-        },
-        {
-          "line": 1502,
+          "line": 1483,
           "expression": "pcf.coreData.Hasher"
         },
         {
+          "line": 1485,
+          "expression": "pcf.coreData.Uint64ByteSliceConverter"
+        },
+        {
+          "line": 1487,
+          "expression": "pcf.data.Datapool"
+        },
+        {
+          "line": 1488,
+          "expression": "pcf.data.Datapool().SmartContracts"
+        },
+        {
+          "line": 1488,
+          "expression": "pcf.data.Datapool"
+        },
+        {
+          "line": 1492,
+          "expression": "pcf.coreData.EpochNotifier"
+        },
+        {
+          "line": 1493,
+          "expression": "pcf.coreData.EnableEpochsHandler"
+        },
+        {
+          "line": 1500,
+          "expression": "pcf.coreData.RoundHandler"
+        },
+        {
           "line": 1503,
+          "expression": "pcf.setDRWABuiltInAdmission"
+        },
+        {
+          "line": 1503,
+          "expression": "pcf.drwaShardTokenClassifier"
+        },
+        {
+          "line": 1505,
+          "expression": "hooks.NewBlockChainHookImpl"
+        },
+        {
+          "line": 1514,
+          "expression": "pcf.coreData.EconomicsData().MaxGasLimitPerBlock"
+        },
+        {
+          "line": 1514,
+          "expression": "pcf.coreData.EconomicsData"
+        },
+        {
+          "line": 1514,
+          "expression": "pcf.bootstrapComponents.ShardCoordinator().SelfId"
+        },
+        {
+          "line": 1514,
+          "expression": "pcf.bootstrapComponents.ShardCoordinator"
+        },
+        {
+          "line": 1516,
+          "expression": "pcf.coreData.EpochNotifier"
+        },
+        {
+          "line": 1517,
+          "expression": "pcf.coreData.EnableEpochsHandler"
+        },
+        {
+          "line": 1520,
+          "expression": "pcf.coreData.Hasher"
+        },
+        {
+          "line": 1521,
           "expression": "pcf.coreData.AddressPubKeyConverter"
         },
         {
-          "line": 1506,
+          "line": 1524,
           "expression": "shard.NewVMContainerFactory"
         }
       ],
-      "end": 1507,
+      "end": 1525,
       "function": "createVMFactoryShard",
       "receiver": "*processComponentsFactory",
-      "repo_revision": "4faa3b341ebaa7b7e550105b2bcf97f66632fb14",
+      "repo_revision": "9b770b0e1be62ece879bf46e6934859c692179c3",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/processing/blockProcessorCreator.go",
-      "source_sha256": "2017349df674f08010dfd15d0ed253ec76e6ca173d8439db65286cfb938a1e4b",
-      "start": 1438
+      "source_sha256": "217d056dc54ebc96d8cfc58152040184b71db82c31e50b1bdd7e5dd8565bff79",
+      "start": 1456
     },
     {
       "body_sha256": "d783b6a3eaffb1c6b7b39223d111cbd2d7c1fde58515b1bd4c7685bf5aecacc9",
       "calls": [
         {
-          "line": 1516,
+          "line": 1534,
           "expression": "check.IfNil"
         },
         {
-          "line": 1516,
+          "line": 1534,
           "expression": "pcf.coreData.EnableEpochsHandler"
         },
         {
-          "line": 1519,
+          "line": 1537,
           "expression": "check.IfNil"
         },
         {
-          "line": 1519,
+          "line": 1537,
           "expression": "pcf.coreData.EnableRoundsHandler"
         },
         {
-          "line": 1522,
+          "line": 1540,
           "expression": "candidate.CheckEnforcedBlock"
         }
       ],
-      "end": 1523,
+      "end": 1541,
       "function": "drwaHeaderTimeEnabledAt",
       "receiver": "*processComponentsFactory",
-      "repo_revision": "4faa3b341ebaa7b7e550105b2bcf97f66632fb14",
+      "repo_revision": "9b770b0e1be62ece879bf46e6934859c692179c3",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/processing/blockProcessorCreator.go",
-      "source_sha256": "2017349df674f08010dfd15d0ed253ec76e6ca173d8439db65286cfb938a1e4b",
-      "start": 1511
+      "source_sha256": "217d056dc54ebc96d8cfc58152040184b71db82c31e50b1bdd7e5dd8565bff79",
+      "start": 1529
     },
     {
       "body_sha256": "a6d4c458dfbc38eda57e8d49950e05ea93bcc457678325449fbe640868f49bd1",
@@ -11724,7 +11724,7 @@
       "start": 8
     },
     {
-      "body_sha256": "100cf384afce4653b78dff50f54dafad131ec52884d6cec3786ef697545b9257",
+      "body_sha256": "5c8f9efd50a19783470fac020ce3306f16073802caabb70b71c97c7d768b91e4",
       "calls": [
         {
           "line": 316,
@@ -11876,546 +11876,550 @@
         },
         {
           "line": 419,
+          "expression": "sp.beginDRWAFinalityImport"
+        },
+        {
+          "line": 424,
           "expression": "time.Now"
         },
         {
-          "line": 420,
+          "line": 425,
           "expression": "sp.txCoordinator.ProcessBlockTransaction"
         },
         {
-          "line": 421,
+          "line": 426,
           "expression": "time.Since"
         },
         {
-          "line": 422,
+          "line": 427,
           "expression": "log.Debug"
         },
         {
-          "line": 429,
+          "line": 434,
           "expression": "sp.txCoordinator.VerifyCreatedBlockTransactions"
         },
         {
-          "line": 435,
+          "line": 440,
           "expression": "sp.collectExecutionResults"
         },
         {
-          "line": 440,
+          "line": 445,
           "expression": "sp.blockProcessingCutoffHandler.HandleProcessErrorCutoff"
         }
       ],
-      "end": 446,
+      "end": 451,
       "function": "ProcessBlockProposal",
       "receiver": "*shardProcessor",
-      "repo_revision": "0506648b23f6b4b61571293739477c599b9a6164",
+      "repo_revision": "4ab4fd4f9f08c5a59dcbf47dea4ff0d1f8ffc1c7",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/block/shardblockProposal.go",
-      "source_sha256": "f6a5ca7b292e67470e55046cfb7c1609af5dcf2d6f5993b0660a445fa5389b04",
+      "source_sha256": "f0e9d6fcc47c0929fdfe7bf2c978252bced3515ce4a985f407708e5f2fbaeffd",
       "start": 311
     },
     {
       "body_sha256": "7ce640d9936824bbf14c6b395570697743fe44c773ec2ba788bb32a8e237e9d8",
       "calls": [
         {
-          "expression": "check.IfNil",
-          "line": 44
+          "line": 44,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "drwa.NewEvaluatedHeaderTime",
-          "line": 47
+          "line": 47,
+          "expression": "drwa.NewEvaluatedHeaderTime"
         }
       ],
       "end": 53,
       "function": "initializeEvaluatedHeaderTime",
       "receiver": "*BlockChainHookImpl",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 43
     },
     {
       "body_sha256": "3f5a5f5b43e843d2d8f56cb999b13e70ec064380987e673f26a4ef709becdaae",
       "calls": [
         {
-          "expression": "common.GetHeaderTimestamps",
-          "line": 58
+          "line": 58,
+          "expression": "common.GetHeaderTimestamps"
         }
       ],
       "end": 60,
       "function": "currentTimeStampMsLocked",
       "receiver": "*BlockChainHookImpl",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 57
     },
     {
       "body_sha256": "af5f51c360a2795d824c9563b139d6f6a3bfd35e12a5b888e082af26abc497ed",
       "calls": [
         {
-          "expression": "bh.drwaTime.active.Load",
-          "line": 64
+          "line": 64,
+          "expression": "bh.drwaTime.active.Load"
         },
         {
-          "expression": "operation.valid.Store",
-          "line": 65
+          "line": 65,
+          "expression": "operation.valid.Store"
         }
       ],
       "end": 68,
       "function": "invalidateEvaluatedHeaderTime",
       "receiver": "*BlockChainHookImpl",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 62
     },
     {
       "body_sha256": "7049120c31f5d81064b3254baaa27e178d909c659a5aa84a188706ad0366af89",
       "calls": [
         {
-          "expression": "time.enabled",
-          "line": 71
+          "line": 71,
+          "expression": "time.enabled"
         }
       ],
       "end": 72,
       "function": "isEnabled",
       "receiver": "*evaluatedHeaderTime",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 70
     },
     {
       "body_sha256": "da8c0c53db3238fb07debf9f779c16893dce5f976a69e2b6ac99e27f81c65bba",
       "calls": [
         {
-          "expression": "bh.BeginDRWAHeaderEvaluation",
-          "line": 87
+          "line": 87,
+          "expression": "bh.BeginDRWAHeaderEvaluation"
         },
         {
-          "expression": "check.IfNil",
-          "line": 89
+          "line": 89,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "bh.invalidateEvaluatedHeaderTime",
-          "line": 90
+          "line": 90,
+          "expression": "bh.invalidateEvaluatedHeaderTime"
         },
         {
-          "expression": "header.GetEpoch",
-          "line": 93
+          "line": 93,
+          "expression": "header.GetEpoch"
         },
         {
-          "expression": "header.GetRound",
-          "line": 93
+          "line": 93,
+          "expression": "header.GetRound"
         },
         {
-          "expression": "bh.beginDRWAHeaderEvaluation",
-          "line": 94
+          "line": 94,
+          "expression": "bh.beginDRWAHeaderEvaluation"
         },
         {
-          "expression": "bh.drwaTime.enabledAt",
-          "line": 94
+          "line": 94,
+          "expression": "bh.drwaTime.enabledAt"
         }
       ],
       "end": 95,
       "function": "BeginDRWAHeaderEvaluationForHeader",
       "receiver": "*BlockChainHookImpl",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 82
     },
     {
       "body_sha256": "7965400ac4fd79f29199d46a8d2123c458c4c5f9e6e7dc3650cd4e9e9bcf982b",
       "calls": [
         {
-          "expression": "bh.beginDRWAHeaderEvaluation",
-          "line": 98
+          "line": 98,
+          "expression": "bh.beginDRWAHeaderEvaluation"
         },
         {
-          "expression": "bh.drwaTime.isEnabled",
-          "line": 98
+          "line": 98,
+          "expression": "bh.drwaTime.isEnabled"
         }
       ],
       "end": 99,
       "function": "BeginDRWAHeaderEvaluation",
       "receiver": "*BlockChainHookImpl",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 97
     },
     {
       "body_sha256": "0e7889a4460499119a46973c9e337c6291b4cdecb166168d0c31302ec3b64bea",
       "calls": [
         {
-          "expression": "enabled",
-          "line": 109
+          "line": 109,
+          "expression": "enabled"
         },
         {
-          "expression": "bh.invalidateEvaluatedHeaderTime",
-          "line": 110
+          "line": 110,
+          "expression": "bh.invalidateEvaluatedHeaderTime"
         },
         {
-          "expression": "time.closed.Load",
-          "line": 113
+          "line": 113,
+          "expression": "time.closed.Load"
         },
         {
-          "expression": "time.gate.TryLock",
-          "line": 116
+          "line": 116,
+          "expression": "time.gate.TryLock"
         },
         {
-          "expression": "time.leases.Load",
-          "line": 121
+          "line": 121,
+          "expression": "time.leases.Load"
         },
         {
-          "expression": "time.gate.Unlock",
-          "line": 122
+          "line": 122,
+          "expression": "time.gate.Unlock"
         },
         {
-          "expression": "bh.mutCurrentHdr.Lock",
-          "line": 125
+          "line": 125,
+          "expression": "bh.mutCurrentHdr.Lock"
         },
         {
-          "expression": "time.clock.Reset",
-          "line": 126
+          "line": 126,
+          "expression": "time.clock.Reset"
         },
         {
-          "expression": "check.IfNil",
-          "line": 128
+          "line": 128,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "core.CalculateHash",
-          "line": 129
+          "line": 129,
+          "expression": "core.CalculateHash"
         },
         {
-          "expression": "operation.valid.Store",
-          "line": 131
+          "line": 131,
+          "expression": "operation.valid.Store"
         },
         {
-          "expression": "time.active.Store",
-          "line": 132
+          "line": 132,
+          "expression": "time.active.Store"
         },
         {
-          "expression": "bh.mutCurrentHdr.Unlock",
-          "line": 133
+          "line": 133,
+          "expression": "bh.mutCurrentHdr.Unlock"
         }
       ],
       "end": 135,
       "function": "beginDRWAHeaderEvaluation",
       "receiver": "*BlockChainHookImpl",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 101
     },
     {
       "body_sha256": "5fa7d417da0564000004192e2103c68e404a81f7e1d8d47bf567509c34b17435",
       "calls": [
         {
-          "expression": "operation.ended.CompareAndSwap",
-          "line": 138
+          "line": 138,
+          "expression": "operation.ended.CompareAndSwap"
         },
         {
-          "expression": "operation.valid.Store",
-          "line": 141
+          "line": 141,
+          "expression": "operation.valid.Store"
         },
         {
-          "expression": "time.active.CompareAndSwap",
-          "line": 143
+          "line": 143,
+          "expression": "time.active.CompareAndSwap"
         },
         {
-          "expression": "time.gate.Unlock",
-          "line": 147
+          "line": 147,
+          "expression": "time.gate.Unlock"
         }
       ],
       "end": 148,
       "function": "end",
       "receiver": "*evaluatedHeaderOperation",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 137
     },
     {
       "body_sha256": "59cd607f5fda41431cc32e670d8c312a882456c5d7736da3c2876281b29ee590",
       "calls": [
         {
-          "expression": "time.active.Load",
-          "line": 154
+          "line": 154,
+          "expression": "time.active.Load"
         },
         {
-          "expression": "bh.invalidateEvaluatedHeaderTime",
-          "line": 155
+          "line": 155,
+          "expression": "bh.invalidateEvaluatedHeaderTime"
         },
         {
-          "expression": "bh.mutCurrentHdr.Lock",
-          "line": 157
+          "line": 157,
+          "expression": "bh.mutCurrentHdr.Lock"
         },
         {
-          "expression": "bh.mutCurrentHdr.Unlock",
-          "line": 158
+          "line": 158,
+          "expression": "bh.mutCurrentHdr.Unlock"
         },
         {
-          "expression": "time.active.Load",
-          "line": 159
+          "line": 159,
+          "expression": "time.active.Load"
         },
         {
-          "expression": "bh.invalidateEvaluatedHeaderTime",
-          "line": 160
+          "line": 160,
+          "expression": "bh.invalidateEvaluatedHeaderTime"
         },
         {
-          "expression": "bh.setCurrentHeaderLocked",
-          "line": 162
+          "line": 162,
+          "expression": "bh.setCurrentHeaderLocked"
         },
         {
-          "expression": "operation.valid.Store",
-          "line": 163
+          "line": 163,
+          "expression": "operation.valid.Store"
         },
         {
-          "expression": "time.active.Load",
-          "line": 166
+          "line": 166,
+          "expression": "time.active.Load"
         },
         {
-          "expression": "operation.valid.Load",
-          "line": 166
+          "line": 166,
+          "expression": "operation.valid.Load"
         },
         {
-          "expression": "operation.ended.Load",
-          "line": 166
+          "line": 166,
+          "expression": "operation.ended.Load"
         },
         {
-          "expression": "time.closed.Load",
-          "line": 167
+          "line": 167,
+          "expression": "time.closed.Load"
         },
         {
-          "expression": "operation.enabled",
-          "line": 167
+          "line": 167,
+          "expression": "operation.enabled"
         },
         {
-          "expression": "time.leases.Load",
-          "line": 167
+          "line": 167,
+          "expression": "time.leases.Load"
         },
         {
-          "expression": "operation.valid.Store",
-          "line": 168
+          "line": 168,
+          "expression": "operation.valid.Store"
         },
         {
-          "expression": "time.clock.Reset",
-          "line": 172
+          "line": 172,
+          "expression": "time.clock.Reset"
         },
         {
-          "expression": "time.clock.BeginBound",
-          "line": 174
+          "line": 174,
+          "expression": "time.clock.BeginBound"
         },
         {
-          "expression": "operation.acquire",
-          "line": 175
+          "line": 175,
+          "expression": "operation.acquire"
         },
         {
-          "expression": "bh.mutCurrentHdr.RLock",
-          "line": 177
+          "line": 177,
+          "expression": "bh.mutCurrentHdr.RLock"
         },
         {
-          "expression": "bh.mutCurrentHdr.RUnlock",
-          "line": 178
+          "line": 178,
+          "expression": "bh.mutCurrentHdr.RUnlock"
         },
         {
-          "expression": "operation.validateLocked",
-          "line": 179
+          "line": 179,
+          "expression": "operation.validateLocked"
         },
         {
-          "expression": "context.HeaderIdentity",
-          "line": 186
+          "line": 186,
+          "expression": "context.HeaderIdentity"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 191
+          "line": 191,
+          "expression": "bytes.Equal"
         },
         {
-          "expression": "operation.valid.Store",
-          "line": 192
+          "line": 192,
+          "expression": "operation.valid.Store"
         },
         {
-          "expression": "bh.currentTimeStampMsLocked",
-          "line": 195
+          "line": 195,
+          "expression": "bh.currentTimeStampMsLocked"
         }
       ],
       "end": 197,
       "function": "install",
       "receiver": "*evaluatedHeaderOperation",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 150
     },
     {
       "body_sha256": "b1c41c2c233e39d236ea28ca2d23ba056c4a40992985078e57e390c5618880ef",
       "calls": [
         {
-          "expression": "time.leases.Add",
-          "line": 201
+          "line": 201,
+          "expression": "time.leases.Add"
         },
         {
-          "expression": "bh.mutCurrentHdr.RLock",
-          "line": 202
+          "line": 202,
+          "expression": "bh.mutCurrentHdr.RLock"
         },
         {
-          "expression": "bh.mutCurrentHdr.RUnlock",
-          "line": 203
+          "line": 203,
+          "expression": "bh.mutCurrentHdr.RUnlock"
         },
         {
-          "expression": "time.leases.Add",
-          "line": 207
+          "line": 207,
+          "expression": "time.leases.Add"
         },
         {
-          "expression": "operation.validateLocked",
-          "line": 208
+          "line": 208,
+          "expression": "operation.validateLocked"
         },
         {
-          "expression": "release",
-          "line": 209
+          "line": 209,
+          "expression": "release"
         }
       ],
       "end": 213,
       "function": "acquire",
       "receiver": "*evaluatedHeaderOperation",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 199
     },
     {
       "body_sha256": "2037b02b837c6f31051f5f74cc2d10a1b8511c7d3f7673214139593e53e84587",
       "calls": [
         {
-          "expression": "time.closed.Load",
-          "line": 217
+          "line": 217,
+          "expression": "time.closed.Load"
         },
         {
-          "expression": "time.active.Load",
-          "line": 217
+          "line": 217,
+          "expression": "time.active.Load"
         },
         {
-          "expression": "operation.valid.Load",
-          "line": 217
+          "line": 217,
+          "expression": "operation.valid.Load"
         },
         {
-          "expression": "operation.ended.Load",
-          "line": 218
+          "line": 218,
+          "expression": "operation.ended.Load"
         },
         {
-          "expression": "operation.enabled",
-          "line": 221
+          "line": 221,
+          "expression": "operation.enabled"
         },
         {
-          "expression": "operation.valid.Store",
-          "line": 222
+          "line": 222,
+          "expression": "operation.valid.Store"
         },
         {
-          "expression": "check.IfNil",
-          "line": 228
+          "line": 228,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "check.IfNil",
-          "line": 228
+          "line": 228,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "check.IfNil",
-          "line": 228
+          "line": 228,
+          "expression": "check.IfNil"
         },
         {
-          "expression": "bh.currentTimeStampMsLocked",
-          "line": 231
+          "line": 231,
+          "expression": "bh.currentTimeStampMsLocked"
         },
         {
-          "expression": "bh.currentHdr.IsHeaderV3",
-          "line": 235
+          "line": 235,
+          "expression": "bh.currentHdr.IsHeaderV3"
         },
         {
-          "expression": "bh.enableEpochsHandler.IsFlagEnabledInEpoch",
-          "line": 235
+          "line": 235,
+          "expression": "bh.enableEpochsHandler.IsFlagEnabledInEpoch"
         },
         {
-          "expression": "bh.currentHdr.GetEpoch",
-          "line": 235
+          "line": 235,
+          "expression": "bh.currentHdr.GetEpoch"
         },
         {
-          "expression": "core.CalculateHash",
-          "line": 238
+          "line": 238,
+          "expression": "core.CalculateHash"
         },
         {
-          "expression": "bytes.Equal",
-          "line": 242
+          "line": 242,
+          "expression": "bytes.Equal"
         }
       ],
       "end": 246,
       "function": "validateLocked",
       "receiver": "*evaluatedHeaderOperation",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
       "start": 215
     },
     {
       "body_sha256": "c8c3d19d4029393b0f6f7369bc68961c364bb0bded7bddd70060de863a61238f",
       "calls": [
         {
-          "expression": "bh.mutCurrentHdr.RLock",
-          "line": 255
+          "line": 263,
+          "expression": "bh.mutCurrentHdr.RLock"
         },
         {
-          "expression": "bh.mutCurrentHdr.RUnlock",
-          "line": 256
+          "line": 264,
+          "expression": "bh.mutCurrentHdr.RUnlock"
         },
         {
-          "expression": "bh.drwaTime.active.Load",
-          "line": 257
+          "line": 265,
+          "expression": "bh.drwaTime.active.Load"
         },
         {
-          "expression": "operation.valid.Load",
-          "line": 258
+          "line": 266,
+          "expression": "operation.valid.Load"
         },
         {
-          "expression": "operation.ended.Load",
-          "line": 258
+          "line": 266,
+          "expression": "operation.ended.Load"
         },
         {
-          "expression": "operation.validateLocked",
-          "line": 264
+          "line": 272,
+          "expression": "operation.validateLocked"
         }
       ],
-      "end": 268,
+      "end": 276,
       "function": "EvaluatedHeaderTimeContext",
       "receiver": "*BlockChainHookImpl",
-      "repo_revision": "ce649e5b97820c7e76c9dd95dd0bc5b86843817a + run_8 candidate header installation",
+      "repo_revision": "899711bbb3ea90349af425dd4794622faf38e2a8",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "process/smartContract/hooks/evaluatedHeaderTime.go",
-      "source_sha256": "8a2870ab289c51f55668114a8ac199972c234ca8fa321ed465c816f1fc5f6fda",
-      "start": 251
+      "source_sha256": "aefe6ceb00b1ac02fa648bc01b2ffd8a503c159dd762e72c1bd42eb283993e76",
+      "start": 259
     },
     {
       "body_sha256": "95681e9824daf8c6c9037686c186938204ba3952de9772948480ef6cfba57cea",
@@ -12452,11 +12456,11 @@
       "end": 160,
       "function": "LoadDRWAConfigurationCandidate",
       "receiver": "",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
       "start": 131
     },
     {
@@ -12474,11 +12478,11 @@
       "end": 172,
       "function": "NewDRWAConfigurationCandidateFromOverlay",
       "receiver": "",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
       "start": 165
     },
     {
@@ -12496,11 +12500,11 @@
       "end": 183,
       "function": "loadDRWAEnforcementEpoch",
       "receiver": "",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
       "start": 174
     },
     {
@@ -12590,11 +12594,11 @@
       "end": 250,
       "function": "NewDRWAConfigurationCandidate",
       "receiver": "",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
       "start": 191
     },
     {
@@ -12644,179 +12648,167 @@
       "end": 306,
       "function": "validateDRWAStartupConfigs",
       "receiver": "",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
       "start": 257
     },
     {
-      "body_sha256": "334e64557e445cc2f01b796e56f3d37fb98a18bc3915e68941d5c3420f555d9b",
+      "body_sha256": "201e3df197b5483a2ad09c568e21c0de7d78c953b46947f7efd49e8909913417",
       "calls": [
         {
           "line": 310,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 322,
+          "line": 328,
           "expression": "append"
         },
         {
-          "line": 325,
+          "line": 331,
           "expression": "append"
         },
         {
-          "line": 329,
+          "line": 335,
           "expression": "c.epochs.IsFlagEnabledInEpoch"
         },
         {
-          "line": 330,
+          "line": 336,
           "expression": "append"
-        },
-        {
-          "line": 333,
-          "expression": "append"
-        },
-        {
-          "line": 338,
-          "expression": "c.epochs.IsFlagDefined"
-        },
-        {
-          "line": 338,
-          "expression": "c.epochs.IsFlagEnabledInEpoch"
         },
         {
           "line": 339,
-          "expression": "fmt.Errorf"
-        },
-        {
-          "line": 343,
-          "expression": "c.epochs.IsFlagDefined"
-        },
-        {
-          "line": 343,
-          "expression": "c.epochs.IsFlagEnabledInEpoch"
+          "expression": "append"
         },
         {
           "line": 344,
+          "expression": "c.epochs.IsFlagDefined"
+        },
+        {
+          "line": 344,
+          "expression": "c.epochs.IsFlagEnabledInEpoch"
+        },
+        {
+          "line": 345,
+          "expression": "fmt.Errorf"
+        },
+        {
+          "line": 349,
+          "expression": "c.epochs.IsFlagDefined"
+        },
+        {
+          "line": 349,
+          "expression": "c.epochs.IsFlagEnabledInEpoch"
+        },
+        {
+          "line": 350,
           "expression": "fmt.Errorf"
         }
       ],
-      "end": 347,
+      "end": 353,
       "function": "checkPrerequisites",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
       "start": 308
     },
     {
       "body_sha256": "fc8ee90b579d97efbb32bacfa9b798b28fdf44c4a86f3771100a298d7b9b330c",
       "calls": [
         {
-          "line": 353,
+          "line": 359,
           "expression": "common.IsAsyncExecutionEnabledForEpochAndRound"
         }
       ],
-      "end": 354,
+      "end": 360,
       "function": "Enabled",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
-      "start": 351
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
+      "start": 357
     },
     {
       "body_sha256": "030ffeeceb212ec03d9b3ff0739cae017f6dfe055102b013a0edf2f2dcac8103",
       "calls": [
         {
-          "line": 359,
+          "line": 365,
           "expression": "c.Enabled"
         },
         {
-          "line": 360,
+          "line": 366,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 362,
+          "line": 368,
           "expression": "c.checkPrerequisites"
         }
       ],
-      "end": 363,
+      "end": 369,
       "function": "CheckEnforcedBlock",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
-      "start": 358
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
+      "start": 364
     },
     {
       "body_sha256": "c94f8bc82d0d09f376f5a2a17de77df35a1c6329697e28f00e49f498c97a47ad",
       "calls": [
         {
-          "line": 373,
+          "line": 379,
           "expression": "c.epochs.GetAllEnableEpochs"
         },
         {
-          "line": 373,
+          "line": 379,
           "expression": "c.rounds.GetAllEnableRounds"
         }
       ],
-      "end": 374,
+      "end": 380,
       "function": "ActivationInventory",
       "receiver": "*DRWAConfigurationCandidate",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "63de4505ef64cb0375bc20b620e44d6abd3e7213",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/core/drwaConfigurationAdmission.go",
-      "source_sha256": "8fd41161379d31291c26b010ffcefcfa3d6fd4745a46978614fcbe0e68e178ee",
-      "start": 369
+      "source_sha256": "7a1e7ea2f1827a9574523849981b4d9163b2c28f35d4917fef9cfbcad7829a50",
+      "start": 375
     },
     {
       "body_sha256": "32642f5e0504ce674c25b7a46d7d7181a7ffdba551bd1ae5f326fe2b2ba751a7",
       "calls": [
         {
-          "line": 261,
+          "line": 264,
           "expression": "checkProcessComponentsArgs"
         },
         {
-          "line": 266,
+          "line": 269,
           "expression": "args.DRWAInitialProgrammeStartup.Clone"
         },
         {
-          "line": 269,
+          "line": 272,
           "expression": "len"
         },
         {
-          "line": 270,
+          "line": 273,
           "expression": "reflect.DeepEqual"
         },
         {
-          "line": 273,
+          "line": 276,
           "expression": "drwaCandidate.MatchesPinnedOverlay"
         },
         {
-          "line": 279,
+          "line": 282,
           "expression": "factoryCore.NewDRWAConfigurationCandidateFromOverlay"
-        },
-        {
-          "line": 291,
-          "expression": "reflect.DeepEqual"
-        },
-        {
-          "line": 292,
-          "expression": "reflect.DeepEqual"
-        },
-        {
-          "line": 293,
-          "expression": "reflect.DeepEqual"
         },
         {
           "line": 294,
@@ -12824,19 +12816,27 @@
         },
         {
           "line": 295,
-          "expression": "fmt.Errorf"
+          "expression": "reflect.DeepEqual"
+        },
+        {
+          "line": 296,
+          "expression": "reflect.DeepEqual"
         },
         {
           "line": 297,
-          "expression": "args.CoreData.EnableEpochsHandler"
-        },
-        {
-          "line": 297,
-          "expression": "args.CoreData.EnableRoundsHandler"
+          "expression": "reflect.DeepEqual"
         },
         {
           "line": 298,
-          "expression": "check.IfNil"
+          "expression": "fmt.Errorf"
+        },
+        {
+          "line": 300,
+          "expression": "args.CoreData.EnableEpochsHandler"
+        },
+        {
+          "line": 300,
+          "expression": "args.CoreData.EnableRoundsHandler"
         },
         {
           "line": 301,
@@ -12844,58 +12844,62 @@
         },
         {
           "line": 304,
+          "expression": "check.IfNil"
+        },
+        {
+          "line": 307,
           "expression": "drwaCandidate.ActivationInventory"
         },
         {
-          "line": 305,
+          "line": 308,
           "expression": "reflect.DeepEqual"
         },
         {
-          "line": 305,
+          "line": 308,
           "expression": "epochs.GetAllEnableEpochs"
         },
         {
-          "line": 305,
+          "line": 308,
           "expression": "reflect.DeepEqual"
         },
         {
-          "line": 305,
+          "line": 308,
           "expression": "rounds.GetAllEnableRounds"
         },
         {
-          "line": 306,
+          "line": 309,
           "expression": "fmt.Errorf"
         },
         {
-          "line": 310,
+          "line": 313,
           "expression": "interceptorFactory.NewInterceptedDataVerifierFactory"
         },
         {
-          "line": 315,
+          "line": 318,
           "expression": "cloneDRWAIdentityConfig"
         },
         {
-          "line": 316,
+          "line": 319,
           "expression": "drwa.CloneInitialProgrammeEvidence"
         },
         {
-          "line": 317,
+          "line": 320,
           "expression": "args.DRWAInitialProgrammeLimits.Clone"
         },
         {
-          "line": 343,
+          "line": 346,
           "expression": "args.CoreData.EpochNotifier"
         }
       ],
-      "end": 352,
+      "end": 355,
       "function": "NewProcessComponentsFactory",
       "receiver": "",
-      "repo_revision": "0506648b23f6b4b61571293739477c599b9a6164",
+      "repo_revision": "e592d87cad107440ca284d10231605c317aa75b5",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "factory/processing/processComponents.go",
-      "source_sha256": "14bd79f3b0fc897c9fb5088083d58dc54b44e0cd188a9042af6461867b4efbb9",
-      "start": 260
+      "source_sha256": "39f0c79f6c020152881b955a1da6d93aae1ab17e2d4b39d3cd006a77fb1931cb",
+      "start": 263
     },
     {
       "body_sha256": "a24de3aa3579f9ec55945b78e1e690dff0a807439119bcd0a8cdf97b916d62d1",
@@ -13117,186 +13121,186 @@
       "end": 334,
       "function": "readConfigs",
       "receiver": "",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "e592d87cad107440ca284d10231605c317aa75b5",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "cmd/node/main.go",
-      "source_sha256": "51f8885b45bfe70698eb2823ffd2f06d85a57def6581777b905f8bd67182248b",
+      "source_sha256": "354a27f0afa29b891d574e87289a7a49d886bf13192b2caba60e72db6f3935ef",
       "start": 209
     },
     {
-      "body_sha256": "97aca94659d3cdcc144c9cbdc0dd34fccdaa60747461384f63ce9ab4873d70f6",
+      "body_sha256": "79bef1bbcf987e6e1f72727b2e4367829a6fb42095984f1e0ab9c17bd0fec507",
       "calls": [
         {
-          "line": 1289,
+          "line": 1338,
           "expression": "ValidateDRWAStartupMode"
         },
         {
-          "line": 1292,
+          "line": 1341,
           "expression": "loadManagedInitialProgrammeData"
         },
         {
-          "line": 1301,
+          "line": 1350,
           "expression": "trigger.NewImportStartHandler"
         },
         {
-          "line": 1301,
+          "line": 1350,
           "expression": "filepath.Join"
         },
         {
-          "line": 1306,
+          "line": 1355,
           "expression": "big.NewInt(0).SetString"
         },
         {
-          "line": 1306,
+          "line": 1355,
           "expression": "big.NewInt"
         },
         {
-          "line": 1308,
+          "line": 1357,
           "expression": "fmt.Errorf"
-        },
-        {
-          "line": 1318,
-          "expression": "coreComponents.AddressPubKeyConverter"
-        },
-        {
-          "line": 1319,
-          "expression": "cryptoComponents.TxSignKeyGen"
-        },
-        {
-          "line": 1320,
-          "expression": "coreComponents.Hasher"
-        },
-        {
-          "line": 1321,
-          "expression": "coreComponents.InternalMarshalizer"
-        },
-        {
-          "line": 1324,
-          "expression": "parsing.NewAccountsParser"
-        },
-        {
-          "line": 1329,
-          "expression": "parsing.NewSmartContractsParser"
-        },
-        {
-          "line": 1331,
-          "expression": "coreComponents.AddressPubKeyConverter"
-        },
-        {
-          "line": 1332,
-          "expression": "cryptoComponents.TxSignKeyGen"
-        },
-        {
-          "line": 1339,
-          "expression": "bootstrapComponents.ShardCoordinator().SelfId"
-        },
-        {
-          "line": 1339,
-          "expression": "bootstrapComponents.ShardCoordinator"
-        },
-        {
-          "line": 1341,
-          "expression": "coreComponents.Hasher"
-        },
-        {
-          "line": 1342,
-          "expression": "coreComponents.InternalMarshalizer"
-        },
-        {
-          "line": 1343,
-          "expression": "dataComponents.StorageService"
-        },
-        {
-          "line": 1344,
-          "expression": "coreComponents.Uint64ByteSliceConverter"
-        },
-        {
-          "line": 1345,
-          "expression": "dataComponents.Datapool"
-        },
-        {
-          "line": 1347,
-          "expression": "dbLookupFactory.NewHistoryRepositoryFactory"
-        },
-        {
-          "line": 1352,
-          "expression": "storageunit.NewCache"
-        },
-        {
-          "line": 1352,
-          "expression": "storageFactory.GetCacherFromConfig"
-        },
-        {
-          "line": 1356,
-          "expression": "time.Duration"
-        },
-        {
-          "line": 1356,
-          "expression": "coreComponents.GenesisNodesSetup().GetRoundDuration"
-        },
-        {
-          "line": 1356,
-          "expression": "coreComponents.GenesisNodesSetup"
-        },
-        {
-          "line": 1357,
-          "expression": "interceptors.NewWhiteListDataVerifier"
-        },
-        {
-          "line": 1357,
-          "expression": "interceptors.WhiteListRequestTTL"
-        },
-        {
-          "line": 1362,
-          "expression": "createWhiteListerVerifiedTxs"
         },
         {
           "line": 1367,
-          "expression": "historyRepositoryFactory.Create"
+          "expression": "coreComponents.AddressPubKeyConverter"
         },
         {
-          "line": 1372,
-          "expression": "log.Trace"
+          "line": 1368,
+          "expression": "cryptoComponents.TxSignKeyGen"
         },
         {
-          "line": 1374,
-          "expression": "cache.NewTimeCache"
+          "line": 1369,
+          "expression": "coreComponents.Hasher"
         },
         {
-          "line": 1376,
-          "expression": "ordering.NewOrderedCollection"
+          "line": 1370,
+          "expression": "coreComponents.InternalMarshalizer"
+        },
+        {
+          "line": 1373,
+          "expression": "parsing.NewAccountsParser"
+        },
+        {
+          "line": 1378,
+          "expression": "parsing.NewSmartContractsParser"
+        },
+        {
+          "line": 1380,
+          "expression": "coreComponents.AddressPubKeyConverter"
         },
         {
           "line": 1381,
-          "expression": "drwa.CloneInitialProgrammeEvidence"
+          "expression": "cryptoComponents.TxSignKeyGen"
         },
         {
-          "line": 1413,
-          "expression": "processComp.NewProcessComponentsFactory"
+          "line": 1388,
+          "expression": "bootstrapComponents.ShardCoordinator().SelfId"
         },
         {
-          "line": 1415,
-          "expression": "fmt.Errorf"
+          "line": 1388,
+          "expression": "bootstrapComponents.ShardCoordinator"
         },
         {
-          "line": 1418,
-          "expression": "processComp.NewManagedProcessComponents"
+          "line": 1390,
+          "expression": "coreComponents.Hasher"
+        },
+        {
+          "line": 1391,
+          "expression": "coreComponents.InternalMarshalizer"
+        },
+        {
+          "line": 1392,
+          "expression": "dataComponents.StorageService"
+        },
+        {
+          "line": 1393,
+          "expression": "coreComponents.Uint64ByteSliceConverter"
+        },
+        {
+          "line": 1394,
+          "expression": "dataComponents.Datapool"
+        },
+        {
+          "line": 1396,
+          "expression": "dbLookupFactory.NewHistoryRepositoryFactory"
+        },
+        {
+          "line": 1401,
+          "expression": "storageunit.NewCache"
+        },
+        {
+          "line": 1401,
+          "expression": "storageFactory.GetCacherFromConfig"
+        },
+        {
+          "line": 1405,
+          "expression": "time.Duration"
+        },
+        {
+          "line": 1405,
+          "expression": "coreComponents.GenesisNodesSetup().GetRoundDuration"
+        },
+        {
+          "line": 1405,
+          "expression": "coreComponents.GenesisNodesSetup"
+        },
+        {
+          "line": 1406,
+          "expression": "interceptors.NewWhiteListDataVerifier"
+        },
+        {
+          "line": 1406,
+          "expression": "interceptors.WhiteListRequestTTL"
+        },
+        {
+          "line": 1411,
+          "expression": "createWhiteListerVerifiedTxs"
+        },
+        {
+          "line": 1416,
+          "expression": "historyRepositoryFactory.Create"
+        },
+        {
+          "line": 1421,
+          "expression": "log.Trace"
         },
         {
           "line": 1423,
+          "expression": "cache.NewTimeCache"
+        },
+        {
+          "line": 1425,
+          "expression": "ordering.NewOrderedCollection"
+        },
+        {
+          "line": 1430,
+          "expression": "drwa.CloneInitialProgrammeEvidence"
+        },
+        {
+          "line": 1462,
+          "expression": "processComp.NewProcessComponentsFactory"
+        },
+        {
+          "line": 1464,
+          "expression": "fmt.Errorf"
+        },
+        {
+          "line": 1467,
+          "expression": "processComp.NewManagedProcessComponents"
+        },
+        {
+          "line": 1472,
           "expression": "managedProcessComponents.Create"
         }
       ],
-      "end": 1429,
+      "end": 1478,
       "function": "CreateManagedProcessComponents",
       "receiver": "*nodeRunner",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "f41cece09ea99be9d74ef15359952afb2aea4004",
       "repository": "mx-chain-go",
       "root": "node",
       "source_file": "node/nodeRunner.go",
-      "source_sha256": "92671e7acde7386aa967a63f21abb85e20ca5ed3be7e879b3ec7d79b52b4dff0",
-      "start": 1276
+      "source_sha256": "2a738beed1417d58d7116548515c3fa28c4081902c4eaab1da59f9f8b43d183f",
+      "start": 1325
     },
     {
       "root": "builtin",
@@ -14185,17 +14189,17 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "f41cece09ea99be9d74ef15359952afb2aea4004",
       "source_file": "node/nodeRunner.go",
-      "source_sha256": "92671e7acde7386aa967a63f21abb85e20ca5ed3be7e879b3ec7d79b52b4dff0",
+      "source_sha256": "2a738beed1417d58d7116548515c3fa28c4081902c4eaab1da59f9f8b43d183f",
       "function": "loadInitialProgrammeData",
       "receiver": "",
-      "start": 1964,
-      "end": 1966,
+      "start": 2013,
+      "end": 2015,
       "body_sha256": "3bc90d3c89f7e2fdd35d609f1c634582d9f9b9b2d6d01491b0fa52759695362b",
       "calls": [
         {
-          "line": 1965,
+          "line": 2014,
           "expression": "parsing.LoadDRWAInitialProgrammeInputs"
         }
       ]
@@ -14203,9 +14207,9 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "35946118e1f482bf827fbbdd5f2d890bbcd14745",
+      "repo_revision": "e592d87cad107440ca284d10231605c317aa75b5",
       "source_file": "factory/processing/drwaNetworkIdentityStartup.go",
-      "source_sha256": "05942f749d240e9e2e203179a1f043293d1f02719aaeb55f01d1c3ef89464f56",
+      "source_sha256": "07e0bdb58864d12ca3b21fabcd71c288a41e6a3cc6958f56c745c349c1bbb8f6",
       "function": "cloneDRWAIdentityConfig",
       "receiver": "",
       "start": 20,
@@ -14250,9 +14254,9 @@
     {
       "root": "node",
       "repository": "mx-chain-go",
-      "repo_revision": "b41b15f7faab68fca20e0cc09d61b319f8073a73",
+      "repo_revision": "e592d87cad107440ca284d10231605c317aa75b5",
       "source_file": "config/drwaInitialProgramme.go",
-      "source_sha256": "cc856957da6b92cc168e3aa6dec19b06ae89243c4bcb8905904327b36a28cac0",
+      "source_sha256": "a42f87224af584ff65e118d7d356c77b41f9b0b0f1009de314f295cc6a101a7d",
       "function": "Clone",
       "receiver": "*DRWAInitialProgrammeLimits",
       "start": 21,

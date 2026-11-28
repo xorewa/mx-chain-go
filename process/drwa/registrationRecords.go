@@ -357,6 +357,16 @@ func (s *registrationRecords) consume(id []byte, expected *bootstrapIntentRecord
 		return s.retain(account, scopedAdmissionWrite{activationKey, activation}, scopedAdmissionWrite{key, association},
 			scopedAdmissionWrite{append([]byte(registrationIntentPrefix), id...), consumed})
 	}
+	// D07 (Part A L2220-2226): where the chain-global retained budget exists,
+	// no registration record is retained outside it. Only the owner bound by
+	// WithRegistrationAdmission carries the limits and epoch that charge it.
+	budget, _, err := account.RetrieveValue([]byte(scopedAdmissionPrefix + "budget"))
+	if err != nil {
+		return err
+	}
+	if len(budget) != 0 {
+		return errInvalidRegistrationRecord
+	}
 	if err = account.SaveKeyValue(activationKey, activation); err != nil {
 		return err
 	}

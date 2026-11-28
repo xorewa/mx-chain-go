@@ -61,6 +61,7 @@ type MetaClassification struct {
 	host          classifierHost
 	native        *registrationNativeExecution
 	maxEver       uint64
+	funding       *CarrierFunding
 	reconstructed bool
 	snapshot      atomic.Pointer[map[string]struct{}]
 }
@@ -218,6 +219,25 @@ func (m *MetaClassification) beginLocked() error {
 	return m.installNext()
 }
 
+// SetRegistrationCarrierFunding installs, once, the funding owner every later
+// registration candidate of this node uses for its registry delta
+// (RegistryRegistration.SetCarrierFunding). It is a construction step of the
+// row that opens the registration ingress, together with the owner of the
+// withheld effects: until then a registration is funded by nobody and its
+// delta is not acknowledged.
+func (m *MetaClassification) SetRegistrationCarrierFunding(funding *CarrierFunding) error {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	if funding == nil || m.funding != nil || funding.codec.state.accounts != m.stores[0] {
+		return ErrInvalidRegistryRegistration
+	}
+	m.funding = funding
+	if m.current != nil && m.current.writer != nil {
+		m.current.writer.funding = funding
+	}
+	return nil
+}
+
 // installNext begins the next candidate at the committed projection and hands
 // it to the System VM. No registry or owner lock is held across the handoff.
 func (m *MetaClassification) installNext() error {
@@ -228,6 +248,8 @@ func (m *MetaClassification) installNext() error {
 		return err
 	}
 	next.native = m.native
+	// Checked against this owner's store by SetRegistrationCarrierFunding.
+	next.writer.funding = m.funding
 	if err = m.host.ReplaceDRWAClassifier(next); err != nil {
 		m.reconstructed = false
 		return errors.Join(err, next.closeNative())
@@ -599,6 +621,18 @@ func builtInIdentifiers(function vmcommon.BuiltinFunction, input *vmcommon.Contr
 		return [][]byte{input.Arguments[0]}, nil
 	}
 	if _, accountOnly := builtInAccountFunctions[input.Function]; accountOnly {
+		return nil, nil
+	}
+	if input.Function == RegistryDeltaFunctionName {
+		// The registry writer itself: it creates the membership that every
+		// other call is classified by, and admits only the metachain ESDT
+		// system contract as its caller.
+		return nil, nil
+	}
+	if input.Function == AdminEffectFunctionName {
+		// The protected admin leg: its identifier is inside the envelope, which
+		// the function itself authenticates together with its sender, the
+		// metachain ESDT system contract.
 		return nil, nil
 	}
 	return nil, fmt.Errorf("%w: %w: %s", vm.ErrDRWAExecution, errUnknownBuiltIn, input.Function)

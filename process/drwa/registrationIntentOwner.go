@@ -58,7 +58,7 @@ func (o *RegistrationIntentOwner) withConvergence(records *convergenceRecords,
 // admitted native convergence host before first use.
 func (o *RegistrationIntentOwner) matchesBootstrapReadiness(t convergenceTransition) bool {
 	if !bytes.Equal(t.action, o.id) || !bytes.Equal(t.digest, o.digest) || t.version != 1 ||
-		t.context == nil || string(t.context.family) != "BOOTSTRAP_READINESS" ||
+		t.context == nil || string(t.context.family) != ConvergenceFamilyBootstrap ||
 		string(t.context.phase) != "TYPE_PROFILE_READINESS" ||
 		o.shards == 0 || uint64(len(t.shards)) != uint64(o.shards) {
 		return false

@@ -12,10 +12,10 @@ var ErrDRWAInitialProgrammeLimits = errors.New("DRWA initial programme limits un
 // DRWAInitialProgrammeLimits carries the existing bounded native decoder's
 // inputs. It supplies neither defaults nor profile or appointment admission.
 type DRWAInitialProgrammeLimits struct {
-	Files, FileBytes, AggregateBytes           int
+	Files, FileBytes, AggregateBytes            int
 	RecordBytes, FieldBytes, RoleBytes, Members int
-	Records, RetainedBytes, NewRecordsPerEpoch uint64
-	AdmissionRole, IndependentRole             []byte
+	Records, RetainedBytes, NewRecordsPerEpoch  uint64
+	AdmissionRole, IndependentRole              []byte
 }
 
 func (l *DRWAInitialProgrammeLimits) Clone() *DRWAInitialProgrammeLimits {
@@ -46,19 +46,38 @@ type DRWAMinimumGenesis struct {
 	MaxEverTokens, RegistryProofBytes uint64
 }
 
+// DRWAStartupConfiguration is the immutable selection of the sealed startup
+// record and the selected role's main configuration. Exclusions are decoded
+// from that exact pinned member, never inferred from native defaults.
+type DRWAStartupConfiguration struct {
+	RecordDigest, MainConfigDigest, RestartConfigDigest [32]byte
+	Exclusions                                          []HardforkRoundExclusionConfig
+}
+
+func (p *DRWAStartupConfiguration) Clone() *DRWAStartupConfiguration {
+	if p == nil {
+		return nil
+	}
+	copy := *p
+	copy.Exclusions = append([]HardforkRoundExclusionConfig(nil), p.Exclusions...)
+	return &copy
+}
+
 // DRWAInitialProgrammeStartup carries the typed inputs of a separately
 // admitted fresh-generation construction. The ordinary CLI/TOML paths do not
 // populate it. This is not a wire format or a fresh-ownership proof.
 type DRWAInitialProgrammeStartup struct {
-	OverlaySHA256        [32]byte
-	OverlayMaxBytes      int64
-	Limits               DRWAInitialProgrammeLimits
-	Minimum              DRWAMinimumGenesis
-	OriginalDatabasePath string
-	RecordDigest         [32]byte
-	ReleaseWait          time.Duration
-	ReleaseMaxBytes      int64
-	Persisted             bool
+	OverlaySHA256            [32]byte
+	OverlayMaxBytes          int64
+	Limits                   DRWAInitialProgrammeLimits
+	Minimum                  DRWAMinimumGenesis
+	OriginalDatabasePath     string
+	RecordDigest             [32]byte
+	ReleaseWait              time.Duration
+	ReleaseMaxBytes          int64
+	Persisted                bool
+	SelectedConfiguration    *DRWAStartupConfiguration
+	PredecessorConfiguration *DRWAStartupConfiguration
 }
 
 func (p *DRWAInitialProgrammeStartup) Clone() *DRWAInitialProgrammeStartup {
@@ -67,5 +86,7 @@ func (p *DRWAInitialProgrammeStartup) Clone() *DRWAInitialProgrammeStartup {
 	}
 	copy := *p
 	copy.Limits = *p.Limits.Clone()
+	copy.SelectedConfiguration = p.SelectedConfiguration.Clone()
+	copy.PredecessorConfiguration = p.PredecessorConfiguration.Clone()
 	return &copy
 }

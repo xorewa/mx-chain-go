@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"sort"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
@@ -30,6 +31,111 @@ type RegistryRegistration struct {
 	boundary *RollbackContainment
 	maxEver  uint64
 	shards   uint32
+	effects  RegistrationEffects
+	funding  *CarrierFunding
+}
+
+// RegistryDeltaCarrierClass is the pricing class of the registry delta: one
+// leg for each execution shard, whose outcome is that shard's acknowledgment.
+const RegistryDeltaCarrierClass = "RegistryDelta"
+
+// SetCarrierFunding installs the funding owner of the registry delta. It is a
+// construction step. With it, a registration is admitted only when the gas it
+// has left after native creation covers, under the active schedule, its own
+// source work and, for every execution shard, the delta, the acknowledgment
+// and the metachain's processing of that acknowledgment; the price is
+// retained with the member, and the registration returns only what is left.
+// A registration that cannot pay is refused inside its own journal operation,
+// before the member or the count is written, and nothing of it remains.
+func (r *RegistryRegistration) SetCarrierFunding(funding *CarrierFunding) error {
+	if funding == nil || r.funding != nil || funding.codec.state.accounts != r.state.accounts {
+		return ErrInvalidRegistryRegistration
+	}
+	r.funding = funding
+	return nil
+}
+
+// registryDeltaEffect is the identity of one member's delta: the token
+// identifier and its ordinal, as the delta and its acknowledgment carry them.
+func registryDeltaEffect(tokenID []byte, ordinal uint64) []byte {
+	return binary.BigEndian.AppendUint64(bytes.Clone(tokenID), ordinal)
+}
+
+// WithheldEffect is one result the token creator produced for a registration.
+type WithheldEffect struct {
+	Destination []byte
+	Transfer    vmcommon.OutputTransfer
+}
+
+// RegistrationEffects is what the registration needs from the metachain half
+// of the acknowledged registration (SP2-34/SP2-38; owner decision of
+// 27 November 2026, option 1: acknowledgment from every shard before any
+// other effect of a registration). Once it is installed, a registration
+// releases nothing but the registry delta; every result the creator produced
+// is handed over here instead, in the order it would have been created.
+type RegistrationEffects interface {
+	// AcknowledgmentGas is the gas each delta carries. The delta uses none
+	// of it; the native processor of the shard gives it to the callback, the
+	// acknowledgment, which it would otherwise drop, so it cannot be zero.
+	// The metachain half takes the amount from the gas schedule and takes
+	// it, once for each execution shard, out of the gas the registration
+	// returns as remaining: the native processor refuses a transaction whose
+	// results carry more gas than it was given (gasConsumedChecks).
+	AcknowledgmentGas() uint64
+	// Withhold is called inside the registration's native journal step, after
+	// the member and the count are saved and before the output is returned.
+	// The implementation keeps the effects, with any value they carry, in
+	// accounts, under that journal, and may release them, in this order, only
+	// when every execution shard has acknowledged member ordinal
+	// (ParseRegistryAcknowledgment, read by the callBack entry of the
+	// metachain ESDT system contract). The same condition gates every later
+	// result the metachain produces for the token. An error rolls back the
+	// whole registration.
+	Withhold(accounts state.AccountsAdapter, tokenID []byte, ordinal uint64, effects []WithheldEffect) error
+	IsInterfaceNil() bool
+}
+
+// SetRegistrationEffects installs the owner of the withheld effects. It is a
+// construction step. Until one is installed the registration releases the
+// creator's results behind the delta and no shard acknowledges; the
+// registration ingress must not open in that state.
+func (r *RegistryRegistration) SetRegistrationEffects(effects RegistrationEffects) error {
+	if check.IfNil(effects) || r.effects != nil {
+		return ErrInvalidRegistryRegistration
+	}
+	r.effects = effects
+	return nil
+}
+
+// withhold removes every transfer from the creator's output and hands them to
+// the effects owner, ordered as their results would have been created
+// (transfer index). A creator cannot supply a delta of its own.
+func (r *RegistryRegistration) withhold(output *vmcommon.VMOutput, tokenID []byte, ordinal uint64) error {
+	var effects []WithheldEffect
+	for _, account := range output.OutputAccounts {
+		if account == nil {
+			return ErrInvalidRegistryRegistration
+		}
+		for _, transfer := range account.OutputTransfers {
+			if bytes.HasPrefix(transfer.Data, []byte(RegistryDeltaFunctionName+"@")) {
+				return ErrInvalidRegistryRegistration
+			}
+			effects = append(effects, WithheldEffect{Destination: bytes.Clone(account.Address), Transfer: transfer})
+		}
+	}
+	if len(effects) == 0 {
+		return nil
+	}
+	sort.SliceStable(effects, func(i, j int) bool { return effects[i].Transfer.Index < effects[j].Transfer.Index })
+	for i := 1; i < len(effects); i++ {
+		if effects[i].Transfer.Index == effects[i-1].Transfer.Index {
+			return ErrInvalidRegistryRegistration
+		}
+	}
+	for _, account := range output.OutputAccounts {
+		account.OutputTransfers = nil
+	}
+	return r.effects.Withhold(r.state.accounts, bytes.Clone(tokenID), ordinal, effects)
 }
 
 // NewRegistryRegistration starts one metachain candidate at a committed native
@@ -116,6 +222,19 @@ func (r *RegistryRegistration) prepareRegistration(create func(state.AccountsAda
 		if !vmcommon.ValidateToken(tokenID) || output == nil || output.ReturnCode != vmcommon.Ok {
 			return nil, ErrInvalidRegistryRegistration
 		}
+		// Funding precedes the member and the count: an underfunded
+		// registration is refused here and its creation rolls back with it.
+		funded := uint64(0)
+		if r.funding != nil && r.shards != 0 {
+			reservation, fundErr := r.funding.Accept(RegistryDeltaCarrierClass, registryDeltaEffect(tokenID, count), r.shards, output.GasRemaining)
+			if fundErr != nil {
+				return nil, fundErr
+			}
+			if reservation.LegGas == 0 {
+				return nil, ErrInvalidRegistryRegistration
+			}
+			funded, output.GasRemaining = reservation.LegGas, reservation.Remaining
+		}
 		// Reload after native creation/associated registration saves: a stale
 		// account object must not overwrite the creator's system-account changes.
 		account, err = r.state.systemAccount()
@@ -157,6 +276,25 @@ func (r *RegistryRegistration) prepareRegistration(create func(state.AccountsAda
 			return nil, err
 		}
 		if err = r.state.accounts.SaveAccount(account); err != nil {
+			return nil, err
+		}
+		// The member reaches every execution shard as the first result of this
+		// registration. With the metachain half installed it is the only one:
+		// the creator's own results wait for every shard's acknowledgment.
+		gas := funded
+		if r.effects != nil && r.shards != 0 {
+			// Without a funding owner the metachain half names the gas itself.
+			if gas == 0 {
+				gas = r.effects.AcknowledgmentGas()
+			}
+			if gas == 0 {
+				return nil, ErrInvalidRegistryRegistration
+			}
+			if err = r.withhold(output, tokenID, count); err != nil {
+				return nil, err
+			}
+		}
+		if err = emitRegistryDelta(output, tokenID, count, r.shards, gas); err != nil {
 			return nil, err
 		}
 		return output, nil

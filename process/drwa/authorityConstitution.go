@@ -2,9 +2,11 @@ package drwa
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/core/check"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
 )
 
 // These private Go coordinates select the owner-adopted SP2-27 synthetic
@@ -110,14 +112,48 @@ type scopedAuthorityProof struct {
 // The reader is a mandatory, read-only owner dependency. It must resolve an
 // authenticated immutable view at the exact evaluated native context. Neither
 // requester keys nor a default/root/off-chain lookup can supply that view.
-// SigningDigest must bind the COMPLETE request, exact role/purpose/reference and
-// certificate window using its separately admitted format. No codec is chosen
-// here. The real native owner must guard callbacks with its existing T04/read
-// boundary and serialize authority checks with the actual effect.
+// The signed bytes are not the reader's: scopedAuthorityCertificate builds the
+// one canonical certificate body (SP2-78) from the complete request, the exact
+// role/kind/reference, the resolved set and the certificate window. The real
+// native owner must guard callbacks with its existing T04/read boundary and
+// serialize authority checks with the actual effect.
 type scopedAuthorityReader interface {
 	ReadScopedAuthority(scopedAuthorityRequest) (scopedAuthorityView, error)
-	ScopedAuthoritySigningDigest(scopedAuthorityRequest, scopedAuthorityProof) ([]byte, error)
 	IsInterfaceNil() bool
+}
+
+// EXPERIMENTAL certificate form of the scoped authority check: operation
+// domain and certificate version of the SP2-78 contract. Not a released format.
+const (
+	scopedAuthorityCertificateOperation = "DRWA/SCOPED_AUTHORITY/experimental1"
+	scopedAuthorityCertificateVersion   = 1
+)
+
+// scopedAuthorityCertificate returns the canonical body one authority set
+// signs for one requirement of one request. Purpose is the signing role; the
+// operation kind carries use, phase, certificate kind, reference source,
+// request purpose, locus, target shard, action and owner; the subject is the
+// request subject; the payload is the request's body commitment. The replay
+// barrier of these certificates is the exact action, owner and body they name,
+// so the nonce field is empty.
+func scopedAuthorityCertificate(codec *registrationRecords, r scopedAuthorityRequest, p scopedAuthorityProof, set scopedAuthoritySet) ([]byte, error) {
+	if codec == nil {
+		return nil, errInvalidAuthoritySignatures
+	}
+	number := func(n uint32) []byte { return binary.BigEndian.AppendUint32(nil, n) }
+	kind, err := codec.frameBatch(true, number(uint32(r.use)), number(uint32(r.phase)), []byte(p.requirement.kind),
+		number(uint32(p.requirement.source)), []byte(r.purpose), number(r.locus), number(r.targetShard), r.action, r.owner)
+	if err != nil {
+		return nil, errInvalidAuthoritySignatures
+	}
+	raw, err := encodeCertificateBody(codec, certificateBody{network: r.domain, operation: []byte(scopedAuthorityCertificateOperation),
+		version: scopedAuthorityCertificateVersion, purpose: []byte(p.requirement.role), scope: r.scope, subjects: [][]byte{r.subject},
+		kind: kind, payload: r.digest, setID: set.id, setHash: set.hash, setVersion: set.version,
+		predecessor: set.predecessor, predecessorVersion: set.predecessorVersion, notBefore: p.notBefore, until: p.until})
+	if err != nil {
+		return nil, errInvalidAuthoritySignatures
+	}
+	return raw, nil
 }
 
 type scopedAuthorityView struct {
@@ -142,6 +178,22 @@ type scopedAuthorityView struct {
 	reconciliationEnabled       bool
 	writer                      *scopedWriterContext
 	arm                         *scopedArmContext
+	// SYNTHETIC, qualification only (owner answer A-1, 27 November 2026).
+	syntheticClaim *scopedSyntheticClaimEvidence
+}
+
+// scopedSyntheticClaimEvidence is a SYNTHETIC qualification premise. It lets
+// the adopted P09 alternatives be exercised on the bound synthetic rosters and
+// is not a rule for real loss or compromise claims: which evidence is
+// admissible, who produces it, how it is verified natively and how it is
+// challenged stay OPEN (policy row R09, A1384, A1629-1631). The premise is a
+// decoded reader statement bound to the exact claim, lost roles, request and
+// frozen cancellation policy. No native reader produces it.
+type scopedSyntheticClaimEvidence struct {
+	claim                                         string
+	lostRoles                                     []string
+	domain, scope, subject, action, owner, digest []byte
+	frozenPolicy                                  []byte
 }
 
 // Only the exact bound synthetic SP2-03 programme rosters may select this
@@ -179,6 +231,80 @@ func scopedAppointmentAllowed(r scopedAuthorityRequest, v scopedAuthorityView) b
 	return r.use == scopedActivation || bytes.Equal(v.nativeActor, v.issuerIdentity)
 }
 
+// scopedOwnerActs is true only when the natively authenticated actor is the
+// owner of the request's exact, already appointed scope (adopted R01 and P17).
+func scopedOwnerActs(r scopedAuthorityRequest, v scopedAuthorityView) bool {
+	c := v.scopeAppointment
+	return c != nil && !c.unappointed && len(c.owner) != 0 && bytes.Equal(c.scope, r.scope) &&
+		bytes.Equal(c.domain, r.domain) && bytes.Equal(v.nativeActor, c.owner)
+}
+
+// scopedSyntheticClaimAdmitted admits a claim only for the adopted P09
+// pre-cutoff cancellation, only under the synthetic roster rule, and only with
+// a synthetic premise that names exactly this claim, these lost roles, this
+// request and the action's frozen cancellation policy. Every other operation
+// with a claim or a lost role stays refused.
+func scopedSyntheticClaimAdmitted(r scopedAuthorityRequest, v scopedAuthorityView) bool {
+	e := v.syntheticClaim
+	if e == nil || r.use != scopedCEBCancellation || v.memberRule != scopedSyntheticThresholdOnly ||
+		(v.claim != "UNAVAILABLE" && v.claim != "COMPROMISED") || e.claim != v.claim ||
+		len(v.lostRoles) == 0 || len(e.lostRoles) != len(v.lostRoles) || len(v.frozenPolicy) == 0 {
+		return false
+	}
+	for i, role := range v.lostRoles {
+		if e.lostRoles[i] != role {
+			return false
+		}
+	}
+	return bytes.Equal(e.domain, r.domain) && bytes.Equal(e.scope, r.scope) && bytes.Equal(e.subject, r.subject) &&
+		bytes.Equal(e.action, r.action) && bytes.Equal(e.owner, r.owner) && bytes.Equal(e.digest, r.digest) &&
+		bytes.Equal(e.frozenPolicy, v.frozenPolicy)
+}
+
+// scopedIndependentPairs lists the role pairs that sign together in at least
+// one adopted row (P01-P17, the P09 alternatives, R03). The list is derived
+// from those rows, not quoted from an approved document; the owner confirmed
+// enforcing it at installation and rotation (answer D-03, 27 November 2026).
+// A1180-1182 requires distinct set identifiers and disjoint keys for each such
+// pair "at enrollment, first reference, installation, rotation and use".
+var scopedIndependentPairs = [][2]string{
+	{scopedIPAA, scopedPR}, {scopedIPAA, scopedPA}, {scopedIPAA, scopedATA},
+	{scopedPA, scopedPR}, {scopedPA, scopedATA}, {scopedPR, scopedATA},
+	{scopedPA, scopedSA}, {scopedPR, scopedSA}, {scopedATA, scopedSA},
+	{scopedSA, scopedEA}, {scopedATA, scopedEA},
+	{scopedCDA, scopedFCA}, {scopedCDA, scopedIRA}, {scopedFCA, scopedIRA},
+}
+
+// scopedSuccessorIndependent checks a set that an operation installs (a
+// proposed or frozen proposed version) against the installed set of every role
+// it is paired with, whether or not the operation's own class names that role.
+// A started action is checked against the sets bound to it and against the
+// sets current now. A paired role that has no installed set has nothing to share.
+func scopedSuccessorIndependent(v scopedAuthorityView, binding scopedAuthorityRequirement, s scopedAuthoritySet, memberLimit uint64) bool {
+	installed := []map[string]scopedAuthoritySet{v.current}
+	if binding.source == scopedFrozenProposed {
+		installed = append(installed, v.bound)
+	}
+	for _, pair := range scopedIndependentPairs {
+		other := pair[1]
+		if pair[1] == binding.role {
+			other = pair[0]
+		} else if pair[0] != binding.role {
+			continue
+		}
+		for _, sets := range installed {
+			peer, exists := sets[other]
+			if !exists {
+				continue
+			}
+			if uint64(len(peer.members)) > memberLimit || validateProgrammeAuthorityIndependentPair(s.id, peer.id, s.members, peer.members) != nil {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func scopedBusinessArmAllowed(r scopedAuthorityRequest, v scopedAuthorityView) bool {
 	if r.use != scopedCEBChange && r.use != scopedRoleRotation && r.use != scopedRetirement {
 		return false
@@ -195,7 +321,8 @@ type scopedAuthorityLimits struct {
 
 // scopedCancellationRoles represents only the adopted CONDITIONAL P09 quorum
 // relation. It does not adjudicate a loss/compromise claim. The consuming check
-// below rejects nonempty claims while claim-evidence policy remains OPEN.
+// below rejects every nonempty claim except under the synthetic qualification
+// premise; the real claim-evidence policy remains OPEN.
 func scopedCancellationRoles(v scopedAuthorityView) ([]string, error) {
 	if v.claim == "" && len(v.lostRoles) == 0 {
 		roles := []string{scopedPA, scopedPR}
@@ -362,7 +489,9 @@ func scopedAuthorityPlan(r scopedAuthorityRequest, v scopedAuthorityView) (proof
 			return nil, nil, errInvalidAuthoritySignatures
 		}
 		if v.preToken {
-			if r.phase != scopedDirect || len(v.nativeAuthentication) == 0 {
+			// Adopted P17 names the lawful scope owner. Since R01 the view
+			// identifies that owner; any other authenticated actor is refused.
+			if r.phase != scopedDirect || len(v.nativeAuthentication) == 0 || !scopedOwnerActs(r, v) {
 				return nil, nil, errInvalidAuthoritySignatures
 			}
 			add(scopedIPAA, "delegation", scopedCurrent)
@@ -397,6 +526,13 @@ func scopedAuthorityPlan(r scopedAuthorityRequest, v scopedAuthorityView) (proof
 	if !business {
 		return proofs, bindings, nil
 	}
+	// Adopted P16 names proposal, start and driver for P06/P07/P12 actions.
+	// No adopted row states them for a cap increase (P08) or an administrative
+	// transfer (P10, whose PA arm is stated). The owner admitted the five
+	// cells on 28 November 2026 (decision entry 9, point 9c): PA proposal, PA
+	// start and unsigned drive of a cap increase; PA proposal and unsigned
+	// drive of an administrative transfer. Same standing as P01-P17: synthetic
+	// qualification only. A transfer is armed, never started.
 	switch r.phase {
 	case scopedPropose:
 		proofs = []scopedAuthorityRequirement{{scopedPA, "proposal", scopedCurrent}}
@@ -459,9 +595,29 @@ func scopedAuthorityReference(v scopedAuthorityView, r scopedAuthorityRequiremen
 // threshold proofs. A nil result proves ONLY that scoped check in the supplied
 // trusted view. It is not native effect admission, canonical evidence, claim
 // eligibility, funding, accounting, cancellation serialization or a state write.
-// No claim, real mandatory-member condition or technical cell gets a default.
-func verifyScopedAuthority(reader scopedAuthorityReader, request scopedAuthorityRequest, proofs []scopedAuthorityProof, limits scopedAuthorityLimits) error {
-	if check.IfNil(reader) || limits.members == 0 || limits.proofs == 0 || limits.bytes == 0 || limits.lifetime == 0 || uint64(len(proofs)) > limits.proofs {
+// No real claim, real mandatory-member condition or technical cell gets a
+// default; a claim passes only under the labelled synthetic premise.
+//
+// The check owns its time source (owner decision SP2-24 D-3): it runs inside
+// the source's current evaluated-header context, and the reader's view must
+// carry that same context. A view with the live context of another clock is
+// refused, as is every use outside the block that issued the context.
+func verifyScopedAuthority(source HeaderTimeSource, codec *registrationRecords, reader scopedAuthorityReader, request scopedAuthorityRequest, proofs []scopedAuthorityProof, limits scopedAuthorityLimits) error {
+	if check.IfNil(source) || codec == nil || check.IfNil(reader) {
+		return errInvalidAuthoritySignatures
+	}
+	context, err := source.EvaluatedHeaderTimeContext()
+	if err != nil {
+		return err
+	}
+	_, err = withHeaderTime(source, context, func() (*vmcommon.VMOutput, error) {
+		return nil, verifyScopedAuthorityAt(context, codec, reader, request, proofs, limits)
+	})
+	return err
+}
+
+func verifyScopedAuthorityAt(context *HeaderTimeContext, codec *registrationRecords, reader scopedAuthorityReader, request scopedAuthorityRequest, proofs []scopedAuthorityProof, limits scopedAuthorityLimits) error {
+	if limits.members == 0 || limits.proofs == 0 || limits.bytes == 0 || limits.lifetime == 0 || uint64(len(proofs)) > limits.proofs {
 		return errInvalidAuthoritySignatures
 	}
 	remaining := limits.bytes
@@ -483,7 +639,10 @@ func verifyScopedAuthority(reader scopedAuthorityReader, request scopedAuthority
 	if r.use != e.use || r.phase != e.phase || r.purpose != e.purpose || r.locus != e.locus || r.targetShard != e.targetShard ||
 		!bytes.Equal(r.domain, e.domain) || !bytes.Equal(r.scope, e.scope) || !bytes.Equal(r.subject, e.subject) ||
 		!bytes.Equal(r.action, e.action) || !bytes.Equal(r.owner, e.owner) || !bytes.Equal(r.digest, e.digest) || v.plane != "NORMAL" ||
-		v.claim != "" || len(v.lostRoles) != 0 || v.time == nil || v.memberRule != scopedSyntheticThresholdOnly {
+		v.time != context || v.memberRule != scopedSyntheticThresholdOnly {
+		return errInvalidAuthoritySignatures
+	}
+	if (v.claim != "" || len(v.lostRoles) != 0 || v.syntheticClaim != nil) && !scopedSyntheticClaimAdmitted(r, v) {
 		return errInvalidAuthoritySignatures
 	}
 	_, locus := v.time.HeaderIdentity()
@@ -532,6 +691,9 @@ func verifyScopedAuthority(reader scopedAuthorityReader, request scopedAuthority
 				return errInvalidAuthoritySignatures
 			}
 		}
+		if (binding.source == scopedProposed || binding.source == scopedFrozenProposed) && !scopedSuccessorIndependent(v, binding, s, limits.members) {
+			return errInvalidAuthoritySignatures
+		}
 		for _, other := range bindings[:i] {
 			if binding.role == other.role {
 				continue
@@ -564,13 +726,11 @@ func verifyScopedAuthority(reader scopedAuthorityReader, request scopedAuthority
 			proof.until < proof.notBefore || proof.until-proof.notBefore > limits.lifetime || at < proof.notBefore || at > proof.until {
 			return errInvalidAuthoritySignatures
 		}
-		metadata := proof
-		metadata.id, metadata.hash = bytes.Clone(proof.id), bytes.Clone(proof.hash)
-		metadata.indices, metadata.signatures = nil, nil
-		digest, digestErr := reader.ScopedAuthoritySigningDigest(r.clone(), metadata)
-		if digestErr != nil {
-			return digestErr
+		raw, bodyErr := scopedAuthorityCertificate(codec, r, proof, s)
+		if bodyErr != nil {
+			return bodyErr
 		}
+		digest := codec.hasher.Compute(string(raw))
 		if err = verifyProgrammeAuthoritySignatures("ED25519_M_OF_N", s.threshold, s.members, proof.indices, proof.signatures, bytes.Clone(digest), limits.members, limits.bytes); err != nil {
 			return err
 		}

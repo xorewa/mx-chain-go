@@ -10,6 +10,7 @@ import (
 
 	"github.com/multiversx/mx-chain-core-go/core"
 	"github.com/multiversx/mx-chain-core-go/hashing/blake2b"
+	"github.com/multiversx/mx-chain-core-go/marshal"
 	crypto "github.com/multiversx/mx-chain-crypto-go"
 	"github.com/multiversx/mx-chain-crypto-go/signing/ed25519/singlesig"
 	"github.com/stretchr/testify/require"
@@ -21,9 +22,11 @@ import (
 // No test installs this host as a native reader, adjudicates an objective
 // claim, executes cancellation or proves independent human controllers.
 type qualSP227Source struct {
-	v                  scopedAuthorityView
-	readErr, digestErr error
-	mutateRead         bool
+	v            scopedAuthorityView
+	readErr      error
+	afterRead    func()
+	mutateRead   bool
+	duringDigest func()
 }
 
 func (s *qualSP227Source) IsInterfaceNil() bool { return s == nil }
@@ -31,20 +34,34 @@ func (s *qualSP227Source) ReadScopedAuthority(r scopedAuthorityRequest) (scopedA
 	if s.mutateRead {
 		r.domain[0] ^= 1
 	}
+	if s.afterRead != nil {
+		s.afterRead()
+	}
 	return s.v, s.readErr
 }
+
+// ScopedAuthoritySigningDigest is the fixture's own encoder of the SP2-78
+// certificate body of one requirement: written from the documented field
+// order with the test framing, not with the product encoder. The signing set's
+// predecessor is the one the view holds for the proof's exact set.
 func (s *qualSP227Source) ScopedAuthoritySigningDigest(r scopedAuthorityRequest, p scopedAuthorityProof) ([]byte, error) {
-	if s.digestErr != nil {
-		return nil, s.digestErr
+	if s.duringDigest != nil {
+		s.duringDigest()
 	}
-	// All request coordinates and all certificate metadata are signed. This
-	// uses existing native Batch framing and Blake2b, not JSON or a new codec.
-	return blake2b.NewBlake2b().Compute(string(qualRecordFrame(
-		qualSP227Number(uint64(r.use)), qualSP227Number(uint64(r.phase)), []byte(r.purpose), qualSP227Number(uint64(r.locus)),
-		qualSP227Number(uint64(r.targetShard)),
-		r.domain, r.scope, r.subject, r.action, r.owner, r.digest, []byte(p.requirement.role), []byte(p.requirement.kind),
-		qualSP227Number(uint64(p.requirement.source)), p.id, p.hash, qualSP227Number(p.version),
-		qualSP227Number(uint64(p.notBefore)), qualSP227Number(uint64(p.until))))), nil
+	u32 := func(n uint32) []byte { return binary.BigEndian.AppendUint32(nil, n) }
+	var predecessor []byte
+	var predecessorVersion uint64
+	for _, sets := range []map[string]scopedAuthoritySet{s.v.current, s.v.bound, s.v.proposed, s.v.frozenProposed} {
+		if set, ok := sets[p.requirement.role]; ok && bytes.Equal(set.id, p.id) && bytes.Equal(set.hash, p.hash) && set.version == p.version {
+			predecessor, predecessorVersion = set.predecessor, set.predecessorVersion
+		}
+	}
+	kind := qualRecordFrame(u32(uint32(r.use)), u32(uint32(r.phase)), []byte(p.requirement.kind), u32(uint32(p.requirement.source)),
+		[]byte(r.purpose), u32(r.locus), u32(r.targetShard), r.action, r.owner)
+	body := qualRecordFrame([]byte("DRWA/CERTIFICATE_BODY/experimental1"), r.domain, []byte("DRWA/SCOPED_AUTHORITY/experimental1"),
+		qualSP227Number(1), []byte(p.requirement.role), r.scope, qualRecordFrame(r.subject), kind, r.digest, p.id, qualSP227Number(p.version), p.hash,
+		qualSP227Number(predecessorVersion), predecessor, qualSP227Number(uint64(p.notBefore)), qualSP227Number(uint64(p.until)), nil)
+	return blake2b.NewBlake2b().Compute(string(body)), nil
 }
 func qualSP227Number(n uint64) []byte {
 	b := make([]byte, 8)
@@ -58,6 +75,8 @@ type qualSP227Constitution struct {
 	keys, proposedKeys map[string][]crypto.PrivateKey
 	limits             scopedAuthorityLimits
 	clock              *qualUnboundHeaderTime
+	source             HeaderTimeSource
+	codec              *registrationRecords
 }
 
 func qualSP227ConstitutionNew(t *testing.T, all []qualSP227Binding, programme string) *qualSP227Constitution {
@@ -110,6 +129,10 @@ func qualSP227ConstitutionNew(t *testing.T, all []qualSP227Binding, programme st
 	v.scopeAppointment = &scopedAppointmentContext{owner: []byte("native programme scope owner"), scope: bytes.Clone(f.r.scope), domain: bytes.Clone(f.r.domain)}
 	v.window = &governedActionWindow{100, 105, 120}
 	v.time = qualGovernedContext(t, f.clock, core.MetachainShardId, 110)
+	f.source = qualClockSource(f.clock, nil)
+	var err error
+	f.codec, err = newRegistrationRecords(qualRegistrationStore(t, 0), &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 4096)
+	require.NoError(t, err)
 	f.bindRequest()
 	return f
 }
@@ -150,7 +173,7 @@ func (f *qualSP227Constitution) sign(t *testing.T, wants []scopedAuthorityRequir
 	return out
 }
 func (f *qualSP227Constitution) verify(p []scopedAuthorityProof) error {
-	return verifyScopedAuthority(f.s, f.r, p, f.limits)
+	return verifyScopedAuthority(f.source, f.codec, f.s, f.r, p, f.limits)
 }
 func qualSP227Want(role, kind string, source int) scopedAuthorityRequirement {
 	return scopedAuthorityRequirement{role, kind, source}
@@ -238,6 +261,9 @@ func TestQualSP227ConstitutionMatrix(t *testing.T) {
 					v.lrc = "WIND_DOWN_SEALED"
 				}
 				v.preToken = row.name == "P17_pretoken"
+				if v.preToken { // adopted P17: the lawful scope owner acts
+					v.nativeActor = bytes.Clone(v.scopeAppointment.owner)
+				}
 				if row.phase == scopedDrive { // started material survives later current rotations and expiry
 					v.time = qualGovernedContext(t, f.clock, core.MetachainShardId, 121)
 					v.current = nil
@@ -421,15 +447,18 @@ func TestQualSP227ConstitutionNegatives(t *testing.T) {
 	}
 	f := qualSP227ConstitutionNew(t, all, programme)
 	p := f.sign(t, wants)
-	require.ErrorIs(t, verifyScopedAuthority(nil, f.r, p, f.limits), errInvalidAuthoritySignatures)
+	require.ErrorIs(t, verifyScopedAuthority(f.source, f.codec, nil, f.r, p, f.limits), errInvalidAuthoritySignatures)
 	var nilReader *qualSP227Source
-	require.ErrorIs(t, verifyScopedAuthority(nilReader, f.r, p, f.limits), errInvalidAuthoritySignatures)
+	require.ErrorIs(t, verifyScopedAuthority(f.source, f.codec, nilReader, f.r, p, f.limits), errInvalidAuthoritySignatures)
 	f.s.readErr = errors.New("reader unavailable")
 	require.ErrorIs(t, f.verify(p), f.s.readErr)
 	f.s.readErr = nil
-	f.s.digestErr = errors.New("digest unavailable")
-	require.ErrorIs(t, f.verify(p), f.s.digestErr)
-	f.s.digestErr = nil
+	// The signed bytes are the product's (SP2-78): there is no reader digest to
+	// fail. Without a codec, or with one too small for the body, it refuses.
+	require.ErrorIs(t, verifyScopedAuthority(f.source, nil, f.s, f.r, p, f.limits), errInvalidAuthoritySignatures)
+	small, err := newRegistrationRecords(qualRegistrationStore(t, 0), &marshal.GogoProtoMarshalizer{}, blake2b.NewBlake2b(), 64)
+	require.NoError(t, err)
+	require.ErrorIs(t, verifyScopedAuthority(f.source, small, f.s, f.r, p, f.limits), errInvalidAuthoritySignatures)
 	f.s.mutateRead = true
 	require.NoError(t, f.verify(p), "reader request copy cannot alter verifier request")
 	require.Equal(t, []byte("W03 constitution experiment"), f.r.domain)
@@ -467,8 +496,16 @@ func TestQualSP227ConstitutionPolicyGuards(t *testing.T) {
 		{"terminal_missing_owner", scopedRetirementSeal, scopedDirect, []scopedAuthorityRequirement{w(scopedPA, "request", scopedCurrent)}, func(f *qualSP227Constitution) { f.s.v.status = "IN_PROGRESS"; f.s.v.lrc = "WIND_DOWN" }, func(f *qualSP227Constitution) { f.s.v.activeOwner = []byte("other") }},
 		{"terminal_wrong_lifecycle", scopedRetirementCommit, scopedDirect, []scopedAuthorityRequirement{w(scopedPA, "request", scopedCurrent)}, func(f *qualSP227Constitution) { f.s.v.status = "IN_PROGRESS"; f.s.v.lrc = "WIND_DOWN_SEALED" }, func(f *qualSP227Constitution) { f.s.v.lrc = "ACTIVE" }},
 		{"rotation_missing_target", scopedRoleRotation, scopedAuthorize, []scopedAuthorityRequirement{w(scopedPA, "approval", scopedCurrent), w(scopedPR, "approval", scopedCurrent), w(scopedSA, "predecessor", scopedCurrent), w(scopedSA, "possession", scopedProposed)}, func(f *qualSP227Constitution) { f.s.v.targetRole = scopedSA }, func(f *qualSP227Constitution) { f.s.v.targetRole = "" }},
-		{"provider_missing", scopedProviderBinding, scopedDirect, []scopedAuthorityRequirement{w(scopedIPAA, "delegation", scopedCurrent), w(scopedPR, "delegation", scopedCurrent), w(scopedSA, "predecessor", scopedCurrent), w(scopedSA, "possession", scopedProposed)}, func(f *qualSP227Constitution) { f.s.v.preToken = true; f.s.v.providerRole = scopedSA }, func(f *qualSP227Constitution) { f.s.v.providerRole = "" }},
-		{"provider_no_native", scopedProviderBinding, scopedDirect, []scopedAuthorityRequirement{w(scopedIPAA, "delegation", scopedCurrent), w(scopedPR, "delegation", scopedCurrent), w(scopedSA, "predecessor", scopedCurrent), w(scopedSA, "possession", scopedProposed)}, func(f *qualSP227Constitution) { f.s.v.preToken = true; f.s.v.providerRole = scopedSA }, func(f *qualSP227Constitution) { f.s.v.nativeAuthentication = nil }},
+		{"provider_missing", scopedProviderBinding, scopedDirect, []scopedAuthorityRequirement{w(scopedIPAA, "delegation", scopedCurrent), w(scopedPR, "delegation", scopedCurrent), w(scopedSA, "predecessor", scopedCurrent), w(scopedSA, "possession", scopedProposed)}, func(f *qualSP227Constitution) {
+			f.s.v.preToken = true
+			f.s.v.providerRole = scopedSA
+			f.s.v.nativeActor = bytes.Clone(f.s.v.scopeAppointment.owner)
+		}, func(f *qualSP227Constitution) { f.s.v.providerRole = "" }},
+		{"provider_no_native", scopedProviderBinding, scopedDirect, []scopedAuthorityRequirement{w(scopedIPAA, "delegation", scopedCurrent), w(scopedPR, "delegation", scopedCurrent), w(scopedSA, "predecessor", scopedCurrent), w(scopedSA, "possession", scopedProposed)}, func(f *qualSP227Constitution) {
+			f.s.v.preToken = true
+			f.s.v.providerRole = scopedSA
+			f.s.v.nativeActor = bytes.Clone(f.s.v.scopeAppointment.owner)
+		}, func(f *qualSP227Constitution) { f.s.v.nativeAuthentication = nil }},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -784,7 +821,8 @@ func TestQualSP227ConstitutionGASComposition(t *testing.T) {
 				want[1] = w(scopedATA, "approval", scopedCurrent)
 			}
 			g.x = qualGovernedContext(t, g.c, core.MetachainShardId, 105)
-			f.s.v.time = g.x
+			// One source for the action store and the authority check (D-3).
+			f.s.v.time, f.source = g.x, g.g.timeSource
 			f.bindRequest()
 			h := &qualSP227GASHost{qualGovernedActionHost: g.h, f: f, proofs: f.sign(t, want)}
 			h.arm = arm
@@ -1221,7 +1259,8 @@ func TestQualSP227AdoptedBusinessArmComposition(t *testing.T) {
 			f.s.v.targetRole = scopedSA
 			f.s.v.activeOwner = bytes.Clone(id)
 			g.x = qualGovernedContext(t, g.c, core.MetachainShardId, 105)
-			f.s.v.time = g.x
+			// One source for the action store and the authority check (D-3).
+			f.s.v.time, f.source = g.x, g.g.timeSource
 			f.bindRequest()
 			wants := []scopedAuthorityRequirement{w(scopedPA, "approval", scopedCurrent), w(scopedPR, "approval", scopedCurrent)}
 			if use == scopedRoleRotation {

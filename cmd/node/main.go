@@ -95,15 +95,15 @@ func startNodeRunner(c *cli.Context, log logger.Logger, baseVersion string, vers
 	if err != nil {
 		return err
 	}
-	// No configured persisted checkpoint is admitted. Keep the parsed
-	// record distinct from ordinary startup before opening even a log file.
-	if startup != nil && startup.Mode == "persisted" {
+	// A persisted syntax carrier without its sealed predecessor is not an
+	// admitted restart. Refuse before opening even a log file.
+	if startup != nil && startup.Mode == "persisted" && startup.Predecessor == (drwaStartupMember{}) {
 		return drwa.ErrDeploymentIdentity
 	}
 
 	flagsConfig := getFlagsConfig(c, log)
 
-	original := startup != nil && startup.Mode == "original"
+	configured := startup != nil
 	cfgs, errCfg := readConfigs(c, log)
 	if errCfg != nil {
 		return errCfg
@@ -115,7 +115,7 @@ func startNodeRunner(c *cli.Context, log logger.Logger, baseVersion string, vers
 	}
 
 	var fileLogging factory.FileLoggingHandler
-	if !original {
+	if !configured {
 		// The native main config can select persisted identity without a
 		// startup record. Refuse it before opening the logger or any provider.
 		if err = node.ValidateDRWAStartupMode(cfgs); err != nil {
@@ -161,9 +161,9 @@ func startNodeRunner(c *cli.Context, log logger.Logger, baseVersion string, vers
 		return errRunner
 	}
 
-	if original {
-		// NewNodeRunner acquires the process-bound original grant before
-		// the configured CLI can open any file logger or start the runner.
+	if configured {
+		// NewNodeRunner acquires original provenance or verifies the retained
+		// restart commitment before a configured CLI opens a file logger.
 		fileLogging, err = attachFileLogger(log, flagsConfig)
 		if err != nil {
 			return err
@@ -182,7 +182,7 @@ func startNodeRunner(c *cli.Context, log logger.Logger, baseVersion string, vers
 	}
 
 	if !check.IfNil(fileLogging) {
-		if original {
+		if configured {
 			closeErr := fileLogging.Close()
 			log.LogIfError(closeErr)
 			if err == nil {

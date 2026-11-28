@@ -75,7 +75,7 @@ func newGovernedActionRecords(accounts state.AccountsAdapter, boundary *Rollback
 		return nil, errGovernedActionRecord
 	}
 	sum, err := core.SafeAddUint64(ordinary, protected)
-	if err != nil || sum != total {
+	if err != nil || sum != total || protected == 0 {
 		return nil, errGovernedActionRecord
 	}
 	owned := false
@@ -88,6 +88,9 @@ func newGovernedActionRecords(accounts state.AccountsAdapter, boundary *Rollback
 	codec, err := newRegistrationRecords(accounts, marshaller, hasher, maxBytes)
 	if err != nil {
 		return nil, err
+	}
+	if !governedActionCapacityFits(total, uint64(codec.hasher.Size()), uint64(codec.maxBytes)) {
+		return nil, errGovernedActionRecord
 	}
 	return &governedActionRecords{codec: codec, boundary: boundary, host: host,
 		domain: bytes.Clone(domain), total: total, ordinary: ordinary, protected: protected, timeSource: timeSource}, nil

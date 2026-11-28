@@ -30,6 +30,7 @@ type drwaIdentityMode struct {
 	afterHardFork            bool
 	startEpoch, genesisEpoch uint32
 	finalizedMetachainHeader []byte
+	startupCommitment        []byte
 }
 
 // One instance belongs to one process-component factory across creation cycles.
@@ -123,6 +124,10 @@ func (o *drwaIdentityLifecycle) admitLocked(db drwaIdentityDB, identity *drwa.De
 		o.failure = errors.Join(err, closeErr)
 		return nil, o.failure
 	}
+	if commitmentErr := verifyRetainedStartupCommitment(db, mode, err == nil); commitmentErr != nil {
+		o.failure = errors.Join(commitmentErr, db.Close())
+		return nil, o.failure
+	}
 	if err == nil {
 		if !bytes.Equal(value, raw) {
 			closeErr := db.Close()
@@ -142,10 +147,34 @@ func (o *drwaIdentityLifecycle) admitLocked(db drwaIdentityDB, identity *drwa.De
 			o.failure = errors.Join(putErr, closeErr)
 			return nil, o.failure
 		}
+		if len(mode.startupCommitment) != 0 {
+			if putErr := db.Put([]byte(drwaStartupCommitmentKey), mode.startupCommitment); putErr != nil {
+				// A partially recorded identity can never admit a restart.
+				o.failure = errors.Join(putErr, db.Close())
+				return nil, o.failure
+			}
+		}
 	}
 	unit := &drwaIdentityUnit{owner: o, db: db, identity: identity}
 	o.unit = unit
 	return unit, nil
+}
+
+func verifyRetainedStartupCommitment(db drwaIdentityDB, mode drwaIdentityMode, identityExists bool) error {
+	if len(mode.startupCommitment) == 0 {
+		return nil
+	}
+	retained, err := db.Get([]byte(drwaStartupCommitmentKey))
+	if mode.freshGenesis {
+		if identityExists || !errors.Is(err, storage.ErrKeyNotFound) {
+			return errors.Join(drwa.ErrDeploymentIdentity, err)
+		}
+		return nil
+	}
+	if !identityExists || err != nil || !bytes.Equal(retained, mode.startupCommitment) {
+		return errors.Join(drwa.ErrDeploymentIdentity, err)
+	}
+	return nil
 }
 
 // Domain never exposes mutable buffers or a view after closure/failure.

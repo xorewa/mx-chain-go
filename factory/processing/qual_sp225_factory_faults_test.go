@@ -50,8 +50,14 @@ func TestQualSP225ProcessingVMMetaConstructionFailures(t *testing.T) {
 	t.Run("deployment_without_a_receipt_pool_source", func(t *testing.T) {
 		pcf := qualSP225Factory(t, core.MetachainShardId, true, store, peer)
 		require.Nil(t, pcf.drwaNativeValidationSource)
+		// SP2-24: the owner is bound only to a hook that carries the factory's
+		// own per-header activation predicate, as the block processor creator
+		// supplies it. (Until SP2-24 this case passed no predicate.)
+		enabledAt, err := pcf.drwaHeaderTimeEnabledAt()
+		require.NoError(t, err)
+		require.NotNil(t, enabledAt)
 		factory, container, owner, err := pcf.createProcessingVMMeta(vmBuiltins.NewBuiltInFunctionContainer(), &testscommon.SimpleNFTStorageHandlerStub{},
-			&testscommon.ESDTGlobalSettingsHandlerStub{}, &testscommon.EpochStartTriggerStub{}, nil)
+			&testscommon.ESDTGlobalSettingsHandlerStub{}, &testscommon.EpochStartTriggerStub{}, enabledAt)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = factory.BlockChainHookImpl().Close() })
 		require.NotNil(t, container)
