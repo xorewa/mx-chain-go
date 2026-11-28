@@ -280,6 +280,9 @@ func (c *verifiedAdminEffectContext) ValidateLocal(e adminEffectEnvelope) error 
 	if err != nil {
 		return err
 	}
+	if err = c.typeMaterialized(e); err != nil {
+		return err
+	}
 	if locus == adminLocusAccountRoles {
 		if len(e.targetKey) != len(core.SystemAccountAddress) || vmcommon.IsSystemAccountAddress(e.targetKey) ||
 			core.IsSmartContractAddress(e.targetKey) || f.args.ShardOf(bytes.Clone(e.targetKey)) != f.args.Shard {
@@ -314,6 +317,52 @@ func (c *verifiedAdminEffectContext) ValidateLocal(e adminEffectEnvelope) error 
 		}
 	}
 	return source.VerifyAdminEffect(effect)
+}
+
+// typeMaterialized is the type guard of every leg that depends on the token's
+// type on this shard (Part A 4.1 step 3: role, supply and setting fan-out;
+// "a later ACK cannot retroactively protect an earlier mutation"). The leg
+// that sets the type is the one effect that precedes it.
+//
+// Where the baseline materializes a type on a shard (the native
+// ESDTSetTokenType of this node is active, which is DynamicESDTFlag), the
+// shard's global item of the token must be positively present with exactly
+// the type of the envelope's family. Where the baseline materializes none,
+// the item may be absent or typeless. A type of another family is refused in
+// both cases, and so is an item that is not the native two bytes.
+func (c *verifiedAdminEffectContext) typeMaterialized(e adminEffectEnvelope) error {
+	if string(e.discriminator) == core.ESDTSetTokenType {
+		return nil
+	}
+	expected, supported := burnReadinessTypeByte[string(e.tokenType)]
+	if !supported {
+		return ErrTokenTypeNotMaterialized
+	}
+	loaded, err := c.function.args.Accounts.LoadAccount(bytes.Clone(core.SystemAccountAddress))
+	if err != nil {
+		return err
+	}
+	system, ok := loaded.(vmcommon.UserAccountHandler)
+	if !ok || check.IfNil(system) {
+		return ErrTokenTypeNotMaterialized
+	}
+	item, err := shardRegistryValue(system, append([]byte(adminTokenKeyPrefix), e.tokenID...))
+	if err != nil {
+		return err
+	}
+	required := false
+	if native, getErr := c.function.args.BuiltIns.Get(core.ESDTSetTokenType); getErr == nil {
+		required = native.IsActive()
+	}
+	switch {
+	case len(item) == 0 && !required:
+		return nil
+	case len(item) == 2 && item[1] == expected:
+		return nil
+	case len(item) == 2 && item[1] == 0 && !required:
+		return nil
+	}
+	return ErrTokenTypeNotMaterialized
 }
 
 func (c *verifiedAdminEffectContext) target(e adminEffectEnvelope) (vmcommon.UserAccountHandler, error) {

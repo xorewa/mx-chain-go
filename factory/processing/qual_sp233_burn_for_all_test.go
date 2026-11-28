@@ -192,4 +192,16 @@ func TestQualSP233ReadinessExistsOnlyOnTheMetachainOfADRWADeployment(t *testing.
 	require.NoError(t, err)
 	require.NotNil(t, again)
 	require.NotNil(t, rebound)
+
+	// SP2-34: the owner of the protected type materialization exception.
+	materialization, err := meta.newDRWATypeMaterialization(installed)
+	require.NoError(t, err)
+	require.False(t, materialization.IsInterfaceNil())
+	_, _, err = materialization.Open(&vmcommon.VMOutput{}, drwa.TypeMaterializationRequest{TokenID: []byte("TOKEN-abcdef"),
+		Family: []byte(core.FungibleESDT)}, 1000)
+	require.ErrorIs(t, err, drwa.ErrInvalidTypeMaterialization, "the baseline of this node materializes no type")
+	_, err = meta.newDRWATypeMaterialization(nil)
+	require.ErrorIs(t, err, drwa.ErrInvalidTypeMaterialization)
+	_, err = meta.newDRWATypeMaterialization(&drwaMetaFinalityImport{})
+	require.ErrorIs(t, err, drwa.ErrInvalidTypeMaterialization)
 }
