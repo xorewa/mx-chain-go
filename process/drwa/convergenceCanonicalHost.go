@@ -121,7 +121,12 @@ func (h *ConvergenceHost) SetFamilyOwner(family string, owner ConvergenceFamilyO
 }
 
 func (h *ConvergenceHost) decode(binding []byte) (*ConvergenceBinding, error) {
-	codec := h.args.Records
+	return decodeConvergenceBinding(h.args.Records, binding)
+}
+
+// decodeConvergenceBinding is the one decoder of a phase binding, for the
+// metachain host and for a shard that applies the phase's object.
+func decodeConvergenceBinding(codec *registrationRecords, binding []byte) (*ConvergenceBinding, error) {
 	fields, err := registrationBoundedFields(codec, binding, 10, 12, codec.maxBytes)
 	if err != nil || len(fields) == 11 || len(fields[5]) != 8 {
 		return nil, errConvergence

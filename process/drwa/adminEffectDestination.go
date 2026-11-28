@@ -123,6 +123,9 @@ type AdminEffectFunction struct {
 	codec   *registrationRecords
 	mut     sync.RWMutex
 	binding AdminEffectBindingSource
+	// seal is the shard's lifecycle seal check (SP2-37). It is separate from
+	// the binding source so that it holds whichever source is installed.
+	seal AdminEffectBindingSource
 }
 
 // NewAdminEffectFunction creates the destination. It reads no state.
@@ -150,6 +153,21 @@ func (f *AdminEffectFunction) SetBindingSource(source AdminEffectBindingSource) 
 		return ErrInvalidAdminEffect
 	}
 	f.binding = source
+	return nil
+}
+
+// SetSealGate installs the shard's lifecycle seal check, once, at node
+// construction. It is asked before the binding source and can only refuse.
+func (f *AdminEffectFunction) SetSealGate(gate AdminEffectBindingSource) error {
+	if check.IfNil(gate) {
+		return ErrInvalidAdminEffect
+	}
+	f.mut.Lock()
+	defer f.mut.Unlock()
+	if f.seal != nil {
+		return ErrInvalidAdminEffect
+	}
+	f.seal = gate
 	return nil
 }
 
@@ -274,7 +292,7 @@ func (c *verifiedAdminEffectContext) ValidateLocal(e adminEffectEnvelope) error 
 		return err
 	}
 	f.mut.RLock()
-	source := f.binding
+	source, seal := f.binding, f.seal
 	f.mut.RUnlock()
 	if source == nil {
 		return errAdminCarrier
@@ -289,6 +307,11 @@ func (c *verifiedAdminEffectContext) ValidateLocal(e adminEffectEnvelope) error 
 			step = step<<8 | uint64(b)
 		}
 		effect.PlanStep = &step
+	}
+	if seal != nil {
+		if err = seal.VerifyAdminEffect(effect); err != nil {
+			return err
+		}
 	}
 	return source.VerifyAdminEffect(effect)
 }

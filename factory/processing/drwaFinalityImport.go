@@ -181,12 +181,29 @@ func (pcf *processComponentsFactory) newDRWAFinalityImport(
 		RecordBytes: limits.RecordBytes,
 		Shards:      pcf.bootstrapComponents.ShardCoordinator().NumberOfShards(),
 	})
+	// The metachain node also owns the replication of the setup seal and is
+	// the owner of the setup convergence family (Part A L2489-2503,
+	// L5466-5470). The two origin owners are built together: a failure of
+	// either refuses the node.
+	var seal *drwa.LifecycleSealOrigin
+	if err == nil {
+		seal, err = pcf.installDRWALifecycleSealOrigin(accounts, host, funding)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// E10 (Part A E.20): the readiness owner of the false global-burn state of
+	// every shard, and the convergence host with that readiness bound into the
+	// completion of every phase. The registration ingress opens a token's
+	// readiness and uses the bound host for its phases (SP2-38).
+	readiness, bound, err := pcf.newDRWABurnReadiness(accounts, owner, host, adminEffects, funding)
 	if err != nil {
 		return nil, err
 	}
 
 	return &drwaMetaFinalityImport{FinalityImport: owner, convergence: host, supplyEvidence: supply, funding: funding,
-		adminEffects: adminEffects}, nil
+		adminEffects: adminEffects, lifecycleSeal: seal, burnReadiness: readiness, burnBound: bound}, nil
 }
 
 // drwaMetaFinalityImport is the metachain block processor's import owner
@@ -197,6 +214,21 @@ type drwaMetaFinalityImport struct {
 	supplyEvidence *drwa.SupplyEvidenceVerifier
 	funding        *drwa.CarrierFunding
 	adminEffects   *drwa.AdminEffects
+	lifecycleSeal  *drwa.LifecycleSealOrigin
+	burnReadiness  *drwa.BurnForAllReadiness
+	burnBound      *drwa.BurnBoundConvergenceHost
+}
+
+// DRWABurnForAllReadiness returns the metachain node's owner of E10's shard
+// readiness.
+func (m *drwaMetaFinalityImport) DRWABurnForAllReadiness() *drwa.BurnForAllReadiness {
+	return m.burnReadiness
+}
+
+// DRWABurnBoundConvergenceHost returns the convergence host with E10's
+// readiness bound into phase completion.
+func (m *drwaMetaFinalityImport) DRWABurnBoundConvergenceHost() *drwa.BurnBoundConvergenceHost {
+	return m.burnBound
 }
 
 // DRWAAdminEffects returns the metachain node's origin owner of protected
@@ -211,6 +243,12 @@ func (m *drwaMetaFinalityImport) DRWACarrierFunding() *drwa.CarrierFunding { ret
 // closure-bound origin SupplyState evidence.
 func (m *drwaMetaFinalityImport) DRWASupplyEvidenceVerifier() *drwa.SupplyEvidenceVerifier {
 	return m.supplyEvidence
+}
+
+// DRWALifecycleSealOrigin returns the metachain node's owner of the setup
+// seal's replication.
+func (m *drwaMetaFinalityImport) DRWALifecycleSealOrigin() *drwa.LifecycleSealOrigin {
+	return m.lifecycleSeal
 }
 
 // DRWAConvergenceHost returns the metachain node's convergence host.

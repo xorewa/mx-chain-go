@@ -354,26 +354,44 @@ func TestQualSP279MetaClassificationInstallsFundingInEveryCandidate(t *testing.T
 // discarded). A DRWA path of this row that used either would have to treat
 // that failure as deny. No path of this row uses either: funding reads no
 // balance and runs no synchronous callback. This test keeps it so.
+// sp279FundingUsers is the closed set of product files that name the funding
+// owner, each with the reason it is admitted. The criterion, stated once: a
+// file is admitted when it is the funding owner or its pricing; or when it is
+// a protected carrier, which means that every path into its use of the owner
+// is a protected metachain operation or a call the file admits only from the
+// metachain ESDT system contract, so that no ordinary (non-DRWA) path reaches
+// it; or when it only constructs or installs such an owner at node
+// construction. Every admitted file is also checked for the two blurred
+// upstream functions. A later row whose carrier uses the owner adds its
+// files here with its reason; nothing else about the check changes.
+var sp279FundingUsers = map[string]string{
+	"carrierFunding.go":                              "the funding owner",
+	"carrierPricing.go":                              "its pricing source",
+	"registryCarrierFunding.go":                      "SP2-79: acknowledgment and redrive of the registry delta",
+	"registryRegistration.go":                        "SP2-79: funding of the registry delta inside the protected registration",
+	"nativeClassification.go":                        "SP2-79: hands the installed owner to the registration writer",
+	"adminEffectOrigin.go":                           "SP2-32: funds an OpenEffect's legs, outcomes and redrive; callers are protected metachain operations",
+	"adminEffectDestination.go":                      "SP2-32: pure CarrierDestinationGas inside a call admitted only from the metachain ESDT system contract",
+	"lifecycleSealOrigin.go":                         "SP2-37: funds the replication of the setup seal, its outcomes and redrive; callers are the protected setup operations",
+	"burnForAllReadiness.go":                         "SP2-33: opens its effects only through the admin-effect carrier, checks their whole price before its first write and reads each effect's funding record; callers are the protected registration and the completion of a convergence phase",
+	"../../factory/processing/drwaFinalityImport.go": "node construction of the metachain owners",
+	"../../factory/processing/drwaBurnReadiness.go":  "SP2-33: node construction of the readiness owner",
+	"../../factory/processing/drwaLifecycleSeal.go":  "SP2-37: node construction of the seal's replication owner",
+}
+
 func TestQualSP279NoPathOfThisRowUsesTheTwoBlurredUpstreamFunctions(t *testing.T) {
 	blurred := regexp.MustCompile(`\bGetBalance\(|ExecuteSyncCallbackAndFinishOutput|executeSyncCallback`)
-	for _, file := range []string{"carrierFunding.go", "carrierPricing.go", "registryCarrierFunding.go", "registryRegistration.go",
-		"outcomeGasReservation.go", "replicationWorkReservation.go", "shardRegistry.go",
-		"adminEffectOrigin.go", "adminEffectDestination.go"} {
+	checked := []string{"outcomeGasReservation.go", "replicationWorkReservation.go", "shardRegistry.go"}
+	for file := range sp279FundingUsers {
+		checked = append(checked, file)
+	}
+	for _, file := range checked {
 		source, err := os.ReadFile(file)
 		require.NoError(t, err)
 		require.False(t, blurred.Match(source), file)
 	}
-	// And the funding owner is reached only from the registration, its
-	// acknowledgment and its redrive, and from the protected admin-effect
-	// carrier of SP2-32: no ordinary path names it. The two admin-effect
-	// files are admitted because they are the P06 consumer this row handed
-	// its interface to: adminEffectOrigin.go funds an OpenEffect's legs
-	// (Accept), their outcomes (Outcome) and a redrive (Redrive) under the
-	// class AdminEffect, and has only protected metachain operations as
-	// callers; adminEffectDestination.go uses the pure arithmetic of
-	// CarrierDestinationGas inside a call it admits only from the metachain
-	// ESDT system contract. Both are also in the list above: neither uses a
-	// blurred upstream function.
+	// And the funding owner is named only by the admitted files: no ordinary
+	// path names it.
 	callers := map[string]bool{}
 	for _, root := range []string{".", "../smartContract", "../transaction", "../block", "../coordinator", "../../vm", "../../factory", "../../node", "../../genesis"} {
 		require.NoError(t, filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
@@ -390,8 +408,10 @@ func TestQualSP279NoPathOfThisRowUsesTheTwoBlurredUpstreamFunctions(t *testing.T
 			return nil
 		}))
 	}
-	require.Equal(t, map[string]bool{"carrierFunding.go": true, "carrierPricing.go": true, "registryCarrierFunding.go": true,
-		"registryRegistration.go": true, "nativeClassification.go": true,
-		"adminEffectOrigin.go": true, "adminEffectDestination.go": true,
-		filepath.Clean("../../factory/processing/drwaFinalityImport.go"): true}, callers)
+	admitted := map[string]bool{}
+	for file, reason := range sp279FundingUsers {
+		require.NotEmpty(t, reason, file)
+		admitted[filepath.Clean(file)] = true
+	}
+	require.Equal(t, admitted, callers)
 }

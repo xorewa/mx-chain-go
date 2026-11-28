@@ -635,5 +635,11 @@ func builtInIdentifiers(function vmcommon.BuiltinFunction, input *vmcommon.Contr
 		// metachain ESDT system contract.
 		return nil, nil
 	}
+	if input.Function == LifecycleSealFunctionName {
+		// The replicated lifecycle seal: the function authenticates its sender,
+		// the metachain ESDT system contract, and requires the token to be a
+		// member of this shard's registry itself.
+		return nil, nil
+	}
 	return nil, fmt.Errorf("%w: %w: %s", vm.ErrDRWAExecution, errUnknownBuiltIn, input.Function)
 }

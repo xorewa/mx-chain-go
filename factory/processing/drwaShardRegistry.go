@@ -36,7 +36,13 @@ func (pcf *processComponentsFactory) installDRWAShardRegistry(
 	}
 	// The destination of protected admin legs classifies by this registry and
 	// lives in the same container.
-	_, err = pcf.installDRWAAdminEffects(accounts, builtIns, registry)
+	adminEffects, err := pcf.installDRWAAdminEffects(accounts, builtIns, registry)
+	if err != nil {
+		return nil, err
+	}
+	// The lifecycle seal of the shard: its replicated call, and the seal
+	// check of every protected admin leg.
+	_, err = pcf.installDRWALifecycleSeal(accounts, builtIns, adminEffects)
 	if err != nil {
 		return nil, err
 	}
