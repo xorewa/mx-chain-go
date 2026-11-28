@@ -1,0 +1,176 @@
+{
+  "tool": "github.com/rillig/gobco v1.3.4, commit 4c9ea04be46fdf4ee7d40f7bba782f83d0397731",
+  "observed": "GitHub run 46165030157 on 558fabe3ea6272a2e99c4333db6d3397cf26650d, both shards",
+  "packages": {
+    "./api/groups": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./api/logs": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./cmd/termui/presenter": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./common": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./common/statistics": [
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./dataRetriever/resolvers": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./factory/api": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./factory/consensus": [
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./factory/core": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./factory/processing": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./factory/state": [
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./genesis/parsing": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./node": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./ntp": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/block": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/block/preprocess": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/drwa": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/drwa/headertime": [
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/economics": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/factory/containers": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/interceptors": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/interceptors/processor": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/peer": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/smartContract/builtInFunctions": [
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/smartContract/hooks": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/sync": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/track": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./process/transaction": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./state": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./state/syncer": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./state/trackableDataTrie": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./statusHandler": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./storage/factory": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./storage/pruning": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ],
+    "./trie": [
+      "tool_error",
+      "compile_or_setup",
+      "missing_report"
+    ]
+  }
+}

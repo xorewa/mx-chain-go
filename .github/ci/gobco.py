@@ -83,8 +83,18 @@ def main():
     parser.add_argument("--binary", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--smoke", action="store_true", help="instrument/compile only")
+    parser.add_argument("--known-unmeasured", help="JSON record of packages the tool cannot measure")
     parser.add_argument("packages", nargs="+")
     args = parser.parse_args()
+    known = None
+    if args.known_unmeasured:
+        known = json.loads(pathlib.Path(args.known_unmeasured).read_text())["packages"]
+        for package, classes in known.items():
+            # Only a tool or compile/setup limit can be recorded: a test
+            # failure or an unclassified failure is never an expected state.
+            if (not isinstance(classes, list) or "missing_report" not in classes
+                    or not set(classes) <= {"tool_error", "compile_or_setup", "missing_report"}):
+                parser.error("not a recordable tool limit: " + package)
     output = pathlib.Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     results = []
@@ -119,7 +129,22 @@ def main():
         publish_report(output / "summary.json", results)
         print(json.dumps(results[-1]), flush=True)
     # Missing measurements remain visible as trial failure, never counted as zero/100%.
-    return int(any(r["exit"] != 0 or r["branches"] is None for r in results))
+    if known is None:
+        return int(any(r["exit"] != 0 or r["branches"] is None for r in results))
+    # With a record of the tool's known limits the trial fails on any
+    # difference from it: a package that newly cannot be measured, a recorded
+    # one that now can (the record must then shrink), or other evidence
+    # classes, a test failure among them. Recorded packages stay UNKNOWN in the
+    # summary; they are never counted as measured.
+    observed = {r["package"]: r["diagnostic"]["evidence_classes"] for r in results
+                if r["exit"] != 0 or r["branches"] is None}
+    expected = {package: known[package] for package in args.packages if package in known}
+    differences = sorted(package for package in set(observed) | set(expected)
+                         if observed.get(package) != expected.get(package))
+    publish_report(output / "known_unmeasured.json", {
+        "recorded": sorted(expected), "observed": sorted(observed), "differences": differences})
+    print(json.dumps({"known_unmeasured_differences": differences}), flush=True)
+    return int(bool(differences))
 
 
 if __name__ == "__main__":

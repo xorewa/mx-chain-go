@@ -1015,6 +1015,7 @@ jobs:
           unshare --user --map-root-user --net -- bash -euc \
             'ip link set lo up; exec "$@"' -- \
             python3 -B .github/ci/gobco.py --binary "$RUNNER_TEMP/gobco" \
+            --known-unmeasured .github/ci/gobco_known_unmeasured.json \
             --output gobco-results "${selected[@]}"
       - name: Upload branch trial reports including tool failures
         if: always() && steps.isolation-preflight.outcome == 'success'

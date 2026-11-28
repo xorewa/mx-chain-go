@@ -179,5 +179,82 @@ class GobcoReportingTests(unittest.TestCase):
             self.assertEqual((output / "0" / "stdout").read_bytes(), raw + b"Branch coverage: 1/2\n")
 
 
+class GobcoKnownUnmeasuredTests(unittest.TestCase):
+    """The record of the tool's limits turns the trial green only when the
+    run reproduces it exactly; every difference keeps the failure exit."""
+
+    LIMIT = ["tool_error", "compile_or_setup", "missing_report"]
+    PANIC = (b"panic: toy_test.go:3:4: undefined: toy.Exported\n"
+             b"main.compile()\n\t/tmp/gobco-source/toy.go:10 +0x0\n")
+
+    def run_trial(self, record, behaviour, packages=("./measured", "./limited")):
+        with tempfile.TemporaryDirectory() as folder:
+            output = pathlib.Path(folder) / "report"
+            known = pathlib.Path(folder) / "known.json"
+            known.write_text(json.dumps({"packages": record}))
+
+            def fake_run(argv, *, env, stdout, stderr):
+                kind = behaviour[argv[-1]]
+                if kind == "measured":
+                    stdout.write(b"Branch coverage: 1/2\n")
+                    return subprocess.CompletedProcess(argv, 0)
+                if kind == "limit":
+                    stderr.write(self.PANIC)
+                    return subprocess.CompletedProcess(argv, 2)
+                if kind == "named":
+                    stdout.write(b'{"Action":"fail","Package":"example.test/toy","Test":"TestDisplay"}\n')
+                    return subprocess.CompletedProcess(argv, 1)
+                return subprocess.CompletedProcess(argv, 1)
+
+            printed = io.StringIO()
+            with patch("sys.argv", ["gobco.py", "--binary", "/unused/gobco", "--known-unmeasured", str(known),
+                                    "--output", str(output), *packages]), \
+                    patch("gobco.subprocess.run", side_effect=fake_run), redirect_stdout(printed):
+                code = gobco.main()
+            summary = json.loads((output / "summary.json").read_text())
+            return code, summary, json.loads((output / "known_unmeasured.json").read_text())
+
+    def test_exact_record_succeeds_and_stays_unknown(self):
+        # A recorded package outside this shard's selection is not expected here.
+        record = {"./limited": self.LIMIT, "./other-shard": self.LIMIT}
+        code, summary, report = self.run_trial(record, {"./measured": "measured", "./limited": "limit"})
+        self.assertEqual(code, 0)
+        self.assertEqual(report, {"recorded": ["./limited"], "observed": ["./limited"], "differences": []})
+        self.assertEqual(summary[0]["status"], "measured")
+        self.assertTrue(summary[1]["status"].startswith("UNKNOWN"))
+        self.assertIsNone(summary[1]["branches"])
+
+    def test_every_difference_keeps_the_failure_exit(self):
+        limit = {"./limited": self.LIMIT}
+        rows = [
+            ("a package that newly cannot be measured", limit, {"./measured": "limit", "./limited": "limit"}, ["./measured"]),
+            ("a recorded package that now can be measured", limit, {"./measured": "measured", "./limited": "measured"}, ["./limited"]),
+            ("a test failure in a recorded package", limit, {"./measured": "measured", "./limited": "named"}, ["./limited"]),
+            ("a test failure in a measured package", limit, {"./measured": "named", "./limited": "limit"}, ["./measured"]),
+            ("an unclassified failure in a recorded package", limit, {"./measured": "measured", "./limited": "other"}, ["./limited"]),
+            ("an empty record", {}, {"./measured": "measured", "./limited": "limit"}, ["./limited"]),
+        ]
+        for desc, record, behaviour, differences in rows:
+            with self.subTest(desc=desc):
+                code, _, report = self.run_trial(record, behaviour)
+                self.assertEqual(code, 1)
+                self.assertEqual(report["differences"], differences)
+
+    def test_only_a_tool_limit_can_be_recorded(self):
+        for classes in (["named_test_failure", "missing_report"], ["unknown_failure", "missing_report"],
+                        ["tool_error"], [], "tool_error"):
+            with self.subTest(classes=classes):
+                with self.assertRaises(SystemExit):
+                    self.run_trial({"./limited": classes}, {"./measured": "measured", "./limited": "limit"})
+
+    def test_the_committed_record_is_recordable(self):
+        record = json.loads((pathlib.Path(gobco.__file__).parent / "gobco_known_unmeasured.json").read_text())
+        self.assertEqual(len(record["packages"]), 35)
+        for package, classes in record["packages"].items():
+            self.assertTrue(package.startswith("./"), package)
+            self.assertIn("missing_report", classes)
+            self.assertLessEqual(set(classes), {"tool_error", "compile_or_setup", "missing_report"})
+
+
 if __name__ == "__main__":
     unittest.main()
